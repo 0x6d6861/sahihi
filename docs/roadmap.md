@@ -58,7 +58,7 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
 - [x] Finalize job: verify original hash → stamp → provider seal → store signed.pdf → certificate.pdf → notify
 - [x] `renderCertificate` with hashes, signers, events, chain head, QR code
 - [x] Verify API (by code, by hash) + `/verify/[code]` page
-- [ ] "Drop a PDF to verify" on `/verify`: Extend `FileUpload`, hash in the browser (Web Crypto), `POST /api/verify/hash`
+- [x] "Drop a PDF to verify" on `/verify`: Extend `FileUpload`, hash in the browser (Web Crypto), `POST /api/verify/hash`
 - [ ] Downloads on envelope detail + signer "completed" state
 - [ ] Unicode font embedding (Noto Sans via `@pdf-lib/fontkit`) for non-Latin text fields
 
