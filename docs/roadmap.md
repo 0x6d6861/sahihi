@@ -65,7 +65,7 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
 ## P5: Hardening & SaaS
 
 - [x] Role-based permissions via organization access control (`docs/auth.md` → Roles)
-- [ ] Members & invitations settings page
+- [x] Members & invitations settings page
 - [ ] Cross-tenant integration test over every route; DB role without UPDATE/DELETE on AuditEvent
 - [ ] CSP headers; security review of `/sign` and `/verify`
 - [ ] Templates (reusable recipients + field layouts)

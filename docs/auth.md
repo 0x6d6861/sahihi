@@ -101,10 +101,44 @@ in the route, and add a case to `permissions.test.ts` and `apps/api/test/permiss
 Static roles need no schema change. Dynamic (per-org custom) roles would need better-auth's
 `dynamicAccessControl` and `bun run auth:schema`.
 
+## Members & invitations
+
+`/settings/members` (nav "Members", `app/(app)/settings/members/page.tsx`) loads
+`GET /api/auth/organization/get-full-organization` for the active org. It has two tabs:
+
+- **Members:** role `Select` and Remove (`AlertDialog`) → `organization.updateMemberRole` /
+  `organization.removeMember`.
+- **Invitations:** pending and expired invitations, with Resend (`inviteMember({ resend: true })`, which
+  resets the 48 h expiry) and Cancel (`cancelInvitation`).
+- **Invite member** dialog: `InviteMemberSchema` (email trimmed and lowercased, role) →
+  `organization.inviteMember`. better-auth enqueues `auth.org-invitation`, which links to
+  `/accept-invitation/<id>`. Server errors ("already a member", "already invited") show on the email
+  field.
+
+better-auth owns these endpoints and enforces them. The page only offers what it will accept, using
+pure helpers in `packages/core/src/members.ts`:
+
+| Rule | Helper |
+|---|---|
+| Invite: `invitation:create`; only owners invite owners | `invitableRoles(role)` |
+| Cancel: `invitation:cancel` | `canCancelInvitations(role)` |
+| Change role: `member:update`; only owners touch owners or assign owner; the last owner can't be demoted | `memberActions(viewer, target, ownerCount).assignableRoles` |
+| Remove: `member:delete`; same owner rules; not yourself; never the last owner | `memberActions(…).canRemove` |
+| better-auth keeps `status: "pending"` after expiry | `invitationState()` → `expired` |
+
+`apps/api/test/members.itest.ts` runs every viewer × target × action against better-auth itself, so
+an upgrade that changes its rules fails there instead of showing buttons that error.
+
+Removing a member doesn't touch their documents or envelopes: they belong to the org, and signing
+continues. After removal, only admins and owners can change those envelopes (the `manage-any` rule).
+
 ## Web flows
 
 - `/sign-up` → verification email → `/onboarding` (create org, set active) → `/documents`
-- `/sign-in?next=…` → back to `next`
+- `/sign-in?next=…` → back to `next`. New sessions start with the user's **first workspace active**
+  (`databaseHooks.session.create.before` in `auth.ts`, by earliest `Member.createdAt`). Without it,
+  every sign-in of an existing member landed on `/onboarding` and could create a duplicate
+  workspace. Users with no membership still get `/onboarding`.
 - `/accept-invitation/[id]` → `organization.acceptInvitation`
 - Workspace switcher (sidebar header, `components/app/app-shell/org-switcher.tsx`): lists
   `GET /api/auth/organization/list` (only the user's memberships). Choosing one calls

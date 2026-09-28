@@ -1,6 +1,6 @@
 "use client"
 
-import { FileTextIcon, SendIcon } from "lucide-react"
+import { FileTextIcon, SendIcon, UsersIcon } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Separator } from "@/components/ui/separator"
@@ -26,6 +26,7 @@ import { type ShellUser, UserMenu } from "./user-menu"
 const NAV_ICONS: Record<AppNavHref, React.ComponentType<{ "aria-hidden"?: boolean }>> = {
   "/documents": FileTextIcon,
   "/envelopes": SendIcon,
+  "/settings/members": UsersIcon,
 }
 
 /** Authenticated app shell: coss Sidebar (sheet on mobile) + inset content area. */

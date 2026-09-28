@@ -47,6 +47,26 @@ export const auth = betterAuth({
     },
   },
 
+  databaseHooks: {
+    session: {
+      create: {
+        // New sessions start with no active org. Without this, every sign-in of an existing member
+        // (owners and invitees alike) would land on /onboarding and create a duplicate workspace.
+        // Their first workspace is active; the switcher changes it.
+        before: async (session) => {
+          const member = await prisma.member.findFirst({
+            where: { userId: session.userId },
+            orderBy: { createdAt: "asc" },
+            select: { organizationId: true },
+          })
+          return {
+            data: { ...session, activeOrganizationId: member?.organizationId ?? null },
+          }
+        },
+      },
+    },
+  },
+
   plugins: [
     organization({
       // Every user can create their own workspace on sign-up
