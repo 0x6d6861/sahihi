@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { SubmitSigningSchema } from "@sahihi/core"
+import { CONSENT_VERSION, SubmitSigningSchema } from "@sahihi/core"
 import {
   autoFieldPreview,
   buildSubmitValues,
@@ -90,7 +90,10 @@ describe("buildSubmitValues", () => {
       { kind: "checkbox", fieldId: "box", checked: true },
       { kind: "image", fieldId: "sig1", dataUrl: PNG },
     ])
-    expect(SubmitSigningSchema.safeParse({ consent: true, values: out }).success).toBe(true)
+    expect(
+      SubmitSigningSchema.safeParse({ consent: true, consentVersion: CONSENT_VERSION, values: out })
+        .success,
+    ).toBe(true)
   })
 })
 

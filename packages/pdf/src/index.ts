@@ -1,4 +1,5 @@
 export * from "./certificate"
+export { embedUnicodeFont, embedUnicodeFonts, type UnicodeFonts, type UnicodeWeight } from "./fonts"
 export * from "./inspect"
 export * from "./stamp"
-export { fitFontSize, sanitizeForFont, wrapText } from "./text"
+export { fitFontSize, needsShaping, sanitizeForFont, wrapText } from "./text"

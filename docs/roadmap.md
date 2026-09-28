@@ -60,7 +60,7 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
 - [x] Verify API (by code, by hash) + `/verify/[code]` page
 - [x] "Drop a PDF to verify" on `/verify`: Extend `FileUpload`, hash in the browser (Web Crypto), `POST /api/verify/hash`
 - [x] Downloads on envelope detail + signer "completed" state
-- [ ] Unicode font embedding (Noto Sans via `@pdf-lib/fontkit`) for non-Latin text fields
+- [x] Unicode font embedding (Noto Sans via `@pdf-lib/fontkit`) for non-Latin text fields
 
 ## P5: Hardening & SaaS
 

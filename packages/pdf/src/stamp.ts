@@ -7,7 +7,8 @@ import {
   type PageBox,
   toPdfPlacement,
 } from "@sahihi/core"
-import { degrees, PDFDocument, rgb, StandardFonts } from "pdf-lib"
+import { degrees, PDFDocument, rgb } from "pdf-lib"
+import { embedUnicodeFont } from "./fonts"
 import { fitFontSize, sanitizeForFont } from "./text"
 
 export type StampValue =
@@ -40,7 +41,8 @@ export async function stampFields(
   opts: StampOptions = {},
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.load(original)
-  const font = await doc.embedFont(StandardFonts.Helvetica)
+  // Noto Sans, not Helvetica: names and text in any Latin, Greek or Cyrillic language stamp as typed.
+  const font = await embedUnicodeFont(doc, "regular")
   const pages = doc.getPages()
   const imageCache = new Map<Uint8Array, Awaited<ReturnType<typeof doc.embedPng>>>()
 
@@ -119,11 +121,14 @@ export async function stampFields(
     }
   }
 
-  // Prevent post-signing edits to interactive fields
-  try {
-    doc.getForm().flatten()
-  } catch {
-    // Some malformed forms can't be flattened; the stamped content is still correct.
+  // Prevent post-signing edits to interactive fields. Only when the PDF has a form: getForm()
+  // would otherwise create an empty AcroForm and embed an unused Helvetica.
+  if (doc.catalog.getAcroForm()) {
+    try {
+      doc.getForm().flatten()
+    } catch {
+      // Some malformed forms can't be flattened; the stamped content is still correct.
+    }
   }
 
   if (opts.title) doc.setTitle(opts.title)
