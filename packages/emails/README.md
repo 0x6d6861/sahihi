@@ -32,6 +32,10 @@ This opens the React Email preview server, with every template rendered from its
 and hot reload. Its Compatibility tab checks client support. To see an email exactly as sent,
 trigger it in the app and open Mailpit (http://localhost:8025).
 
+The package script is called `preview`, not `dev`, on purpose. `bun run dev` runs every workspace's
+`dev` script in dependency order. The worker depends on this package, so a long-running `dev` here
+would keep the worker from ever starting.
+
 ## Adding an email
 
 1. Add `src/templates/<name>.tsx`, following the other templates:

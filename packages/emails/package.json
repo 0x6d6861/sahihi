@@ -8,7 +8,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "dev": "email dev --dir src/templates --port 3030",
+    "preview": "email dev --dir src/templates --port 3030",
     "typecheck": "tsc -p .",
     "test": "bun test"
   },
