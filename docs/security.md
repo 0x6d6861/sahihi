@@ -108,6 +108,9 @@ viewer's worker and wasm needs are known (roadmap P5). HTTPS everywhere in produ
 - [ ] Behind `requireOrg` (sender) or `withSigner` + `rateLimit` (public)
 - [ ] Body validated with a zod schema via `parseJson`
 - [ ] Tenant-scoped lookups (`forOrganization`), and 404 for anything out of scope
+- [ ] Role checked after the lookup: `assertCanManageEnvelope` / `assertCanDeleteDocument`
+      (`apps/api/src/lib/permissions.ts`), or `hasPermission` from `@sahihi/core` for new actions.
+      403 `forbidden` only for rows the caller's org owns, so other orgs still get a 404
 - [ ] State change via `assertTransition` + `appendAuditEvent` in the same transaction
 - [ ] Jobs enqueued after commit, IDs only
 - [ ] Response contains no token hashes, OTP hashes or other recipients' PII

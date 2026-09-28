@@ -23,6 +23,7 @@ import {
 } from "@/components/app/envelope/sender-actions"
 import { FieldEditor } from "@/components/app/field-editor/field-editor"
 import { RecipientsEditor } from "@/components/app/recipients-editor/recipients-editor"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import {
   Breadcrumb,
@@ -87,13 +88,17 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
   const { id } = await params
   const path = `/envelopes/${encodeURIComponent(id)}`
   const [{ status, data }, audit] = await Promise.all([
-    apiServer<{ envelope: EnvelopeDetail }>(path),
+    apiServer<{ envelope: EnvelopeDetail; permissions: { manage: boolean } }>(path),
     apiServer<{ events: AuditEventRow[]; verification: ChainVerification }>(`${path}/audit`),
   ])
   if (status === 404 || !data) notFound()
   const e = data.envelope
   const badge = ENVELOPE_STATUS_BADGE[e.status]
-  const draft = e.status === "DRAFT"
+  // Members change only envelopes they created; owners and admins change any (docs/auth.md).
+  const canManage = data.permissions.manage
+  /** Editable draft: the field and recipient editors. Everyone else gets the read-only views. */
+  const draft = e.status === "DRAFT" && canManage
+  const open = e.status === "DRAFT" || e.status === "SENT" || e.status === "IN_PROGRESS"
   const sequential = e.signingOrder === "SEQUENTIAL"
   // The original PDF (presigned, short-lived): field editor while drafting, viewer afterwards.
   const file = await apiServer<{ url: string }>(
@@ -113,7 +118,7 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
           {e.document.pageCount} {e.document.pageCount === 1 ? "page" : "pages"}
           {draft
             ? " · Pick a field type, then click or drag on a page."
-            : ` · ${e.fields.length} fields · the original, as sent for signing`}
+            : ` · ${e.fields.length} fields · ${e.status === "DRAFT" ? "not sent yet" : "the original, as sent for signing"}`}
         </CardDescription>
       </CardHeader>
       <CardPanel>
@@ -189,6 +194,7 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
                       envelopeId={e.id}
                       envelopeStatus={e.status}
                       recipient={r}
+                      canRemind={canManage}
                     />
                   </TableCell>
                 </TableRow>
@@ -257,6 +263,7 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
             {heading}
             <EnvelopeHeaderActions
               envelopeId={e.id}
+              canVoid={canManage}
               summary={{
                 title: e.title,
                 status: e.status,
@@ -265,6 +272,16 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
               }}
             />
           </div>
+        )}
+
+        {!canManage && open && (
+          <Alert variant="info">
+            <AlertTitle>View only</AlertTitle>
+            <AlertDescription>
+              Only the member who created this envelope, an admin or the owner can edit, send,
+              remind or void it.
+            </AlertDescription>
+          </Alert>
         )}
 
         {e.status === "COMPLETED" && (

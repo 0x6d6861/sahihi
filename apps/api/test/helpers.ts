@@ -69,6 +69,23 @@ export async function createSender(
   return { userId: user.id, organizationId, cookie }
 }
 
+/** A new signed-in user who joins `org`'s organization with `role` and makes it active. */
+export async function joinOrganization(
+  org: Sender,
+  label: string,
+  role: "owner" | "admin" | "member",
+): Promise<Sender> {
+  const user = await createSender(label, { withOrganization: false })
+  await auth.api.addMember({
+    body: { userId: user.userId, organizationId: org.organizationId, role },
+  })
+  await auth.api.setActiveOrganization({
+    body: { organizationId: org.organizationId },
+    headers: new Headers({ cookie: user.cookie }),
+  })
+  return { ...user, organizationId: org.organizationId }
+}
+
 /** `app.request` as a sender. `json` sets the body and Content-Type. */
 export function request(
   sender: Sender | null,

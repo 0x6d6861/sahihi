@@ -1,6 +1,7 @@
 import {
   assertTransition,
   CreateEnvelopeSchema,
+  canManageEnvelope,
   downloadFileName,
   isEditable,
   ReplaceFieldsSchema,
@@ -15,6 +16,7 @@ import { getQueues, presignDownload } from "@sahihi/infra"
 import { Hono } from "hono"
 import type { AppEnv } from "../lib/env"
 import { badRequest, clientMeta, conflict, notFound, parseJson } from "../lib/http"
+import { actor, assertCanManageEnvelope } from "../lib/permissions"
 import { requireOrg } from "../middleware/session"
 import { activateNextRecipients, rotateRecipientLink } from "../services/routing"
 
@@ -101,7 +103,7 @@ export const envelopes = new Hono<AppEnv>()
       },
     })
     if (!envelope) notFound("Envelope")
-    return c.json({ envelope })
+    return c.json({ envelope, permissions: { manage: canManageEnvelope(actor(c), envelope) } })
   })
 
   /** Replace the recipient list (draft only). Removed recipients lose their fields. */
@@ -113,6 +115,7 @@ export const envelopes = new Hono<AppEnv>()
       include: { recipients: { select: { id: true } } },
     })
     if (!envelope) notFound("Envelope")
+    assertCanManageEnvelope(c, envelope)
     if (!isEditable(envelope.status)) conflict("Only draft envelopes can be edited")
 
     const emails = recipients.map((r) => r.email)
@@ -158,6 +161,7 @@ export const envelopes = new Hono<AppEnv>()
       },
     })
     if (!envelope) notFound("Envelope")
+    assertCanManageEnvelope(c, envelope)
     if (!isEditable(envelope.status)) conflict("Only draft envelopes can be edited")
 
     const owners = new Map(envelope.recipients.map((r) => [r.id, r.role]))
@@ -196,6 +200,7 @@ export const envelopes = new Hono<AppEnv>()
       include: { recipients: true, fields: { select: { recipientId: true, type: true } } },
     })
     if (!envelope) notFound("Envelope")
+    assertCanManageEnvelope(c, envelope)
     assertTransition(envelope.status, "SENT")
 
     // ── Pre-flight validation (docs/signing-flow.md → Sending) ──
@@ -231,6 +236,7 @@ export const envelopes = new Hono<AppEnv>()
       where: scope.envelope({ id: c.req.param("id") }),
     })
     if (!envelope) notFound("Envelope")
+    assertCanManageEnvelope(c, envelope)
     assertTransition(envelope.status, "VOIDED")
 
     await prisma.$transaction(async (tx) => {
@@ -262,9 +268,10 @@ export const envelopes = new Hono<AppEnv>()
         id: c.req.param("recipientId"),
         envelope: scope.envelope({ id: c.req.param("id") }),
       },
-      include: { envelope: { select: { status: true } } },
+      include: { envelope: { select: { status: true, createdById: true } } },
     })
     if (!recipient) notFound("Recipient")
+    assertCanManageEnvelope(c, recipient.envelope)
     // Same rules the UI uses to enable "Send reminder" (throttled: it emails and rotates the link).
     const availability = reminderAvailability(recipient, recipient.envelope.status)
     if (!availability.ok) {

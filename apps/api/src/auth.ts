@@ -1,4 +1,5 @@
 import { getEnv } from "@sahihi/config"
+import { orgAc, orgRoles } from "@sahihi/core"
 import { prisma } from "@sahihi/db"
 import { getQueues } from "@sahihi/infra"
 import { betterAuth } from "better-auth"
@@ -50,6 +51,9 @@ export const auth = betterAuth({
     organization({
       // Every user can create their own workspace on sign-up
       allowUserToCreateOrganization: true,
+      // Roles and permissions shared with our routes and the web client (docs/auth.md → Roles)
+      ac: orgAc,
+      roles: orgRoles,
       sendInvitationEmail: async (data) => {
         await getQueues().notifications.add("auth.org-invitation", {
           email: data.email,

@@ -42,6 +42,13 @@ export function conflict(message: string): never {
   throw new HTTPException(409, { message })
 }
 
+/** 403 for a member whose role doesn't allow the action (docs/auth.md → Roles). */
+export function forbidden(message: string): never {
+  throw new HTTPException(403, {
+    res: Response.json({ error: "forbidden", message }, { status: 403 }),
+  })
+}
+
 export function badRequest(message: string): never {
   throw new HTTPException(400, { message })
 }
