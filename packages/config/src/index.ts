@@ -35,6 +35,12 @@ const EnvSchema = z.object({
   AT_API_KEY: z.string().optional(),
   AT_SENDER_ID: z.string().optional(),
 
+  /**
+   * Proxies in front of the API that append to X-Forwarded-For (docs/security.md → Rate limiting).
+   * Railway's edge = 1 (the web's /api rewrite passes the header through unchanged). 0 = trust none.
+   */
+  TRUSTED_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(1),
+
   SIGNING_LINK_TTL_DAYS: z.coerce.number().int().positive().default(14),
   SIGNING_PROVIDER: z.enum(["internal", "ca"]).default("internal"),
 })

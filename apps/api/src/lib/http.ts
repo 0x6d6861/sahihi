@@ -1,3 +1,5 @@
+import { getEnv } from "@sahihi/config"
+import { clientIpFromForwarded } from "@sahihi/core"
 import type { Context } from "hono"
 import { HTTPException } from "hono/http-exception"
 import type { z } from "zod"
@@ -53,11 +55,14 @@ export function badRequest(message: string): never {
   throw new HTTPException(400, { message })
 }
 
-/** Client metadata recorded in the audit trail. */
+/**
+ * Client metadata for the audit trail and rate limits. The IP comes only from the
+ * X-Forwarded-For entries our own proxies appended (`TRUSTED_PROXY_HOPS`), never from the
+ * client-controlled left side or X-Real-IP.
+ */
 export function clientMeta(c: Context) {
-  const forwarded = c.req.header("x-forwarded-for")?.split(",")[0]?.trim()
   return {
-    ipAddress: forwarded || c.req.header("x-real-ip") || null,
+    ipAddress: clientIpFromForwarded(c.req.header("x-forwarded-for"), getEnv().TRUSTED_PROXY_HOPS),
     userAgent: c.req.header("user-agent")?.slice(0, 500) ?? null,
   }
 }

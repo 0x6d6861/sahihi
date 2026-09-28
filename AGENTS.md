@@ -119,7 +119,8 @@ the relevant doc in `docs/` is updated if behaviour changed, and the matching ch
 13. Validate every request body with a zod schema from `@sahihi/core/schemas` via `parseJson()`.
     Shared schemas live in core so web forms and the API agree.
 14. Env vars: add them to `packages/config/src/index.ts` **and** `.env.example`. Never read
-    `process.env` elsewhere, with two exceptions: `apps/web` for `API_URL`, and
+    `process.env` elsewhere, with two exceptions: `apps/web` for `API_URL`, `STORAGE_ORIGIN` and
+    `NODE_ENV`, and
     `packages/db/prisma.config.ts` for `MIGRATE_DATABASE_URL` / `DATABASE_URL`.
 15. Prisma enums must mirror the unions in `packages/core/src/enums.ts`. `packages/db/src/enums.test.ts`
     enforces this, so update both.

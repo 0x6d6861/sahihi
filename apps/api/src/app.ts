@@ -28,6 +28,11 @@ export function createApp() {
     )
     // Signature PNGs are the largest bodies (~500 KB each)
     .use("/api/*", bodyLimit({ maxSize: 8 * 1024 * 1024 }))
+    // Responses carry PII, presigned URLs and session data: no browser, proxy or CDN may store them.
+    .use("/api/*", async (c, next) => {
+      await next()
+      if (!c.res.headers.has("Cache-Control")) c.res.headers.set("Cache-Control", "no-store")
+    })
 
     .get("/health", (c) => c.json({ ok: true }))
     .on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw))

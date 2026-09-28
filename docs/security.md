@@ -40,6 +40,9 @@ tenants must never see each other's data.**
 
 - 6 digits drawn by rejection sampling (no modulo bias), stored as `sha256("otp:"+recipientId+":"+code)`.
 - 10-minute TTL, 5 attempts per code, 5 sends per 15 minutes per token, constant-time comparison.
+- Attempts are claimed atomically (`updateMany … attempts < 5 → increment`) **before** comparing.
+  Read-then-increment let parallel requests all see the same count: 20 concurrent guesses got 15
+  through instead of 5. `signing-otp.itest.ts` covers the lockout and the parallel case.
 - On success, a signed httpOnly cookie (HMAC keyed from `BETTER_AUTH_SECRET`) scoped to `/api/sign`
   for 30 minutes and bound to the recipient id.
 
@@ -53,8 +56,19 @@ tenants must never see each other's data.**
 | `/api/sign/:token/otp` | 5 / 15 min / token |
 | `/api/verify/*` | 30 / min / IP |
 
-better-auth applies its own limits to `/api/auth/*`. Behind Railway's proxy, `x-forwarded-for[0]`
-is the client IP. If you add another proxy hop, revisit `clientMeta()`.
+better-auth applies its own limits to `/api/auth/*`.
+
+**Client IP** (rate-limit key and the audit trail's `ipAddress`): `clientMeta()` →
+`clientIpFromForwarded()` (`@sahihi/core`) takes the `X-Forwarded-For` entry **`TRUSTED_PROXY_HOPS`
+from the right**. That's the one our own proxy appended. The left side is whatever the client sent;
+trusting it (as before) let anyone pick their own rate-limit bucket and forge the IP in the evidence.
+`X-Real-IP` is ignored.
+- Railway: `TRUSTED_PROXY_HOPS=1`. The edge appends the client, and the web's `/api` rewrite passes
+  the header through unchanged (checked in dev: Next adds nothing).
+- Add one per extra proxy that appends (e.g. a CDN in front, or the web calling the API through a
+  public domain).
+- No usable entry → `null`: one shared "unknown" bucket and no IP recorded, never a forged one.
+- `client-ip.itest.ts` checks that forged entries don't pick the bucket.
 
 ## Audit trail integrity
 
@@ -121,9 +135,39 @@ is the client IP. If you add another proxy hop, revisit `clientMeta()`.
 
 ## Headers & transport
 
-`secureHeaders()` on the API. Next sets its own headers, and a CSP should be added once the Extend
-viewer's worker and wasm needs are known (roadmap P5). HTTPS everywhere in production. Cookies are
-`Secure` when `NODE_ENV=production`.
+- **API:** `secureHeaders()`, and `Cache-Control: no-store` on every `/api/*` response (PII,
+  presigned URLs, sessions) unless a handler sets its own.
+- **Web, every page:** a **Content Security Policy** with a per-request nonce, built by
+  `lib/csp.ts#buildCsp` in `proxy.ts` (ADR 0011):
+  - `script-src 'self' 'nonce-…' 'strict-dynamic' 'wasm-unsafe-eval'`. No inline scripts, inline
+    handlers or `javascript:` URLs; pdfium may compile wasm; React's `'unsafe-eval'` in dev only.
+  - `style-src 'self' 'unsafe-inline'`, because Base UI and Extend set inline `style` attributes.
+  - `connect-src 'self' https://cdn.jsdelivr.net <STORAGE_ORIGIN>`: the PDF engine's wasm and
+    fallback fonts, and presigned upload/download URLs. `img-src` adds `blob: data:` and storage;
+    `worker-src 'self' blob:`.
+  - `frame-ancestors 'none'` (no clickjacking of Sign/Send/Void), `object-src 'none'`,
+    `base-uri 'self'`, `form-action 'self'`, and `upgrade-insecure-requests` outside dev.
+  - Next only puts nonces on dynamically rendered pages, so the root layout calls `connection()`.
+  - `STORAGE_ORIGIN` (web env) is the S3 origin of presigned URLs. It defaults to local MinIO in dev,
+    and `next.config.ts` refuses to build or start production without it.
+- **Web baseline** (`next.config.ts`): `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy: strict-origin-when-cross-origin` (`/sign/*`: `no-referrer`, `noindex`),
+  `Permissions-Policy` (no camera, mic, geolocation or payment), HSTS, no `X-Powered-By`.
+- Checked in a browser (signing page, field editor, `/verify`): zero violations, the PDF engine renders,
+  and injected inline handlers and `javascript:` links are blocked.
+- HTTPS everywhere in production. Cookies are `Secure` when `NODE_ENV=production`.
+
+### Review of `/sign` and `/verify` (2026-09-28)
+
+| Finding | Status |
+|---|---|
+| Rate limits and audit IPs came from the client-controlled left of `X-Forwarded-For` | Fixed (`TRUSTED_PROXY_HOPS`) |
+| OTP attempt cap bypassable with parallel requests | Fixed (atomic claim) |
+| `/api/sign` responses (PII, presigned URLs) cacheable | Fixed (`no-store` on `/api/*`) |
+| Signing page could be framed (clickjacking) | Fixed (`frame-ancestors 'none'`) |
+| No CSP | Fixed (above) |
+| pdfium wasm and fallback fonts load from jsdelivr at runtime, without integrity checks, on the signing page | Open: self-host them (changes vendored `lib/pdf-thumbnail-utils.ts`, needs an ADR) |
+| Token format checked before lookup, only hashes stored, 404 without detail, signer PII masked until OTP, `/verify` masks emails and `/verify/hash` never matches originals | OK |
 
 ## Checklist for any new route
 

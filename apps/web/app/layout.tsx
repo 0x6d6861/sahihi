@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import "./globals.css"
 import { Geist_Mono, Inter } from "next/font/google"
+import { connection } from "next/server"
 import { AnchoredToastProvider, ToastProvider } from "@/components/ui/toast"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
@@ -16,7 +17,10 @@ export const metadata: Metadata = {
   description: "Send documents for electronic signature",
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Every page renders per request so Next can put proxy.ts's CSP nonce on its scripts. A
+  // prerendered page would ship scripts without it, and the CSP would block them.
+  await connection()
   return (
     <html
       lang="en"

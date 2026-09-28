@@ -30,4 +30,13 @@ describe("api smoke", () => {
     const res = await createApp().request("/api/documents")
     expect(res.status).toBe(401)
   })
+
+  test("API responses are never cacheable (PII, presigned URLs, sessions)", async () => {
+    const { createApp } = await import("./app")
+    const app = createApp()
+    for (const path of ["/api/documents", "/api/envelopes/x"]) {
+      const res = await app.request(path)
+      expect({ path, cache: res.headers.get("cache-control") }).toEqual({ path, cache: "no-store" })
+    }
+  })
 })

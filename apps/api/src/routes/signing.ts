@@ -251,15 +251,19 @@ export const signing = new Hono<SigningEnv>()
       orderBy: { createdAt: "desc" },
     })
     if (!otp) badRequest("Code expired — request a new one")
-    if (otp.attempts >= OTP_MAX_ATTEMPTS)
-      throw new HTTPException(429, { message: "Too many attempts" })
+    // Claim one attempt atomically BEFORE comparing. A read-then-increment would let parallel
+    // requests all see the same count and guess far more than OTP_MAX_ATTEMPTS times.
+    const claimed = await prisma.recipientOtp.updateMany({
+      where: { id: otp.id, consumedAt: null, attempts: { lt: OTP_MAX_ATTEMPTS } },
+      data: { attempts: { increment: 1 } },
+    })
+    if (claimed.count === 0) throw new HTTPException(429, { message: "Too many attempts" })
 
     const ok = timingSafeEqual(otp.codeHash, await hashOtp(s.id, code))
     await prisma.$transaction(async (tx) => {
-      await tx.recipientOtp.update({
-        where: { id: otp.id },
-        data: ok ? { consumedAt: new Date() } : { attempts: { increment: 1 } },
-      })
+      if (ok) {
+        await tx.recipientOtp.update({ where: { id: otp.id }, data: { consumedAt: new Date() } })
+      }
       await appendAuditEvent(tx, {
         envelopeId: s.envelopeId,
         type: ok ? "recipient.otp_verified" : "recipient.otp_failed",
