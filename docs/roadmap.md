@@ -66,7 +66,7 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
 
 - [x] Role-based permissions via organization access control (`docs/auth.md` → Roles)
 - [x] Members & invitations settings page
-- [ ] Cross-tenant integration test over every route; DB role without UPDATE/DELETE on AuditEvent
+- [x] Cross-tenant integration test over every route; DB role without UPDATE/DELETE on AuditEvent
 - [ ] CSP headers; security review of `/sign` and `/verify`
 - [ ] Templates (reusable recipients + field layouts)
 - [ ] Webhooks per org (envelope.completed, …) with signed payloads

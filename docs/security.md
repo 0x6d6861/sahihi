@@ -17,8 +17,12 @@ tenants must never see each other's data.**
   scope, and always filtered by that parent's id.
 - Never use `findUnique({ where: { id } })` on a tenant model in an authenticated route.
 - S3 keys are prefixed `org/{orgId}/…`, but authorization comes from the DB lookup, not from the key.
-- Planned (roadmap P5): an integration test that creates two orgs and hits every route cross-tenant,
-  plus Postgres row-level security as defence in depth.
+- `apps/api/test/tenant-isolation.itest.ts` calls **every** tenant route as the owner of another
+  org, with a valid body and the first org's ids. Each must return 404, lists must not include the
+  first org's rows, and a snapshot of its documents, envelopes, recipients, fields and audit events
+  must be unchanged. The test also checks that every route in `app.routes` is classified (tenant,
+  list, or not tenant-scoped with a reason), so a new route without a cross-tenant case fails CI.
+- Planned: Postgres row-level security as defence in depth.
 
 ## Signing tokens
 
@@ -60,8 +64,26 @@ is the client IP. If you add another proxy hop, revisit `clientMeta()`.
   deletions and reordering. `GET /api/envelopes/:id/audit` returns `verification`.
 - The chain head hash is printed on the certificate, so a later rewrite of the log is detectable
   against the PDF.
-- Hardening (roadmap P5): a DB role for the app without `UPDATE`/`DELETE` on `AuditEvent`, and
-  periodic anchoring of chain heads (e.g. to an RFC 3161 timestamp authority).
+- **Append-only in the database** (migration `20260928180000_audit_append_only`, ADR 0010):
+  - The api and worker connect as a login role in the group role **`sahihi_app`**. It has
+    SELECT/INSERT/UPDATE/DELETE on every table, except no UPDATE, DELETE or TRUNCATE on
+    `AuditEvent`, and nothing on `_prisma_migrations`. Default privileges extend this to tables that
+    later migrations create.
+  - A `BEFORE UPDATE` trigger (`AuditEvent_no_update`) refuses updates from **anyone**, the owner
+    included.
+  - `AuditEvent.recipientId` is `ON DELETE NO ACTION`, so audit rows are never rewritten by
+    `SET NULL`, and a recipient with audit events can't be deleted on its own.
+  - Deleting a whole organization still cascades through its envelopes and their audit events
+    (FK actions run as the table owner). Retention and deletion rules are a separate roadmap item.
+  - `apps/api/test/audit-append-only.itest.ts` checks all of the above with `SET LOCAL ROLE sahihi_app`.
+- Setting up an environment (once per database cluster; the migration creates `sahihi_app`):
+  ```sql
+  CREATE ROLE sahihi_api LOGIN PASSWORD '…' IN ROLE sahihi_app;
+  ```
+  Then set `DATABASE_URL` (api, worker) to `sahihi_api`, and `MIGRATE_DATABASE_URL` (used by
+  `prisma migrate deploy`, see `packages/db/prisma.config.ts`) to the owner. Locally both are the
+  `sahihi` superuser, so the restrictions are only exercised by the integration test.
+- Planned: periodic anchoring of chain heads (e.g. to an RFC 3161 timestamp authority).
 
 ## Documents
 

@@ -102,8 +102,8 @@ the relevant doc in `docs/` is updated if behaviour changed, and the matching ch
 6. **State changes go through `assertTransition()`** (`packages/core/src/envelope-state.ts`). No other
    code may decide whether a status change is legal.
 7. **Audit:** every state change writes an audit event with `appendAuditEvent(tx, …)` **inside the
-   same `prisma.$transaction`**. Never update or delete `AuditEvent` rows. New event types go in
-   `AUDIT_EVENT_TYPES`.
+   same `prisma.$transaction`**. Never update or delete `AuditEvent` rows (the database refuses:
+   the `sahihi_app` role and an update trigger, ADR 0010). New event types go in `AUDIT_EVENT_TYPES`.
 8. **Secrets:** raw signing tokens and OTP codes are never stored or logged. Store only hashes
    (`hashSigningToken`, `hashOtp`). A raw token exists only in a notification job payload and the email.
 9. **The server owns final PDFs:** the browser submits field values only. Stamping, flattening and
@@ -120,7 +120,7 @@ the relevant doc in `docs/` is updated if behaviour changed, and the matching ch
     Shared schemas live in core so web forms and the API agree.
 14. Env vars: add them to `packages/config/src/index.ts` **and** `.env.example`. Never read
     `process.env` elsewhere, with two exceptions: `apps/web` for `API_URL`, and
-    `packages/db/prisma.config.ts` for `DATABASE_URL`.
+    `packages/db/prisma.config.ts` for `MIGRATE_DATABASE_URL` / `DATABASE_URL`.
 15. Prisma enums must mirror the unions in `packages/core/src/enums.ts`. `packages/db/src/enums.test.ts`
     enforces this, so update both.
 16. When you change better-auth plugins, run `bun run auth:schema` and reconcile section 1 of

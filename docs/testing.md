@@ -57,7 +57,12 @@ Conventions (`test/helpers.ts`):
 - `request(sender, path, { method, json })` wraps `createApp().request(...)`. No HTTP server needed.
 - `uploadDocument(sender, bytes?)` runs the real create → presigned PUT → complete flow.
   `minimalPdf(pages)` builds a valid PDF without a PDF library.
-- Every tenant-owned route gets a cross-tenant test: another org's session gets **404** (never 403,
-  so existence isn't leaked), and the owner's row is unchanged afterwards.
+- Every tenant-owned route gets a cross-tenant case in `tenant-isolation.itest.ts`: another org's
+  session gets **404** (never 403, so existence isn't leaked), and the owner's rows are unchanged
+  afterwards. That test lists every route the app serves, so it fails until a new route is
+  classified there.
+- Database privileges: `audit-append-only.itest.ts` switches to the app role with
+  `SET LOCAL ROLE sahihi_app` inside `prisma.$transaction`. Tests themselves connect as the owner,
+  because `resetDb()` needs TRUNCATE.
 - Assert on queued jobs with `getQueues().notifications.raw.getJobs()` (Redis DB 15).
 - Use the fixture PDFs in `fixtures/` (see `coordinates.md`).

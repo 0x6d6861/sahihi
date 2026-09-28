@@ -160,7 +160,9 @@ process fails fast) and documented in `.env.example`.
 ## Deployment
 
 Railway: three services (api, worker, web) from the monorepo plus managed Postgres and Redis.
-The api service runs `prisma migrate deploy` before starting. Set `WEB_URL`, `API_URL` and
+The api service runs `prisma migrate deploy` before starting, as the schema owner
+(`MIGRATE_DATABASE_URL`). The api and worker themselves connect with `DATABASE_URL` as a login role
+in `sahihi_app`, which can't run DDL or rewrite the audit trail (see `security.md`). Set `WEB_URL`, `API_URL` and
 `BETTER_AUTH_URL` (= web origin) per environment. The web service needs `API_URL` for the rewrite.
 Workers scale horizontally. The finalize job is deduped by `jobId`, and audit writes are serialised
 with a Postgres advisory lock.

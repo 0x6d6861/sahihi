@@ -49,7 +49,8 @@ async function ensureDatabase() {
 function migrate() {
   const result = Bun.spawnSync(["bunx", "prisma", "migrate", "deploy"], {
     cwd: path.resolve(import.meta.dir, "../../../packages/db"),
-    env: { ...process.env, DATABASE_URL: databaseUrl },
+    // Both: prisma.config.ts prefers MIGRATE_DATABASE_URL, which may point at the dev database.
+    env: { ...process.env, DATABASE_URL: databaseUrl, MIGRATE_DATABASE_URL: databaseUrl },
     stdout: "pipe",
     stderr: "pipe",
   })

@@ -348,7 +348,7 @@ model AuditEvent {
   seq         Int
   type        String
   recipientId String?
-  recipient   Recipient? @relation(fields: [recipientId], references: [id])
+  recipient   Recipient? @relation(fields: [recipientId], references: [id], onDelete: NoAction)
   actorUserId String?
   data        Json?
   ipAddress   String?
