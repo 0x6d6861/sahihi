@@ -81,6 +81,21 @@ pdf-lib's standard fonts are WinAnsi only. `sanitizeForFont` replaces characters
 encoded, so text fields with non-Latin scripts currently degrade. To support them, embed a Unicode TTF
 (Noto Sans) with `@pdf-lib/fontkit`, recorded as a roadmap item.
 
+## 4. Downloads
+
+- Sender: `GET /api/envelopes/:id/downloads` (org-scoped). Recipient: `GET /api/sign/:token/downloads`,
+  with the fresh link from the completion email. Both return `{ signed, certificate }` presigned
+  URLs, and a 409 until finalize has stored both files.
+- The links are served as `attachment`, with RFC 6266 file names from `downloadFileName()` /
+  `contentDisposition()` (`@sahihi/core`): `<title> (signed).pdf`, in any script, with an ASCII
+  fallback and an exact UTF-8 `filename*`. The PDF viewers keep `inline`.
+- The URLs live for 5 minutes, so the web fetches them **when a download button is clicked**, never
+  at page load (`components/app/downloads/download-buttons.tsx`, shared by the envelope page and
+  the signer's completed state).
+- The envelope page shows a "Signed and certified" card for `COMPLETED` envelopes: both downloads,
+  the certificate code and a link to its public `/verify/<code>` page. While finalize is still
+  running, it shows a "being produced" notice instead.
+
 ## Invariants
 
 - `original.pdf` is never modified. Its hash is on the certificate.

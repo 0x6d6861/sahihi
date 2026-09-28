@@ -7,6 +7,7 @@ import {
 } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 import { getEnv } from "@sahihi/config"
+import { contentDisposition } from "@sahihi/core"
 
 /**
  * Private object storage. The bucket is NEVER public; clients only receive
@@ -58,9 +59,13 @@ export async function presignUpload(
   )
 }
 
+/**
+ * Short-lived GET URL. `inline` for the PDF viewers; `attachment` for "Download" buttons (the
+ * browser saves the file instead of opening it). File names may be any language (RFC 6266).
+ */
 export async function presignDownload(
   key: string,
-  opts: { fileName?: string; expiresIn?: number } = {},
+  opts: { fileName?: string; expiresIn?: number; disposition?: "inline" | "attachment" } = {},
 ) {
   return getSignedUrl(
     s3(),
@@ -68,7 +73,7 @@ export async function presignDownload(
       Bucket: bucket(),
       Key: key,
       ResponseContentDisposition: opts.fileName
-        ? `inline; filename="${opts.fileName.replace(/["\\\r\n]/g, "_")}"`
+        ? contentDisposition(opts.fileName, opts.disposition ?? "inline")
         : undefined,
     }),
     { expiresIn: opts.expiresIn ?? 300 },

@@ -8,6 +8,7 @@ import type {
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { DocumentViewer } from "@/components/app/document-viewer"
+import { DownloadButtons } from "@/components/app/downloads/download-buttons"
 import {
   ActivityList,
   type AuditEventRow,
@@ -66,6 +67,9 @@ interface EnvelopeDetail {
     required: boolean
     label: string | null
   })[]
+  completedAt: string | null
+  /** Set by the finalize job, shortly after COMPLETED. */
+  certificate: { code: string; issuedAt: string; provider: "INTERNAL" | "CA" } | null
 }
 
 const dateLabel = new Intl.DateTimeFormat("en-GB", {
@@ -109,7 +113,7 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
           {e.document.pageCount} {e.document.pageCount === 1 ? "page" : "pages"}
           {draft
             ? " · Pick a field type, then click or drag on a page."
-            : ` · ${e.fields.length} fields`}
+            : ` · ${e.fields.length} fields · the original, as sent for signing`}
         </CardDescription>
       </CardHeader>
       <CardPanel>
@@ -261,6 +265,38 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
               }}
             />
           </div>
+        )}
+
+        {e.status === "COMPLETED" && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Signed and certified</CardTitle>
+              <CardDescription>
+                {e.certificate
+                  ? `Everyone signed${e.completedAt ? ` on ${dateLabel.format(new Date(e.completedAt))}` : ""}. The signed PDF and the Certificate of Completion are ready.`
+                  : "Everyone has signed. The signed PDF and certificate are being produced; refresh in a moment."}
+              </CardDescription>
+            </CardHeader>
+            {e.certificate && (
+              <CardPanel className="flex flex-wrap items-center justify-between gap-4">
+                <DownloadButtons endpoint={`/envelopes/${e.id}/downloads`} />
+                <p className="text-muted-foreground text-sm">
+                  Certificate{" "}
+                  <span className="font-medium font-mono text-foreground">
+                    {e.certificate.code}
+                  </span>
+                  {" · "}
+                  <Link
+                    href={`/verify/${e.certificate.code}`}
+                    className="underline"
+                    target="_blank"
+                  >
+                    Public verification page
+                  </Link>
+                </p>
+              </CardPanel>
+            )}
+          </Card>
         )}
 
         <EnvelopeTabs

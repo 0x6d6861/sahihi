@@ -2,6 +2,7 @@
 
 import type { FieldType, VerificationMethod } from "@sahihi/core"
 import { useCallback, useEffect, useRef, useState } from "react"
+import { DownloadButtons } from "@/components/app/downloads/download-buttons"
 import { SigningSurface } from "@/components/app/signing/signing-surface"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -116,7 +117,7 @@ export function SigningExperience({ token }: { token: string }) {
         </CardHeader>
         {session.downloadsAvailable && (
           <CardFooter className="gap-2">
-            <DownloadButtons base={base} />
+            <DownloadButtons endpoint={`${base}/downloads`} />
           </CardFooter>
         )}
       </Card>
@@ -297,28 +298,5 @@ function OtpStep({
         </CardFooter>
       )}
     </Card>
-  )
-}
-
-function DownloadButtons({ base }: { base: string }) {
-  const [links, setLinks] = useState<{ signed: string; certificate: string } | null>(null)
-  useEffect(() => {
-    api<{ signed: string; certificate: string }>(`${base}/downloads`).then(setLinks, () =>
-      setLinks(null),
-    )
-  }, [base])
-  if (!links) return null
-  return (
-    <>
-      <Button render={<a href={links.signed} target="_blank" rel="noreferrer" />}>
-        Signed document
-      </Button>
-      <Button
-        variant="outline"
-        render={<a href={links.certificate} target="_blank" rel="noreferrer" />}
-      >
-        Certificate
-      </Button>
-    </>
   )
 }

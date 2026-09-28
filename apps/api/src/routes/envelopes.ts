@@ -1,6 +1,7 @@
 import {
   assertTransition,
   CreateEnvelopeSchema,
+  downloadFileName,
   isEditable,
   ReplaceFieldsSchema,
   ReplaceRecipientsSchema,
@@ -318,11 +319,14 @@ export const envelopes = new Hono<AppEnv>()
     })
     if (!envelope) notFound("Envelope")
     if (!envelope.signedS3Key || !envelope.certificate) conflict("Envelope is not finalized yet")
-    const base = envelope.title.replace(/[^\w\- ]+/g, "").trim() || "document"
     return c.json({
-      signed: await presignDownload(envelope.signedS3Key, { fileName: `${base} (signed).pdf` }),
+      signed: await presignDownload(envelope.signedS3Key, {
+        fileName: downloadFileName(envelope.title, "signed"),
+        disposition: "attachment",
+      }),
       certificate: await presignDownload(envelope.certificate.s3Key, {
-        fileName: `${base} (certificate).pdf`,
+        fileName: downloadFileName(envelope.title, "certificate"),
+        disposition: "attachment",
       }),
     })
   })

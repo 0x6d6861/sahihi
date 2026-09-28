@@ -5,6 +5,7 @@ import {
   consentTextSha256,
   DeclineSigningSchema,
   deriveOutcome,
+  downloadFileName,
   type FieldValueInput,
   generateOtp,
   hashOtp,
@@ -172,11 +173,14 @@ export const signing = new Hono<SigningEnv>()
     if (linkState(s) !== "completed" || !s.envelope.signedS3Key || !s.envelope.certificate) {
       return c.json({ error: "not_available" }, 409)
     }
-    const base = s.envelope.title.replace(/[^\w\- ]+/g, "").trim() || "document"
     return c.json({
-      signed: await presignDownload(s.envelope.signedS3Key, { fileName: `${base} (signed).pdf` }),
+      signed: await presignDownload(s.envelope.signedS3Key, {
+        fileName: downloadFileName(s.envelope.title, "signed"),
+        disposition: "attachment",
+      }),
       certificate: await presignDownload(s.envelope.certificate.s3Key, {
-        fileName: `${base} (certificate).pdf`,
+        fileName: downloadFileName(s.envelope.title, "certificate"),
+        disposition: "attachment",
       }),
     })
   })
