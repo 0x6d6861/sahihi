@@ -1,0 +1,22 @@
+{
+  "name": "@sahihi/pdf",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "test": "bun test",
+    "fixtures": "bun src/fixtures.cli.ts"
+  },
+  "dependencies": {
+    "@sahihi/core": "workspace:*",
+    "pdf-lib": "1.17.1",
+    "qrcode": "1.5.4"
+  },
+  "devDependencies": {
+    "@types/qrcode": "1.5.6"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@sahihi/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --env-file=../../.env --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "build": "bun build src/index.ts --target=bun --outdir=dist",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@sahihi/config": "workspace:*",
+    "@sahihi/core": "workspace:*",
+    "@sahihi/db": "workspace:*",
+    "@sahihi/infra": "workspace:*",
+    "@sahihi/pdf": "workspace:*",
+    "better-auth": "1.7.6",
+    "hono": "4.13.9",
+    "zod": "4.6.5"
+  }
+}

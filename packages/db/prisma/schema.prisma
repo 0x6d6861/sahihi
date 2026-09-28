@@ -1,0 +1,375 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Sahihi — Prisma schema
+//
+// Sections:
+//   1. better-auth tables (User, Session, Account, Verification, Organization,
+//      Member, Invitation). Shape is owned by better-auth — after upgrading
+//      better-auth or adding plugins run `bun run auth:schema` and diff against
+//      prisma/better-auth.generated.prisma before editing this section.
+//   2. Domain tables. Every tenant-owned row carries `organizationId`.
+//
+// Enum values here MUST match the string unions in packages/core/src/enums.ts
+// (enforced by packages/db/src/enums.test.ts).
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ═══ 1. better-auth ══════════════════════════════════════════════════════════
+
+model User {
+  id            String       @id
+  name          String
+  email         String       @unique
+  emailVerified Boolean      @default(false)
+  image         String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+  members       Member[]
+  invitations   Invitation[]
+
+  documents Document[]
+  envelopes Envelope[]
+
+  @@map("user")
+}
+
+model Session {
+  id                   String   @id
+  expiresAt            DateTime
+  token                String   @unique
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  ipAddress            String?
+  userAgent            String?
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activeOrganizationId String?
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+model Organization {
+  id          String       @id
+  name        String
+  slug        String       @unique
+  logo        String?
+  createdAt   DateTime
+  metadata    String?
+  members     Member[]
+  invitations Invitation[]
+
+  documents Document[]
+  envelopes Envelope[]
+
+  @@map("organization")
+}
+
+model Member {
+  id             String       @id
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           String       @default("member")
+  createdAt      DateTime
+
+  @@index([organizationId])
+  @@index([userId])
+  @@map("member")
+}
+
+model Invitation {
+  id             String       @id
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String
+  role           String?
+  status         String       @default("pending")
+  expiresAt      DateTime
+  createdAt      DateTime     @default(now())
+  inviterId      String
+  user           User         @relation(fields: [inviterId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([email])
+  @@map("invitation")
+}
+
+// ═══ 2. Domain ═══════════════════════════════════════════════════════════════
+
+enum DocumentStatus {
+  UPLOADING // presigned URL issued, bytes not yet confirmed
+  READY // hashed + inspected, usable in envelopes
+  FAILED // invalid / encrypted / corrupt PDF
+}
+
+enum EnvelopeStatus {
+  DRAFT
+  SENT
+  IN_PROGRESS
+  COMPLETED
+  DECLINED
+  VOIDED
+  EXPIRED
+}
+
+enum SigningOrder {
+  PARALLEL
+  SEQUENTIAL
+}
+
+enum RecipientRole {
+  SIGNER // must complete their fields
+  APPROVER // must approve; may have fields
+  VIEWER // receives a copy (CC); never has fields
+}
+
+enum RecipientStatus {
+  PENDING // not yet notified (e.g. waiting for their turn)
+  SENT
+  VIEWED
+  SIGNED
+  DECLINED
+}
+
+enum VerificationMethod {
+  LINK // possession of the emailed link only
+  EMAIL_OTP // link + 6-digit code by email
+  SMS_OTP // link + 6-digit code by SMS (Africa's Talking)
+}
+
+enum FieldType {
+  SIGNATURE
+  INITIALS
+  DATE_SIGNED
+  NAME
+  EMAIL
+  TEXT
+  CHECKBOX
+}
+
+enum SigningProviderKind {
+  INTERNAL
+  CA
+}
+
+/// An uploaded source PDF. Immutable once READY — never overwrite `s3Key`.
+model Document {
+  id               String         @id @default(cuid())
+  organizationId   String
+  organization     Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  uploadedById     String
+  uploadedBy       User           @relation(fields: [uploadedById], references: [id])
+  name             String
+  s3Key            String         @unique
+  status           DocumentStatus @default(UPLOADING)
+  sizeBytes        Int?
+  sha256           String?
+  pageCount        Int?
+  /// PageBox[] from @sahihi/core — unrotated crop box + rotation per page
+  pages            Json?
+  failureReason    String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  deletedAt        DateTime?
+  envelopes        Envelope[]
+  /// Set when this document was produced by "Prepare document" from another one (same org).
+  /// The source is never modified; this is lineage only.
+  sourceDocumentId String?
+  source           Document?      @relation("DocumentLineage", fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  derived          Document[]     @relation("DocumentLineage")
+
+  @@index([organizationId, createdAt])
+  @@index([sourceDocumentId])
+}
+
+/// A signing request for one document with N recipients.
+model Envelope {
+  id             String         @id @default(cuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  documentId     String
+  document       Document       @relation(fields: [documentId], references: [id])
+  createdById    String
+  createdBy      User           @relation(fields: [createdById], references: [id])
+  title          String
+  message        String?
+  status         EnvelopeStatus @default(DRAFT)
+  signingOrder   SigningOrder   @default(PARALLEL)
+  expiresAt      DateTime?
+  sentAt         DateTime?
+  completedAt    DateTime?
+  voidedAt       DateTime?
+  voidReason     String?
+  /// Stamped + flattened output (without certificate)
+  signedS3Key    String?
+  signedSha256   String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  recipients  Recipient[]
+  fields      Field[]
+  auditEvents AuditEvent[]
+  certificate Certificate?
+
+  @@index([organizationId, status])
+  @@index([organizationId, createdAt])
+}
+
+model Recipient {
+  id              String             @id @default(cuid())
+  envelopeId      String
+  envelope        Envelope           @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+  name            String
+  email           String
+  phone           String?
+  role            RecipientRole      @default(SIGNER)
+  /// 1-based routing order; equal values sign in parallel within SEQUENTIAL envelopes
+  order           Int                @default(1)
+  status          RecipientStatus    @default(PENDING)
+  verification    VerificationMethod @default(LINK)
+  /// UI-only colour index for the field-placement editor
+  colorIndex      Int                @default(0)
+  /// SHA-256 (hex) of the signing token. The raw token is only ever in the email link.
+  tokenHash       String?            @unique
+  tokenExpiresAt  DateTime?
+  notifiedAt      DateTime?
+  lastRemindedAt  DateTime?
+  reminderCount   Int                @default(0)
+  viewedAt        DateTime?
+  signedAt        DateTime?
+  declinedAt      DateTime?
+  declineReason   String?
+  signedIp        String?
+  signedUserAgent String?
+  consentedAt     DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  fields      Field[]
+  otps        RecipientOtp[]
+  auditEvents AuditEvent[]
+
+  @@unique([envelopeId, email])
+  @@index([envelopeId, order])
+}
+
+model RecipientOtp {
+  id          String             @id @default(cuid())
+  recipientId String
+  recipient   Recipient          @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  codeHash    String
+  channel     VerificationMethod
+  expiresAt   DateTime
+  attempts    Int                @default(0)
+  consumedAt  DateTime?
+  createdAt   DateTime           @default(now())
+
+  @@index([recipientId, createdAt])
+}
+
+/// A placement on the document. Coordinates are NORMALIZED (0–1) relative to the
+/// page as displayed (rotation applied), origin TOP-LEFT. See docs/coordinates.md.
+model Field {
+  id          String    @id @default(cuid())
+  envelopeId  String
+  envelope    Envelope  @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+  recipientId String
+  recipient   Recipient @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  type        FieldType
+  /// 1-based page number
+  page        Int
+  x           Float
+  y           Float
+  width       Float
+  height      Float
+  required    Boolean   @default(true)
+  label       String?
+  // ── completion ──
+  value       String?
+  /// S3 key of the PNG for SIGNATURE / INITIALS fields
+  imageS3Key  String?
+  filledAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([envelopeId])
+  @@index([recipientId])
+}
+
+/// Append-only, hash-chained log. NEVER update or delete rows.
+/// hash = sha256(prevHash + canonicalJSON(event)). See packages/core/src/audit.ts.
+model AuditEvent {
+  id          String     @id @default(cuid())
+  envelopeId  String
+  envelope    Envelope   @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+  seq         Int
+  type        String
+  recipientId String?
+  recipient   Recipient? @relation(fields: [recipientId], references: [id])
+  actorUserId String?
+  data        Json?
+  ipAddress   String?
+  userAgent   String?
+  occurredAt  DateTime
+  prevHash    String?
+  hash        String
+
+  @@unique([envelopeId, seq])
+  @@index([envelopeId, occurredAt])
+}
+
+model Certificate {
+  id          String              @id @default(cuid())
+  envelopeId  String              @unique
+  envelope    Envelope            @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+  /// Public verification code printed on the certificate / QR code
+  code        String              @unique
+  s3Key       String
+  sha256      String
+  provider    SigningProviderKind @default(INTERNAL)
+  providerRef String?
+  issuedAt    DateTime            @default(now())
+}

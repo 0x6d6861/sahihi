@@ -1,0 +1,16 @@
+node_modules
+.next
+dist
+generated
+*.log
+.env
+.env.local
+.DS_Store
+coverage
+.turbo
+packages/db/prisma/better-auth.generated.prisma
+*.tsbuildinfo
+next-env.d.ts
+
+# Claude Code per-user settings (permission approvals); not project config
+.claude/settings.local.json

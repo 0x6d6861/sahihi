@@ -1,0 +1,73 @@
+import { getEnv, QUEUES } from "@sahihi/config"
+import {
+  type FinalizeJobs,
+  getQueues,
+  type MaintenanceJobs,
+  type NotificationJobs,
+  redis,
+} from "@sahihi/infra"
+import { type Job, Worker } from "bullmq"
+import { finalizeEnvelope } from "./jobs/finalize"
+import { expireEnvelopes, remindRecipients, sweepAbandonedUploads } from "./jobs/maintenance"
+import { handleNotification } from "./jobs/notifications"
+
+getEnv() // fail fast on bad config
+const connection = redis()
+
+const workers = [
+  new Worker<NotificationJobs[keyof NotificationJobs]>(
+    QUEUES.notifications,
+    (job) => handleNotification(job as Parameters<typeof handleNotification>[0]),
+    { connection, concurrency: 10 },
+  ),
+  new Worker<FinalizeJobs["envelope.finalize"]>(
+    QUEUES.finalize,
+    (job: Job<FinalizeJobs["envelope.finalize"]>) => finalizeEnvelope(job.data.envelopeId),
+    { connection, concurrency: 2 },
+  ),
+  new Worker<MaintenanceJobs[keyof MaintenanceJobs]>(
+    QUEUES.maintenance,
+    async (job) => {
+      if (job.name === "envelopes.expire") return expireEnvelopes()
+      if (job.name === "envelopes.remind") return remindRecipients()
+      if (job.name === "documents.sweep-uploads") return sweepAbandonedUploads()
+      throw new Error(`Unknown maintenance job ${job.name}`)
+    },
+    { connection, concurrency: 1 },
+  ),
+]
+
+for (const w of workers) {
+  w.on("failed", (job, err) =>
+    console.error(`[${w.name}] ${job?.name} ${job?.id} failed:`, err.message),
+  )
+  w.on("completed", (job) => console.log(`[${w.name}] ${job.name} ${job.id} done`))
+}
+
+// Repeatable schedules (idempotent — same key replaces the previous schedule)
+const { maintenance } = getQueues()
+await maintenance.raw.upsertJobScheduler(
+  "expire-hourly",
+  { pattern: "5 * * * *" },
+  { name: "envelopes.expire", data: {} },
+)
+await maintenance.raw.upsertJobScheduler(
+  "sweep-uploads-15m",
+  { pattern: "*/15 * * * *", tz: "Africa/Nairobi" },
+  { name: "documents.sweep-uploads", data: {} },
+)
+await maintenance.raw.upsertJobScheduler(
+  "remind-daily",
+  { pattern: "0 9 * * *", tz: "Africa/Nairobi" },
+  { name: "envelopes.remind", data: {} },
+)
+
+console.log("▲ worker running:", workers.map((w) => w.name).join(", "))
+
+async function shutdown() {
+  console.log("worker shutting down…")
+  await Promise.all(workers.map((w) => w.close()))
+  process.exit(0)
+}
+process.on("SIGTERM", shutdown)
+process.on("SIGINT", shutdown)

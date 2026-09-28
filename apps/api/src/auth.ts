@@ -1,0 +1,67 @@
+import { getEnv } from "@sahihi/config"
+import { prisma } from "@sahihi/db"
+import { getQueues } from "@sahihi/infra"
+import { betterAuth } from "better-auth"
+import { prismaAdapter } from "better-auth/adapters/prisma"
+import { organization } from "better-auth/plugins"
+
+/**
+ * better-auth — authentication for SENDERS (SaaS users) only.
+ * Signers never get accounts; they use recipient tokens (see routes/signing.ts).
+ *
+ * After changing plugins run `bun run auth:schema` and reconcile the Prisma schema.
+ * Docs: docs/auth.md
+ */
+const env = getEnv()
+
+export const auth = betterAuth({
+  appName: "Sahihi",
+  baseURL: env.BETTER_AUTH_URL,
+  basePath: "/api/auth",
+  secret: env.BETTER_AUTH_SECRET,
+  trustedOrigins: [env.WEB_URL],
+  database: prismaAdapter(prisma, { provider: "postgresql" }),
+
+  emailAndPassword: {
+    enabled: true,
+    requireEmailVerification: true,
+    minPasswordLength: 10,
+    sendResetPassword: async ({ user, url }) => {
+      await getQueues().notifications.add("auth.reset-password", {
+        email: user.email,
+        name: user.name,
+        url,
+      })
+    },
+  },
+  emailVerification: {
+    sendOnSignUp: true,
+    autoSignInAfterVerification: true,
+    sendVerificationEmail: async ({ user, url }) => {
+      await getQueues().notifications.add("auth.verify-email", {
+        email: user.email,
+        name: user.name,
+        url,
+      })
+    },
+  },
+
+  plugins: [
+    organization({
+      // Every user can create their own workspace on sign-up
+      allowUserToCreateOrganization: true,
+      sendInvitationEmail: async (data) => {
+        await getQueues().notifications.add("auth.org-invitation", {
+          email: data.email,
+          inviterName: data.inviter.user.name,
+          organizationName: data.organization.name,
+          url: `${env.WEB_URL}/accept-invitation/${data.id}`,
+        })
+      },
+    }),
+  ],
+
+  advanced: { cookiePrefix: "sahihi" },
+})
+
+export type AuthSession = typeof auth.$Infer.Session
