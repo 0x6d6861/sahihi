@@ -52,7 +52,8 @@ Conventions (`test/helpers.ts`):
 - `helpers.ts` throws on import unless `DATABASE_URL` ends in `_test`. `resetDb()` in `beforeEach`
   re-checks `current_database()`, then truncates every table except `_prisma_migrations`.
 - `createSender(label)` creates a user through better-auth's API, sets `emailVerified`, signs in, and
-  creates and activates an organization. It returns `{ userId, organizationId, cookie }`. Pass
+  creates and activates an organization on the **Enterprise** plan (no quotas; pass
+  `{ plan: "free" }` to test limits, `docs/billing.md`). It returns `{ userId, organizationId, cookie }`. Pass
   `{ withOrganization: false }` for the 403 `no_active_organization` case.
 - `request(sender, path, { method, json })` wraps `createApp().request(...)`. No HTTP server needed.
 - `uploadDocument(sender, bytes?)` runs the real create → presigned PUT → complete flow.

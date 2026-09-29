@@ -37,7 +37,7 @@ Read this file first, then the doc for the area you're touching (see **Doc map**
 
 ```
 apps/
-  api/        Hono REST API. routes/{documents,envelopes,templates,webhooks,signing,verify}.ts, auth.ts (better-auth)
+  api/        Hono REST API. routes/{documents,envelopes,templates,webhooks,billing,signing,verify}.ts, auth.ts (better-auth)
   worker/     BullMQ consumers: notifications, envelope finalize, webhooks, maintenance (expire/remind/sweeps)
   web/        Next.js. (auth)/ sign-in/up/onboarding, (app)/ documents+envelopes, sign/[token], verify/[code]
 packages/
@@ -72,6 +72,7 @@ bun test                   # unit tests (no DB/Redis needed)
 bun run test:integration   # API integration tests (needs infra:up; uses sahihi_test DB)
 bun run fixtures           # regenerate fixtures/*.pdf (commit them; tests check they match)
 bun run emails:dev         # React Email preview of every template → http://localhost:3030
+bun run billing:set-plan <org-slug> <plan>   # change a workspace's plan (docs/billing.md)
 bun run typecheck          # all workspaces
 bun run lint               # biome check
 ```
@@ -142,6 +143,7 @@ the relevant doc in `docs/` is updated if behaviour changed, and the matching ch
 | Send / sign / decline / void / reminders / OTP | `docs/signing-flow.md` |
 | Templates (save as / use) | `docs/templates.md` |
 | Webhooks (events, signing, delivery) | `docs/webhooks.md` |
+| Plans, envelope quotas, seats | `docs/billing.md` |
 | Certificates, `/verify`, CA integration | `docs/certificates.md` |
 | Any public route, tokens, tenancy | `docs/security.md` |
 | Any screen or component | `docs/ui.md` |

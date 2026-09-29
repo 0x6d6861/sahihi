@@ -1,9 +1,10 @@
 import { getEnv } from "@sahihi/config"
-import { orgAc, orgRoles } from "@sahihi/core"
-import { prisma } from "@sahihi/db"
+import { canAddSeat, orgAc, orgRoles, seatLimitMessage } from "@sahihi/core"
+import { countSeats, getOrgPlan, prisma } from "@sahihi/db"
 import { getQueues } from "@sahihi/infra"
 import { betterAuth } from "better-auth"
 import { prismaAdapter } from "better-auth/adapters/prisma"
+import { APIError } from "better-auth/api"
 import { organization } from "better-auth/plugins"
 
 /**
@@ -74,6 +75,20 @@ export const auth = betterAuth({
       // Roles and permissions shared with our routes and the web client (docs/auth.md → Roles)
       ac: orgAc,
       roles: orgRoles,
+      // Seats come from the plan (docs/billing.md). better-auth checks this when a member is added
+      // or an invitation is accepted; unlimited plans get a very high number.
+      membershipLimit: async (_user, organization) =>
+        (await getOrgPlan(prisma, organization.id)).seats ?? 100_000,
+      organizationHooks: {
+        // Pending invitations hold a seat, so an invite that could never be accepted is refused now.
+        beforeCreateInvitation: async ({ organization }) => {
+          const plan = await getOrgPlan(prisma, organization.id)
+          const { members, pendingInvitations } = await countSeats(prisma, organization.id)
+          if (!canAddSeat(plan, members, pendingInvitations)) {
+            throw new APIError("FORBIDDEN", { message: seatLimitMessage(plan) })
+          }
+        },
+      },
       sendInvitationEmail: async (data) => {
         await getQueues().notifications.add("auth.org-invitation", {
           email: data.email,

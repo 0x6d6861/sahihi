@@ -1,6 +1,7 @@
-import type { EnvelopeStatus } from "@sahihi/core"
+import type { EnvelopeStatus, UsageLevel } from "@sahihi/core"
 import { PlusIcon, SendIcon } from "lucide-react"
 import Link from "next/link"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardPanel } from "@/components/ui/card"
@@ -21,6 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { apiServer } from "@/lib/api-server"
+import { quotaBanner } from "@/lib/billing"
 import { ENVELOPE_STATUS_BADGE } from "@/lib/constants"
 
 interface EnvelopeRow {
@@ -35,8 +37,26 @@ interface EnvelopeRow {
 export const metadata = { title: "Envelopes" }
 
 export default async function EnvelopesPage() {
-  const { data } = await apiServer<{ items: EnvelopeRow[] }>("/envelopes")
+  const [{ data }, { data: billing }] = await Promise.all([
+    apiServer<{ items: EnvelopeRow[] }>("/envelopes"),
+    apiServer<{
+      period: { end: string }
+      envelopes: { used: number; limit: number | null; level: UsageLevel }
+    }>("/billing"),
+  ])
   const items = data?.items ?? []
+  const banner = billing
+    ? quotaBanner(
+        billing.envelopes.level,
+        billing.envelopes.used,
+        billing.envelopes.limit,
+        new Intl.DateTimeFormat("en-GB", {
+          day: "numeric",
+          month: "long",
+          timeZone: "Africa/Nairobi",
+        }).format(new Date(billing.period.end)),
+      )
+    : null
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-4">
@@ -46,6 +66,17 @@ export default async function EnvelopesPage() {
           New envelope
         </Button>
       </div>
+      {banner && (
+        <Alert variant={banner.variant}>
+          <AlertTitle>{banner.title}</AlertTitle>
+          <AlertDescription>
+            {banner.description}{" "}
+            <Link href="/settings/billing" className="underline">
+              Plan &amp; usage
+            </Link>
+          </AlertDescription>
+        </Alert>
+      )}
       <Card>
         <CardPanel>
           {items.length === 0 ? (

@@ -70,7 +70,7 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
 - [x] CSP headers; security review of `/sign` and `/verify`
 - [x] Templates (reusable recipients + field layouts)
 - [x] Webhooks per org (envelope.completed, …) with signed payloads
-- [ ] Billing per org (plans, envelope quotas)
+- [~] Billing per org (plans, envelope quotas): plans, envelope quotas and seats enforced; no payment provider yet (`docs/billing.md`)
 - [ ] Retention settings + data export/delete (Kenya DPA)
 - [ ] Playwright E2E: sign-up → upload → place → send → sign (Mailpit) → certificate
 - [ ] Observability: structured logs, BullMQ dashboard, error tracking

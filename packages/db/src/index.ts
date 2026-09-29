@@ -2,6 +2,7 @@ import { PrismaPg } from "@prisma/adapter-pg"
 import { PrismaClient } from "./generated/prisma/client"
 
 export { type AppendAuditInput, appendAuditEvent, toChainedEvent } from "./audit"
+export { countEnvelopesSent, countSeats, getOrgPlan, lockOrgQuota } from "./billing"
 export * from "./generated/prisma/client"
 export { issueSigningLink } from "./signing-links"
 export { forOrganization } from "./tenant"

@@ -163,6 +163,8 @@ const LISTS = [
 const NOT_TENANT = [
   // Creates in the caller's own org and takes no ids from the request.
   "POST /api/webhooks",
+  // The caller's own workspace plan and usage; takes no ids.
+  "GET /api/billing",
   "GET /health",
   "GET /api/auth/*",
   "POST /api/auth/*",

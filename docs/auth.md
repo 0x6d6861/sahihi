@@ -73,7 +73,8 @@ The better-auth defaults are `owner`, `admin` and `member`. The creator of an or
 | Rename or delete a template | any | any | own only |
 | Webhooks (view, add, edit, rotate, delete) | ✓ | ✓ | – |
 | Invite / remove members, change roles | ✓ | ✓ | – |
-| Billing (`billing:manage`, not built yet), delete org | ✓ | – | – |
+| Billing (`billing:manage`, reserved for self-serve plan changes), delete org | ✓ | – | – |
+| See the plan and usage (Settings → Plan & usage) | ✓ | ✓ | ✓ |
 
 "Own" means `Envelope.createdById` / `Document.uploadedById` is the caller. Owners and admins get
 "any" from the `envelope:manage-any` and `document:delete-any` permissions.

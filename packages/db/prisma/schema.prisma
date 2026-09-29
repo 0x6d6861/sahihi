@@ -102,10 +102,11 @@ model Organization {
   members     Member[]
   invitations Invitation[]
 
-  documents Document[]
-  envelopes Envelope[]
-  templates Template[]
-  webhooks  WebhookEndpoint[]
+  documents    Document[]
+  envelopes    Envelope[]
+  templates    Template[]
+  webhooks     WebhookEndpoint[]
+  subscription Subscription?
 
   @@map("organization")
 }
@@ -497,4 +498,18 @@ model WebhookDelivery {
 
   @@index([endpointId, createdAt])
   @@index([status, createdAt])
+}
+
+/// A workspace's plan (docs/billing.md). No row = Free. `plan` is a PlanId from @sahihi/core,
+/// kept as a string so plans can change without a Prisma enum migration.
+model Subscription {
+  organizationId         String       @id
+  organization           Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan                   String       @default("free")
+  /// Reserved for a payment provider (e.g. "paystack"); null while plans are set manually.
+  provider               String?
+  providerCustomerId     String?
+  providerSubscriptionId String?
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
 }

@@ -104,6 +104,9 @@ export function SendControl({
       const issues =
         (err instanceof ApiError && (err.body as { issues?: PreflightIssue[] })?.issues) || []
       if (issues.length > 0) setProblems(toProblems(issues))
+      // Plan limit reached (docs/billing.md): keep the explanation on screen, not in a toast.
+      else if (err instanceof ApiError && err.status === 402)
+        setProblems([{ message: err.message }])
       else
         toastManager.add({
           title: "Could not send",

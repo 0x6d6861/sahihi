@@ -20,6 +20,7 @@ import {
 } from "@sahihi/db"
 import { enqueueWebhookDeliveries, getQueues, presignDownload } from "@sahihi/infra"
 import { Hono } from "hono"
+import { assertEnvelopeQuota } from "../lib/billing"
 import type { AppEnv } from "../lib/env"
 import { badRequest, clientMeta, conflict, notFound, parseJson } from "../lib/http"
 import { actor, assertCanManageEnvelope } from "../lib/permissions"
@@ -216,6 +217,8 @@ export const envelopes = new Hono<AppEnv>()
     }
 
     const { links, webhooks } = await prisma.$transaction(async (tx) => {
+      // Plan limit (docs/billing.md): serialised per workspace, refused with 402.
+      await assertEnvelopeQuota(tx, envelope.organizationId)
       await tx.envelope.update({
         where: { id: envelope.id },
         data: { status: "SENT", sentAt: new Date() },

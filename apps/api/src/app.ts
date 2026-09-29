@@ -7,6 +7,7 @@ import { HTTPException } from "hono/http-exception"
 import { logger } from "hono/logger"
 import { secureHeaders } from "hono/secure-headers"
 import { auth } from "./auth"
+import { billing } from "./routes/billing"
 import { documents } from "./routes/documents"
 import { envelopes } from "./routes/envelopes"
 import { signing } from "./routes/signing"
@@ -42,6 +43,7 @@ export function createApp() {
     .route("/api/documents", documents)
     .route("/api/envelopes", envelopes)
     .route("/api/templates", templates)
+    .route("/api/billing", billing)
     .route("/api/webhooks", webhooks)
     .route("/api/sign", signing)
     .route("/api/verify", verify)

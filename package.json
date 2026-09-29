@@ -26,7 +26,8 @@
     "auth:schema": "bunx @better-auth/cli generate --config apps/api/src/auth.ts --output packages/db/prisma/better-auth.generated.prisma",
     "infra:up": "docker compose up -d",
     "infra:down": "docker compose down",
-    "ui:bootstrap": "bash scripts/bootstrap-ui.sh"
+    "ui:bootstrap": "bash scripts/bootstrap-ui.sh",
+    "billing:set-plan": "bun --env-file=.env packages/db/scripts/set-plan.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",
