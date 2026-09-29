@@ -69,6 +69,8 @@ The better-auth defaults are `owner`, `admin` and `member`. The creator of an or
 | Upload documents, create envelopes | ✓ | ✓ | ✓ |
 | Edit, send, remind or void an envelope | any | any | own only |
 | Delete a document | any | any | own only |
+| Use templates / save envelopes as templates | ✓ | ✓ | ✓ |
+| Rename or delete a template | any | any | own only |
 | Invite / remove members, change roles | ✓ | ✓ | – |
 | Billing (`billing:manage`, not built yet), delete org | ✓ | – | – |
 

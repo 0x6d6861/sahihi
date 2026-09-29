@@ -62,6 +62,7 @@ for the reinstall checklist.
 | Public signing | Extend `PDFViewer` (lighter; **not** `PDFEditor`) + E-Signature dialog, coss `OTPField`, `Checkbox` (consent), `Progress`, `Alert`, `Button` |
 | Verify | `Card`, `Badge`, `Alert`, Extend `FileUpload` (hash locally) |
 | Settings / members | `Tabs`, `Table`, `Select` (role), `Dialog` (invite) |
+| Templates | `Table`, `Badge` (roles), `Menu` + `Dialog`/`AlertDialog` (rename/delete), `Empty`; "Save as template" `Dialog` with `Checkbox`; use page `Card` + `Form` |
 
 ## Extend specifics
 

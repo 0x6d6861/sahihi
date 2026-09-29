@@ -14,7 +14,13 @@ import { app, createSender, request, resetDb, type Sender, uploadDocument } from
 
 let alice: Sender
 let mallory: Sender
-const ids = { document: "", envelope: "", recipient: "" }
+const ids = {
+  document: "",
+  envelope: "",
+  recipient: "",
+  template: "",
+  role: "",
+}
 
 type Case = () => { path: string; init?: RequestInit & { json?: unknown } }
 
@@ -87,10 +93,40 @@ const TENANT: Record<string, Case> = {
   }),
   "GET /api/envelopes/:id/audit": () => ({ path: `/api/envelopes/${ids.envelope}/audit` }),
   "GET /api/envelopes/:id/downloads": () => ({ path: `/api/envelopes/${ids.envelope}/downloads` }),
+  "POST /api/templates": () => ({
+    path: "/api/templates",
+    init: {
+      method: "POST",
+      json: {
+        envelopeId: ids.envelope,
+        name: "Stolen",
+        roles: [{ recipientId: ids.recipient, label: "Tenant" }],
+      },
+    },
+  }),
+  "GET /api/templates/:id": () => ({ path: `/api/templates/${ids.template}` }),
+  "PATCH /api/templates/:id": () => ({
+    path: `/api/templates/${ids.template}`,
+    init: { method: "PATCH", json: { name: "Renamed" } },
+  }),
+  "DELETE /api/templates/:id": () => ({
+    path: `/api/templates/${ids.template}`,
+    init: { method: "DELETE" },
+  }),
+  "POST /api/templates/:id/envelopes": () => ({
+    path: `/api/templates/${ids.template}/envelopes`,
+    init: {
+      method: "POST",
+      json: {
+        title: "Stolen",
+        recipients: [{ roleId: ids.role, name: "Mallory", email: "mallory@example.test" }],
+      },
+    },
+  }),
 }
 
 /** Org-scoped lists: 200, but only the caller's rows. */
-const LISTS = ["GET /api/documents", "GET /api/envelopes"]
+const LISTS = ["GET /api/documents", "GET /api/envelopes", "GET /api/templates"]
 
 /**
  * Not org-scoped, each for a stated reason. Signing routes are authorized by the token alone
@@ -114,7 +150,7 @@ const NOT_TENANT = [
 
 /** Everything of alice's that a cross-tenant request could touch. */
 async function snapshot() {
-  const [documents, envelopes, recipients, fields, auditEvents] = await Promise.all([
+  const [documents, envelopes, recipients, fields, auditEvents, templates] = await Promise.all([
     prisma.document.findMany({
       where: { organizationId: alice.organizationId },
       orderBy: { id: "asc" },
@@ -126,8 +162,12 @@ async function snapshot() {
     prisma.recipient.findMany({ where: { envelopeId: ids.envelope }, orderBy: { id: "asc" } }),
     prisma.field.findMany({ where: { envelopeId: ids.envelope }, orderBy: { id: "asc" } }),
     prisma.auditEvent.findMany({ where: { envelopeId: ids.envelope }, orderBy: { seq: "asc" } }),
+    prisma.template.findMany({
+      where: { organizationId: alice.organizationId },
+      include: { roles: true, fields: true },
+    }),
   ])
-  return { documents, envelopes, recipients, fields, auditEvents }
+  return { documents, envelopes, recipients, fields, auditEvents, templates }
 }
 
 beforeAll(async () => {
@@ -148,6 +188,19 @@ beforeAll(async () => {
   const [recipient] = ((await put.json()) as { recipients: { id: string }[] }).recipients
   if (!recipient) throw new Error("no recipient")
   ids.recipient = recipient.id
+  const saved = await request(alice, "/api/templates", {
+    method: "POST",
+    json: {
+      envelopeId: ids.envelope,
+      name: "Alice's lease",
+      roles: [{ recipientId: recipient.id, label: "Tenant" }],
+    },
+  })
+  ids.template = ((await saved.json()) as { template: { id: string } }).template.id
+  const tpl = (await (await request(alice, `/api/templates/${ids.template}`)).json()) as {
+    template: { roles: { id: string }[] }
+  }
+  ids.role = tpl.template.roles[0]?.id ?? ""
 })
 
 describe("tenant isolation", () => {
@@ -177,7 +230,7 @@ describe("tenant isolation", () => {
   })
 
   test("lists only return the caller's rows", async () => {
-    for (const path of ["/api/documents", "/api/envelopes"]) {
+    for (const path of ["/api/documents", "/api/envelopes", "/api/templates"]) {
       const mine = (await (await request(alice, path)).json()) as { items: unknown[] }
       const theirs = (await (await request(mallory, path)).json()) as { items: unknown[] }
       expect({ path, alice: mine.items.length > 0, mallory: theirs.items.length }).toEqual({
@@ -195,6 +248,7 @@ describe("tenant isolation", () => {
       `/api/envelopes/${ids.envelope}`,
       `/api/envelopes/${ids.envelope}/preflight`,
       `/api/envelopes/${ids.envelope}/audit`,
+      `/api/templates/${ids.template}`,
     ]) {
       expect({ path, status: (await request(alice, path)).status }).toEqual({ path, status: 200 })
     }

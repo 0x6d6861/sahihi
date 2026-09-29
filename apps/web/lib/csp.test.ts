@@ -70,7 +70,13 @@ describe("helpers", () => {
   })
 
   test("isProtectedPath covers the app routes, not public ones", () => {
-    for (const p of ["/documents", "/envelopes/abc", "/settings/members", "/onboarding"])
+    for (const p of [
+      "/documents",
+      "/envelopes/abc",
+      "/templates/t1/use",
+      "/settings/members",
+      "/onboarding",
+    ])
       expect({ p, ok: isProtectedPath(p) }).toEqual({ p, ok: true })
     for (const p of ["/", "/sign/tok", "/verify", "/sign-in", "/documents-old"])
       expect({ p, ok: isProtectedPath(p) }).toEqual({ p, ok: false })

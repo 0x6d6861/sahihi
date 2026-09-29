@@ -37,7 +37,7 @@ Read this file first, then the doc for the area you're touching (see **Doc map**
 
 ```
 apps/
-  api/        Hono REST API. routes/{documents,envelopes,signing,verify}.ts, auth.ts (better-auth)
+  api/        Hono REST API. routes/{documents,envelopes,templates,signing,verify}.ts, auth.ts (better-auth)
   worker/     BullMQ consumers: notifications, envelope finalize, maintenance (expire/remind)
   web/        Next.js. (auth)/ sign-in/up/onboarding, (app)/ documents+envelopes, sign/[token], verify/[code]
 packages/
@@ -138,6 +138,7 @@ the relevant doc in `docs/` is updated if behaviour changed, and the matching ch
 | Field editor, signing page, stamping maths | `docs/coordinates.md` |
 | Upload, stamping, finalize job | `docs/pdf-pipeline.md` |
 | Send / sign / decline / void / reminders / OTP | `docs/signing-flow.md` |
+| Templates (save as / use) | `docs/templates.md` |
 | Certificates, `/verify`, CA integration | `docs/certificates.md` |
 | Any public route, tokens, tenancy | `docs/security.md` |
 | Any screen or component | `docs/ui.md` |

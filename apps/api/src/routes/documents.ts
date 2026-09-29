@@ -145,6 +145,13 @@ export const documents = new Hono<AppEnv>()
     })
     if (!doc) notFound("Document")
     assertCanDeleteDocument(c, doc)
+    // A template carries its document (its fields are placed on these pages).
+    const usedBy = await prisma.template.count({ where: { documentId: doc.id } })
+    if (usedBy > 0) {
+      conflict(
+        `Used by ${usedBy} template${usedBy === 1 ? "" : "s"}. Delete ${usedBy === 1 ? "it" : "them"} first.`,
+      )
+    }
     // Sent envelopes reference the original forever (evidence). Soft delete only.
     await prisma.document.update({ where: { id: doc.id }, data: { deletedAt: new Date() } })
     if (doc.envelopes.length === 0) {

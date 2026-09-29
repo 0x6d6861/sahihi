@@ -23,6 +23,7 @@ import {
 } from "@/components/app/envelope/sender-actions"
 import { FieldEditor } from "@/components/app/field-editor/field-editor"
 import { RecipientsEditor } from "@/components/app/recipients-editor/recipients-editor"
+import { SaveTemplateDialog } from "@/components/app/templates/save-template-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -222,6 +223,12 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
     </Card>
   )
 
+  // Anyone who can see the envelope may copy it into a template (the envelope isn't changed).
+  const saveTemplate =
+    e.recipients.length > 0 ? (
+      <SaveTemplateDialog envelopeId={e.id} envelopeTitle={e.title} recipients={e.recipients} />
+    ) : null
+
   const heading = (
     <div className="flex min-w-0 flex-col gap-1">
       <div className="flex items-center gap-3">
@@ -255,6 +262,7 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
             envelopeId={e.id}
             recipientCount={e.recipients.length}
             defaultTab={defaultTab}
+            actions={saveTemplate}
           >
             {heading}
           </SendControl>
@@ -264,6 +272,7 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
             <EnvelopeHeaderActions
               envelopeId={e.id}
               canVoid={canManage}
+              actions={saveTemplate}
               summary={{
                 title: e.title,
                 status: e.status,

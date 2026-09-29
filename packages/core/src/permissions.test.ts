@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test"
-import { canDeleteDocument, canManageEnvelope, hasPermission, ORG_ROLES } from "./permissions"
+import {
+  canDeleteDocument,
+  canManageEnvelope,
+  canManageTemplate,
+  hasPermission,
+  ORG_ROLES,
+} from "./permissions"
 
 describe("hasPermission (docs/auth.md → Roles)", () => {
   test("everyone can upload documents and create envelopes", () => {
@@ -59,5 +65,16 @@ describe("ownership", () => {
     expect(canDeleteDocument({ userId: "u-alice", role: "member" }, document)).toBe(true)
     expect(canDeleteDocument({ userId: "u-bob", role: "member" }, document)).toBe(false)
     expect(canDeleteDocument({ userId: "u-bob", role: "admin" }, document)).toBe(true)
+  })
+})
+
+describe("templates", () => {
+  test("everyone creates and uses templates; members manage only their own", () => {
+    for (const role of ORG_ROLES) expect(hasPermission(role, { template: ["create"] })).toBe(true)
+    const t = { createdById: "u-alice" }
+    expect(canManageTemplate({ userId: "u-alice", role: "member" }, t)).toBe(true)
+    expect(canManageTemplate({ userId: "u-bob", role: "member" }, t)).toBe(false)
+    expect(canManageTemplate({ userId: "u-bob", role: "admin" }, t)).toBe(true)
+    expect(canManageTemplate({ userId: "u-bob", role: "owner" }, t)).toBe(true)
   })
 })

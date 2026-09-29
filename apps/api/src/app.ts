@@ -10,6 +10,7 @@ import { auth } from "./auth"
 import { documents } from "./routes/documents"
 import { envelopes } from "./routes/envelopes"
 import { signing } from "./routes/signing"
+import { templates } from "./routes/templates"
 import { verify } from "./routes/verify"
 
 export function createApp() {
@@ -39,6 +40,7 @@ export function createApp() {
 
     .route("/api/documents", documents)
     .route("/api/envelopes", envelopes)
+    .route("/api/templates", templates)
     .route("/api/sign", signing)
     .route("/api/verify", verify)
 

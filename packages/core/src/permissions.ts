@@ -20,6 +20,7 @@ export const orgStatements = {
   ...defaultStatements,
   document: ["create", "delete-any"],
   envelope: ["create", "manage-any"],
+  template: ["create", "manage-any"],
   billing: ["manage"],
 } as const
 
@@ -30,17 +31,20 @@ export const orgRoles = {
     ...ownerAc.statements,
     document: ["create", "delete-any"],
     envelope: ["create", "manage-any"],
+    template: ["create", "manage-any"],
     billing: ["manage"],
   }),
   admin: orgAc.newRole({
     ...adminAc.statements,
     document: ["create", "delete-any"],
     envelope: ["create", "manage-any"],
+    template: ["create", "manage-any"],
   }),
   member: orgAc.newRole({
     ...memberAc.statements,
     document: ["create"],
     envelope: ["create"],
+    template: ["create"],
   }),
 }
 
@@ -82,5 +86,12 @@ export function canDeleteDocument(actor: Actor, document: { uploadedById: string
   return (
     document.uploadedById === actor.userId ||
     hasPermission(actor.role, { document: ["delete-any"] })
+  )
+}
+
+/** Rename or delete a template: its creator, or a role with `template:manage-any`. */
+export function canManageTemplate(actor: Actor, template: { createdById: string }): boolean {
+  return (
+    template.createdById === actor.userId || hasPermission(actor.role, { template: ["manage-any"] })
   )
 }

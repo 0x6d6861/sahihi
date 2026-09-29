@@ -2,6 +2,7 @@
 export const APP_NAV = [
   { href: "/documents", label: "Documents" },
   { href: "/envelopes", label: "Envelopes" },
+  { href: "/templates", label: "Templates" },
   { href: "/settings/members", label: "Members" },
 ] as const
 

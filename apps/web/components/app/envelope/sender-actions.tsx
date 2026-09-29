@@ -49,10 +49,13 @@ export function EnvelopeHeaderActions({
   envelopeId,
   summary,
   canVoid: allowed,
+  actions,
 }: {
   envelopeId: string
   summary: SummaryInput
   canVoid: boolean
+  /** Extra header buttons, shown first. */
+  actions?: React.ReactNode
 }) {
   const router = useRouter()
   const [reason, setReason] = useState("")
@@ -82,7 +85,8 @@ export function EnvelopeHeaderActions({
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
+      {actions}
       <Button variant="outline" onClick={() => copy(statusSummary(summary), "Status")}>
         <ClipboardCopyIcon aria-hidden />
         Copy status

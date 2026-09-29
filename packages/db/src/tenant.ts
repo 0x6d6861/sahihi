@@ -16,5 +16,9 @@ export function forOrganization(organizationId: string) {
       ...where,
       organizationId,
     }),
+    template: (where: Prisma.TemplateWhereInput = {}): Prisma.TemplateWhereInput => ({
+      ...where,
+      organizationId,
+    }),
   }
 }

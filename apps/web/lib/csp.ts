@@ -69,7 +69,7 @@ export function createNonce(): string {
 }
 
 /** App routes that need a session (the optimistic cookie check in proxy.ts). */
-const PROTECTED_PREFIXES = ["/documents", "/envelopes", "/settings", "/onboarding"]
+const PROTECTED_PREFIXES = ["/documents", "/envelopes", "/templates", "/settings", "/onboarding"]
 
 export function isProtectedPath(pathname: string): boolean {
   return PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))

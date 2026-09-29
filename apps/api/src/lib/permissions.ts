@@ -1,4 +1,4 @@
-import { type Actor, canDeleteDocument, canManageEnvelope } from "@sahihi/core"
+import { type Actor, canDeleteDocument, canManageEnvelope, canManageTemplate } from "@sahihi/core"
 import type { Context } from "hono"
 import type { AppEnv } from "./env"
 import { forbidden } from "./http"
@@ -23,5 +23,12 @@ export function assertCanManageEnvelope(c: Context<AppEnv>, envelope: { createdB
 export function assertCanDeleteDocument(c: Context<AppEnv>, document: { uploadedById: string }) {
   if (!canDeleteDocument(actor(c), document)) {
     forbidden("Only the uploader, an admin or the owner can delete this document")
+  }
+}
+
+/** Members rename/delete only templates they saved; owners and admins any. */
+export function assertCanManageTemplate(c: Context<AppEnv>, template: { createdById: string }) {
+  if (!canManageTemplate(actor(c), template)) {
+    forbidden("Only the member who saved this template, an admin or the owner can change it")
   }
 }
