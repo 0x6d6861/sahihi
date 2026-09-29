@@ -4,9 +4,10 @@ import { Hono } from "hono"
 import { bodyLimit } from "hono/body-limit"
 import { cors } from "hono/cors"
 import { HTTPException } from "hono/http-exception"
-import { logger } from "hono/logger"
 import { secureHeaders } from "hono/secure-headers"
+import { ADMIN_QUEUES_PATH, adminDashboard } from "./admin"
 import { auth } from "./auth"
+import { reportRequestError, requestIdOf, requestLog } from "./middleware/request-log"
 import { billing } from "./routes/billing"
 import { data } from "./routes/data"
 import { documents } from "./routes/documents"
@@ -20,7 +21,7 @@ export function createApp() {
   const env = getEnv()
 
   const app = new Hono()
-    .use(logger())
+    .use(requestLog)
     .use(secureHeaders())
     .use(
       "/api/*",
@@ -50,6 +51,10 @@ export function createApp() {
     .route("/api/sign", signing)
     .route("/api/verify", verify)
 
+  // Staff-only queue dashboard, when configured (docs/observability.md).
+  const admin = adminDashboard()
+  if (admin) app.route(ADMIN_QUEUES_PATH, admin)
+
   app.onError((err, c) => {
     if (err instanceof HTTPException) {
       return err.res ?? c.json({ error: err.message }, err.status)
@@ -57,7 +62,7 @@ export function createApp() {
     if (err instanceof InvalidTransitionError) {
       return c.json({ error: "invalid_state", message: err.message }, 409)
     }
-    console.error(err)
+    reportRequestError(err, requestIdOf(c.req.raw), c.req.path)
     return c.json({ error: "internal_error" }, 500)
   })
 

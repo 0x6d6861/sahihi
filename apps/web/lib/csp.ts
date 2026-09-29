@@ -14,10 +14,13 @@ export interface CspOptions {
    * Null blocks both, so production requires STORAGE_ORIGIN (next.config.ts).
    */
   storageOrigin: string | null
+  /** Origin of the error-tracking ingest (from NEXT_PUBLIC_SENTRY_DSN); null when off. */
+  errorReportingOrigin?: string | null
 }
 
-export function buildCsp({ nonce, dev, storageOrigin }: CspOptions): string {
+export function buildCsp({ nonce, dev, storageOrigin, errorReportingOrigin }: CspOptions): string {
   const storage = storageOrigin ? [storageOrigin] : []
+  const reporting = errorReportingOrigin ? [errorReportingOrigin] : []
   const directives: Record<string, string[]> = {
     "default-src": ["'self'"],
     // strict-dynamic: chunks loaded by nonce'd Next scripts are trusted; hosts are ignored.
@@ -35,7 +38,7 @@ export function buildCsp({ nonce, dev, storageOrigin }: CspOptions): string {
     "style-src": ["'self'", "'unsafe-inline'"],
     "img-src": ["'self'", "blob:", "data:", ...storage],
     "font-src": ["'self'", "data:"],
-    "connect-src": ["'self'", PDF_ENGINE_CDN, ...storage],
+    "connect-src": ["'self'", PDF_ENGINE_CDN, ...storage, ...reporting],
     // The PDF engine runs in blob: workers (blob workers inherit this policy).
     "worker-src": ["'self'", "blob:"],
     "frame-src": ["'self'"],

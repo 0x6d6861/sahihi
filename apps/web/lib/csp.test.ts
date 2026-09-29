@@ -45,6 +45,18 @@ describe("buildCsp", () => {
     expect(dev["connect-src"]).toContain("http://localhost:9000")
   })
 
+  test("error reporting origin is allowed only when configured", () => {
+    const on = directives(
+      buildCsp({
+        nonce: "n",
+        dev: false,
+        storageOrigin: null,
+        errorReportingOrigin: "https://o1.ingest.sentry.io",
+      }),
+    )
+    expect(on["connect-src"]).toContain("https://o1.ingest.sentry.io")
+  })
+
   test("without a storage origin, nothing extra is allowed", () => {
     const none = directives(buildCsp({ nonce: "n", dev: false, storageOrigin: null }))
     expect(none["connect-src"]).toEqual(["'self'", PDF_ENGINE_CDN])

@@ -7,10 +7,13 @@ import { getEnv } from "@sahihi/config"
 export async function sendSms(to: string, message: string): Promise<void> {
   const env = getEnv()
   if (!env.AT_USERNAME || !env.AT_API_KEY) {
-    if (env.NODE_ENV !== "production") {
+    // Local development only: print the SMS (it contains the OTP) the way Mailpit shows emails.
+    // Never in production (throws below) and not in tests (they read the code from the job).
+    if (env.NODE_ENV === "development") {
       console.warn(`[sms:dev] to=${to} message=${message}`)
       return
     }
+    if (env.NODE_ENV === "test") return
     throw new Error("Africa's Talking is not configured")
   }
   const host =

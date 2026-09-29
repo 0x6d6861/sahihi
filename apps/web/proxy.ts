@@ -5,6 +5,8 @@ import { buildCsp, createNonce, isProtectedPath, toOrigin } from "@/lib/csp"
 const DEV = process.env.NODE_ENV === "development"
 // Where presigned upload/download URLs point (S3 or MinIO). next.config.ts requires it in production.
 const STORAGE_ORIGIN = toOrigin(process.env.STORAGE_ORIGIN ?? (DEV ? "http://localhost:9000" : ""))
+// Browser error reports go to the DSN's host (docs/observability.md).
+const ERROR_REPORTING_ORIGIN = toOrigin(process.env.NEXT_PUBLIC_SENTRY_DSN)
 
 /**
  * Next 16 "proxy" (formerly middleware), on every page request:
@@ -22,7 +24,12 @@ export function proxy(request: NextRequest) {
   }
 
   const nonce = createNonce()
-  const csp = buildCsp({ nonce, dev: DEV, storageOrigin: STORAGE_ORIGIN })
+  const csp = buildCsp({
+    nonce,
+    dev: DEV,
+    storageOrigin: STORAGE_ORIGIN,
+    errorReportingOrigin: ERROR_REPORTING_ORIGIN,
+  })
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set("x-nonce", nonce)
   requestHeaders.set("Content-Security-Policy", csp)

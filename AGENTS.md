@@ -108,6 +108,7 @@ the relevant doc in `docs/` is updated if behaviour changed, and the matching ch
    the `sahihi_app` role and an update trigger, ADR 0010). New event types go in `AUDIT_EVENT_TYPES`.
 8. **Secrets:** raw signing tokens and OTP codes are never stored or logged. Store only hashes
    (`hashSigningToken`, `hashOtp`). A raw token exists only in a notification job payload and the email.
+   Log with `createLogger` (`@sahihi/infra`), not `console`: it redacts fields and masks tokens.
 9. **The server owns final PDFs:** the browser submits field values only. Stamping, flattening and
    hashing happen in the worker (`@sahihi/pdf`). Original PDFs are immutable once `READY`.
 10. **Coordinates:** `Field.x/y/width/height` are **normalized 0–1, top-left origin, relative to the
@@ -123,8 +124,8 @@ the relevant doc in `docs/` is updated if behaviour changed, and the matching ch
 13. Validate every request body with a zod schema from `@sahihi/core/schemas` via `parseJson()`.
     Shared schemas live in core so web forms and the API agree.
 14. Env vars: add them to `packages/config/src/index.ts` **and** `.env.example`. Never read
-    `process.env` elsewhere, with two exceptions: `apps/web` for `API_URL`, `STORAGE_ORIGIN` and
-    `NODE_ENV`, and
+    `process.env` elsewhere, with two exceptions: `apps/web` for `API_URL`, `STORAGE_ORIGIN`,
+    `NODE_ENV` and the Sentry DSNs (`SENTRY_*`, `NEXT_PUBLIC_SENTRY_*`, docs/observability.md), and
     `packages/db/prisma.config.ts` for `MIGRATE_DATABASE_URL` / `DATABASE_URL`.
 15. Prisma enums must mirror the unions in `packages/core/src/enums.ts`. `packages/db/src/enums.test.ts`
     enforces this, so update both.
@@ -146,6 +147,7 @@ the relevant doc in `docs/` is updated if behaviour changed, and the matching ch
 | Webhooks (events, signing, delivery) | `docs/webhooks.md` |
 | Plans, envelope quotas, seats | `docs/billing.md` |
 | Retention, export, deleting data or a workspace | `docs/data-retention.md` |
+| Logs, error tracking, queue dashboard | `docs/observability.md` |
 | Certificates, `/verify`, CA integration | `docs/certificates.md` |
 | Any public route, tokens, tenancy | `docs/security.md` |
 | Any screen or component | `docs/ui.md` |

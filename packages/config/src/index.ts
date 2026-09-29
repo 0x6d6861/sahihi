@@ -50,6 +50,15 @@ const EnvSchema = z.object({
     .default("false")
     .transform((v) => v === "true"),
 
+  // ── Observability (docs/observability.md) ──
+  LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
+  /** Error tracking; off when unset. */
+  SENTRY_DSN: z.string().url().optional(),
+  SENTRY_ENVIRONMENT: z.string().optional(),
+  /** Staff-only BullMQ dashboard at /admin/queues on the api; off unless both are set. */
+  ADMIN_DASHBOARD_USER: z.string().min(1).optional(),
+  ADMIN_DASHBOARD_PASSWORD: z.string().min(16, "Use at least 16 characters").optional(),
+
   SIGNING_LINK_TTL_DAYS: z.coerce.number().int().positive().default(14),
   SIGNING_PROVIDER: z.enum(["internal", "ca"]).default("internal"),
 })

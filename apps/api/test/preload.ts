@@ -34,6 +34,9 @@ Object.assign(process.env, {
   EMAIL_FROM: "Sahihi Test <test@example.com>",
   // Webhook itests use a local receiver; SSRF rules are covered by core unit tests.
   WEBHOOKS_ALLOW_PRIVATE_URLS: "true",
+  // Queue dashboard on, so its auth and redaction are tested (docs/observability.md).
+  ADMIN_DASHBOARD_USER: "ops",
+  ADMIN_DASHBOARD_PASSWORD: "test-dashboard-password-1234",
 })
 
 async function ensureDatabase() {

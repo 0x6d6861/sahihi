@@ -1,7 +1,9 @@
 import { getEnv } from "@sahihi/config"
 import { abandonedUploadCutoff } from "@sahihi/core"
 import { appendAuditEvent, issueSigningLink, prisma, queueEnvelopeWebhook } from "@sahihi/db"
-import { deleteObject, enqueueWebhookDeliveries, getQueues } from "@sahihi/infra"
+import { createLogger, deleteObject, enqueueWebhookDeliveries, getQueues } from "@sahihi/infra"
+
+const log = createLogger("worker")
 
 const DAY = 86_400_000
 const REMIND_EVERY_DAYS = 3
@@ -95,7 +97,7 @@ export async function sweepAbandonedUploads(now = new Date()) {
       // Missing keys are a no-op in S3, so an error here is a real outage. The row is already
       // swept; log the key so the orphaned (private) object can be removed by hand.
       await deleteObject(doc.s3Key).catch((err: unknown) =>
-        console.error(`[maintenance] could not delete ${doc.s3Key}:`, err),
+        log.error("could not delete abandoned upload", { key: doc.s3Key, err }),
       )
     }
     if (stale.length < SWEEP_BATCH) break

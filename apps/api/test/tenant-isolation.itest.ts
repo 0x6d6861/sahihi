@@ -169,6 +169,13 @@ const LISTS = [
  * (signing-*.itest.ts), verify is public by design (verify.itest.ts), auth is better-auth's
  * (members.itest.ts / permissions.itest.ts).
  */
+/**
+ * The staff-only queue dashboard isn't tenant data: it sits behind its own basic auth, redacts
+ * job data and only allows retries (observability.itest.ts).
+ */
+const isStaffDashboard = (route: string) =>
+  route.split(" ")[1]?.startsWith("/admin/queues/") || route.endsWith(" /admin/queues")
+
 const NOT_TENANT = [
   // Creates in the caller's own org and takes no ids from the request.
   "POST /api/webhooks",
@@ -274,7 +281,12 @@ beforeAll(async () => {
 describe("tenant isolation", () => {
   test("every route is classified (tenant, list or not tenant-scoped)", () => {
     const served = [
-      ...new Set(app.routes.filter((r) => r.method !== "ALL").map((r) => `${r.method} ${r.path}`)),
+      ...new Set(
+        app.routes
+          .filter((r) => r.method !== "ALL")
+          .map((r) => `${r.method} ${r.path}`)
+          .filter((route) => !isStaffDashboard(route)),
+      ),
     ].sort()
     const classified = [...Object.keys(TENANT), ...LISTS, ...NOT_TENANT].sort()
     expect(served).toEqual(classified)

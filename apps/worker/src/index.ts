@@ -1,8 +1,12 @@
 import { getEnv, QUEUES } from "@sahihi/config"
 import { webhookRetryDelayMs } from "@sahihi/core"
 import {
+  captureError,
+  createLogger,
   type FinalizeJobs,
+  flushErrors,
   getQueues,
+  initErrorTracking,
   type MaintenanceJobs,
   type NotificationJobs,
   redis,
@@ -22,6 +26,8 @@ import {
 import { deliverWebhook, sweepWebhookOutbox } from "./jobs/webhooks"
 
 getEnv() // fail fast on bad config
+const log = createLogger("worker")
+const tracking = initErrorTracking("worker")
 const connection = redis()
 
 const workers = [
@@ -73,11 +79,32 @@ const workers = [
   ),
 ]
 
+// Job lifecycle (docs/observability.md): ids and timings only, never job data (it can carry raw
+// tokens and OTP codes). Error tracking hears about the final failure, not every retry.
 for (const w of workers) {
-  w.on("failed", (job, err) =>
-    console.error(`[${w.name}] ${job?.name} ${job?.id} failed:`, err.message),
+  w.on("failed", (job, err) => {
+    const final = !job || job.attemptsMade >= (job.opts.attempts ?? 1)
+    const fields = {
+      queue: w.name,
+      job: job?.name,
+      jobId: job?.id,
+      attempt: job?.attemptsMade,
+      final,
+      err,
+    }
+    if (final) {
+      log.error("job failed", fields)
+      captureError(err, { queue: w.name, job: job?.name, jobId: job?.id })
+    } else log.warn("job attempt failed; retrying", fields)
+  })
+  w.on("completed", (job) =>
+    log.info("job done", {
+      queue: w.name,
+      job: job.name,
+      jobId: job.id,
+      ms: job.finishedOn && job.processedOn ? job.finishedOn - job.processedOn : undefined,
+    }),
   )
-  w.on("completed", (job) => console.log(`[${w.name}] ${job.name} ${job.id} done`))
 }
 
 // Repeatable schedules (idempotent — same key replaces the previous schedule)
@@ -113,11 +140,14 @@ await maintenance.raw.upsertJobScheduler(
   { name: "envelopes.remind", data: {} },
 )
 
-console.log("▲ worker running:", workers.map((w) => w.name).join(", "))
+log.info(`worker running: ${workers.map((w) => w.name).join(", ")}`, {
+  errorTracking: tracking ? "sentry" : "off",
+})
 
 async function shutdown() {
-  console.log("worker shutting down…")
+  log.info("worker shutting down")
   await Promise.all(workers.map((w) => w.close()))
+  await flushErrors()
   process.exit(0)
 }
 process.on("SIGTERM", shutdown)

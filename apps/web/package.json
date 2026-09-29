@@ -41,6 +41,7 @@
     "@embedpdf/plugin-viewport": "2.15.1",
     "@embedpdf/plugin-zoom": "2.15.1",
     "@sahihi/core": "workspace:*",
+    "@sentry/nextjs": "11.1.0",
     "better-auth": "1.7.6",
     "border-beam": "1.4.1",
     "class-variance-authority": "0.7.1",
