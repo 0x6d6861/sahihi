@@ -22,6 +22,7 @@ const ids = {
   role: "",
   webhook: "",
   delivery: "",
+  export: "",
 }
 
 type Case = () => { path: string; init?: RequestInit & { json?: unknown } }
@@ -115,6 +116,13 @@ const TENANT: Record<string, Case> = {
     path: `/api/templates/${ids.template}`,
     init: { method: "DELETE" },
   }),
+  "POST /api/envelopes/:id/purge": () => ({
+    path: `/api/envelopes/${ids.envelope}/purge`,
+    init: { method: "POST" },
+  }),
+  "GET /api/data/exports/:id/download": () => ({
+    path: `/api/data/exports/${ids.export}/download`,
+  }),
   "PATCH /api/webhooks/:id": () => ({
     path: `/api/webhooks/${ids.webhook}`,
     init: { method: "PATCH", json: { url: "https://attacker.example/hook" } },
@@ -153,6 +161,7 @@ const LISTS = [
   "GET /api/envelopes",
   "GET /api/templates",
   "GET /api/webhooks",
+  "GET /api/data/exports",
 ]
 
 /**
@@ -165,6 +174,10 @@ const NOT_TENANT = [
   "POST /api/webhooks",
   // The caller's own workspace plan and usage; takes no ids.
   "GET /api/billing",
+  // The caller's own workspace data settings / a new export of their own data; no ids.
+  "GET /api/data/settings",
+  "PUT /api/data/settings",
+  "POST /api/data/exports",
   "GET /health",
   "GET /api/auth/*",
   "POST /api/auth/*",
@@ -244,6 +257,16 @@ beforeAll(async () => {
   ids.webhook = ((await hook.json()) as { endpoint: { id: string } }).endpoint.id
   const tested = await request(alice, `/api/webhooks/${ids.webhook}/test`, { method: "POST" })
   ids.delivery = ((await tested.json()) as { delivery: { id: string } }).delivery.id
+  const exp = await prisma.dataExport.create({
+    data: {
+      organizationId: alice.organizationId,
+      requestedById: alice.userId,
+      status: "READY",
+      s3Key: `org/${alice.organizationId}/exports/x.zip`,
+      expiresAt: new Date(Date.now() + 86_400_000),
+    },
+  })
+  ids.export = exp.id
   // A failed delivery, so "retry" would otherwise be allowed.
   await prisma.webhookDelivery.update({ where: { id: ids.delivery }, data: { status: "FAILED" } })
 })
@@ -275,7 +298,13 @@ describe("tenant isolation", () => {
   })
 
   test("lists only return the caller's rows", async () => {
-    for (const path of ["/api/documents", "/api/envelopes", "/api/templates", "/api/webhooks"]) {
+    for (const path of [
+      "/api/documents",
+      "/api/envelopes",
+      "/api/templates",
+      "/api/webhooks",
+      "/api/data/exports",
+    ]) {
       const mine = (await (await request(alice, path)).json()) as { items: unknown[] }
       const theirs = (await (await request(mallory, path)).json()) as { items: unknown[] }
       expect({ path, alice: mine.items.length > 0, mallory: theirs.items.length }).toEqual({

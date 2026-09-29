@@ -1,0 +1,72 @@
+# Data retention, export and deletion
+
+Kenya Data Protection Act 2019 (and GDPR-style) duties: keep personal data only as long as
+needed, let the workspace take its data with it, and delete it on request (ADR 0015). Owners and
+admins manage this under **Settings → Data** (`data:manage`).
+
+## What "purging" an envelope does
+
+| Deleted | Kept (evidence) |
+|---|---|
+| Signed PDF, certificate PDF, signature/initials images (`org/<id>/envelopes/<envelopeId>/…`) | Status, all timestamps, signing order |
+| The original PDF, once no other live envelope and no template uses it (the `Document` row is renamed "Deleted document" and soft-deleted; its `sha256` stays) | Document hash, `signedSha256`, the `Certificate` row (code, hash) so `/verify/<code>` still answers |
+| Recipients' names, emails (→ `deleted-<id>@redacted.invalid`), phones, signing IPs and user agents, decline reasons, OTP rows, link tokens | Recipient roles, order, statuses and `signedAt`/`viewedAt`/`declinedAt` |
+| Field values and labels; envelope title and message; void reason | Field positions and types |
+| Webhook delivery payloads for that envelope (→ `{ redacted: true }`) | The hash-chained **audit trail**, append-only (ADR 0010), plus an `envelope.purged` event with the reason |
+
+The audit trail is kept as it is under the lawful-basis exception: it's the evidence that a
+signature happened. Its rows can't be edited (ADR 0010), so personal data inside older audit
+payloads (e.g. a decline or void reason) stays there.
+
+`purgeEnvelope` (`apps/worker/src/jobs/retention.ts`) deletes files first, then redacts in one
+transaction with the audit event, then removes the original if it's unused. It's idempotent
+(`purgedAt`). Afterwards, downloads return **410** `purged`, and the envelope page shows a
+"Files and personal data deleted" notice.
+
+## Retention (automatic)
+
+- `WorkspaceSettings.retentionYears`: **null = keep forever (default)**, or 1, 3, 7 or 10 years.
+  `PUT /api/data/settings`.
+- The `retention.sweep` job (daily 02:30 Nairobi) queues `envelope.purge` for closed envelopes
+  (COMPLETED, DECLINED, VOIDED, EXPIRED) that closed before the cutoff. "Closed" = `completedAt`,
+  else `voidedAt`, else `updatedAt` for declined/expired (`closedAt`). Drafts and open envelopes
+  are never purged.
+
+## On request
+
+`POST /api/envelopes/:id/purge` (owner/admin, closed envelopes only) queues the same purge now,
+e.g. for a data subject's erasure request. It's the "Delete data" button on the envelope page.
+
+## Export
+
+- `POST /api/data/exports` (one at a time) queues `export.build`. The worker streams a ZIP to a
+  temp file and uploads it to `org/<id>/exports/<exportId>.zip`. It contains:
+  - `README.txt`, `manifest.json`
+  - per sent, non-purged envelope (up to `EXPORT_MAX_ENVELOPES` = 2,000): `envelope.json`
+    (details, recipients), `audit.json` (events + chain verification), `original.pdf`, and when
+    completed `signed.pdf` and `certificate.pdf`
+- `GET /api/data/exports` lists the last 10. `GET /api/data/exports/:id/download` returns a
+  presigned `attachment` URL. Archives expire after **7 days** (`exports.cleanup`, daily), and
+  the row is kept as history.
+
+## Deleting a workspace
+
+The owner uses **Settings → Data → Delete workspace** and types the name to confirm. That calls
+better-auth's `organization.delete`:
+- DB rows cascade: documents, envelopes, recipients, fields, audit trails, certificates,
+  templates, webhooks, exports, settings.
+- The `afterDeleteOrganization` hook queues `organization.purge-storage`, which deletes everything
+  under `org/<id>/` in storage (`deletePrefix`, which refuses any prefix that isn't a workspace
+  folder).
+- Certificates stop verifying. The dialog says so and suggests exporting first.
+
+## Tests
+
+`apps/api/test/retention.itest.ts` covers what's deleted and what's kept (including a valid audit
+chain), shared originals, API permissions, the sweep cutoff, the export's contents and expiry, and
+the storage wipe after workspace deletion. The new routes are in `tenant-isolation.itest.ts`.
+
+## Not in v1
+
+Erasing one person across every envelope in a single action (purge their envelopes one by one),
+exports larger than 2,000 envelopes, and emailing the owner when an export is ready.

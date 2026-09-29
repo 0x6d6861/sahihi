@@ -27,6 +27,8 @@ export const AUDIT_EVENT_TYPES = [
   "recipient.declined",
   "document.finalized",
   "certificate.issued",
+  /** Files and personal data deleted (retention or on request); evidence kept (docs/data-retention.md). */
+  "envelope.purged",
 ] as const
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]
 

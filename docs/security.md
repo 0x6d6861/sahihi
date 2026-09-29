@@ -149,8 +149,10 @@ checks are strict (`docs/webhooks.md`, ADR 0013):
 ## Data protection (Kenya DPA 2019 / GDPR)
 
 - PII: sender and recipient names, emails, phones, IPs and user agents.
-- Planned: per-org retention settings, an export and delete tool (the audit trail is retained
-  under a lawful-basis exception), a DPA template for tenants, and data residency options.
+- Retention, export and deletion: `docs/data-retention.md` (ADR 0015). Purging keeps the evidence
+  (hashes, certificate code, audit trail under the lawful-basis exception) and deletes files and
+  personal data. Deleting a workspace also wipes its storage prefix.
+- Planned: a DPA template for tenants, and data residency options.
 - Don't put PII in logs. Log ids, not emails.
 
 ## Headers & transport

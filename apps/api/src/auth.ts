@@ -88,6 +88,15 @@ export const auth = betterAuth({
             throw new APIError("FORBIDDEN", { message: seatLimitMessage(plan) })
           }
         },
+        // The DB rows cascade; stored files (PDFs, signatures, exports) are removed by the worker
+        // (docs/data-retention.md → Deleting a workspace).
+        afterDeleteOrganization: async ({ organization }) => {
+          await getQueues().maintenance.add(
+            "organization.purge-storage",
+            { organizationId: organization.id },
+            { jobId: `purge-org-${organization.id}`, attempts: 5 },
+          )
+        },
       },
       sendInvitationEmail: async (data) => {
         await getQueues().notifications.add("auth.org-invitation", {

@@ -176,6 +176,12 @@ export const signing = new Hono<SigningEnv>()
   /** After completion, every recipient receives a fresh link that lands here. */
   .get("/:token/downloads", withSigner, async (c) => {
     const s = c.get("signer")
+    if (s.envelope.purgedAt) {
+      return c.json(
+        { error: "purged", message: "These files were deleted under the data retention policy" },
+        410,
+      )
+    }
     if (linkState(s) !== "completed" || !s.envelope.signedS3Key || !s.envelope.certificate) {
       return c.json({ error: "not_available" }, 409)
     }

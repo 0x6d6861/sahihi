@@ -8,6 +8,7 @@ import { logger } from "hono/logger"
 import { secureHeaders } from "hono/secure-headers"
 import { auth } from "./auth"
 import { billing } from "./routes/billing"
+import { data } from "./routes/data"
 import { documents } from "./routes/documents"
 import { envelopes } from "./routes/envelopes"
 import { signing } from "./routes/signing"
@@ -44,6 +45,7 @@ export function createApp() {
     .route("/api/envelopes", envelopes)
     .route("/api/templates", templates)
     .route("/api/billing", billing)
+    .route("/api/data", data)
     .route("/api/webhooks", webhooks)
     .route("/api/sign", signing)
     .route("/api/verify", verify)

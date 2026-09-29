@@ -16,6 +16,7 @@ import {
 } from "@/components/app/envelope/activity-list"
 import { DraftStateProvider } from "@/components/app/envelope/draft-state"
 import { type EnvelopeTab, EnvelopeTabs } from "@/components/app/envelope/envelope-tabs"
+import { PurgeEnvelope } from "@/components/app/envelope/purge-envelope"
 import { SendControl } from "@/components/app/envelope/send-control"
 import {
   EnvelopeHeaderActions,
@@ -70,6 +71,8 @@ interface EnvelopeDetail {
     label: string | null
   })[]
   completedAt: string | null
+  /** Files and personal data deleted (docs/data-retention.md) */
+  purgedAt: string | null
   /** Set by the finalize job, shortly after COMPLETED. */
   certificate: { code: string; issuedAt: string; provider: "INTERNAL" | "CA" } | null
 }
@@ -89,7 +92,7 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
   const { id } = await params
   const path = `/envelopes/${encodeURIComponent(id)}`
   const [{ status, data }, audit] = await Promise.all([
-    apiServer<{ envelope: EnvelopeDetail; permissions: { manage: boolean } }>(path),
+    apiServer<{ envelope: EnvelopeDetail; permissions: { manage: boolean; purge: boolean } }>(path),
     apiServer<{ events: AuditEventRow[]; verification: ChainVerification }>(`${path}/audit`),
   ])
   if (status === 404 || !data) notFound()
@@ -101,10 +104,11 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
   const draft = e.status === "DRAFT" && canManage
   const open = e.status === "DRAFT" || e.status === "SENT" || e.status === "IN_PROGRESS"
   const sequential = e.signingOrder === "SEQUENTIAL"
+  const purged = Boolean(e.purgedAt)
   // The original PDF (presigned, short-lived): field editor while drafting, viewer afterwards.
-  const file = await apiServer<{ url: string }>(
-    `/documents/${encodeURIComponent(e.document.id)}/file`,
-  )
+  const file = purged
+    ? { status: 410, data: null }
+    : await apiServer<{ url: string }>(`/documents/${encodeURIComponent(e.document.id)}/file`)
   const fieldOwners = e.recipients
     .filter((r) => r.role !== "VIEWER")
     .map((r) => ({ id: r.id, name: r.name, colorIndex: r.colorIndex }))
@@ -123,7 +127,12 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
         </CardDescription>
       </CardHeader>
       <CardPanel>
-        {!file.data ? (
+        {purged ? (
+          <p className="text-muted-foreground text-sm">
+            The document was deleted under the data retention policy. Its hash is kept on the
+            certificate and in the Activity log.
+          </p>
+        ) : !file.data ? (
           <p className="text-muted-foreground text-sm">The document could not be loaded.</p>
         ) : !draft ? (
           <DocumentViewer src={file.data.url} fileName={e.document.name} />
@@ -225,7 +234,7 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
 
   // Anyone who can see the envelope may copy it into a template (the envelope isn't changed).
   const saveTemplate =
-    e.recipients.length > 0 ? (
+    e.recipients.length > 0 && !purged ? (
       <SaveTemplateDialog envelopeId={e.id} envelopeTitle={e.title} recipients={e.recipients} />
     ) : null
 
@@ -272,7 +281,12 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
             <EnvelopeHeaderActions
               envelopeId={e.id}
               canVoid={canManage}
-              actions={saveTemplate}
+              actions={
+                <>
+                  {saveTemplate}
+                  {data.permissions.purge && <PurgeEnvelope envelopeId={e.id} />}
+                </>
+              }
               summary={{
                 title: e.title,
                 status: e.status,
@@ -293,7 +307,17 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
           </Alert>
         )}
 
-        {e.status === "COMPLETED" && (
+        {purged && e.purgedAt && (
+          <Alert variant="info">
+            <AlertTitle>Files and personal data deleted</AlertTitle>
+            <AlertDescription>
+              On {dateLabel.format(new Date(e.purgedAt))}, under the data retention policy. The
+              status, hashes, certificate code and audit trail are kept as evidence.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {e.status === "COMPLETED" && !purged && (
           <Card>
             <CardHeader>
               <CardTitle>Signed and certified</CardTitle>

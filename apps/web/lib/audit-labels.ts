@@ -21,6 +21,7 @@ const LABELS: Record<AuditEventType, (who: string) => string> = {
   "recipient.declined": (who) => `${who} declined to sign`,
   "document.finalized": () => "Signed PDF produced",
   "certificate.issued": () => "Certificate of completion issued",
+  "envelope.purged": () => "Files and personal data deleted",
 }
 
 export function auditEventLabel(

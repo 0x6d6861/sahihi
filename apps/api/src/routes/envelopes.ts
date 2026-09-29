@@ -3,6 +3,8 @@ import {
   CreateEnvelopeSchema,
   canManageEnvelope,
   downloadFileName,
+  hasPermission,
+  isClosed,
   isEditable,
   ReplaceFieldsSchema,
   ReplaceRecipientsSchema,
@@ -20,12 +22,26 @@ import {
 } from "@sahihi/db"
 import { enqueueWebhookDeliveries, getQueues, presignDownload } from "@sahihi/infra"
 import { Hono } from "hono"
+import { HTTPException } from "hono/http-exception"
 import { assertEnvelopeQuota } from "../lib/billing"
 import type { AppEnv } from "../lib/env"
-import { badRequest, clientMeta, conflict, notFound, parseJson } from "../lib/http"
+import { badRequest, clientMeta, conflict, forbidden, notFound, parseJson } from "../lib/http"
 import { actor, assertCanManageEnvelope } from "../lib/permissions"
 import { requireOrg } from "../middleware/session"
 import { activateNextRecipients, rotateRecipientLink } from "../services/routing"
+
+/** 410 for files deleted under retention or on request (docs/data-retention.md). */
+function gone(): never {
+  throw new HTTPException(410, {
+    res: Response.json(
+      {
+        error: "purged",
+        message: "This envelope's files were deleted under the data retention policy",
+      },
+      { status: 410 },
+    ),
+  })
+}
 
 /** Never leak token hashes to clients. */
 const recipientSelect = {
@@ -110,7 +126,17 @@ export const envelopes = new Hono<AppEnv>()
       },
     })
     if (!envelope) notFound("Envelope")
-    return c.json({ envelope, permissions: { manage: canManageEnvelope(actor(c), envelope) } })
+    return c.json({
+      envelope,
+      permissions: {
+        manage: canManageEnvelope(actor(c), envelope),
+        // Delete files + personal data now (docs/data-retention.md)
+        purge:
+          hasPermission(c.get("memberRole"), { data: ["manage"] }) &&
+          isClosed(envelope.status) &&
+          !envelope.purgedAt,
+      },
+    })
   })
 
   /** Replace the recipient list (draft only). Removed recipients lose their fields. */
@@ -342,6 +368,7 @@ export const envelopes = new Hono<AppEnv>()
       include: { certificate: true },
     })
     if (!envelope) notFound("Envelope")
+    if (envelope.purgedAt) gone()
     if (!envelope.signedS3Key || !envelope.certificate) conflict("Envelope is not finalized yet")
     return c.json({
       signed: await presignDownload(envelope.signedS3Key, {
@@ -353,4 +380,30 @@ export const envelopes = new Hono<AppEnv>()
         disposition: "attachment",
       }),
     })
+  })
+
+  /**
+   * Delete this closed envelope's files and personal data now, keeping the evidence
+   * (docs/data-retention.md). Owners/admins; e.g. for a data-subject erasure request.
+   */
+  .post("/:id/purge", async (c) => {
+    if (!hasPermission(c.get("memberRole"), { data: ["manage"] })) {
+      forbidden("Only owners and admins can delete envelope data")
+    }
+    const scope = forOrganization(c.get("organizationId"))
+    const envelope = await prisma.envelope.findFirst({
+      where: scope.envelope({ id: c.req.param("id") }),
+      select: { id: true, status: true, purgedAt: true },
+    })
+    if (!envelope) notFound("Envelope")
+    if (envelope.purgedAt) conflict("This envelope's data was already deleted")
+    if (!isClosed(envelope.status)) {
+      conflict("Only completed, declined, voided or expired envelopes can be deleted")
+    }
+    await getQueues().maintenance.add(
+      "envelope.purge",
+      { envelopeId: envelope.id, reason: "manual" },
+      { jobId: `purge-${envelope.id}` },
+    )
+    return c.json({ ok: true }, 202)
   })

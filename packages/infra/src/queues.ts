@@ -35,6 +35,15 @@ export interface MaintenanceJobs {
   "envelopes.remind": Record<string, never>
   "documents.sweep-uploads": Record<string, never>
   "webhooks.sweep": Record<string, never>
+  /** Daily: purge closed envelopes past their workspace's retention (docs/data-retention.md). */
+  "retention.sweep": Record<string, never>
+  /** Purge one closed envelope now (owner/admin request). */
+  "envelope.purge": { envelopeId: string; reason: "retention" | "manual" }
+  "export.build": { exportId: string }
+  /** Daily: delete expired export archives. */
+  "exports.cleanup": Record<string, never>
+  /** After a workspace is deleted: remove everything under org/<id>/ in storage. */
+  "organization.purge-storage": { organizationId: string }
 }
 
 export interface WebhookJobs {

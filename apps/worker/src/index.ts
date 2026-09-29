@@ -12,6 +12,13 @@ import { type Job, Worker } from "bullmq"
 import { finalizeEnvelope } from "./jobs/finalize"
 import { expireEnvelopes, remindRecipients, sweepAbandonedUploads } from "./jobs/maintenance"
 import { handleNotification } from "./jobs/notifications"
+import {
+  buildExport,
+  cleanupExports,
+  purgeEnvelope,
+  purgeOrganizationStorage,
+  retentionSweep,
+} from "./jobs/retention"
 import { deliverWebhook, sweepWebhookOutbox } from "./jobs/webhooks"
 
 getEnv() // fail fast on bad config
@@ -35,6 +42,19 @@ const workers = [
       if (job.name === "envelopes.remind") return remindRecipients()
       if (job.name === "documents.sweep-uploads") return sweepAbandonedUploads()
       if (job.name === "webhooks.sweep") return sweepWebhookOutbox()
+      if (job.name === "retention.sweep") return retentionSweep()
+      if (job.name === "exports.cleanup") return cleanupExports()
+      if (job.name === "envelope.purge") {
+        const data = job.data as MaintenanceJobs["envelope.purge"]
+        return purgeEnvelope(data.envelopeId, data.reason)
+      }
+      if (job.name === "export.build") {
+        return buildExport((job.data as MaintenanceJobs["export.build"]).exportId)
+      }
+      if (job.name === "organization.purge-storage") {
+        const data = job.data as MaintenanceJobs["organization.purge-storage"]
+        return purgeOrganizationStorage(data.organizationId)
+      }
       throw new Error(`Unknown maintenance job ${job.name}`)
     },
     { connection, concurrency: 1 },
@@ -76,6 +96,16 @@ await maintenance.raw.upsertJobScheduler(
   "webhooks-sweep-5m",
   { pattern: "*/5 * * * *" },
   { name: "webhooks.sweep", data: {} },
+)
+await maintenance.raw.upsertJobScheduler(
+  "retention-daily",
+  { pattern: "30 2 * * *", tz: "Africa/Nairobi" },
+  { name: "retention.sweep", data: {} },
+)
+await maintenance.raw.upsertJobScheduler(
+  "exports-cleanup-daily",
+  { pattern: "45 2 * * *", tz: "Africa/Nairobi" },
+  { name: "exports.cleanup", data: {} },
 )
 await maintenance.raw.upsertJobScheduler(
   "remind-daily",

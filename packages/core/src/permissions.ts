@@ -22,6 +22,8 @@ export const orgStatements = {
   envelope: ["create", "manage-any"],
   template: ["create", "manage-any"],
   webhook: ["manage"],
+  /** Retention settings, exports and purging closed envelopes (docs/data-retention.md). */
+  data: ["manage"],
   billing: ["manage"],
 } as const
 
@@ -34,6 +36,7 @@ export const orgRoles = {
     envelope: ["create", "manage-any"],
     template: ["create", "manage-any"],
     webhook: ["manage"],
+    data: ["manage"],
     billing: ["manage"],
   }),
   admin: orgAc.newRole({
@@ -42,6 +45,7 @@ export const orgRoles = {
     envelope: ["create", "manage-any"],
     template: ["create", "manage-any"],
     webhook: ["manage"],
+    data: ["manage"],
   }),
   member: orgAc.newRole({
     ...memberAc.statements,

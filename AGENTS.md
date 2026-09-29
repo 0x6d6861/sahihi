@@ -37,8 +37,8 @@ Read this file first, then the doc for the area you're touching (see **Doc map**
 
 ```
 apps/
-  api/        Hono REST API. routes/{documents,envelopes,templates,webhooks,billing,signing,verify}.ts, auth.ts (better-auth)
-  worker/     BullMQ consumers: notifications, envelope finalize, webhooks, maintenance (expire/remind/sweeps)
+  api/        Hono REST API. routes/{documents,envelopes,templates,webhooks,billing,data,signing,verify}.ts, auth.ts (better-auth)
+  worker/     BullMQ consumers: notifications, envelope finalize, webhooks, maintenance (expire/remind/sweeps/retention/exports)
   web/        Next.js. (auth)/ sign-in/up/onboarding, (app)/ documents+envelopes, sign/[token], verify/[code]
 packages/
   config/     Env schema (zod) + queue names. The ONLY place process.env is parsed.
@@ -144,6 +144,7 @@ the relevant doc in `docs/` is updated if behaviour changed, and the matching ch
 | Templates (save as / use) | `docs/templates.md` |
 | Webhooks (events, signing, delivery) | `docs/webhooks.md` |
 | Plans, envelope quotas, seats | `docs/billing.md` |
+| Retention, export, deleting data or a workspace | `docs/data-retention.md` |
 | Certificates, `/verify`, CA integration | `docs/certificates.md` |
 | Any public route, tokens, tenancy | `docs/security.md` |
 | Any screen or component | `docs/ui.md` |

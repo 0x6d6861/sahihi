@@ -18,5 +18,8 @@
     "better-auth": "1.7.6",
     "hono": "4.13.9",
     "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "fflate": "0.8.3"
   }
 }
