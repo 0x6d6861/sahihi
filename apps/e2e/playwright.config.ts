@@ -3,6 +3,8 @@ import { defineConfig, devices } from "@playwright/test"
 import { API_URL, serverEnv, WEB_PORT, WEB_URL, withEnv } from "./env"
 
 const root = path.resolve(import.meta.dirname, "../..")
+// GitHub Actions (.github/workflows/ci.yml → integration-e2e): cold `next dev` compiles are slower.
+const CI = Boolean(process.env.CI)
 
 /**
  * End-to-end: sign-up → upload → place → send → sign (Mailpit) → certificate (docs/testing.md → E2E).
@@ -13,12 +15,16 @@ export default defineConfig({
   testDir: "tests",
   // *.e2e.ts, so a bare `bun test` never picks these up.
   testMatch: "**/*.e2e.ts",
-  timeout: 180_000,
-  expect: { timeout: 20_000 },
+  timeout: CI ? 360_000 : 180_000,
+  expect: { timeout: CI ? 45_000 : 20_000 },
   fullyParallel: false,
   workers: 1,
-  retries: 0,
-  reporter: [["list"], ["html", { open: "never", outputFolder: "playwright-report" }]],
+  retries: CI ? 1 : 0,
+  forbidOnly: CI,
+  reporter: [
+    [CI ? "github" : "list"],
+    ["html", { open: "never", outputFolder: "playwright-report" }],
+  ],
   outputDir: "test-results",
   globalSetup: "./global-setup.ts",
   use: {
@@ -43,7 +49,7 @@ export default defineConfig({
       url: `${WEB_URL}/sign-in`,
       env: withEnv({ API_URL, NODE_ENV: "development" }),
       reuseExistingServer: false,
-      timeout: 180_000,
+      timeout: CI ? 300_000 : 180_000,
     },
   ],
 })
