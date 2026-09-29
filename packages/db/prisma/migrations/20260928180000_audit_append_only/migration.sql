@@ -40,4 +40,11 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE O
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO sahihi_app;
 
 REVOKE UPDATE, DELETE, TRUNCATE ON "AuditEvent" FROM sahihi_app;
-REVOKE ALL ON "_prisma_migrations" FROM sahihi_app;
+-- Guarded: Prisma replays migrations into a shadow database that has no _prisma_migrations table.
+DO $$
+BEGIN
+  IF to_regclass('"_prisma_migrations"') IS NOT NULL THEN
+    REVOKE ALL ON "_prisma_migrations" FROM sahihi_app;
+  END IF;
+END
+$$;
