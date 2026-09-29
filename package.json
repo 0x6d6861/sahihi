@@ -27,7 +27,8 @@
     "infra:up": "docker compose up -d",
     "infra:down": "docker compose down",
     "ui:bootstrap": "bash scripts/bootstrap-ui.sh",
-    "billing:set-plan": "bun --env-file=.env packages/db/scripts/set-plan.ts"
+    "billing:set-plan": "bun --env-file=.env packages/db/scripts/set-plan.ts",
+    "test:e2e": "bun run --filter @sahihi/e2e test"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",

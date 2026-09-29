@@ -70,6 +70,7 @@ bun run dev                # api :4000, worker, web :3000
 
 bun test                   # unit tests (no DB/Redis needed)
 bun run test:integration   # API integration tests (needs infra:up; uses sahihi_test DB)
+bun run test:e2e           # Playwright journey on its own stack (needs infra:up, dev stopped; docs/testing.md → E2E)
 bun run fixtures           # regenerate fixtures/*.pdf (commit them; tests check they match)
 bun run emails:dev         # React Email preview of every template → http://localhost:3030
 bun run billing:set-plan <org-slug> <plan>   # change a workspace's plan (docs/billing.md)

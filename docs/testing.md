@@ -13,7 +13,7 @@ Runner: **`bun test`** (Jest-compatible `bun:test` API). No vitest or jest.
 | API smoke | `apps/api/src/app.test.ts` (health, 401 without a session) | no | `bun test` |
 | Web helpers | `apps/web/lib/*.test.ts` (DOM-free only) | no | `bun test apps/web` |
 | API/worker integration | `apps/api/test/*.itest.ts`, `apps/worker/test/*.itest.ts` | Postgres + Redis + MinIO | `bun run infra:up && bun run test:integration` |
-| E2E | Playwright (**to create**, roadmap P5) | full stack | `bunx playwright test` |
+| E2E | `apps/e2e/tests/*.e2e.ts` (Playwright, Chromium) | Postgres + Redis + MinIO + Mailpit | `bun run infra:up && bun run test:e2e` |
 
 The root `bun run test` script covers `packages`, `apps/api/src`, `apps/worker` and `apps/web/lib`.
 Integration tests are named `*.itest.ts`, so neither it nor a bare `bun test` picks them up.
@@ -67,3 +67,39 @@ Conventions (`test/helpers.ts`):
   because `resetDb()` needs TRUNCATE.
 - Assert on queued jobs with `getQueues().notifications.raw.getJobs()` (Redis DB 15).
 - Use the fixture PDFs in `fixtures/` (see `coordinates.md`).
+
+## E2E (`apps/e2e`)
+
+`bun run test:e2e` runs the core journey through the real UI and real email:
+sign-up → verify email (Mailpit) → create workspace → upload a PDF → create envelope → add a
+recipient → place a signature field → send → the signer opens the emailed link in a separate
+browser context, types a signature, consents and finishes → the worker stamps the PDF and issues
+the certificate → the public `/verify/<code>` page. It takes about 25 s.
+
+**Its own stack.** It never uses your `.env` or dev database. `playwright.config.ts` and
+`global-setup.ts` start:
+- the api on **4100** and `next dev` on **3100**, via Playwright's `webServer`;
+- the worker, as a child process;
+- all with explicit env from `apps/e2e/env.ts`: database `sahihi_e2e` (created and migrated by
+  `scripts/prepare-db.ts`, which refuses any database not named `*_e2e`), Redis DB **14**, and the
+  shared MinIO bucket and Mailpit.
+
+Each run uses unique `@example.test` addresses, so Mailpit lookups (`tests/mailpit.ts`) never pick
+up another run's email.
+
+**Before running:**
+- `bun run infra:up`.
+- Stop `bun run dev`: Next allows one `next dev` per app directory.
+- First time only: `cd apps/e2e && bunx playwright install chromium`.
+
+**Conventions:**
+- Files are `*.e2e.ts` (`testMatch`), so a bare `bun test` never picks them up.
+- Wait for `networkidle` after navigating to a page that's compiling for the first time. Typing
+  before React hydrates is lost (`settle()`).
+- Use roles and labels, not CSS. `[data-field-layer]` (the field editor's page overlay) is the one
+  structural hook.
+- On failure, the screenshot, video and trace are in `apps/e2e/test-results/`
+  (`bunx playwright show-trace …`). Both output folders are gitignored.
+
+Not in CI yet: it needs MinIO and Mailpit alongside Postgres and Redis. Add it as a separate job
+next to the integration tests.
