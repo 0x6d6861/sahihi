@@ -194,6 +194,28 @@ describe("use a template", () => {
     ).toBe(200)
   })
 
+  test("a template can be used again and again", async () => {
+    const id = await saveTemplate(alice)
+    const { template } = await detail(alice, id)
+    for (const n of [1, 2, 3]) {
+      const res = await request(alice, `/api/templates/${id}/envelopes`, {
+        method: "POST",
+        json: {
+          title: `Lease ${n}`,
+          recipients: [
+            { roleId: template.roles[0]?.id, name: `Tenant ${n}`, email: `t${n}@example.test` },
+          ],
+        },
+      })
+      expect(res.status).toBe(201)
+    }
+    expect(
+      await prisma.field.count({
+        where: { envelope: { title: { in: ["Lease 1", "Lease 2", "Lease 3"] } } },
+      }),
+    ).toBe(9)
+  })
+
   test("missing or invalid people come back per role", async () => {
     const id = await saveTemplate(alice)
     const res = await request(alice, `/api/templates/${id}/envelopes`, {

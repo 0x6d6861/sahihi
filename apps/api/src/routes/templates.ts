@@ -218,11 +218,19 @@ export const templates = new Hono<AppEnv>()
         const saved = await tx.recipient.create({ data: { ...r, envelopeId: created.id } })
         recipientIdByRole.set(roleId, saved.id)
       }
+      // Copy only the layout: never the template field's own id (a second use would collide).
       await tx.field.createMany({
-        data: draft.fields.map(({ roleId, ...f }) => ({
-          ...f,
+        data: draft.fields.map((f) => ({
           envelopeId: created.id,
-          recipientId: recipientIdByRole.get(roleId) as string,
+          recipientId: recipientIdByRole.get(f.roleId) as string,
+          type: f.type,
+          page: f.page,
+          x: f.x,
+          y: f.y,
+          width: f.width,
+          height: f.height,
+          required: f.required,
+          label: f.label,
         })),
       })
       await appendAuditEvent(tx, {
