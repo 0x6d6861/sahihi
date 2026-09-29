@@ -19,6 +19,7 @@ import { OTPField, OTPFieldInput } from "@/components/ui/otp-field"
 import { Spinner } from "@/components/ui/spinner"
 import { ApiError, api } from "@/lib/api"
 import { formatCountdown } from "@/lib/countdown"
+import { embedEventFor, postEmbedEvent } from "@/lib/embed"
 
 type State = "ready" | "waiting" | "signed" | "completed" | "declined" | "expired" | "closed"
 
@@ -53,6 +54,8 @@ interface SigningSession {
   }[]
   downloadsAvailable: boolean
   certificateCode: string | null
+  /** Embedded recipients (docs/embedded-signing.md): the origins to post events to. */
+  embed: { origins: string[] } | null
 }
 
 const MESSAGES: Record<Exclude<State, "ready">, { title: string; body: string }> = {
@@ -80,6 +83,21 @@ export function SigningExperience({ token }: { token: string }) {
   const [session, setSession] = useState<SigningSession | null>(null)
   const [error, setError] = useState<string | null>(null)
   const base = `/sign/${encodeURIComponent(token)}`
+  // Embedded signing: tell the host app about state changes (ready, signed, declined).
+  const lastState = useRef<State | null>(null)
+  useEffect(() => {
+    if (!session?.embed) return
+    const event = embedEventFor(lastState.current, session.state)
+    lastState.current = session.state
+    if (event) {
+      postEmbedEvent(
+        event,
+        session.state,
+        session.embed.origins,
+        window.parent === window ? null : window.parent,
+      )
+    }
+  }, [session])
 
   const load = useCallback(async () => {
     try {

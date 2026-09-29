@@ -1,5 +1,6 @@
 import { getEnv, QUEUES } from "@sahihi/config"
 import { webhookRetryDelayMs } from "@sahihi/core"
+import { processBulkSend } from "@sahihi/envelopes"
 import {
   captureError,
   createLogger,
@@ -56,6 +57,9 @@ const workers = [
       }
       if (job.name === "export.build") {
         return buildExport((job.data as MaintenanceJobs["export.build"]).exportId)
+      }
+      if (job.name === "bulk.send") {
+        return processBulkSend((job.data as MaintenanceJobs["bulk.send"]).bulkSendId)
       }
       if (job.name === "organization.purge-storage") {
         const data = job.data as MaintenanceJobs["organization.purge-storage"]

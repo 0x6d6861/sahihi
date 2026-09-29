@@ -8,6 +8,7 @@ const TABS = [
   { href: "/settings/webhooks", label: "Webhooks" },
   { href: "/settings/billing", label: "Plan & usage" },
   { href: "/settings/data", label: "Data" },
+  { href: "/settings/api", label: "API" },
 ] as const
 
 /** Settings sub-navigation. Each tab is its own page, so choosing one navigates. */

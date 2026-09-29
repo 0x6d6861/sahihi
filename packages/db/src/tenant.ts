@@ -23,6 +23,14 @@ export function forOrganization(organizationId: string) {
     webhookEndpoint: (
       where: Prisma.WebhookEndpointWhereInput = {},
     ): Prisma.WebhookEndpointWhereInput => ({ ...where, organizationId }),
+    bulkSend: (where: Prisma.BulkSendWhereInput = {}): Prisma.BulkSendWhereInput => ({
+      ...where,
+      organizationId,
+    }),
+    apiKey: (where: Prisma.ApiKeyWhereInput = {}): Prisma.ApiKeyWhereInput => ({
+      ...where,
+      organizationId,
+    }),
     dataExport: (where: Prisma.DataExportWhereInput = {}): Prisma.DataExportWhereInput => ({
       ...where,
       organizationId,

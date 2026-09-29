@@ -19,6 +19,7 @@ import {
   VerifyOtpSchema,
 } from "@sahihi/core"
 import { appendAuditEvent, prisma, queueEnvelopeWebhook } from "@sahihi/db"
+import { activateNextRecipients } from "@sahihi/envelopes"
 import {
   enqueueWebhookDeliveries,
   getQueues,
@@ -33,7 +34,6 @@ import { createMiddleware } from "hono/factory"
 import { HTTPException } from "hono/http-exception"
 import { badRequest, clientMeta, conflict, parseJson } from "../lib/http"
 import { rateLimit } from "../middleware/rate-limit"
-import { activateNextRecipients } from "../services/routing"
 
 /**
  * PUBLIC signing API — authenticated ONLY by the recipient token in the URL
@@ -98,6 +98,19 @@ const maskEmail = (e: string) =>
     (_, a, b: string, d) => `${a}${"•".repeat(Math.min(b.length, 6))}${d}`,
   )
 const maskPhone = (p: string | null) => (p ? `${p.slice(0, 4)}•••${p.slice(-3)}` : null)
+
+/**
+ * Origins allowed to frame this signing page: the workspace's embed origins, only for an
+ * EMBEDDED recipient (docs/embedded-signing.md). Email recipients can never be framed.
+ */
+async function embedOriginsFor(s: Signer): Promise<string[]> {
+  if (s.delivery !== "EMBEDDED") return []
+  const settings = await prisma.workspaceSettings.findUnique({
+    where: { organizationId: s.envelope.organizationId },
+    select: { embedOrigins: true },
+  })
+  return settings?.embedOrigins ?? []
+}
 
 /** Resolves the recipient from :token or responds 404. */
 const withSigner = createMiddleware<SigningEnv>(async (c, next) => {
@@ -169,9 +182,16 @@ export const signing = new Hono<SigningEnv>()
       },
       fields,
       downloadsAvailable: state === "completed" && Boolean(e.signedS3Key && e.certificate),
+      // Embedded recipients: where the page may post its events (and be framed from).
+      embed: s.delivery === "EMBEDDED" ? { origins: await embedOriginsFor(s) } : null,
       certificateCode: state === "completed" ? (e.certificate?.code ?? null) : null,
     })
   })
+
+  /** Frame policy for /sign/<token>?embed=1, read by the web's proxy.ts to set frame-ancestors. */
+  .get("/:token/embed", withSigner, async (c) =>
+    c.json({ origins: await embedOriginsFor(c.get("signer")) }),
+  )
 
   /** After completion, every recipient receives a fresh link that lands here. */
   .get("/:token/downloads", withSigner, async (c) => {

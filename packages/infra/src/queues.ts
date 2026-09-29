@@ -44,6 +44,8 @@ export interface MaintenanceJobs {
   "exports.cleanup": Record<string, never>
   /** After a workspace is deleted: remove everything under org/<id>/ in storage. */
   "organization.purge-storage": { organizationId: string }
+  /** Create and send one envelope per row (docs/bulk-send.md). */
+  "bulk.send": { bulkSendId: string }
 }
 
 export interface WebhookJobs {

@@ -15,7 +15,34 @@ const ERROR_REPORTING_ORIGIN = toOrigin(process.env.NEXT_PUBLIC_SENTRY_DSN)
  * 2. For app routes, a cheap optimistic session-cookie check. The API re-validates everything.
  *    Public routes: /sign, /verify, auth pages.
  */
-export function proxy(request: NextRequest) {
+const API_URL = process.env.API_URL ?? "http://localhost:4000"
+const EMBED_PATH = /^\/sign\/([A-Za-z0-9_-]{43})$/
+
+/**
+ * Embedded signing (docs/embedded-signing.md): /sign/<token>?embed=1 may be framed by the
+ * workspace's allowed origins, and only for an EMBEDDED recipient. Asks the API (which validates
+ * the token); any failure means no framing.
+ */
+async function frameAncestorsFor(request: NextRequest): Promise<string[]> {
+  const token = request.nextUrl.pathname.match(EMBED_PATH)?.[1]
+  if (!token || request.nextUrl.searchParams.get("embed") !== "1") return []
+  try {
+    const res = await fetch(`${API_URL}/api/sign/${token}/embed`, {
+      headers: { "x-forwarded-for": request.headers.get("x-forwarded-for") ?? "" },
+      signal: AbortSignal.timeout(2_000),
+      cache: "no-store",
+    })
+    if (!res.ok) return []
+    const body = (await res.json()) as { origins?: unknown }
+    return Array.isArray(body.origins)
+      ? body.origins.filter((o): o is string => typeof o === "string" && toOrigin(o) === o)
+      : []
+  } catch {
+    return []
+  }
+}
+
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   if (isProtectedPath(pathname) && !getSessionCookie(request, { cookiePrefix: "sahihi" })) {
     const url = new URL("/sign-in", request.url)
@@ -29,6 +56,7 @@ export function proxy(request: NextRequest) {
     dev: DEV,
     storageOrigin: STORAGE_ORIGIN,
     errorReportingOrigin: ERROR_REPORTING_ORIGIN,
+    frameAncestors: await frameAncestorsFor(request),
   })
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set("x-nonce", nonce)

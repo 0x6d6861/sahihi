@@ -23,6 +23,8 @@ const ids = {
   webhook: "",
   delivery: "",
   export: "",
+  apiKey: "",
+  bulkSend: "",
 }
 
 type Case = () => { path: string; init?: RequestInit & { json?: unknown } }
@@ -123,6 +125,23 @@ const TENANT: Record<string, Case> = {
   "GET /api/data/exports/:id/download": () => ({
     path: `/api/data/exports/${ids.export}/download`,
   }),
+  "POST /api/templates/:id/bulk-sends": () => ({
+    path: `/api/templates/${ids.template}/bulk-sends`,
+    init: {
+      method: "POST",
+      json: {
+        title: "Stolen",
+        rows: [
+          { recipients: [{ roleId: ids.role, name: "Mallory", email: "mallory@example.test" }] },
+        ],
+      },
+    },
+  }),
+  "GET /api/bulk-sends/:id": () => ({ path: `/api/bulk-sends/${ids.bulkSend}` }),
+  "DELETE /api/api-keys/:id": () => ({
+    path: `/api/api-keys/${ids.apiKey}`,
+    init: { method: "DELETE" },
+  }),
   "PATCH /api/webhooks/:id": () => ({
     path: `/api/webhooks/${ids.webhook}`,
     init: { method: "PATCH", json: { url: "https://attacker.example/hook" } },
@@ -162,6 +181,7 @@ const LISTS = [
   "GET /api/templates",
   "GET /api/webhooks",
   "GET /api/data/exports",
+  "GET /api/bulk-sends",
 ]
 
 /**
@@ -173,6 +193,12 @@ const LISTS = [
  * The staff-only queue dashboard isn't tenant data: it sits behind its own basic auth, redacts
  * job data and only allows retries (observability.itest.ts).
  */
+/**
+ * The public API authenticates by API key, not session: its cross-workspace 404s are covered in
+ * public-api.itest.ts.
+ */
+const isPublicApi = (route: string) => route.split(" ")[1]?.startsWith("/api/v1")
+
 const isStaffDashboard = (route: string) =>
   route.split(" ")[1]?.startsWith("/admin/queues/") || route.endsWith(" /admin/queues")
 
@@ -181,6 +207,12 @@ const NOT_TENANT = [
   "POST /api/webhooks",
   // The caller's own workspace plan and usage; takes no ids.
   "GET /api/billing",
+  // The caller's own embedding origins (docs/embedded-signing.md); no ids.
+  "GET /api/embedding",
+  "PUT /api/embedding",
+  // The caller's own API keys (list / create); no ids.
+  "GET /api/api-keys",
+  "POST /api/api-keys",
   // The caller's own workspace data settings / a new export of their own data; no ids.
   "GET /api/data/settings",
   "PUT /api/data/settings",
@@ -190,6 +222,7 @@ const NOT_TENANT = [
   "POST /api/auth/*",
   "GET /api/sign/:token",
   "GET /api/sign/:token/downloads",
+  "GET /api/sign/:token/embed",
   "POST /api/sign/:token/otp",
   "POST /api/sign/:token/otp/verify",
   "GET /api/sign/:token/file",
@@ -201,7 +234,7 @@ const NOT_TENANT = [
 
 /** Everything of alice's that a cross-tenant request could touch. */
 async function snapshot() {
-  const [documents, envelopes, recipients, fields, auditEvents, templates, webhooks] =
+  const [documents, envelopes, recipients, fields, auditEvents, templates, webhooks, apiKeys] =
     await Promise.all([
       prisma.document.findMany({
         where: { organizationId: alice.organizationId },
@@ -222,8 +255,9 @@ async function snapshot() {
         where: { organizationId: alice.organizationId },
         include: { deliveries: true },
       }),
+      prisma.apiKey.findMany({ where: { organizationId: alice.organizationId } }),
     ])
-  return { documents, envelopes, recipients, fields, auditEvents, templates, webhooks }
+  return { documents, envelopes, recipients, fields, auditEvents, templates, webhooks, apiKeys }
 }
 
 beforeAll(async () => {
@@ -274,6 +308,22 @@ beforeAll(async () => {
     },
   })
   ids.export = exp.id
+  const key = await request(alice, "/api/api-keys", {
+    method: "POST",
+    json: { name: "Alice's ERP", scopes: ["envelopes:read"] },
+  })
+  ids.apiKey = ((await key.json()) as { apiKey: { id: string } }).apiKey.id
+  const bulk = await prisma.bulkSend.create({
+    data: {
+      organizationId: alice.organizationId,
+      templateId: ids.template,
+      createdById: alice.userId,
+      title: "Alice's batch",
+      total: 0,
+      status: "DONE",
+    },
+  })
+  ids.bulkSend = bulk.id
   // A failed delivery, so "retry" would otherwise be allowed.
   await prisma.webhookDelivery.update({ where: { id: ids.delivery }, data: { status: "FAILED" } })
 })
@@ -285,7 +335,7 @@ describe("tenant isolation", () => {
         app.routes
           .filter((r) => r.method !== "ALL")
           .map((r) => `${r.method} ${r.path}`)
-          .filter((route) => !isStaffDashboard(route)),
+          .filter((route) => !isStaffDashboard(route) && !isPublicApi(route)),
       ),
     ].sort()
     const classified = [...Object.keys(TENANT), ...LISTS, ...NOT_TENANT].sort()
@@ -316,6 +366,7 @@ describe("tenant isolation", () => {
       "/api/templates",
       "/api/webhooks",
       "/api/data/exports",
+      "/api/bulk-sends",
     ]) {
       const mine = (await (await request(alice, path)).json()) as { items: unknown[] }
       const theirs = (await (await request(mallory, path)).json()) as { items: unknown[] }

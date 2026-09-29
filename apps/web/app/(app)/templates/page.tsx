@@ -29,9 +29,30 @@ interface TemplateListItem extends TemplateRow {
 export const metadata = { title: "Templates" }
 
 /** Reusable envelopes of the active workspace (docs/templates.md). */
+interface BulkSendListItem {
+  id: string
+  title: string
+  status: "PENDING" | "RUNNING" | "DONE"
+  total: number
+  sent: number
+  failed: number
+  createdAt: string
+  template: { name: string } | null
+}
+
+const when = new Intl.DateTimeFormat("en-GB", {
+  dateStyle: "medium",
+  timeStyle: "short",
+  timeZone: "Africa/Nairobi",
+})
+
 export default async function TemplatesPage() {
-  const { data } = await apiServer<{ items: TemplateListItem[] }>("/templates")
+  const [{ data }, { data: bulk }] = await Promise.all([
+    apiServer<{ items: TemplateListItem[] }>("/templates"),
+    apiServer<{ items: BulkSendListItem[] }>("/bulk-sends"),
+  ])
   const items = data?.items ?? []
+  const batches = (bulk?.items ?? []).slice(0, 10)
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
@@ -63,7 +84,7 @@ export default async function TemplatesPage() {
                   <TableHead>Roles</TableHead>
                   <TableHead>Document</TableHead>
                   <TableHead>Saved by</TableHead>
-                  <TableHead className="w-40">
+                  <TableHead className="w-60">
                     <span className="sr-only">Actions</span>
                   </TableHead>
                 </TableRow>
@@ -98,6 +119,13 @@ export default async function TemplatesPage() {
                         <Button size="sm" render={<Link href={`/templates/${t.id}/use`} />}>
                           Use
                         </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          render={<Link href={`/templates/${t.id}/bulk`} />}
+                        >
+                          Bulk send
+                        </Button>
                         {t.permissions.manage && <TemplateRowActions template={t} />}
                       </div>
                     </TableCell>
@@ -108,6 +136,43 @@ export default async function TemplatesPage() {
           )}
         </CardPanel>
       </Card>
+      {batches.length > 0 && (
+        <Card>
+          <CardPanel>
+            <p className="pb-3 font-medium text-sm">Recent bulk sends</p>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Batch</TableHead>
+                  <TableHead>Progress</TableHead>
+                  <TableHead>Started</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {batches.map((b) => (
+                  <TableRow key={b.id}>
+                    <TableCell>
+                      <Link href={`/bulk-sends/${b.id}`} className="font-medium hover:underline">
+                        {b.title}
+                      </Link>
+                      <div className="text-muted-foreground text-xs">
+                        {b.template?.name ?? "Deleted template"}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {b.sent}/{b.total} sent{b.failed > 0 ? `, ${b.failed} failed` : ""}
+                      {b.status !== "DONE" ? " · in progress" : ""}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-xs">
+                      {when.format(new Date(b.createdAt))}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardPanel>
+        </Card>
+      )}
     </div>
   )
 }

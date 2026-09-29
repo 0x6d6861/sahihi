@@ -45,6 +45,19 @@ describe("buildCsp", () => {
     expect(dev["connect-src"]).toContain("http://localhost:9000")
   })
 
+  test("frame-ancestors: none by default, exactly the given origins for embedded signing", () => {
+    const embedded = directives(
+      buildCsp({
+        nonce: "n",
+        dev: false,
+        storageOrigin: null,
+        frameAncestors: ["https://app.acme.co.ke"],
+      }),
+    )
+    expect(embedded["frame-ancestors"]).toEqual(["https://app.acme.co.ke"])
+    expect(prod["frame-ancestors"]).toEqual(["'none'"])
+  })
+
   test("error reporting origin is allowed only when configured", () => {
     const on = directives(
       buildCsp({

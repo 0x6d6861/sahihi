@@ -72,6 +72,8 @@ The better-auth defaults are `owner`, `admin` and `member`. The creator of an or
 | Use templates / save envelopes as templates | ✓ | ✓ | ✓ |
 | Rename or delete a template | any | any | own only |
 | Webhooks (view, add, edit, rotate, delete) | ✓ | ✓ | – |
+| API keys and embedded-signing origins (`api:manage`) | ✓ | ✓ | – |
+| Bulk send from a template | ✓ | ✓ | ✓ |
 | Data: retention, exports, "Delete data" on closed envelopes (`data:manage`) | ✓ | ✓ | – |
 | Invite / remove members, change roles | ✓ | ✓ | – |
 | Billing (`billing:manage`, reserved for self-serve plan changes), delete org | ✓ | – | – |
@@ -81,8 +83,8 @@ The better-auth defaults are `owner`, `admin` and `member`. The creator of an or
 "any" from the `envelope:manage-any` and `document:delete-any` permissions.
 
 **One definition:** `packages/core/src/permissions.ts` builds the access control with better-auth's
-`createAccessControl`: the default org statements plus `document`, `envelope` and `billing`. It
-exports `orgAc` and `orgRoles`, which are passed to `organization()` in `auth.ts` and to
+`createAccessControl`: the default org statements plus `document`, `envelope`, `template`,
+`webhook`, `data`, `api` and `billing`. It exports `orgAc` and `orgRoles`, which are passed to `organization()` in `auth.ts` and to
 `organizationClient()` in `auth-client.ts`. better-auth enforces its own resources (members,
 invitations, org delete) with them. Our routes use the pure helpers from the same file:
 

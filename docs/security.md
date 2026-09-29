@@ -55,6 +55,7 @@ tenants must never see each other's data.**
 | `/api/sign/:token*` | 120 / min / IP |
 | `/api/sign/:token/otp` | 5 / 15 min / token |
 | `/api/verify/*` | 30 / min / IP |
+| `/api/v1/*` (public API) | 1200 / min / IP, then 600 / min / API key |
 
 better-auth applies its own limits to `/api/auth/*`.
 
@@ -168,6 +169,8 @@ checks are strict (`docs/webhooks.md`, ADR 0013):
     fallback fonts, and presigned upload/download URLs. `img-src` adds `blob: data:` and storage;
     `worker-src 'self' blob:`.
   - `frame-ancestors 'none'` (no clickjacking of Sign/Send/Void), `object-src 'none'`,
+    except `/sign/<token>?embed=1` for an **embedded** recipient, which gets the workspace's allowed
+    origins from an API lookup keyed by the token (docs/embedded-signing.md; any failure → `'none'`),
     `base-uri 'self'`, `form-action 'self'`, and `upgrade-insecure-requests` outside dev.
   - Next only puts nonces on dynamically rendered pages, so the root layout calls `connection()`.
   - `STORAGE_ORIGIN` (web env) is the S3 origin of presigned URLs. It defaults to local MinIO in dev,
@@ -190,6 +193,18 @@ checks are strict (`docs/webhooks.md`, ADR 0013):
 | No CSP | Fixed (above) |
 | pdfium wasm and fallback fonts load from jsdelivr at runtime, without integrity checks, on the signing page | Open: self-host them (changes vendored `lib/pdf-thumbnail-utils.ts`, needs an ADR) |
 | Token format checked before lookup, only hashes stored, 404 without detail, signer PII masked until OTP, `/verify` masks emails and `/verify/hash` never matches originals | OK |
+
+## API keys
+
+The public API (`/api/v1`, docs/public-api.md, ADR 0017) authenticates with workspace API keys:
+
+- Stored as `sha256("api-key:" + key)` with a display hint; the raw key is shown once and never
+  stored or logged. Revoked and expired keys get 401.
+- Scoped: every `/api/v1` route declares its scope with `requireScope`. `organizationId` comes from
+  the key row, and every lookup goes through `forOrganization`, so other workspaces' ids are 404.
+- Only owners and admins (`api:manage`) create or revoke keys and set embed origins.
+- Audit events from the API record the key's creator as the actor plus `{ via: "api", apiKeyId }`.
+- Embedded signing URLs are single-use-in-effect: each request rotates the token (30 min TTL).
 
 ## Checklist for any new route
 

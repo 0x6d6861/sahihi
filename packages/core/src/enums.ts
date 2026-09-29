@@ -28,6 +28,10 @@ export type RecipientStatus = (typeof RECIPIENT_STATUSES)[number]
 export const VERIFICATION_METHODS = ["LINK", "EMAIL_OTP", "SMS_OTP"] as const
 export type VerificationMethod = (typeof VERIFICATION_METHODS)[number]
 
+/** EMAIL: invited and reminded by email. EMBEDDED: signs inside the sender's own app (docs/embedded-signing.md). */
+export const RECIPIENT_DELIVERIES = ["EMAIL", "EMBEDDED"] as const
+export type RecipientDelivery = (typeof RECIPIENT_DELIVERIES)[number]
+
 export const FIELD_TYPES = [
   "SIGNATURE",
   "INITIALS",

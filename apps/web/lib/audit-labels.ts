@@ -22,6 +22,7 @@ const LABELS: Record<AuditEventType, (who: string) => string> = {
   "document.finalized": () => "Signed PDF produced",
   "certificate.issued": () => "Certificate of completion issued",
   "envelope.purged": () => "Files and personal data deleted",
+  "recipient.link_issued": (who: string) => `Embedded signing link issued for ${who}`,
 }
 
 export function auditEventLabel(

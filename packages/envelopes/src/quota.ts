@@ -1,6 +1,6 @@
 import { billingPeriod, checkEnvelopeQuota, quotaExceededMessage } from "@sahihi/core"
 import { countEnvelopesSent, getOrgPlan, lockOrgQuota, type Prisma } from "@sahihi/db"
-import { HTTPException } from "hono/http-exception"
+import { EnvelopeError } from "./errors"
 
 /**
  * Envelope quota (docs/billing.md). Call inside the send transaction: it locks the workspace's
@@ -15,18 +15,11 @@ export async function assertEnvelopeQuota(tx: Prisma.TransactionClient, organiza
   ])
   const check = checkEnvelopeQuota(plan, used)
   if (!check.ok) {
-    throw new HTTPException(402, {
-      res: Response.json(
-        {
-          error: "quota_exceeded",
-          message: quotaExceededMessage(plan, period.end),
-          plan: plan.id,
-          limit: check.limit,
-          used: check.used,
-          resetsAt: period.end.toISOString(),
-        },
-        { status: 402 },
-      ),
+    throw new EnvelopeError(402, "quota_exceeded", quotaExceededMessage(plan, period.end), {
+      plan: plan.id,
+      limit: check.limit,
+      used: check.used,
+      resetsAt: period.end.toISOString(),
     })
   }
 }

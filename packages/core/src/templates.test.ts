@@ -199,6 +199,7 @@ describe("draftFromTemplate", () => {
         order: 1,
         verification: "SMS_OTP",
         colorIndex: 0,
+        delivery: "EMAIL",
       },
       {
         roleId: "r-landlord",
@@ -209,6 +210,7 @@ describe("draftFromTemplate", () => {
         order: 2,
         verification: "LINK",
         colorIndex: 1,
+        delivery: "EMAIL",
       },
       {
         roleId: "r-agent",
@@ -219,6 +221,7 @@ describe("draftFromTemplate", () => {
         order: 3,
         verification: "LINK",
         colorIndex: 2,
+        delivery: "EMAIL",
       },
     ])
     // Viewers never own fields.

@@ -19,6 +19,7 @@
         "@sahihi/config": "workspace:*",
         "@sahihi/core": "workspace:*",
         "@sahihi/db": "workspace:*",
+        "@sahihi/envelopes": "workspace:*",
         "@sahihi/infra": "workspace:*",
         "@sahihi/pdf": "workspace:*",
         "better-auth": "1.7.6",
@@ -106,6 +107,7 @@
         "@sahihi/core": "workspace:*",
         "@sahihi/db": "workspace:*",
         "@sahihi/emails": "workspace:*",
+        "@sahihi/envelopes": "workspace:*",
         "@sahihi/infra": "workspace:*",
         "@sahihi/pdf": "workspace:*",
         "bullmq": "6.3.9",
@@ -156,6 +158,16 @@
         "@react-email/ui": "6.11.0",
         "@types/react": "19.3.0",
         "react-email": "6.11.0",
+      },
+    },
+    "packages/envelopes": {
+      "name": "@sahihi/envelopes",
+      "version": "0.0.0",
+      "dependencies": {
+        "@sahihi/config": "workspace:*",
+        "@sahihi/core": "workspace:*",
+        "@sahihi/db": "workspace:*",
+        "@sahihi/infra": "workspace:*",
       },
     },
     "packages/infra": {
@@ -747,6 +759,8 @@
     "@sahihi/e2e": ["@sahihi/e2e@workspace:apps/e2e"],
 
     "@sahihi/emails": ["@sahihi/emails@workspace:packages/emails"],
+
+    "@sahihi/envelopes": ["@sahihi/envelopes@workspace:packages/envelopes"],
 
     "@sahihi/infra": ["@sahihi/infra@workspace:packages/infra"],
 

@@ -37,13 +37,17 @@ Read this file first, then the doc for the area you're touching (see **Doc map**
 
 ```
 apps/
-  api/        Hono REST API. routes/{documents,envelopes,templates,webhooks,billing,data,signing,verify}.ts, auth.ts (better-auth)
+  api/        Hono REST API. routes/{documents,envelopes,templates,webhooks,billing,data,signing,verify}.ts, v1.ts (public API,
+              API keys), api-keys/embedding/bulk-sends.ts, auth.ts (better-auth)
   worker/     BullMQ consumers: notifications, envelope finalize, webhooks, maintenance (expire/remind/sweeps/retention/exports)
-  web/        Next.js. (auth)/ sign-in/up/onboarding, (app)/ documents+envelopes, sign/[token], verify/[code]
+  web/        Next.js. (auth)/ sign-in/up/onboarding, (app)/ documents+envelopes+templates+bulk-sends+settings,
+              sign/[token], verify/[code]
 packages/
   config/     Env schema (zod) + queue names. The ONLY place process.env is parsed.
   core/       Pure domain logic, no I/O: enums, state machines, routing, coordinates, crypto, audit chain, zod schemas
   db/         Prisma schema + client, tenant scoping, appendAuditEvent, issueSigningLink
+  envelopes/  Envelope services shared by api + worker: send, void, create (document/template), routing,
+              bulk send, embedded links. Throws EnvelopeError (mapped to HTTP in app.onError)
   infra/      S3 storage + typed BullMQ queues + Redis
   pdf/        inspectPdf, stampFields, renderCertificate (pdf-lib)
   emails/     React Email templates → { subject, html, text }; preview server (see its README)
@@ -53,7 +57,7 @@ scripts/      bootstrap-ui.sh (installs coss + Extend components)
 ```
 
 Dependency direction (never import "upwards"):
-`core` ← `config` ← `db`, `infra`, `pdf` ← `api`, `worker`. `emails` is a leaf (React Email only,
+`core` ← `config` ← `db`, `infra`, `pdf` ← `envelopes` ← `api`, `worker`. `emails` is a leaf (React Email only,
 no internal deps) used by `worker`. `web` may import **only** `@sahihi/core` (types, enums, zod
 schemas, coordinate helpers). It must never import `db`, `infra`, `pdf`, `emails` or `config`.
 
@@ -145,6 +149,9 @@ the relevant doc in `docs/` is updated if behaviour changed, and the matching ch
 | Send / sign / decline / void / reminders / OTP | `docs/signing-flow.md` |
 | Templates (save as / use) | `docs/templates.md` |
 | Webhooks (events, signing, delivery) | `docs/webhooks.md` |
+| Public API `/api/v1`, API keys and scopes | `docs/public-api.md` |
+| Bulk send (CSV / API, worker job) | `docs/bulk-send.md` |
+| Embedded signing (iframe, allowed origins) | `docs/embedded-signing.md` |
 | Plans, envelope quotas, seats | `docs/billing.md` |
 | Retention, export, deleting data or a workspace | `docs/data-retention.md` |
 | Logs, error tracking, queue dashboard | `docs/observability.md` |

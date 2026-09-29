@@ -16,9 +16,17 @@ export interface CspOptions {
   storageOrigin: string | null
   /** Origin of the error-tracking ingest (from NEXT_PUBLIC_SENTRY_DSN); null when off. */
   errorReportingOrigin?: string | null
+  /** Embedded signing: origins allowed to frame this page (docs/embedded-signing.md). Default none. */
+  frameAncestors?: string[]
 }
 
-export function buildCsp({ nonce, dev, storageOrigin, errorReportingOrigin }: CspOptions): string {
+export function buildCsp({
+  nonce,
+  dev,
+  storageOrigin,
+  errorReportingOrigin,
+  frameAncestors = [],
+}: CspOptions): string {
   const storage = storageOrigin ? [storageOrigin] : []
   const reporting = errorReportingOrigin ? [errorReportingOrigin] : []
   const directives: Record<string, string[]> = {
@@ -45,8 +53,9 @@ export function buildCsp({ nonce, dev, storageOrigin, errorReportingOrigin }: Cs
     "object-src": ["'none'"],
     "base-uri": ["'self'"],
     "form-action": ["'self'"],
-    // Nobody may frame us: stops clickjacking of "Sign", "Send" and "Void".
-    "frame-ancestors": ["'none'"],
+    // Nobody may frame us (clickjacking of "Sign", "Send", "Void"), except a workspace's own
+    // allowed origins for an embedded recipient's /sign page.
+    "frame-ancestors": frameAncestors.length > 0 ? frameAncestors : ["'none'"],
   }
   const policy = Object.entries(directives).map(([name, values]) => `${name} ${values.join(" ")}`)
   // Local MinIO is plain http; upgrading it would break uploads in development.
@@ -72,7 +81,14 @@ export function createNonce(): string {
 }
 
 /** App routes that need a session (the optimistic cookie check in proxy.ts). */
-const PROTECTED_PREFIXES = ["/documents", "/envelopes", "/templates", "/settings", "/onboarding"]
+const PROTECTED_PREFIXES = [
+  "/documents",
+  "/envelopes",
+  "/templates",
+  "/bulk-sends",
+  "/settings",
+  "/onboarding",
+]
 
 export function isProtectedPath(pathname: string): boolean {
   return PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))

@@ -24,6 +24,8 @@ export const orgStatements = {
   webhook: ["manage"],
   /** Retention settings, exports and purging closed envelopes (docs/data-retention.md). */
   data: ["manage"],
+  /** Public API keys (docs/public-api.md) */
+  api: ["manage"],
   billing: ["manage"],
 } as const
 
@@ -37,6 +39,7 @@ export const orgRoles = {
     template: ["create", "manage-any"],
     webhook: ["manage"],
     data: ["manage"],
+    api: ["manage"],
     billing: ["manage"],
   }),
   admin: orgAc.newRole({
@@ -46,6 +49,7 @@ export const orgRoles = {
     template: ["create", "manage-any"],
     webhook: ["manage"],
     data: ["manage"],
+    api: ["manage"],
   }),
   member: orgAc.newRole({
     ...memberAc.statements,

@@ -64,6 +64,8 @@ for the reinstall checklist.
 | Settings / members | `Tabs`, `Table`, `Select` (role), `Dialog` (invite) |
 | Settings / data | `Card` (retention `Select`, exports `Table` + `Badge`, danger zone), `AlertDialog` + `Input` (typed confirmation) |
 | Settings / webhooks | `Tabs` (settings sub-nav), `Card` per endpoint, `Switch` (active), `Menu`, `Dialog` + `CheckboxGroup` (events), `AlertDialog` (rotate/delete), `Table` + `Badge` (deliveries), `Alert` (secret shown once) |
+| Settings / API | `Table` + `Badge` (keys, scopes), `Dialog` + `CheckboxGroup` + `Select` (create key), `Alert` (key shown once), `AlertDialog` (revoke), `Form` + `Textarea` (embed origins) |
+| Bulk send | Extend `FileUpload` (CSV, parsed in the browser), `Alert` (problems / ready), `Table` (preview), `Progress` + `Table` + `Badge` (batch progress) |
 | Templates | `Table`, `Badge` (roles), `Menu` + `Dialog`/`AlertDialog` (rename/delete), `Empty`; "Save as template" `Dialog` with `Checkbox`; use page `Card` + `Form` |
 
 ## Extend specifics

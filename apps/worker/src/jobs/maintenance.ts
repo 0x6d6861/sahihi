@@ -38,6 +38,8 @@ export async function remindRecipients() {
   const due = await prisma.recipient.findMany({
     where: {
       status: { in: ["SENT", "VIEWED"] },
+      // Embedded recipients sign inside the sender's app; they're never emailed.
+      delivery: "EMAIL",
       reminderCount: { lt: MAX_REMINDERS },
       notifiedAt: { lt: cutoff },
       OR: [{ lastRemindedAt: null }, { lastRemindedAt: { lt: cutoff } }],

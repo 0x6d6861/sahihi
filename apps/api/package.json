@@ -15,6 +15,7 @@
     "@sahihi/config": "workspace:*",
     "@sahihi/core": "workspace:*",
     "@sahihi/db": "workspace:*",
+    "@sahihi/envelopes": "workspace:*",
     "@sahihi/infra": "workspace:*",
     "@sahihi/pdf": "workspace:*",
     "better-auth": "1.7.6",

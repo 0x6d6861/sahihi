@@ -1,5 +1,4 @@
 import {
-  assertTransition,
   CreateEnvelopeSchema,
   canManageEnvelope,
   downloadFileName,
@@ -13,22 +12,15 @@ import {
   VoidEnvelopeSchema,
   verifyAuditChain,
 } from "@sahihi/core"
-import {
-  appendAuditEvent,
-  forOrganization,
-  prisma,
-  queueEnvelopeWebhook,
-  toChainedEvent,
-} from "@sahihi/db"
-import { enqueueWebhookDeliveries, getQueues, presignDownload } from "@sahihi/infra"
+import { appendAuditEvent, forOrganization, prisma, toChainedEvent } from "@sahihi/db"
+import { rotateRecipientLink, sendEnvelope, voidEnvelope } from "@sahihi/envelopes"
+import { getQueues, presignDownload } from "@sahihi/infra"
 import { Hono } from "hono"
 import { HTTPException } from "hono/http-exception"
-import { assertEnvelopeQuota } from "../lib/billing"
 import type { AppEnv } from "../lib/env"
 import { badRequest, clientMeta, conflict, forbidden, notFound, parseJson } from "../lib/http"
 import { actor, assertCanManageEnvelope } from "../lib/permissions"
 import { requireOrg } from "../middleware/session"
-import { activateNextRecipients, rotateRecipientLink } from "../services/routing"
 
 /** 410 for files deleted under retention or on request (docs/data-retention.md). */
 function gone(): never {
@@ -168,6 +160,7 @@ export const envelopes = new Hono<AppEnv>()
           role: r.role,
           order: envelope.signingOrder === "SEQUENTIAL" ? r.order : 1,
           verification: r.verification,
+          delivery: r.delivery,
           colorIndex: i,
         }
         if (r.id && existingIds.has(r.id)) await tx.recipient.update({ where: { id: r.id }, data })
@@ -230,44 +223,16 @@ export const envelopes = new Hono<AppEnv>()
     const scope = forOrganization(c.get("organizationId"))
     const envelope = await prisma.envelope.findFirst({
       where: scope.envelope({ id: c.req.param("id") }),
-      include: { recipients: true, fields: { select: { recipientId: true, type: true } } },
+      select: { id: true, createdById: true },
     })
     if (!envelope) notFound("Envelope")
     assertCanManageEnvelope(c, envelope)
-    assertTransition(envelope.status, "SENT")
-
-    // ── Pre-flight validation (docs/signing-flow.md → Sending) ──
-    const issues = sendPreflight(envelope)
-    if (issues.length > 0) {
-      return c.json({ error: "preflight_failed", message: issues[0]?.message, issues }, 400)
-    }
-
-    const { links, webhooks } = await prisma.$transaction(async (tx) => {
-      // Plan limit (docs/billing.md): serialised per workspace, refused with 402.
-      await assertEnvelopeQuota(tx, envelope.organizationId)
-      await tx.envelope.update({
-        where: { id: envelope.id },
-        data: { status: "SENT", sentAt: new Date() },
-      })
-      await appendAuditEvent(tx, {
-        envelopeId: envelope.id,
-        type: "envelope.sent",
-        actorUserId: c.get("user").id,
-        data: { recipients: envelope.recipients.length, signingOrder: envelope.signingOrder },
-        ...clientMeta(c),
-      })
-      const links = await activateNextRecipients(tx, envelope.id)
-      const webhooks = await queueEnvelopeWebhook(tx, {
-        envelopeId: envelope.id,
-        type: "envelope.sent",
-      })
-      return { links, webhooks }
+    const { notified } = await sendEnvelope({
+      envelopeId: envelope.id,
+      organizationId: c.get("organizationId"),
+      actor: { userId: c.get("user").id, ...clientMeta(c) },
     })
-
-    const q = getQueues().notifications
-    await Promise.all(links.map((l) => q.add("envelope.invite", l)))
-    await enqueueWebhookDeliveries(webhooks)
-    return c.json({ ok: true, notified: links.length })
+    return c.json({ ok: true, notified })
   })
 
   .post("/:id/void", async (c) => {
@@ -275,32 +240,16 @@ export const envelopes = new Hono<AppEnv>()
     const scope = forOrganization(c.get("organizationId"))
     const envelope = await prisma.envelope.findFirst({
       where: scope.envelope({ id: c.req.param("id") }),
+      select: { id: true, createdById: true },
     })
     if (!envelope) notFound("Envelope")
     assertCanManageEnvelope(c, envelope)
-    assertTransition(envelope.status, "VOIDED")
-
-    const webhooks = await prisma.$transaction(async (tx) => {
-      await tx.envelope.update({
-        where: { id: envelope.id },
-        data: { status: "VOIDED", voidedAt: new Date(), voidReason: reason },
-      })
-      // Kill all outstanding links
-      await tx.recipient.updateMany({
-        where: { envelopeId: envelope.id },
-        data: { tokenHash: null },
-      })
-      await appendAuditEvent(tx, {
-        envelopeId: envelope.id,
-        type: "envelope.voided",
-        actorUserId: c.get("user").id,
-        data: { reason },
-        ...clientMeta(c),
-      })
-      return queueEnvelopeWebhook(tx, { envelopeId: envelope.id, type: "envelope.voided" })
+    await voidEnvelope({
+      envelopeId: envelope.id,
+      organizationId: c.get("organizationId"),
+      reason,
+      actor: { userId: c.get("user").id, ...clientMeta(c) },
     })
-    await getQueues().notifications.add("envelope.voided", { envelopeId: envelope.id })
-    await enqueueWebhookDeliveries(webhooks)
     return c.json({ ok: true })
   })
 
@@ -315,6 +264,9 @@ export const envelopes = new Hono<AppEnv>()
     })
     if (!recipient) notFound("Recipient")
     assertCanManageEnvelope(c, recipient.envelope)
+    if (recipient.delivery === "EMBEDDED") {
+      conflict("Embedded recipients sign inside your app and aren't emailed")
+    }
     // Same rules the UI uses to enable "Send reminder" (throttled: it emails and rotates the link).
     const availability = reminderAvailability(recipient, recipient.envelope.status)
     if (!availability.ok) {

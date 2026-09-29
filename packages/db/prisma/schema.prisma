@@ -41,6 +41,8 @@ model User {
   templates Template[]
   webhooks  WebhookEndpoint[]
   exports   DataExport[]
+  apiKeys   ApiKey[]
+  bulkSends BulkSend[]
 
   @@map("user")
 }
@@ -110,6 +112,8 @@ model Organization {
   subscription Subscription?
   settings     WorkspaceSettings?
   exports      DataExport[]
+  apiKeys      ApiKey[]
+  bulkSends    BulkSend[]
 
   @@map("organization")
 }
@@ -281,6 +285,8 @@ model Recipient {
   order           Int                @default(1)
   status          RecipientStatus    @default(PENDING)
   verification    VerificationMethod @default(LINK)
+  /// EMAIL: invited/reminded by email. EMBEDDED: signs inside the sender's app (docs/embedded-signing.md)
+  delivery        RecipientDelivery  @default(EMAIL)
   /// UI-only colour index for the field-placement editor
   colorIndex      Int                @default(0)
   /// SHA-256 (hex) of the signing token. The raw token is only ever in the email link.
@@ -405,8 +411,9 @@ model Template {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  roles  TemplateRole[]
-  fields TemplateField[]
+  bulkSends BulkSend[]
+  roles     TemplateRole[]
+  fields    TemplateField[]
 
   @@index([organizationId, createdAt])
   @@index([documentId])
@@ -525,6 +532,8 @@ model WorkspaceSettings {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   /// Years to keep closed envelopes before purging files and personal data; null = forever
   retentionYears Int?
+  /// Origins allowed to show /sign in an iframe for EMBEDDED recipients (docs/embedded-signing.md)
+  embedOrigins   String[]     @default([])
   updatedAt      DateTime     @updatedAt
 }
 
@@ -552,4 +561,85 @@ model DataExport {
   expiresAt      DateTime?
 
   @@index([organizationId, createdAt])
+}
+
+/// Public API key (docs/public-api.md). Only the hash is stored; the key is shown once.
+model ApiKey {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// The admin who created it: the actor recorded in audit trails for API actions
+  createdById    String
+  createdBy      User         @relation(fields: [createdById], references: [id])
+  name           String
+  /// sha256("api-key:" + key)
+  secretHash     String       @unique
+  /// "sahihi_sk_AbCd…WxYz", to tell keys apart
+  hint           String
+  /// ApiKeyScope[] from @sahihi/core
+  scopes         String[]
+  lastUsedAt     DateTime?
+  expiresAt      DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, createdAt])
+}
+
+enum BulkSendStatus {
+  PENDING
+  RUNNING
+  DONE
+}
+
+enum BulkSendItemStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+/// One template sent to many people: one envelope per row (docs/bulk-send.md).
+model BulkSend {
+  id             String         @id @default(cuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// Kept as history if the template is deleted later
+  templateId     String?
+  template       Template?      @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  createdById    String
+  createdBy      User           @relation(fields: [createdById], references: [id])
+  title          String
+  message        String?
+  status         BulkSendStatus @default(PENDING)
+  total          Int
+  sent           Int            @default(0)
+  failed         Int            @default(0)
+  /// Set when started through the public API
+  apiKeyId       String?
+  createdAt      DateTime       @default(now())
+  completedAt    DateTime?
+  items          BulkSendItem[]
+
+  @@index([organizationId, createdAt])
+}
+
+model BulkSendItem {
+  id         String             @id @default(cuid())
+  bulkSendId String
+  bulkSend   BulkSend           @relation(fields: [bulkSendId], references: [id], onDelete: Cascade)
+  /// 1-based row in the upload
+  row        Int
+  status     BulkSendItemStatus @default(PENDING)
+  /// The row's people until processed; cleared afterwards (personal data lives on the envelope)
+  recipients Json?
+  /// Set as soon as the draft exists, so a retry sends it instead of creating a duplicate
+  envelopeId String?
+  error      String?
+
+  @@unique([bulkSendId, row])
+}
+
+enum RecipientDelivery {
+  EMAIL
+  EMBEDDED
 }

@@ -64,6 +64,8 @@ export const UseTemplateSchema = z.object({
         name: z.string(),
         email: z.string(),
         phone: z.string().optional(),
+        /** EMBEDDED: signs inside your app, no emails (docs/embedded-signing.md) */
+        delivery: z.enum(["EMAIL", "EMBEDDED"]).optional(),
       }),
     )
     .max(50),
@@ -170,6 +172,7 @@ export interface TemplateForUse {
 
 export interface DraftRecipient {
   roleId: string
+  delivery: "EMAIL" | "EMBEDDED"
   name: string
   email: string
   phone: string | null
@@ -214,7 +217,12 @@ export function draftFromTemplate(
   for (const role of template.roles) {
     const path = `recipients.${role.id}`
     const person = hasFixedContact(role)
-      ? { name: role.name ?? "", email: role.email ?? "", phone: role.phone ?? undefined }
+      ? {
+          name: role.name ?? "",
+          email: role.email ?? "",
+          phone: role.phone ?? undefined,
+          delivery: undefined,
+        }
       : given.get(role.id)
     if (!person) {
       issues.push({ path, message: `Who is the ${role.label}?` })
@@ -227,6 +235,7 @@ export function draftFromTemplate(
       role: role.role,
       order: role.order,
       verification: role.verification,
+      delivery: person.delivery,
     })
     if (!parsed.success) {
       for (const issue of parsed.error.issues) {
@@ -253,6 +262,7 @@ export function draftFromTemplate(
       order: template.signingOrder === "SEQUENTIAL" ? role.order : 1,
       verification: role.verification,
       colorIndex: role.colorIndex,
+      delivery: parsed.data.delivery,
     })
   }
   if (issues.length > 0) return { ok: false, issues }

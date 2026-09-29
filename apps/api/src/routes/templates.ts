@@ -1,12 +1,12 @@
 import {
   canManageTemplate,
-  draftFromTemplate,
   SaveTemplateSchema,
   templateRolesFromEnvelope,
   UpdateTemplateSchema,
   UseTemplateSchema,
 } from "@sahihi/core"
-import { appendAuditEvent, forOrganization, prisma } from "@sahihi/db"
+import { forOrganization, prisma } from "@sahihi/db"
+import { createEnvelopeFromTemplate } from "@sahihi/envelopes"
 import { Hono } from "hono"
 import type { AppEnv } from "../lib/env"
 import { badRequest, clientMeta, notFound, parseJson } from "../lib/http"
@@ -174,77 +174,12 @@ export const templates = new Hono<AppEnv>()
 
   /** Use the template: fill every role, get a DRAFT envelope with the fields copied. */
   .post("/:id/envelopes", async (c) => {
-    const input = await parseJson(c, UseTemplateSchema)
-    const orgId = c.get("organizationId")
-    const scope = forOrganization(orgId)
-    const template = await prisma.template.findFirst({
-      where: scope.template({ id: c.req.param("id") }),
-      include: {
-        document: { select: { id: true, status: true, deletedAt: true, sha256: true } },
-        roles: { select: roleSelect, orderBy: { order: "asc" } },
-        fields: { select: fieldSelect },
-      },
-    })
-    if (!template) notFound("Template")
-    if (template.document.status !== "READY" || template.document.deletedAt) {
-      badRequest("This template's document is no longer available")
-    }
-    if (input.expiresAt && input.expiresAt <= new Date()) {
-      return c.json(
-        {
-          error: "validation_error",
-          issues: [{ path: "expiresAt", message: "Pick a date in the future" }],
-        },
-        400,
-      )
-    }
-    const draft = draftFromTemplate(template, input.recipients)
-    if (!draft.ok) return c.json({ error: "validation_error", issues: draft.issues }, 400)
-
-    const envelope = await prisma.$transaction(async (tx) => {
-      const created = await tx.envelope.create({
-        data: {
-          organizationId: orgId,
-          documentId: template.document.id,
-          createdById: c.get("user").id,
-          title: input.title,
-          message: input.message ?? template.message,
-          signingOrder: template.signingOrder,
-          expiresAt: input.expiresAt,
-        },
-      })
-      const recipientIdByRole = new Map<string, string>()
-      for (const { roleId, ...r } of draft.recipients) {
-        const saved = await tx.recipient.create({ data: { ...r, envelopeId: created.id } })
-        recipientIdByRole.set(roleId, saved.id)
-      }
-      // Copy only the layout: never the template field's own id (a second use would collide).
-      await tx.field.createMany({
-        data: draft.fields.map((f) => ({
-          envelopeId: created.id,
-          recipientId: recipientIdByRole.get(f.roleId) as string,
-          type: f.type,
-          page: f.page,
-          x: f.x,
-          y: f.y,
-          width: f.width,
-          height: f.height,
-          required: f.required,
-          label: f.label,
-        })),
-      })
-      await appendAuditEvent(tx, {
-        envelopeId: created.id,
-        type: "envelope.created",
-        actorUserId: c.get("user").id,
-        data: {
-          documentId: template.document.id,
-          documentSha256: template.document.sha256,
-          templateId: template.id,
-        },
-        ...clientMeta(c),
-      })
-      return created
+    const data = await parseJson(c, UseTemplateSchema)
+    const envelope = await createEnvelopeFromTemplate({
+      templateId: c.req.param("id"),
+      organizationId: c.get("organizationId"),
+      actor: { userId: c.get("user").id, ...clientMeta(c) },
+      data,
     })
     return c.json({ envelope }, 201)
   })

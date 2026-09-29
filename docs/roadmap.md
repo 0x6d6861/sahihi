@@ -79,5 +79,6 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
 
 - [ ] **CA integration** via `SigningProvider` (PAdES-B-LT), see `docs/certificates.md`
 - [ ] DOCX → PDF conversion on upload (LibreOffice in the worker)
-- [ ] Bulk send, public API + API keys, embedded signing
+- [x] Bulk send, public API + API keys, embedded signing (docs/public-api.md, docs/bulk-send.md,
+      docs/embedded-signing.md, ADR 0017)
 - [ ] SMS/WhatsApp delivery of signing links (Africa's Talking)
