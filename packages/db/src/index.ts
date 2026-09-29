@@ -5,6 +5,7 @@ export { type AppendAuditInput, appendAuditEvent, toChainedEvent } from "./audit
 export * from "./generated/prisma/client"
 export { issueSigningLink } from "./signing-links"
 export { forOrganization } from "./tenant"
+export { queueEnvelopeWebhook } from "./webhooks"
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient }
 

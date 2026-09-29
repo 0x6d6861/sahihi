@@ -12,6 +12,7 @@ import { envelopes } from "./routes/envelopes"
 import { signing } from "./routes/signing"
 import { templates } from "./routes/templates"
 import { verify } from "./routes/verify"
+import { webhooks } from "./routes/webhooks"
 
 export function createApp() {
   const env = getEnv()
@@ -41,6 +42,7 @@ export function createApp() {
     .route("/api/documents", documents)
     .route("/api/envelopes", envelopes)
     .route("/api/templates", templates)
+    .route("/api/webhooks", webhooks)
     .route("/api/sign", signing)
     .route("/api/verify", verify)
 

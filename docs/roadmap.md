@@ -69,7 +69,7 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
 - [x] Cross-tenant integration test over every route; DB role without UPDATE/DELETE on AuditEvent
 - [x] CSP headers; security review of `/sign` and `/verify`
 - [x] Templates (reusable recipients + field layouts)
-- [ ] Webhooks per org (envelope.completed, …) with signed payloads
+- [x] Webhooks per org (envelope.completed, …) with signed payloads
 - [ ] Billing per org (plans, envelope quotas)
 - [ ] Retention settings + data export/delete (Kenya DPA)
 - [ ] Playwright E2E: sign-up → upload → place → send → sign (Mailpit) → certificate

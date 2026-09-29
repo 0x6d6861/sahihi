@@ -20,6 +20,8 @@ const ids = {
   recipient: "",
   template: "",
   role: "",
+  webhook: "",
+  delivery: "",
 }
 
 type Case = () => { path: string; init?: RequestInit & { json?: unknown } }
@@ -113,6 +115,26 @@ const TENANT: Record<string, Case> = {
     path: `/api/templates/${ids.template}`,
     init: { method: "DELETE" },
   }),
+  "PATCH /api/webhooks/:id": () => ({
+    path: `/api/webhooks/${ids.webhook}`,
+    init: { method: "PATCH", json: { url: "https://attacker.example/hook" } },
+  }),
+  "DELETE /api/webhooks/:id": () => ({
+    path: `/api/webhooks/${ids.webhook}`,
+    init: { method: "DELETE" },
+  }),
+  "POST /api/webhooks/:id/rotate-secret": () => ({
+    path: `/api/webhooks/${ids.webhook}/rotate-secret`,
+    init: { method: "POST" },
+  }),
+  "POST /api/webhooks/:id/test": () => ({
+    path: `/api/webhooks/${ids.webhook}/test`,
+    init: { method: "POST" },
+  }),
+  "POST /api/webhooks/:id/deliveries/:deliveryId/retry": () => ({
+    path: `/api/webhooks/${ids.webhook}/deliveries/${ids.delivery}/retry`,
+    init: { method: "POST" },
+  }),
   "POST /api/templates/:id/envelopes": () => ({
     path: `/api/templates/${ids.template}/envelopes`,
     init: {
@@ -126,7 +148,12 @@ const TENANT: Record<string, Case> = {
 }
 
 /** Org-scoped lists: 200, but only the caller's rows. */
-const LISTS = ["GET /api/documents", "GET /api/envelopes", "GET /api/templates"]
+const LISTS = [
+  "GET /api/documents",
+  "GET /api/envelopes",
+  "GET /api/templates",
+  "GET /api/webhooks",
+]
 
 /**
  * Not org-scoped, each for a stated reason. Signing routes are authorized by the token alone
@@ -134,6 +161,8 @@ const LISTS = ["GET /api/documents", "GET /api/envelopes", "GET /api/templates"]
  * (members.itest.ts / permissions.itest.ts).
  */
 const NOT_TENANT = [
+  // Creates in the caller's own org and takes no ids from the request.
+  "POST /api/webhooks",
   "GET /health",
   "GET /api/auth/*",
   "POST /api/auth/*",
@@ -150,24 +179,29 @@ const NOT_TENANT = [
 
 /** Everything of alice's that a cross-tenant request could touch. */
 async function snapshot() {
-  const [documents, envelopes, recipients, fields, auditEvents, templates] = await Promise.all([
-    prisma.document.findMany({
-      where: { organizationId: alice.organizationId },
-      orderBy: { id: "asc" },
-    }),
-    prisma.envelope.findMany({
-      where: { organizationId: alice.organizationId },
-      orderBy: { id: "asc" },
-    }),
-    prisma.recipient.findMany({ where: { envelopeId: ids.envelope }, orderBy: { id: "asc" } }),
-    prisma.field.findMany({ where: { envelopeId: ids.envelope }, orderBy: { id: "asc" } }),
-    prisma.auditEvent.findMany({ where: { envelopeId: ids.envelope }, orderBy: { seq: "asc" } }),
-    prisma.template.findMany({
-      where: { organizationId: alice.organizationId },
-      include: { roles: true, fields: true },
-    }),
-  ])
-  return { documents, envelopes, recipients, fields, auditEvents, templates }
+  const [documents, envelopes, recipients, fields, auditEvents, templates, webhooks] =
+    await Promise.all([
+      prisma.document.findMany({
+        where: { organizationId: alice.organizationId },
+        orderBy: { id: "asc" },
+      }),
+      prisma.envelope.findMany({
+        where: { organizationId: alice.organizationId },
+        orderBy: { id: "asc" },
+      }),
+      prisma.recipient.findMany({ where: { envelopeId: ids.envelope }, orderBy: { id: "asc" } }),
+      prisma.field.findMany({ where: { envelopeId: ids.envelope }, orderBy: { id: "asc" } }),
+      prisma.auditEvent.findMany({ where: { envelopeId: ids.envelope }, orderBy: { seq: "asc" } }),
+      prisma.template.findMany({
+        where: { organizationId: alice.organizationId },
+        include: { roles: true, fields: true },
+      }),
+      prisma.webhookEndpoint.findMany({
+        where: { organizationId: alice.organizationId },
+        include: { deliveries: true },
+      }),
+    ])
+  return { documents, envelopes, recipients, fields, auditEvents, templates, webhooks }
 }
 
 beforeAll(async () => {
@@ -201,6 +235,15 @@ beforeAll(async () => {
     template: { roles: { id: string }[] }
   }
   ids.role = tpl.template.roles[0]?.id ?? ""
+  const hook = await request(alice, "/api/webhooks", {
+    method: "POST",
+    json: { url: "https://hooks.example.test/alice", events: ["envelope.sent"] },
+  })
+  ids.webhook = ((await hook.json()) as { endpoint: { id: string } }).endpoint.id
+  const tested = await request(alice, `/api/webhooks/${ids.webhook}/test`, { method: "POST" })
+  ids.delivery = ((await tested.json()) as { delivery: { id: string } }).delivery.id
+  // A failed delivery, so "retry" would otherwise be allowed.
+  await prisma.webhookDelivery.update({ where: { id: ids.delivery }, data: { status: "FAILED" } })
 })
 
 describe("tenant isolation", () => {
@@ -230,7 +273,7 @@ describe("tenant isolation", () => {
   })
 
   test("lists only return the caller's rows", async () => {
-    for (const path of ["/api/documents", "/api/envelopes", "/api/templates"]) {
+    for (const path of ["/api/documents", "/api/envelopes", "/api/templates", "/api/webhooks"]) {
       const mine = (await (await request(alice, path)).json()) as { items: unknown[] }
       const theirs = (await (await request(mallory, path)).json()) as { items: unknown[] }
       expect({ path, alice: mine.items.length > 0, mallory: theirs.items.length }).toEqual({

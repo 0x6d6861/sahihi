@@ -21,6 +21,7 @@ export const orgStatements = {
   document: ["create", "delete-any"],
   envelope: ["create", "manage-any"],
   template: ["create", "manage-any"],
+  webhook: ["manage"],
   billing: ["manage"],
 } as const
 
@@ -32,6 +33,7 @@ export const orgRoles = {
     document: ["create", "delete-any"],
     envelope: ["create", "manage-any"],
     template: ["create", "manage-any"],
+    webhook: ["manage"],
     billing: ["manage"],
   }),
   admin: orgAc.newRole({
@@ -39,6 +41,7 @@ export const orgRoles = {
     document: ["create", "delete-any"],
     envelope: ["create", "manage-any"],
     template: ["create", "manage-any"],
+    webhook: ["manage"],
   }),
   member: orgAc.newRole({
     ...memberAc.statements,

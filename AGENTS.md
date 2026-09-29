@@ -37,8 +37,8 @@ Read this file first, then the doc for the area you're touching (see **Doc map**
 
 ```
 apps/
-  api/        Hono REST API. routes/{documents,envelopes,templates,signing,verify}.ts, auth.ts (better-auth)
-  worker/     BullMQ consumers: notifications, envelope finalize, maintenance (expire/remind)
+  api/        Hono REST API. routes/{documents,envelopes,templates,webhooks,signing,verify}.ts, auth.ts (better-auth)
+  worker/     BullMQ consumers: notifications, envelope finalize, webhooks, maintenance (expire/remind/sweeps)
   web/        Next.js. (auth)/ sign-in/up/onboarding, (app)/ documents+envelopes, sign/[token], verify/[code]
 packages/
   config/     Env schema (zod) + queue names. The ONLY place process.env is parsed.
@@ -112,6 +112,8 @@ the relevant doc in `docs/` is updated if behaviour changed, and the matching ch
     page as displayed**. Convert only with `@sahihi/core` helpers. Read `docs/coordinates.md`.
 11. **Enqueue after commit:** add BullMQ jobs *after* the transaction resolves. Job payloads carry IDs
     (plus the raw token for invites) and nothing else. Workers re-read state and must be idempotent.
+    Webhook events are written **inside** the transaction with `queueEnvelopeWebhook(tx, …)` (outbox)
+    and enqueued after it with `enqueueWebhookDeliveries(ids)`.
 12. **Public routes** (`/api/sign/*`, `/api/verify/*`) must be rate-limited (`rateLimit()`) and must
     never return token hashes, other recipients' PII or data from another envelope.
 
@@ -139,6 +141,7 @@ the relevant doc in `docs/` is updated if behaviour changed, and the matching ch
 | Upload, stamping, finalize job | `docs/pdf-pipeline.md` |
 | Send / sign / decline / void / reminders / OTP | `docs/signing-flow.md` |
 | Templates (save as / use) | `docs/templates.md` |
+| Webhooks (events, signing, delivery) | `docs/webhooks.md` |
 | Certificates, `/verify`, CA integration | `docs/certificates.md` |
 | Any public route, tokens, tenancy | `docs/security.md` |
 | Any screen or component | `docs/ui.md` |

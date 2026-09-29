@@ -99,6 +99,26 @@ trusting it (as before) let anyone pick their own rate-limit bucket and forge th
   `sahihi` superuser, so the restrictions are only exercised by the integration test.
 - Planned: periodic anchoring of chain heads (e.g. to an RFC 3161 timestamp authority).
 
+## Webhooks
+
+Owners and admins can send the org's envelope data to a URL of their choosing, so the
+checks are strict (`docs/webhooks.md`, ADR 0013):
+
+- **SSRF:** URLs must be `https://` with no credentials, and may not be `localhost`, `*.local`,
+  `*.internal`, a single-label host or a private IP literal (`checkWebhookUrl`). Before **every**
+  delivery, the worker resolves the host and refuses private, loopback, link-local (incl.
+  `169.254.169.254`), CGNAT, multicast and reserved answers (`isPrivateAddress`). Redirects are not
+  followed. `WEBHOOKS_ALLOW_PRIVATE_URLS=true` turns this off for local development and tests only.
+  Residual risk: DNS rebinding between the check and the connection.
+- **Signing:** `Sahihi-Signature: t=…,v1=HMAC-SHA256(secret, "t.body")`. Receivers check it and
+  reject timestamps older than 5 minutes.
+- **Secrets:** generated server-side and shown once (create, rotate). They're stored AES-256-GCM
+  encrypted with a key derived from `BETTER_AUTH_SECRET` (HKDF, own `info`). Responses carry only the
+  last 4 characters. Rotating `BETTER_AUTH_SECRET` means rotating every webhook secret.
+- **Payloads:** the tenant's own envelope data (titles, recipients' names/emails/statuses, hashes).
+  Never signing tokens, OTPs or IP addresses.
+- Response bodies are stored trimmed to 1,000 characters, for debugging.
+
 ## Documents
 
 - The bucket is private. Every read or write uses a presigned URL (PUT for 5 minutes; GET short-lived

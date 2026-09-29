@@ -1,4 +1,5 @@
 import { getEnv, QUEUES } from "@sahihi/config"
+import { WEBHOOK_MAX_ATTEMPTS } from "@sahihi/core"
 import { type JobsOptions, Queue } from "bullmq"
 import { Redis } from "ioredis"
 
@@ -33,6 +34,12 @@ export interface MaintenanceJobs {
   "envelopes.expire": Record<string, never>
   "envelopes.remind": Record<string, never>
   "documents.sweep-uploads": Record<string, never>
+  "webhooks.sweep": Record<string, never>
+}
+
+export interface WebhookJobs {
+  /** Retries and backoff: WEBHOOK_MAX_ATTEMPTS / webhookRetryDelayMs (@sahihi/core). */
+  "webhook.deliver": { deliveryId: string }
 }
 
 export type JobName<M> = Extract<keyof M, string>
@@ -70,6 +77,7 @@ let queues:
       notifications: TypedQueue<NotificationJobs>
       finalize: TypedQueue<FinalizeJobs>
       maintenance: TypedQueue<MaintenanceJobs>
+      webhooks: TypedQueue<WebhookJobs>
     }
   | undefined
 
@@ -78,6 +86,32 @@ export function getQueues() {
     notifications: new TypedQueue<NotificationJobs>(QUEUES.notifications),
     finalize: new TypedQueue<FinalizeJobs>(QUEUES.finalize),
     maintenance: new TypedQueue<MaintenanceJobs>(QUEUES.maintenance),
+    webhooks: new TypedQueue<WebhookJobs>(QUEUES.webhooks),
   }
   return queues
+}
+
+/**
+ * Enqueue webhook deliveries AFTER the transaction that created them has committed. The job id is
+ * the delivery id, so enqueueing twice (e.g. the outbox sweep) never delivers twice.
+ */
+export async function enqueueWebhookDeliveries(
+  deliveryIds: string[],
+  /** A manual retry of a FAILED delivery needs a new job id (the failed job is kept for debugging). */
+  { retryKey }: { retryKey?: string } = {},
+) {
+  const { webhooks } = getQueues()
+  await Promise.all(
+    deliveryIds.map((deliveryId) =>
+      webhooks.add(
+        "webhook.deliver",
+        { deliveryId },
+        {
+          jobId: retryKey ? `whd-${deliveryId}-${retryKey}` : `whd-${deliveryId}`,
+          attempts: WEBHOOK_MAX_ATTEMPTS,
+          backoff: { type: "webhook" },
+        },
+      ),
+    ),
+  )
 }

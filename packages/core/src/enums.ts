@@ -44,3 +44,7 @@ export const IMAGE_FIELD_TYPES: readonly FieldType[] = ["SIGNATURE", "INITIALS"]
 
 /** Field types filled automatically from recipient data at submit time. */
 export const AUTO_FIELD_TYPES: readonly FieldType[] = ["DATE_SIGNED", "NAME", "EMAIL"]
+
+/** Webhook delivery lifecycle (docs/webhooks.md). */
+export const WEBHOOK_DELIVERY_STATUSES = ["PENDING", "SUCCEEDED", "FAILED"] as const
+export type WebhookDeliveryStatus = (typeof WEBHOOK_DELIVERY_STATUSES)[number]

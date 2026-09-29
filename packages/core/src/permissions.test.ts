@@ -78,3 +78,11 @@ describe("templates", () => {
     expect(canManageTemplate({ userId: "u-bob", role: "owner" }, t)).toBe(true)
   })
 })
+
+describe("webhooks", () => {
+  test("only owners and admins configure webhooks", () => {
+    expect(hasPermission("owner", { webhook: ["manage"] })).toBe(true)
+    expect(hasPermission("admin", { webhook: ["manage"] })).toBe(true)
+    expect(hasPermission("member", { webhook: ["manage"] })).toBe(false)
+  })
+})

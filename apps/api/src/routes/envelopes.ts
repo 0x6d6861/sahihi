@@ -11,8 +11,14 @@ import {
   VoidEnvelopeSchema,
   verifyAuditChain,
 } from "@sahihi/core"
-import { appendAuditEvent, forOrganization, prisma, toChainedEvent } from "@sahihi/db"
-import { getQueues, presignDownload } from "@sahihi/infra"
+import {
+  appendAuditEvent,
+  forOrganization,
+  prisma,
+  queueEnvelopeWebhook,
+  toChainedEvent,
+} from "@sahihi/db"
+import { enqueueWebhookDeliveries, getQueues, presignDownload } from "@sahihi/infra"
 import { Hono } from "hono"
 import type { AppEnv } from "../lib/env"
 import { badRequest, clientMeta, conflict, notFound, parseJson } from "../lib/http"
@@ -209,7 +215,7 @@ export const envelopes = new Hono<AppEnv>()
       return c.json({ error: "preflight_failed", message: issues[0]?.message, issues }, 400)
     }
 
-    const links = await prisma.$transaction(async (tx) => {
+    const { links, webhooks } = await prisma.$transaction(async (tx) => {
       await tx.envelope.update({
         where: { id: envelope.id },
         data: { status: "SENT", sentAt: new Date() },
@@ -221,11 +227,17 @@ export const envelopes = new Hono<AppEnv>()
         data: { recipients: envelope.recipients.length, signingOrder: envelope.signingOrder },
         ...clientMeta(c),
       })
-      return activateNextRecipients(tx, envelope.id)
+      const links = await activateNextRecipients(tx, envelope.id)
+      const webhooks = await queueEnvelopeWebhook(tx, {
+        envelopeId: envelope.id,
+        type: "envelope.sent",
+      })
+      return { links, webhooks }
     })
 
     const q = getQueues().notifications
     await Promise.all(links.map((l) => q.add("envelope.invite", l)))
+    await enqueueWebhookDeliveries(webhooks)
     return c.json({ ok: true, notified: links.length })
   })
 
@@ -239,7 +251,7 @@ export const envelopes = new Hono<AppEnv>()
     assertCanManageEnvelope(c, envelope)
     assertTransition(envelope.status, "VOIDED")
 
-    await prisma.$transaction(async (tx) => {
+    const webhooks = await prisma.$transaction(async (tx) => {
       await tx.envelope.update({
         where: { id: envelope.id },
         data: { status: "VOIDED", voidedAt: new Date(), voidReason: reason },
@@ -256,8 +268,10 @@ export const envelopes = new Hono<AppEnv>()
         data: { reason },
         ...clientMeta(c),
       })
+      return queueEnvelopeWebhook(tx, { envelopeId: envelope.id, type: "envelope.voided" })
     })
     await getQueues().notifications.add("envelope.voided", { envelopeId: envelope.id })
+    await enqueueWebhookDeliveries(webhooks)
     return c.json({ ok: true })
   })
 

@@ -18,8 +18,14 @@ import {
   timingSafeEqual,
   VerifyOtpSchema,
 } from "@sahihi/core"
-import { appendAuditEvent, prisma } from "@sahihi/db"
-import { getQueues, keys, presignDownload, putObject } from "@sahihi/infra"
+import { appendAuditEvent, prisma, queueEnvelopeWebhook } from "@sahihi/db"
+import {
+  enqueueWebhookDeliveries,
+  getQueues,
+  keys,
+  presignDownload,
+  putObject,
+} from "@sahihi/infra"
 import { pngFromDataUrl } from "@sahihi/pdf"
 import { type Context, Hono } from "hono"
 import { getSignedCookie, setSignedCookie } from "hono/cookie"
@@ -440,12 +446,17 @@ export const signing = new Hono<SigningEnv>()
           data: { status: "COMPLETED", completedAt: new Date() },
         })
         await appendAuditEvent(tx, { envelopeId: s.envelopeId, type: "envelope.completed" })
-        return { outcome, links: [] }
-      }
-      if (s.envelope.status === "SENT") {
+      } else if (s.envelope.status === "SENT") {
         await tx.envelope.update({ where: { id: s.envelopeId }, data: { status: "IN_PROGRESS" } })
       }
-      return { outcome, links: await activateNextRecipients(tx, s.envelopeId) }
+      // envelope.completed is emitted by finalize, once the signed PDF and certificate exist.
+      const webhooks = await queueEnvelopeWebhook(tx, {
+        envelopeId: s.envelopeId,
+        type: "recipient.signed",
+        extra: { recipientId: s.id },
+      })
+      const links = outcome === "COMPLETED" ? [] : await activateNextRecipients(tx, s.envelopeId)
+      return { outcome, links, webhooks }
     })
 
     const q = getQueues()
@@ -458,13 +469,14 @@ export const signing = new Hono<SigningEnv>()
       )
     }
     await Promise.all(result.links.map((l) => q.notifications.add("envelope.invite", l)))
+    await enqueueWebhookDeliveries(result.webhooks)
     return c.json({ ok: true, envelopeStatus: result.outcome })
   })
 
   .post("/:token/decline", withSigner, requireReady, async (c) => {
     const s = c.get("signer")
     const { reason } = await parseJson(c, DeclineSigningSchema)
-    await prisma.$transaction(async (tx) => {
+    const webhooks = await prisma.$transaction(async (tx) => {
       const claimed = await tx.recipient.updateMany({
         where: { id: s.id, status: { in: ["SENT", "VIEWED"] } },
         data: { status: "DECLINED", declinedAt: new Date(), declineReason: reason },
@@ -484,10 +496,16 @@ export const signing = new Hono<SigningEnv>()
         ...clientMeta(c),
       })
       await appendAuditEvent(tx, { envelopeId: s.envelopeId, type: "envelope.declined" })
+      return queueEnvelopeWebhook(tx, {
+        envelopeId: s.envelopeId,
+        type: "envelope.declined",
+        extra: { recipientId: s.id },
+      })
     })
     await getQueues().notifications.add("envelope.declined", {
       envelopeId: s.envelopeId,
       recipientId: s.id,
     })
+    await enqueueWebhookDeliveries(webhooks)
     return c.json({ ok: true })
   })

@@ -48,7 +48,7 @@ export default async function MembersPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="font-semibold text-xl">Members</h1>
+          <h2 className="font-semibold text-lg">Members</h2>
           <p className="text-muted-foreground text-sm">
             People in {org.name}. Everyone can send envelopes; admins and owners manage members.
           </p>

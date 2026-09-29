@@ -39,6 +39,7 @@ model User {
   documents Document[]
   envelopes Envelope[]
   templates Template[]
+  webhooks  WebhookEndpoint[]
 
   @@map("user")
 }
@@ -104,6 +105,7 @@ model Organization {
   documents Document[]
   envelopes Envelope[]
   templates Template[]
+  webhooks  WebhookEndpoint[]
 
   @@map("organization")
 }
@@ -440,4 +442,59 @@ model TemplateField {
   label      String?
 
   @@index([templateId])
+}
+
+enum WebhookDeliveryStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+/// An org's HTTPS endpoint for signed event POSTs (docs/webhooks.md). Owners/admins only.
+model WebhookEndpoint {
+  id              String            @id @default(cuid())
+  organizationId  String
+  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdById     String
+  createdBy       User              @relation(fields: [createdById], references: [id])
+  url             String
+  description     String?
+  /// WebhookEventType[] from @sahihi/core
+  events          String[]
+  enabled         Boolean           @default(true)
+  /// Signing secret, AES-GCM encrypted (encryptSecret). It must be recoverable to sign, so it's
+  /// encrypted rather than hashed, and it's only ever shown in full once.
+  secretEncrypted String
+  /// Last 4 characters, to tell secrets apart in the UI.
+  secretHint      String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  deliveries      WebhookDelivery[]
+
+  @@index([organizationId])
+}
+
+/// One event for one endpoint: written in the same transaction as the state change (outbox),
+/// then delivered by the worker with retries.
+model WebhookDelivery {
+  id             String                @id @default(cuid())
+  endpointId     String
+  endpoint       WebhookEndpoint       @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  organizationId String
+  /// Event id sent to the receiver (their idempotency key). Same for every attempt.
+  eventId        String
+  type           String
+  /// Event data snapshot at emission time
+  payload        Json
+  status         WebhookDeliveryStatus @default(PENDING)
+  attempts       Int                   @default(0)
+  lastAttemptAt  DateTime?
+  lastStatusCode Int?
+  lastError      String?
+  lastResponse   String?
+  deliveredAt    DateTime?
+  createdAt      DateTime              @default(now())
+
+  @@index([endpointId, createdAt])
+  @@index([status, createdAt])
 }

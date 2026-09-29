@@ -5,8 +5,8 @@ import {
   readConsentEvidence,
   sha256Hex,
 } from "@sahihi/core"
-import { appendAuditEvent, prisma } from "@sahihi/db"
-import { getObjectBytes, getQueues, keys, putObject } from "@sahihi/infra"
+import { appendAuditEvent, prisma, queueEnvelopeWebhook } from "@sahihi/db"
+import { enqueueWebhookDeliveries, getObjectBytes, getQueues, keys, putObject } from "@sahihi/infra"
 import { renderCertificate, type StampField, stampFields } from "@sahihi/pdf"
 import { getSigningProvider } from "../providers"
 
@@ -167,7 +167,7 @@ export async function finalizeEnvelope(envelopeId: string) {
   const certKey = keys.certificate(e.organizationId, envelopeId)
   const certSha = await sha256Hex(pdf)
   await putObject(certKey, pdf, "application/pdf")
-  await prisma.$transaction(async (tx) => {
+  const webhooks = await prisma.$transaction(async (tx) => {
     await tx.certificate.create({
       data: {
         envelopeId,
@@ -182,9 +182,12 @@ export async function finalizeEnvelope(envelopeId: string) {
       type: "certificate.issued",
       data: { code, sha256: certSha },
     })
+    // Emitted here, not at the last signature, so receivers can fetch the signed PDF right away.
+    return queueEnvelopeWebhook(tx, { envelopeId, type: "envelope.completed" })
   })
 
   // ── 6: notify ──
   await getQueues().notifications.add("envelope.completed", { envelopeId })
+  await enqueueWebhookDeliveries(webhooks)
   return { code }
 }

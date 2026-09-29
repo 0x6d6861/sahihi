@@ -1,15 +1,18 @@
 import { getEnv, QUEUES } from "@sahihi/config"
+import { webhookRetryDelayMs } from "@sahihi/core"
 import {
   type FinalizeJobs,
   getQueues,
   type MaintenanceJobs,
   type NotificationJobs,
   redis,
+  type WebhookJobs,
 } from "@sahihi/infra"
 import { type Job, Worker } from "bullmq"
 import { finalizeEnvelope } from "./jobs/finalize"
 import { expireEnvelopes, remindRecipients, sweepAbandonedUploads } from "./jobs/maintenance"
 import { handleNotification } from "./jobs/notifications"
+import { deliverWebhook, sweepWebhookOutbox } from "./jobs/webhooks"
 
 getEnv() // fail fast on bad config
 const connection = redis()
@@ -31,9 +34,22 @@ const workers = [
       if (job.name === "envelopes.expire") return expireEnvelopes()
       if (job.name === "envelopes.remind") return remindRecipients()
       if (job.name === "documents.sweep-uploads") return sweepAbandonedUploads()
+      if (job.name === "webhooks.sweep") return sweepWebhookOutbox()
       throw new Error(`Unknown maintenance job ${job.name}`)
     },
     { connection, concurrency: 1 },
+  ),
+  new Worker<WebhookJobs["webhook.deliver"]>(
+    QUEUES.webhooks,
+    (job: Job<WebhookJobs["webhook.deliver"]>) =>
+      deliverWebhook(job.data.deliveryId, {
+        isFinal: job.attemptsMade + 1 >= (job.opts.attempts ?? 1),
+      }),
+    {
+      connection,
+      concurrency: 10,
+      settings: { backoffStrategy: (attemptsMade: number) => webhookRetryDelayMs(attemptsMade) },
+    },
   ),
 ]
 
@@ -55,6 +71,11 @@ await maintenance.raw.upsertJobScheduler(
   "sweep-uploads-15m",
   { pattern: "*/15 * * * *", tz: "Africa/Nairobi" },
   { name: "documents.sweep-uploads", data: {} },
+)
+await maintenance.raw.upsertJobScheduler(
+  "webhooks-sweep-5m",
+  { pattern: "*/5 * * * *" },
+  { name: "webhooks.sweep", data: {} },
 )
 await maintenance.raw.upsertJobScheduler(
   "remind-daily",

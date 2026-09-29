@@ -20,5 +20,11 @@ export function forOrganization(organizationId: string) {
       ...where,
       organizationId,
     }),
+    webhookEndpoint: (
+      where: Prisma.WebhookEndpointWhereInput = {},
+    ): Prisma.WebhookEndpointWhereInput => ({ ...where, organizationId }),
+    webhookDelivery: (
+      where: Prisma.WebhookDeliveryWhereInput = {},
+    ): Prisma.WebhookDeliveryWhereInput => ({ ...where, organizationId }),
   }
 }

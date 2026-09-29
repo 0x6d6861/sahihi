@@ -41,6 +41,15 @@ const EnvSchema = z.object({
    */
   TRUSTED_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(1),
 
+  /**
+   * Development/tests only: let webhook endpoints use http:// and private addresses (e.g. a local
+   * receiver). Never set in production: it disables the SSRF protection (docs/webhooks.md).
+   */
+  WEBHOOKS_ALLOW_PRIVATE_URLS: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+
   SIGNING_LINK_TTL_DAYS: z.coerce.number().int().positive().default(14),
   SIGNING_PROVIDER: z.enum(["internal", "ca"]).default("internal"),
 })
@@ -67,6 +76,7 @@ export const QUEUES = {
   notifications: "notifications",
   finalize: "envelope-finalize",
   maintenance: "maintenance",
+  webhooks: "webhooks",
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]

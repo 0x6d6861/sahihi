@@ -32,6 +32,8 @@ Object.assign(process.env, {
   S3_SECRET_ACCESS_KEY: process.env.TEST_S3_SECRET_ACCESS_KEY ?? "sahihi-secret",
   S3_FORCE_PATH_STYLE: "true",
   EMAIL_FROM: "Sahihi Test <test@example.com>",
+  // Webhook itests use a local receiver; SSRF rules are covered by core unit tests.
+  WEBHOOKS_ALLOW_PRIVATE_URLS: "true",
 })
 
 async function ensureDatabase() {

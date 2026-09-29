@@ -1,7 +1,7 @@
 import { getEnv } from "@sahihi/config"
 import { abandonedUploadCutoff } from "@sahihi/core"
-import { appendAuditEvent, issueSigningLink, prisma } from "@sahihi/db"
-import { deleteObject, getQueues } from "@sahihi/infra"
+import { appendAuditEvent, issueSigningLink, prisma, queueEnvelopeWebhook } from "@sahihi/db"
+import { deleteObject, enqueueWebhookDeliveries, getQueues } from "@sahihi/infra"
 
 const DAY = 86_400_000
 const REMIND_EVERY_DAYS = 3
@@ -15,15 +15,17 @@ export async function expireEnvelopes() {
     take: 500,
   })
   for (const { id } of overdue) {
-    await prisma.$transaction(async (tx) => {
+    const webhooks = await prisma.$transaction(async (tx) => {
       const res = await tx.envelope.updateMany({
         where: { id, status: { in: ["SENT", "IN_PROGRESS"] } },
         data: { status: "EXPIRED" },
       })
-      if (res.count === 0) return
+      if (res.count === 0) return []
       await tx.recipient.updateMany({ where: { envelopeId: id }, data: { tokenHash: null } })
       await appendAuditEvent(tx, { envelopeId: id, type: "envelope.expired" })
+      return queueEnvelopeWebhook(tx, { envelopeId: id, type: "envelope.expired" })
     })
+    await enqueueWebhookDeliveries(webhooks)
   }
   return { expired: overdue.length }
 }
