@@ -13,6 +13,11 @@ describe("prisma enums match @sahihi/core", () => {
     ["SigningOrder", core.SIGNING_ORDERS, $Enums.SigningOrder],
     ["VerificationMethod", core.VERIFICATION_METHODS, $Enums.VerificationMethod],
     ["DocumentStatus", core.DOCUMENT_STATUSES, $Enums.DocumentStatus],
+    ["WebhookDeliveryStatus", core.WEBHOOK_DELIVERY_STATUSES, $Enums.WebhookDeliveryStatus],
+    ["ExportStatus", core.EXPORT_STATUSES, $Enums.ExportStatus],
+    ["BulkSendStatus", core.BULK_SEND_STATUSES, $Enums.BulkSendStatus],
+    ["BulkSendItemStatus", core.BULK_ITEM_STATUSES, $Enums.BulkSendItemStatus],
+    ["RecipientDelivery", core.RECIPIENT_DELIVERIES, $Enums.RecipientDelivery],
   ]
   for (const [name, coreValues, prismaEnum] of pairs) {
     test(name, () => {

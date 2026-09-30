@@ -41,19 +41,27 @@ const errorMessage = (err: unknown) => (err instanceof Error ? err.message : "Pl
 
 type SummaryInput = Parameters<typeof statusSummary>[0]
 
-/** Header actions for a sent envelope: copy a status summary, and void while it's still open. */
+/**
+ * Header actions for a sent envelope: copy a status summary, and void while it's still open.
+ * `canVoid` is the API's `permissions.manage` (the creator, an admin or the owner).
+ */
 export function EnvelopeHeaderActions({
   envelopeId,
   summary,
+  canVoid: allowed,
+  actions,
 }: {
   envelopeId: string
   summary: SummaryInput
+  canVoid: boolean
+  /** Extra header buttons, shown first. */
+  actions?: React.ReactNode
 }) {
   const router = useRouter()
   const [reason, setReason] = useState("")
   const [open, setOpen] = useState(false)
   const [voiding, setVoiding] = useState(false)
-  const canVoid = summary.status === "SENT" || summary.status === "IN_PROGRESS"
+  const canVoid = allowed && (summary.status === "SENT" || summary.status === "IN_PROGRESS")
 
   async function voidEnvelope() {
     setVoiding(true)
@@ -77,7 +85,8 @@ export function EnvelopeHeaderActions({
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
+      {actions}
       <Button variant="outline" onClick={() => copy(statusSummary(summary), "Status")}>
         <ClipboardCopyIcon aria-hidden />
         Copy status
@@ -136,9 +145,12 @@ export function RecipientActionsMenu({
   envelopeId,
   envelopeStatus,
   recipient,
+  canRemind,
 }: {
   envelopeId: string
   envelopeStatus: EnvelopeStatus
+  /** The API's `permissions.manage`: only the creator, an admin or the owner can remind. */
+  canRemind: boolean
   recipient: {
     id: string
     name: string
@@ -201,7 +213,7 @@ export function RecipientActionsMenu({
         {sending ? <Spinner aria-hidden /> : <EllipsisIcon aria-hidden />}
       </MenuTrigger>
       <MenuPopup align="end" className="min-w-56">
-        {recipient.role !== "VIEWER" && (
+        {canRemind && recipient.role !== "VIEWER" && (
           <MenuItem disabled={!availability?.ok || sending} onClick={remind}>
             <BellIcon aria-hidden />
             <span className="flex flex-col">

@@ -58,26 +58,27 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
 - [x] Finalize job: verify original hash → stamp → provider seal → store signed.pdf → certificate.pdf → notify
 - [x] `renderCertificate` with hashes, signers, events, chain head, QR code
 - [x] Verify API (by code, by hash) + `/verify/[code]` page
-- [ ] "Drop a PDF to verify" on `/verify`: Extend `FileUpload`, hash in the browser (Web Crypto), `POST /api/verify/hash`
-- [ ] Downloads on envelope detail + signer "completed" state
-- [ ] Unicode font embedding (Noto Sans via `@pdf-lib/fontkit`) for non-Latin text fields
+- [x] "Drop a PDF to verify" on `/verify`: Extend `FileUpload`, hash in the browser (Web Crypto), `POST /api/verify/hash`
+- [x] Downloads on envelope detail + signer "completed" state
+- [x] Unicode font embedding (Noto Sans via `@pdf-lib/fontkit`) for non-Latin text fields
 
 ## P5: Hardening & SaaS
 
-- [ ] Role-based permissions via organization access control (`docs/auth.md` → Roles)
-- [ ] Members & invitations settings page
-- [ ] Cross-tenant integration test over every route; DB role without UPDATE/DELETE on AuditEvent
-- [ ] CSP headers; security review of `/sign` and `/verify`
-- [ ] Templates (reusable recipients + field layouts)
-- [ ] Webhooks per org (envelope.completed, …) with signed payloads
-- [ ] Billing per org (plans, envelope quotas)
-- [ ] Retention settings + data export/delete (Kenya DPA)
-- [ ] Playwright E2E: sign-up → upload → place → send → sign (Mailpit) → certificate
-- [ ] Observability: structured logs, BullMQ dashboard, error tracking
+- [x] Role-based permissions via organization access control (`docs/auth.md` → Roles)
+- [x] Members & invitations settings page
+- [x] Cross-tenant integration test over every route; DB role without UPDATE/DELETE on AuditEvent
+- [x] CSP headers; security review of `/sign` and `/verify`
+- [x] Templates (reusable recipients + field layouts)
+- [x] Webhooks per org (envelope.completed, …) with signed payloads
+- [~] Billing per org (plans, envelope quotas): plans, envelope quotas and seats enforced; no payment provider yet (`docs/billing.md`)
+- [x] Retention settings + data export/delete (Kenya DPA)
+- [x] Playwright E2E: sign-up → upload → place → send → sign (Mailpit) → certificate
+- [x] Observability: structured logs, BullMQ dashboard, error tracking
 
 ## Later
 
 - [ ] **CA integration** via `SigningProvider` (PAdES-B-LT), see `docs/certificates.md`
 - [ ] DOCX → PDF conversion on upload (LibreOffice in the worker)
-- [ ] Bulk send, public API + API keys, embedded signing
+- [x] Bulk send, public API + API keys, embedded signing (docs/public-api.md, docs/bulk-send.md,
+      docs/embedded-signing.md, ADR 0017)
 - [ ] SMS/WhatsApp delivery of signing links (Africa's Talking)

@@ -12,6 +12,7 @@
     "test": "bun test"
   },
   "dependencies": {
+    "better-auth": "1.7.6",
     "zod": "4.6.5"
   }
 }

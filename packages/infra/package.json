@@ -13,6 +13,8 @@
     "@aws-sdk/client-s3": "3.1141.0",
     "@aws-sdk/s3-request-presigner": "3.1141.0",
     "@sahihi/config": "workspace:*",
+    "@sahihi/core": "workspace:*",
+    "@sentry/bun": "11.1.0",
     "bullmq": "6.3.9",
     "ioredis": "6.0.0"
   }

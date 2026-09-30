@@ -1,5 +1,11 @@
 import { z } from "zod"
-import { FIELD_TYPES, RECIPIENT_ROLES, SIGNING_ORDERS, VERIFICATION_METHODS } from "./enums"
+import {
+  FIELD_TYPES,
+  RECIPIENT_DELIVERIES,
+  RECIPIENT_ROLES,
+  SIGNING_ORDERS,
+  VERIFICATION_METHODS,
+} from "./enums"
 
 /**
  * Request/response validators shared by the API (server-side validation) and
@@ -58,10 +64,17 @@ export const RecipientInputSchema = z
     role: z.enum(RECIPIENT_ROLES).default("SIGNER"),
     order: z.number().int().min(1).default(1),
     verification: z.enum(VERIFICATION_METHODS).default("LINK"),
+    delivery: z.enum(RECIPIENT_DELIVERIES).default("EMAIL"),
   })
   .refine((r) => r.verification !== "SMS_OTP" || Boolean(r.phone), {
     message: "SMS verification needs a phone number",
     path: ["phone"],
+  })
+  // The OTP cookie can't be set inside a third-party iframe; the host app has already
+  // authenticated its user (docs/embedded-signing.md).
+  .refine((r) => r.delivery !== "EMBEDDED" || r.verification === "LINK", {
+    message: "Embedded recipients sign without an extra code (verification must be LINK)",
+    path: ["verification"],
   })
 export type RecipientInput = z.infer<typeof RecipientInputSchema>
 

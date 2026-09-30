@@ -35,10 +35,15 @@ let seq = 0
 /**
  * A verified user with an active organization, signed in through better-auth.
  * `withOrganization: false` gives a signed-in user with no active org.
+ * Test orgs are on the unlimited Enterprise plan so quotas never interfere; billing tests pass
+ * `plan` to test limits (docs/billing.md).
  */
 export async function createSender(
   label: string,
-  { withOrganization = true }: { withOrganization?: boolean } = {},
+  {
+    withOrganization = true,
+    plan = "enterprise",
+  }: { withOrganization?: boolean; plan?: "free" | "starter" | "business" | "enterprise" } = {},
 ): Promise<Sender> {
   seq += 1
   const email = `${label}-${seq}-${crypto.randomUUID().slice(0, 8)}@example.test`
@@ -61,12 +66,30 @@ export async function createSender(
     })
     if (!org) throw new Error("createOrganization returned nothing")
     organizationId = org.id
+    await prisma.subscription.create({ data: { organizationId, plan } })
     await auth.api.setActiveOrganization({
       body: { organizationId },
       headers: new Headers({ cookie }),
     })
   }
   return { userId: user.id, organizationId, cookie }
+}
+
+/** A new signed-in user who joins `org`'s organization with `role` and makes it active. */
+export async function joinOrganization(
+  org: Sender,
+  label: string,
+  role: "owner" | "admin" | "member",
+): Promise<Sender> {
+  const user = await createSender(label, { withOrganization: false })
+  await auth.api.addMember({
+    body: { userId: user.userId, organizationId: org.organizationId, role },
+  })
+  await auth.api.setActiveOrganization({
+    body: { organizationId: org.organizationId },
+    headers: new Headers({ cookie: user.cookie }),
+  })
+  return { ...user, organizationId: org.organizationId }
 }
 
 /** `app.request` as a sender. `json` sets the body and Content-Type. */

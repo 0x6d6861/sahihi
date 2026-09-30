@@ -1,19 +1,63 @@
 import type { PDFFont } from "pdf-lib"
 
 /**
- * Standard 14 fonts only support WinAnsi. Replace anything the font can't
- * encode so stamping never throws on user input. (Embed a Unicode TTF via
- * @pdf-lib/fontkit if non-Latin scripts become a requirement.)
+ * Scripts that need complex shaping (contextual joining, reordering, conjuncts) or right-to-left
+ * layout. pdf-lib places glyphs one by one without shaping, so these would render wrongly even
+ * when the font has the glyphs: Hebrew, Arabic, Syriac, Thaana, N'Ko, Indic scripts, Thai, Lao,
+ * Tibetan, Myanmar, Khmer, and the Arabic/Hebrew presentation forms.
+ */
+const SHAPED_RANGES: readonly [number, number][] = [
+  [0x0590, 0x08ff],
+  [0x0900, 0x0dff],
+  [0x0e00, 0x0fff],
+  [0x1000, 0x109f],
+  [0x1780, 0x17ff],
+  [0xfb1d, 0xfdff],
+  [0xfe70, 0xfeff],
+]
+
+export function needsShaping(codePoint: number): boolean {
+  return SHAPED_RANGES.some(([lo, hi]) => codePoint >= lo && codePoint <= hi)
+}
+
+const coverage = new WeakMap<PDFFont, Set<number> | null>()
+
+/** Code points an embedded (fontkit) font has glyphs for; null for the standard 14 fonts. */
+function charset(font: PDFFont): Set<number> | null {
+  if (!coverage.has(font)) {
+    let set: Set<number> | null = null
+    try {
+      set = new Set(font.getCharacterSet())
+    } catch {
+      set = null
+    }
+    coverage.set(font, set)
+  }
+  return coverage.get(font) ?? null
+}
+
+/**
+ * Makes user text safe to draw with `font`: collapses line breaks, and replaces with "?" any
+ * character the font has no glyph for, or whose script needs shaping. Stamping never throws on user
+ * input, and never draws a mis-shaped word. The exact text is still stored in `Field.value`.
  */
 export function sanitizeForFont(text: string, font: PDFFont): string {
+  const set = charset(font)
   let out = ""
   for (const ch of text.replace(/[\r\n\t]+/g, " ")) {
-    try {
-      font.encodeText(ch)
-      out += ch
-    } catch {
-      out += "?"
+    const cp = ch.codePointAt(0) as number
+    let ok: boolean
+    if (needsShaping(cp)) ok = false
+    else if (set) ok = cp === 0x20 || set.has(cp)
+    else {
+      try {
+        font.encodeText(ch)
+        ok = true
+      } catch {
+        ok = false
+      }
     }
+    out += ok ? ch : "?"
   }
   return out
 }

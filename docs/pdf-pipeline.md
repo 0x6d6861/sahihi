@@ -63,7 +63,7 @@ Triggered when the last actionable recipient signs (`jobId: finalize:<envelopeId
    1. download `original.pdf` and **verify its SHA-256 equals `Document.sha256`**, failing loudly
       otherwise
    2. `stampFields(original, fields)`: draws PNGs (contain-fit), text (auto-sized with
-      `fitFontSize`/`wrapText`, Helvetica, WinAnsi-sanitized) and checkmarks using
+      `fitFontSize`/`wrapText`, Noto Sans, see **Fonts**) and checkmarks using
       `toPdfPlacement`; flattens any AcroForm; sets title and metadata
    3. `getSigningProvider().seal(stamped, evidence)`. INTERNAL returns the bytes unchanged; a CA
       provider will embed a PAdES signature
@@ -77,9 +77,46 @@ Each step checks what already exists, so BullMQ retries are safe.
 
 ### Fonts
 
-pdf-lib's standard fonts are WinAnsi only. `sanitizeForFont` replaces characters that can't be
-encoded, so text fields with non-Latin scripts currently degrade. To support them, embed a Unicode TTF
-(Noto Sans) with `@pdf-lib/fontkit`, recorded as a roadmap item.
+Stamped text and certificates use **Noto Sans** (SIL OFL 1.1, `packages/pdf/fonts/` with
+`OFL.txt`), embedded with `@pdf-lib/fontkit` (`src/fonts.ts`). Stamping embeds only Regular; the
+certificate embeds Regular and Bold. Fonts are **subset**, so a stamped PDF grows by a few KB, not
+600 KB, and each subset has a ToUnicode map, so the text stays searchable and copyable.
+
+- **Coverage:** Latin with all extensions (Swahili, Kikuyu ũ/ĩ, Polish, Turkish, Vietnamese…), Greek
+  and Cyrillic.
+- **Replaced with "?"** by `sanitizeForFont`, one per character:
+  - characters Noto Sans has no glyph for (CJK, Ethiopic, Arabic, symbols such as ✓);
+  - scripts that need shaping or RTL layout even when the glyphs exist (Hebrew, Arabic, Indic,
+    Thai, Lao, Tibetan, Myanmar, Khmer; `needsShaping`). pdf-lib places glyphs one by one, so
+    these would render wrongly.
+
+  The exact text is always kept in `Field.value` and the audit trail. Adding a script means
+  bundling its Noto font and a shaping engine (e.g. harfbuzz), so it's a new roadmap item.
+- **Glyph padding:** fontkit's subsetter writes a short-format `loca`, which assumes even glyph
+  offsets. Noto's static TTFs have odd-length glyphs, and unpadded subsets render most glyphs
+  blank. `padGlyphs` (`src/ttf.ts`) rewrites `glyf`/`loca` with 4-byte-padded glyphs when the font
+  loads (once per process). `ttf.test.ts` checks the embedded subset's outlines, so a font swap
+  can't regress silently.
+- **Bundling:** the TTFs are imported `with { type: "file" }`. In source mode that gives an absolute
+  path. After `bun build`, the TTFs are copied next to the bundle and resolved against
+  `import.meta.dir`, so `dist/` works from any cwd.
+- Forms are only flattened when the PDF has an AcroForm. `getForm()` would otherwise create one and
+  embed Helvetica.
+
+## 4. Downloads
+
+- Sender: `GET /api/envelopes/:id/downloads` (org-scoped). Recipient: `GET /api/sign/:token/downloads`,
+  with the fresh link from the completion email. Both return `{ signed, certificate }` presigned
+  URLs, and a 409 until finalize has stored both files.
+- The links are served as `attachment`, with RFC 6266 file names from `downloadFileName()` /
+  `contentDisposition()` (`@sahihi/core`): `<title> (signed).pdf`, in any script, with an ASCII
+  fallback and an exact UTF-8 `filename*`. The PDF viewers keep `inline`.
+- The URLs live for 5 minutes, so the web fetches them **when a download button is clicked**, never
+  at page load (`components/app/downloads/download-buttons.tsx`, shared by the envelope page and
+  the signer's completed state).
+- The envelope page shows a "Signed and certified" card for `COMPLETED` envelopes: both downloads,
+  the certificate code and a link to its public `/verify/<code>` page. While finalize is still
+  running, it shows a "being produced" notice instead.
 
 ## Invariants
 

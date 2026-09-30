@@ -35,6 +35,30 @@ const EnvSchema = z.object({
   AT_API_KEY: z.string().optional(),
   AT_SENDER_ID: z.string().optional(),
 
+  /**
+   * Proxies in front of the API that append to X-Forwarded-For (docs/security.md → Rate limiting).
+   * Railway's edge = 1 (the web's /api rewrite passes the header through unchanged). 0 = trust none.
+   */
+  TRUSTED_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(1),
+
+  /**
+   * Development/tests only: let webhook endpoints use http:// and private addresses (e.g. a local
+   * receiver). Never set in production: it disables the SSRF protection (docs/webhooks.md).
+   */
+  WEBHOOKS_ALLOW_PRIVATE_URLS: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+
+  // ── Observability (docs/observability.md) ──
+  LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
+  /** Error tracking; off when unset. */
+  SENTRY_DSN: z.string().url().optional(),
+  SENTRY_ENVIRONMENT: z.string().optional(),
+  /** Staff-only BullMQ dashboard at /admin/queues on the api; off unless both are set. */
+  ADMIN_DASHBOARD_USER: z.string().min(1).optional(),
+  ADMIN_DASHBOARD_PASSWORD: z.string().min(16, "Use at least 16 characters").optional(),
+
   SIGNING_LINK_TTL_DAYS: z.coerce.number().int().positive().default(14),
   SIGNING_PROVIDER: z.enum(["internal", "ca"]).default("internal"),
 })
@@ -61,6 +85,7 @@ export const QUEUES = {
   notifications: "notifications",
   finalize: "envelope-finalize",
   maintenance: "maintenance",
+  webhooks: "webhooks",
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]

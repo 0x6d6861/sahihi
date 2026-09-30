@@ -14,9 +14,11 @@
     "@sahihi/core": "workspace:*",
     "@sahihi/db": "workspace:*",
     "@sahihi/emails": "workspace:*",
+    "@sahihi/envelopes": "workspace:*",
     "@sahihi/infra": "workspace:*",
     "@sahihi/pdf": "workspace:*",
     "bullmq": "6.3.9",
+    "fflate": "0.8.3",
     "nodemailer": "8.0.11"
   },
   "devDependencies": {

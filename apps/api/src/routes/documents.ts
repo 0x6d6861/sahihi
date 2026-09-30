@@ -1,5 +1,6 @@
 import {
   CreateUploadSchema,
+  canDeleteDocument,
   DOCUMENTS_PAGE_SIZE,
   ListDocumentsQuerySchema,
   MAX_UPLOAD_BYTES,
@@ -18,6 +19,7 @@ import { inspectPdf, PdfInspectionError } from "@sahihi/pdf"
 import { Hono } from "hono"
 import type { AppEnv } from "../lib/env"
 import { badRequest, conflict, notFound, parseJson, parseQuery } from "../lib/http"
+import { actor, assertCanDeleteDocument } from "../lib/permissions"
 import { requireOrg } from "../middleware/session"
 
 /**
@@ -122,7 +124,7 @@ export const documents = new Hono<AppEnv>()
       include: { source: { select: { id: true, name: true, deletedAt: true } } },
     })
     if (!doc) notFound("Document")
-    return c.json({ document: doc })
+    return c.json({ document: doc, permissions: { delete: canDeleteDocument(actor(c), doc) } })
   })
 
   /** Short-lived URL the PDF viewer loads. */
@@ -142,6 +144,14 @@ export const documents = new Hono<AppEnv>()
       include: { envelopes: { where: { status: { not: "DRAFT" } }, select: { id: true } } },
     })
     if (!doc) notFound("Document")
+    assertCanDeleteDocument(c, doc)
+    // A template carries its document (its fields are placed on these pages).
+    const usedBy = await prisma.template.count({ where: { documentId: doc.id } })
+    if (usedBy > 0) {
+      conflict(
+        `Used by ${usedBy} template${usedBy === 1 ? "" : "s"}. Delete ${usedBy === 1 ? "it" : "them"} first.`,
+      )
+    }
     // Sent envelopes reference the original forever (evidence). Soft delete only.
     await prisma.document.update({ where: { id: doc.id }, data: { deletedAt: new Date() } })
     if (doc.envelopes.length === 0) {

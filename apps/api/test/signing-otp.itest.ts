@@ -106,3 +106,41 @@ describe("POST /sign/:token/otp (resend cooldown)", () => {
     expect(ok.headers.get("set-cookie")).toContain("HttpOnly")
   })
 })
+
+describe("POST /sign/:token/otp/verify (lockout)", () => {
+  /** Own rate-limit bucket per test (the trusted, rightmost X-Forwarded-For entry). */
+  const ip = `10.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}.1`
+  const verify = (code: string) =>
+    request(null, `/api/sign/${token}/otp/verify`, {
+      method: "POST",
+      json: { code },
+      headers: { "x-forwarded-for": ip },
+    })
+
+  async function issuedCode() {
+    await sendOtp()
+    return (
+      await latestJobData<{ recipientId: string; code: string }>(
+        "recipient.otp",
+        (d) => d.recipientId === recipientId,
+      )
+    ).code
+  }
+
+  test("after 5 wrong codes even the right one is refused (429)", async () => {
+    const code = await issuedCode()
+    const wrong = code === "000000" ? "111111" : "000000"
+    for (let i = 0; i < 5; i++) expect((await verify(wrong)).status).toBe(400)
+    expect((await verify(code)).status).toBe(429)
+  })
+
+  test("parallel guesses can't exceed the attempt cap", async () => {
+    const code = await issuedCode()
+    const wrong = code === "000000" ? "111111" : "000000"
+    const statuses = await Promise.all(Array.from({ length: 20 }, () => verify(wrong)))
+    expect(statuses.filter((r) => r.status === 400)).toHaveLength(5)
+    expect(statuses.filter((r) => r.status === 429)).toHaveLength(15)
+    const otp = await prisma.recipientOtp.findFirstOrThrow({ where: { recipientId } })
+    expect(otp.attempts).toBe(5)
+  })
+})

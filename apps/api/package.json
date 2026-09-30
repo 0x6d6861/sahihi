@@ -10,13 +10,19 @@
     "typecheck": "tsc -p ."
   },
   "dependencies": {
+    "@bull-board/api": "9.10.1",
+    "@bull-board/hono": "9.10.1",
     "@sahihi/config": "workspace:*",
     "@sahihi/core": "workspace:*",
     "@sahihi/db": "workspace:*",
+    "@sahihi/envelopes": "workspace:*",
     "@sahihi/infra": "workspace:*",
     "@sahihi/pdf": "workspace:*",
     "better-auth": "1.7.6",
     "hono": "4.13.9",
     "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "fflate": "0.8.3"
   }
 }

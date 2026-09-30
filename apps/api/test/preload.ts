@@ -32,6 +32,11 @@ Object.assign(process.env, {
   S3_SECRET_ACCESS_KEY: process.env.TEST_S3_SECRET_ACCESS_KEY ?? "sahihi-secret",
   S3_FORCE_PATH_STYLE: "true",
   EMAIL_FROM: "Sahihi Test <test@example.com>",
+  // Webhook itests use a local receiver; SSRF rules are covered by core unit tests.
+  WEBHOOKS_ALLOW_PRIVATE_URLS: "true",
+  // Queue dashboard on, so its auth and redaction are tested (docs/observability.md).
+  ADMIN_DASHBOARD_USER: "ops",
+  ADMIN_DASHBOARD_PASSWORD: "test-dashboard-password-1234",
 })
 
 async function ensureDatabase() {
@@ -49,7 +54,8 @@ async function ensureDatabase() {
 function migrate() {
   const result = Bun.spawnSync(["bunx", "prisma", "migrate", "deploy"], {
     cwd: path.resolve(import.meta.dir, "../../../packages/db"),
-    env: { ...process.env, DATABASE_URL: databaseUrl },
+    // Both: prisma.config.ts prefers MIGRATE_DATABASE_URL, which may point at the dev database.
+    env: { ...process.env, DATABASE_URL: databaseUrl, MIGRATE_DATABASE_URL: databaseUrl },
     stdout: "pipe",
     stderr: "pipe",
   })

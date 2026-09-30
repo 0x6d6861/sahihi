@@ -8,6 +8,7 @@ import type {
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { DocumentViewer } from "@/components/app/document-viewer"
+import { DownloadButtons } from "@/components/app/downloads/download-buttons"
 import {
   ActivityList,
   type AuditEventRow,
@@ -15,6 +16,7 @@ import {
 } from "@/components/app/envelope/activity-list"
 import { DraftStateProvider } from "@/components/app/envelope/draft-state"
 import { type EnvelopeTab, EnvelopeTabs } from "@/components/app/envelope/envelope-tabs"
+import { PurgeEnvelope } from "@/components/app/envelope/purge-envelope"
 import { SendControl } from "@/components/app/envelope/send-control"
 import {
   EnvelopeHeaderActions,
@@ -22,6 +24,8 @@ import {
 } from "@/components/app/envelope/sender-actions"
 import { FieldEditor } from "@/components/app/field-editor/field-editor"
 import { RecipientsEditor } from "@/components/app/recipients-editor/recipients-editor"
+import { SaveTemplateDialog } from "@/components/app/templates/save-template-dialog"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import {
   Breadcrumb,
@@ -66,6 +70,11 @@ interface EnvelopeDetail {
     required: boolean
     label: string | null
   })[]
+  completedAt: string | null
+  /** Files and personal data deleted (docs/data-retention.md) */
+  purgedAt: string | null
+  /** Set by the finalize job, shortly after COMPLETED. */
+  certificate: { code: string; issuedAt: string; provider: "INTERNAL" | "CA" } | null
 }
 
 const dateLabel = new Intl.DateTimeFormat("en-GB", {
@@ -83,18 +92,23 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
   const { id } = await params
   const path = `/envelopes/${encodeURIComponent(id)}`
   const [{ status, data }, audit] = await Promise.all([
-    apiServer<{ envelope: EnvelopeDetail }>(path),
+    apiServer<{ envelope: EnvelopeDetail; permissions: { manage: boolean; purge: boolean } }>(path),
     apiServer<{ events: AuditEventRow[]; verification: ChainVerification }>(`${path}/audit`),
   ])
   if (status === 404 || !data) notFound()
   const e = data.envelope
   const badge = ENVELOPE_STATUS_BADGE[e.status]
-  const draft = e.status === "DRAFT"
+  // Members change only envelopes they created; owners and admins change any (docs/auth.md).
+  const canManage = data.permissions.manage
+  /** Editable draft: the field and recipient editors. Everyone else gets the read-only views. */
+  const draft = e.status === "DRAFT" && canManage
+  const open = e.status === "DRAFT" || e.status === "SENT" || e.status === "IN_PROGRESS"
   const sequential = e.signingOrder === "SEQUENTIAL"
+  const purged = Boolean(e.purgedAt)
   // The original PDF (presigned, short-lived): field editor while drafting, viewer afterwards.
-  const file = await apiServer<{ url: string }>(
-    `/documents/${encodeURIComponent(e.document.id)}/file`,
-  )
+  const file = purged
+    ? { status: 410, data: null }
+    : await apiServer<{ url: string }>(`/documents/${encodeURIComponent(e.document.id)}/file`)
   const fieldOwners = e.recipients
     .filter((r) => r.role !== "VIEWER")
     .map((r) => ({ id: r.id, name: r.name, colorIndex: r.colorIndex }))
@@ -109,11 +123,16 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
           {e.document.pageCount} {e.document.pageCount === 1 ? "page" : "pages"}
           {draft
             ? " · Pick a field type, then click or drag on a page."
-            : ` · ${e.fields.length} fields`}
+            : ` · ${e.fields.length} fields · ${e.status === "DRAFT" ? "not sent yet" : "the original, as sent for signing"}`}
         </CardDescription>
       </CardHeader>
       <CardPanel>
-        {!file.data ? (
+        {purged ? (
+          <p className="text-muted-foreground text-sm">
+            The document was deleted under the data retention policy. Its hash is kept on the
+            certificate and in the Activity log.
+          </p>
+        ) : !file.data ? (
           <p className="text-muted-foreground text-sm">The document could not be loaded.</p>
         ) : !draft ? (
           <DocumentViewer src={file.data.url} fileName={e.document.name} />
@@ -185,6 +204,7 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
                       envelopeId={e.id}
                       envelopeStatus={e.status}
                       recipient={r}
+                      canRemind={canManage}
                     />
                   </TableCell>
                 </TableRow>
@@ -211,6 +231,12 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
       </CardPanel>
     </Card>
   )
+
+  // Anyone who can see the envelope may copy it into a template (the envelope isn't changed).
+  const saveTemplate =
+    e.recipients.length > 0 && !purged ? (
+      <SaveTemplateDialog envelopeId={e.id} envelopeTitle={e.title} recipients={e.recipients} />
+    ) : null
 
   const heading = (
     <div className="flex min-w-0 flex-col gap-1">
@@ -245,6 +271,7 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
             envelopeId={e.id}
             recipientCount={e.recipients.length}
             defaultTab={defaultTab}
+            actions={saveTemplate}
           >
             {heading}
           </SendControl>
@@ -253,6 +280,13 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
             {heading}
             <EnvelopeHeaderActions
               envelopeId={e.id}
+              canVoid={canManage}
+              actions={
+                <>
+                  {saveTemplate}
+                  {data.permissions.purge && <PurgeEnvelope envelopeId={e.id} />}
+                </>
+              }
               summary={{
                 title: e.title,
                 status: e.status,
@@ -261,6 +295,58 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
               }}
             />
           </div>
+        )}
+
+        {!canManage && open && (
+          <Alert variant="info">
+            <AlertTitle>View only</AlertTitle>
+            <AlertDescription>
+              Only the member who created this envelope, an admin or the owner can edit, send,
+              remind or void it.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {purged && e.purgedAt && (
+          <Alert variant="info">
+            <AlertTitle>Files and personal data deleted</AlertTitle>
+            <AlertDescription>
+              On {dateLabel.format(new Date(e.purgedAt))}, under the data retention policy. The
+              status, hashes, certificate code and audit trail are kept as evidence.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {e.status === "COMPLETED" && !purged && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Signed and certified</CardTitle>
+              <CardDescription>
+                {e.certificate
+                  ? `Everyone signed${e.completedAt ? ` on ${dateLabel.format(new Date(e.completedAt))}` : ""}. The signed PDF and the Certificate of Completion are ready.`
+                  : "Everyone has signed. The signed PDF and certificate are being produced; refresh in a moment."}
+              </CardDescription>
+            </CardHeader>
+            {e.certificate && (
+              <CardPanel className="flex flex-wrap items-center justify-between gap-4">
+                <DownloadButtons endpoint={`/envelopes/${e.id}/downloads`} />
+                <p className="text-muted-foreground text-sm">
+                  Certificate{" "}
+                  <span className="font-medium font-mono text-foreground">
+                    {e.certificate.code}
+                  </span>
+                  {" · "}
+                  <Link
+                    href={`/verify/${e.certificate.code}`}
+                    className="underline"
+                    target="_blank"
+                  >
+                    Public verification page
+                  </Link>
+                </p>
+              </CardPanel>
+            )}
+          </Card>
         )}
 
         <EnvelopeTabs

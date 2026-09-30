@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { CONSENT_VERSION } from "./consent"
 import {
   abandonedUploadCutoff,
   CreateUploadSchema,
@@ -33,8 +34,14 @@ describe("schemas", () => {
     ).toBe(false)
   })
   test("signing requires explicit consent", () => {
-    expect(SubmitSigningSchema.safeParse({ consent: false, values: [] }).success).toBe(false)
-    expect(SubmitSigningSchema.safeParse({ consent: true, values: [] }).success).toBe(true)
+    expect(
+      SubmitSigningSchema.safeParse({ consent: false, consentVersion: CONSENT_VERSION, values: [] })
+        .success,
+    ).toBe(false)
+    expect(
+      SubmitSigningSchema.safeParse({ consent: true, consentVersion: CONSENT_VERSION, values: [] })
+        .success,
+    ).toBe(true)
   })
   test("documents list page is a bounded positive integer", () => {
     expect(ListDocumentsQuerySchema.parse({})).toEqual({ page: 1 })

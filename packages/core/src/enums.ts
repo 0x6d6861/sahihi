@@ -28,6 +28,10 @@ export type RecipientStatus = (typeof RECIPIENT_STATUSES)[number]
 export const VERIFICATION_METHODS = ["LINK", "EMAIL_OTP", "SMS_OTP"] as const
 export type VerificationMethod = (typeof VERIFICATION_METHODS)[number]
 
+/** EMAIL: invited and reminded by email. EMBEDDED: signs inside the sender's own app (docs/embedded-signing.md). */
+export const RECIPIENT_DELIVERIES = ["EMAIL", "EMBEDDED"] as const
+export type RecipientDelivery = (typeof RECIPIENT_DELIVERIES)[number]
+
 export const FIELD_TYPES = [
   "SIGNATURE",
   "INITIALS",
@@ -44,3 +48,7 @@ export const IMAGE_FIELD_TYPES: readonly FieldType[] = ["SIGNATURE", "INITIALS"]
 
 /** Field types filled automatically from recipient data at submit time. */
 export const AUTO_FIELD_TYPES: readonly FieldType[] = ["DATE_SIGNED", "NAME", "EMAIL"]
+
+/** Webhook delivery lifecycle (docs/webhooks.md). */
+export const WEBHOOK_DELIVERY_STATUSES = ["PENDING", "SUCCEEDED", "FAILED"] as const
+export type WebhookDeliveryStatus = (typeof WEBHOOK_DELIVERY_STATUSES)[number]

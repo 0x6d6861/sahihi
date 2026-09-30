@@ -13,17 +13,26 @@ Runner: **`bun test`** (Jest-compatible `bun:test` API). No vitest or jest.
 | API smoke | `apps/api/src/app.test.ts` (health, 401 without a session) | no | `bun test` |
 | Web helpers | `apps/web/lib/*.test.ts` (DOM-free only) | no | `bun test apps/web` |
 | API/worker integration | `apps/api/test/*.itest.ts`, `apps/worker/test/*.itest.ts` | Postgres + Redis + MinIO | `bun run infra:up && bun run test:integration` |
-| E2E | Playwright (**to create**, roadmap P5) | full stack | `bunx playwright test` |
+| E2E | `apps/e2e/tests/*.e2e.ts` (Playwright, Chromium) | Postgres + Redis + MinIO + Mailpit | `bun run infra:up && bun run test:e2e` |
 
 The root `bun run test` script covers `packages`, `apps/api/src`, `apps/worker` and `apps/web/lib`.
 Integration tests are named `*.itest.ts`, so neither it nor a bare `bun test` picks them up.
 
 ## CI
 
-`.github/workflows/ci.yml` runs on pushes to `main` and on every PR: `bun install --frozen-lockfile` →
-`db:generate` → `bun run test` (the scoped script, not bare `bun test`) → `typecheck` → `lint`. It
-needs no services and no `.env`, so unit tests must stay infra-free. When the API integration tests
-land, add a separate job with Postgres, Redis and MinIO service containers, and keep this one fast.
+`.github/workflows/ci.yml` runs on pushes to `main` and on every PR:
+- **`check`** (fast, no services): `bun install --frozen-lockfile` → `db:generate` → `bun run test`
+  (the scoped script, not bare `bun test`) → `typecheck` → `lint`. Unit tests must stay
+  infra-free.
+- **`integration-e2e`** (after `check`):
+  - Services: Postgres 17, Redis 7 and Mailpit (pinned to v1.31.2) as service containers. MinIO is
+    started with `docker run`, because service containers can't take its `server /data` command,
+    and the bucket is created with aws-cli, like `minio-init`.
+  - Then `bun run test:integration` and `bun run test:e2e`. Chromium is cached per Playwright
+    version.
+  - On failure, the Playwright report and traces are uploaded as an artifact for 7 days.
+  - It was replayed locally with `CI=true` against freshly created databases, and both suites
+    passed.
 
 ## What must be tested
 
@@ -52,12 +61,54 @@ Conventions (`test/helpers.ts`):
 - `helpers.ts` throws on import unless `DATABASE_URL` ends in `_test`. `resetDb()` in `beforeEach`
   re-checks `current_database()`, then truncates every table except `_prisma_migrations`.
 - `createSender(label)` creates a user through better-auth's API, sets `emailVerified`, signs in, and
-  creates and activates an organization. It returns `{ userId, organizationId, cookie }`. Pass
+  creates and activates an organization on the **Enterprise** plan (no quotas; pass
+  `{ plan: "free" }` to test limits, `docs/billing.md`). It returns `{ userId, organizationId, cookie }`. Pass
   `{ withOrganization: false }` for the 403 `no_active_organization` case.
 - `request(sender, path, { method, json })` wraps `createApp().request(...)`. No HTTP server needed.
 - `uploadDocument(sender, bytes?)` runs the real create → presigned PUT → complete flow.
   `minimalPdf(pages)` builds a valid PDF without a PDF library.
-- Every tenant-owned route gets a cross-tenant test: another org's session gets **404** (never 403,
-  so existence isn't leaked), and the owner's row is unchanged afterwards.
+- Every tenant-owned route gets a cross-tenant case in `tenant-isolation.itest.ts`: another org's
+  session gets **404** (never 403, so existence isn't leaked), and the owner's rows are unchanged
+  afterwards. That test lists every route the app serves, so it fails until a new route is
+  classified there.
+- Database privileges: `audit-append-only.itest.ts` switches to the app role with
+  `SET LOCAL ROLE sahihi_app` inside `prisma.$transaction`. Tests themselves connect as the owner,
+  because `resetDb()` needs TRUNCATE.
 - Assert on queued jobs with `getQueues().notifications.raw.getJobs()` (Redis DB 15).
 - Use the fixture PDFs in `fixtures/` (see `coordinates.md`).
+
+## E2E (`apps/e2e`)
+
+`bun run test:e2e` runs the core journey through the real UI and real email:
+sign-up → verify email (Mailpit) → create workspace → upload a PDF → create envelope → add a
+recipient → place a signature field → send → the signer opens the emailed link in a separate
+browser context, types a signature, consents and finishes → the worker stamps the PDF and issues
+the certificate → the public `/verify/<code>` page. It takes about 25 s.
+
+**Its own stack.** It never uses your `.env` or dev database. `playwright.config.ts` and
+`global-setup.ts` start:
+- the api on **4100** and `next dev` on **3100**, via Playwright's `webServer`;
+- the worker, as a child process;
+- all with explicit env from `apps/e2e/env.ts`: database `sahihi_e2e` (created and migrated by
+  `scripts/prepare-db.ts`, which refuses any database not named `*_e2e`), Redis DB **14**, and the
+  shared MinIO bucket and Mailpit.
+
+Each run uses unique `@example.test` addresses, so Mailpit lookups (`tests/mailpit.ts`) never pick
+up another run's email.
+
+**Before running:**
+- `bun run infra:up`.
+- Stop `bun run dev`: Next allows one `next dev` per app directory.
+- First time only: `cd apps/e2e && bunx playwright install chromium`.
+
+**Conventions:**
+- Files are `*.e2e.ts` (`testMatch`), so a bare `bun test` never picks them up.
+- Wait for `networkidle` after navigating to a page that's compiling for the first time. Typing
+  before React hydrates is lost (`settle()`).
+- Use roles and labels, not CSS. `[data-field-layer]` (the field editor's page overlay) is the one
+  structural hook.
+- On failure, the screenshot, video and trace are in `apps/e2e/test-results/`
+  (`bunx playwright show-trace …`). Both output folders are gitignored.
+
+In CI it runs in the `integration-e2e` job (below). With `CI` set, Playwright retries once and
+allows longer timeouts for cold `next dev` compiles.

@@ -1,6 +1,6 @@
+import { normalizeCertificateCode, VerifyHashSchema } from "@sahihi/core"
 import { prisma } from "@sahihi/db"
 import { Hono } from "hono"
-import { z } from "zod"
 import { parseJson } from "../lib/http"
 import { rateLimit } from "../middleware/rate-limit"
 
@@ -8,8 +8,6 @@ import { rateLimit } from "../middleware/rate-limit"
  * Public verification. Anyone holding a certificate code or a PDF can check
  * it. The browser hashes the file locally and sends ONLY the SHA-256.
  */
-const HashSchema = z.object({ sha256: z.string().regex(/^[a-f0-9]{64}$/) })
-
 const mask = (e: string) =>
   e.replace(
     /^(.)(.*)(@.*)$/,
@@ -20,8 +18,11 @@ export const verify = new Hono()
   .use(rateLimit({ bucket: "verify", limit: 30, windowSec: 60 }))
 
   .get("/:code", async (c) => {
+    // Malformed codes can't exist; answer without a DB lookup.
+    const code = normalizeCertificateCode(c.req.param("code"))
+    if (!code) return c.json({ valid: false }, 404)
     const cert = await prisma.certificate.findUnique({
-      where: { code: c.req.param("code").toUpperCase() },
+      where: { code },
       include: {
         envelope: {
           select: {
@@ -64,7 +65,9 @@ export const verify = new Hono()
   })
 
   .post("/hash", async (c) => {
-    const { sha256 } = await parseJson(c, HashSchema)
+    // Only signed documents and certificates match, never originals: this endpoint must not reveal
+    // whether some unsigned file was ever uploaded to Sahihi.
+    const { sha256 } = await parseJson(c, VerifyHashSchema)
     const [signed, cert] = await Promise.all([
       prisma.envelope.findFirst({
         where: { signedSha256: sha256 },

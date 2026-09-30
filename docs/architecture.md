@@ -108,6 +108,12 @@ Error body shape: `{ error: string, message?: string, issues?: {path, message}[]
 | GET | `/api/sign/:token/downloads` | token | After completion |
 | GET | `/api/verify/:code` | public | Certificate lookup |
 | POST | `/api/verify/hash` | public | Is this SHA-256 a document we issued? |
+| GET/POST/DELETE | `/api/api-keys` · `/:id` | org (`api:manage`) | List / create (key shown once) / revoke API keys |
+| GET/PUT | `/api/embedding` | org (`api:manage`) | Allowed origins for embedded signing |
+| POST | `/api/templates/:id/bulk-sends` | org | Start a bulk send (docs/bulk-send.md) |
+| GET | `/api/bulk-sends` · `/:id` | org | Batches / progress per row |
+| GET | `/api/sign/:token/embed` | token | Frame policy for `?embed=1` (read by `proxy.ts`) |
+| * | `/api/v1/*` | API key + scope | Public API, see docs/public-api.md |
 
 ## Queues & jobs
 
@@ -117,7 +123,7 @@ Typed contracts: `packages/infra/src/queues.ts`. Consumers: `apps/worker/src/ind
 |---|---|---|
 | `notifications` | `auth.*`, `envelope.invite/reminder/completed/declined/voided`, `recipient.otp` | concurrency 10, 5 attempts exp. backoff |
 | `envelope-finalize` | `envelope.finalize` | `jobId: finalize-<envelopeId>` dedupes (BullMQ ids may not contain `:`); concurrency 2 |
-| `maintenance` | `envelopes.expire` (hourly :05), `envelopes.remind` (09:00 Africa/Nairobi), `documents.sweep-uploads` (every 15 min) | job schedulers upserted at worker boot |
+| `maintenance` | `envelopes.expire` (hourly :05), `envelopes.remind` (09:00 Africa/Nairobi), `documents.sweep-uploads` (every 15 min), `bulk.send` (on demand, `jobId: bulk-<id>`) | job schedulers upserted at worker boot |
 
 ### Emails
 
@@ -160,7 +166,9 @@ process fails fast) and documented in `.env.example`.
 ## Deployment
 
 Railway: three services (api, worker, web) from the monorepo plus managed Postgres and Redis.
-The api service runs `prisma migrate deploy` before starting. Set `WEB_URL`, `API_URL` and
+The api service runs `prisma migrate deploy` before starting, as the schema owner
+(`MIGRATE_DATABASE_URL`). The api and worker themselves connect with `DATABASE_URL` as a login role
+in `sahihi_app`, which can't run DDL or rewrite the audit trail (see `security.md`). Set `WEB_URL`, `API_URL` and
 `BETTER_AUTH_URL` (= web origin) per environment. The web service needs `API_URL` for the rewrite.
 Workers scale horizontally. The finalize job is deduped by `jobId`, and audit writes are serialised
 with a Postgres advisory lock.

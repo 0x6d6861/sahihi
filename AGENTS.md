@@ -37,13 +37,17 @@ Read this file first, then the doc for the area you're touching (see **Doc map**
 
 ```
 apps/
-  api/        Hono REST API. routes/{documents,envelopes,signing,verify}.ts, auth.ts (better-auth)
-  worker/     BullMQ consumers: notifications, envelope finalize, maintenance (expire/remind)
-  web/        Next.js. (auth)/ sign-in/up/onboarding, (app)/ documents+envelopes, sign/[token], verify/[code]
+  api/        Hono REST API. routes/{documents,envelopes,templates,webhooks,billing,data,signing,verify}.ts, v1.ts (public API,
+              API keys), api-keys/embedding/bulk-sends.ts, auth.ts (better-auth)
+  worker/     BullMQ consumers: notifications, envelope finalize, webhooks, maintenance (expire/remind/sweeps/retention/exports)
+  web/        Next.js. (auth)/ sign-in/up/onboarding, (app)/ documents+envelopes+templates+bulk-sends+settings,
+              sign/[token], verify/[code]
 packages/
   config/     Env schema (zod) + queue names. The ONLY place process.env is parsed.
   core/       Pure domain logic, no I/O: enums, state machines, routing, coordinates, crypto, audit chain, zod schemas
   db/         Prisma schema + client, tenant scoping, appendAuditEvent, issueSigningLink
+  envelopes/  Envelope services shared by api + worker: send, void, create (document/template), routing,
+              bulk send, embedded links. Throws EnvelopeError (mapped to HTTP in app.onError)
   infra/      S3 storage + typed BullMQ queues + Redis
   pdf/        inspectPdf, stampFields, renderCertificate (pdf-lib)
   emails/     React Email templates → { subject, html, text }; preview server (see its README)
@@ -53,7 +57,7 @@ scripts/      bootstrap-ui.sh (installs coss + Extend components)
 ```
 
 Dependency direction (never import "upwards"):
-`core` ← `config` ← `db`, `infra`, `pdf` ← `api`, `worker`. `emails` is a leaf (React Email only,
+`core` ← `config` ← `db`, `infra`, `pdf` ← `envelopes` ← `api`, `worker`. `emails` is a leaf (React Email only,
 no internal deps) used by `worker`. `web` may import **only** `@sahihi/core` (types, enums, zod
 schemas, coordinate helpers). It must never import `db`, `infra`, `pdf`, `emails` or `config`.
 
@@ -70,8 +74,10 @@ bun run dev                # api :4000, worker, web :3000
 
 bun test                   # unit tests (no DB/Redis needed)
 bun run test:integration   # API integration tests (needs infra:up; uses sahihi_test DB)
+bun run test:e2e           # Playwright journey on its own stack (needs infra:up, dev stopped; docs/testing.md → E2E)
 bun run fixtures           # regenerate fixtures/*.pdf (commit them; tests check they match)
 bun run emails:dev         # React Email preview of every template → http://localhost:3030
+bun run billing:set-plan <org-slug> <plan>   # change a workspace's plan (docs/billing.md)
 bun run typecheck          # all workspaces
 bun run lint               # biome check
 ```
@@ -102,16 +108,19 @@ the relevant doc in `docs/` is updated if behaviour changed, and the matching ch
 6. **State changes go through `assertTransition()`** (`packages/core/src/envelope-state.ts`). No other
    code may decide whether a status change is legal.
 7. **Audit:** every state change writes an audit event with `appendAuditEvent(tx, …)` **inside the
-   same `prisma.$transaction`**. Never update or delete `AuditEvent` rows. New event types go in
-   `AUDIT_EVENT_TYPES`.
+   same `prisma.$transaction`**. Never update or delete `AuditEvent` rows (the database refuses:
+   the `sahihi_app` role and an update trigger, ADR 0010). New event types go in `AUDIT_EVENT_TYPES`.
 8. **Secrets:** raw signing tokens and OTP codes are never stored or logged. Store only hashes
    (`hashSigningToken`, `hashOtp`). A raw token exists only in a notification job payload and the email.
+   Log with `createLogger` (`@sahihi/infra`), not `console`: it redacts fields and masks tokens.
 9. **The server owns final PDFs:** the browser submits field values only. Stamping, flattening and
    hashing happen in the worker (`@sahihi/pdf`). Original PDFs are immutable once `READY`.
 10. **Coordinates:** `Field.x/y/width/height` are **normalized 0–1, top-left origin, relative to the
     page as displayed**. Convert only with `@sahihi/core` helpers. Read `docs/coordinates.md`.
 11. **Enqueue after commit:** add BullMQ jobs *after* the transaction resolves. Job payloads carry IDs
     (plus the raw token for invites) and nothing else. Workers re-read state and must be idempotent.
+    Webhook events are written **inside** the transaction with `queueEnvelopeWebhook(tx, …)` (outbox)
+    and enqueued after it with `enqueueWebhookDeliveries(ids)`.
 12. **Public routes** (`/api/sign/*`, `/api/verify/*`) must be rate-limited (`rateLimit()`) and must
     never return token hashes, other recipients' PII or data from another envelope.
 
@@ -119,8 +128,9 @@ the relevant doc in `docs/` is updated if behaviour changed, and the matching ch
 13. Validate every request body with a zod schema from `@sahihi/core/schemas` via `parseJson()`.
     Shared schemas live in core so web forms and the API agree.
 14. Env vars: add them to `packages/config/src/index.ts` **and** `.env.example`. Never read
-    `process.env` elsewhere, with two exceptions: `apps/web` for `API_URL`, and
-    `packages/db/prisma.config.ts` for `DATABASE_URL`.
+    `process.env` elsewhere, with two exceptions: `apps/web` for `API_URL`, `STORAGE_ORIGIN`,
+    `NODE_ENV` and the Sentry DSNs (`SENTRY_*`, `NEXT_PUBLIC_SENTRY_*`, docs/observability.md), and
+    `packages/db/prisma.config.ts` for `MIGRATE_DATABASE_URL` / `DATABASE_URL`.
 15. Prisma enums must mirror the unions in `packages/core/src/enums.ts`. `packages/db/src/enums.test.ts`
     enforces this, so update both.
 16. When you change better-auth plugins, run `bun run auth:schema` and reconcile section 1 of
@@ -137,6 +147,14 @@ the relevant doc in `docs/` is updated if behaviour changed, and the matching ch
 | Field editor, signing page, stamping maths | `docs/coordinates.md` |
 | Upload, stamping, finalize job | `docs/pdf-pipeline.md` |
 | Send / sign / decline / void / reminders / OTP | `docs/signing-flow.md` |
+| Templates (save as / use) | `docs/templates.md` |
+| Webhooks (events, signing, delivery) | `docs/webhooks.md` |
+| Public API `/api/v1`, API keys and scopes | `docs/public-api.md` |
+| Bulk send (CSV / API, worker job) | `docs/bulk-send.md` |
+| Embedded signing (iframe, allowed origins) | `docs/embedded-signing.md` |
+| Plans, envelope quotas, seats | `docs/billing.md` |
+| Retention, export, deleting data or a workspace | `docs/data-retention.md` |
+| Logs, error tracking, queue dashboard | `docs/observability.md` |
 | Certificates, `/verify`, CA integration | `docs/certificates.md` |
 | Any public route, tokens, tenancy | `docs/security.md` |
 | Any screen or component | `docs/ui.md` |

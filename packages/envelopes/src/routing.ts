@@ -33,6 +33,21 @@ export async function activateNextRecipients(
   )
   const issued: IssuedLink[] = []
   for (const r of due) {
+    // Embedded recipients sign inside the sender's app: their turn starts now, but no link is
+    // issued or emailed until the API asks for a signing URL (docs/embedded-signing.md).
+    if (r.delivery === "EMBEDDED") {
+      await tx.recipient.update({
+        where: { id: r.id },
+        data: { status: "SENT", notifiedAt: new Date() },
+      })
+      await appendAuditEvent(tx, {
+        envelopeId,
+        type: "recipient.notified",
+        recipientId: r.id,
+        data: { delivery: "embedded" },
+      })
+      continue
+    }
     issued.push(
       await issueSigningLink(tx, r.id, linkExpiry(envelope.expiresAt), {
         status: "SENT",
@@ -62,4 +77,16 @@ export async function rotateRecipientLink(
     lastRemindedAt: new Date(),
     reminderCount: { increment: 1 },
   })
+}
+
+/**
+ * A short-lived signing URL token for an EMBEDDED recipient (public API). Rotates any previous
+ * one. Valid for EMBED_LINK_TTL_MS (or until the envelope expires), for the whole session.
+ */
+export async function issueEmbeddedSigningLink(
+  tx: Prisma.TransactionClient,
+  recipientId: string,
+  expiresAt: Date,
+): Promise<IssuedLink> {
+  return issueSigningLink(tx, recipientId, expiresAt)
 }

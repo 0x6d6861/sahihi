@@ -1,5 +1,6 @@
 "use client"
 
+import { orgAc, orgRoles } from "@sahihi/core"
 import { organizationClient } from "better-auth/client/plugins"
 import { createAuthClient } from "better-auth/react"
 
@@ -8,7 +9,7 @@ import { createAuthClient } from "better-auth/react"
  * and are proxied to the API (next.config.ts rewrites).
  */
 export const authClient = createAuthClient({
-  plugins: [organizationClient()],
+  plugins: [organizationClient({ ac: orgAc, roles: orgRoles })],
 })
 
 export const { signIn, signUp, signOut, useSession, organization, useActiveOrganization } =

@@ -1,10 +1,15 @@
-/** Primary navigation of the authenticated app shell. Icons are attached in the component. */
-export const APP_NAV = [
+/**
+ * Primary navigation of the authenticated app shell. Icons are attached in the component.
+ * `match` is the path prefix that marks the item active (defaults to `href`).
+ */
+export const APP_NAV: readonly { href: AppNavHref; label: string; match?: string }[] = [
   { href: "/documents", label: "Documents" },
   { href: "/envelopes", label: "Envelopes" },
-] as const
+  { href: "/templates", label: "Templates" },
+  { href: "/settings/members", label: "Settings", match: "/settings" },
+]
 
-export type AppNavHref = (typeof APP_NAV)[number]["href"]
+export type AppNavHref = "/documents" | "/envelopes" | "/templates" | "/settings/members"
 
 /** True when `pathname` is `href` itself or a page below it (`/envelopes/abc` → `/envelopes`). */
 export function isNavActive(pathname: string, href: string): boolean {

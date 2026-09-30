@@ -21,12 +21,26 @@ party. That's the CA integration below.
 
 ## Verification
 
-- `GET /api/verify/:code` returns certificate metadata, hashes and signers (emails masked).
-  Page: `apps/web/app/verify/[code]`.
-- `POST /api/verify/hash { sha256 }` reports whether a hash matches a signed document or a
-  certificate we issued. The **browser hashes the file locally** (Web Crypto) and only the hash
-  leaves the device. The "drop a PDF to verify" UI is roadmap P4 (Extend `FileUpload`).
+- `GET /api/verify/:code` returns certificate metadata, hashes and signers (emails masked; viewers
+  aren't listed).
+  - Codes are normalized with `normalizeCertificateCode` (`@sahihi/core`): case, spaces and dashes
+    are ignored, and anything outside the code alphabet (no 0/O/1/I) is a 404 without a DB lookup.
+  - Page: `apps/web/app/verify/[code]`, the QR-code target.
+- `POST /api/verify/hash { sha256 }` (`VerifyHashSchema`, lowercase hex) returns
+  `{ match: "signed_document" | "certificate" | null, code? }`.
+  - The **browser hashes the file locally** (Web Crypto via `sha256Hex`) and only the hash leaves
+    the device.
+  - Only signed PDFs and certificates match, **never unsigned originals**. Otherwise the endpoint
+    would reveal to anyone whether a given file was ever uploaded to Sahihi.
 - Both are public and rate-limited.
+
+Web (public, no account):
+- `/verify` has an Extend `FileUpload` drop zone (PDF only, up to 100 MB hashed in memory) and a
+  certificate code form.
+  - A match goes to `/verify/<code>?match=signed_document|certificate`, which shows a "File
+    verified" banner above the certificate details.
+  - No match explains that the exact file wasn't signed with Sahihi or was changed since (re-saving
+    counts), and shows the file's SHA-256.
 
 ## CA integration (later)
 

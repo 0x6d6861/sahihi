@@ -1,7 +1,9 @@
 import { getEnv } from "@sahihi/config"
 import { abandonedUploadCutoff } from "@sahihi/core"
-import { appendAuditEvent, issueSigningLink, prisma } from "@sahihi/db"
-import { deleteObject, getQueues } from "@sahihi/infra"
+import { appendAuditEvent, issueSigningLink, prisma, queueEnvelopeWebhook } from "@sahihi/db"
+import { createLogger, deleteObject, enqueueWebhookDeliveries, getQueues } from "@sahihi/infra"
+
+const log = createLogger("worker")
 
 const DAY = 86_400_000
 const REMIND_EVERY_DAYS = 3
@@ -15,15 +17,17 @@ export async function expireEnvelopes() {
     take: 500,
   })
   for (const { id } of overdue) {
-    await prisma.$transaction(async (tx) => {
+    const webhooks = await prisma.$transaction(async (tx) => {
       const res = await tx.envelope.updateMany({
         where: { id, status: { in: ["SENT", "IN_PROGRESS"] } },
         data: { status: "EXPIRED" },
       })
-      if (res.count === 0) return
+      if (res.count === 0) return []
       await tx.recipient.updateMany({ where: { envelopeId: id }, data: { tokenHash: null } })
       await appendAuditEvent(tx, { envelopeId: id, type: "envelope.expired" })
+      return queueEnvelopeWebhook(tx, { envelopeId: id, type: "envelope.expired" })
     })
+    await enqueueWebhookDeliveries(webhooks)
   }
   return { expired: overdue.length }
 }
@@ -34,6 +38,8 @@ export async function remindRecipients() {
   const due = await prisma.recipient.findMany({
     where: {
       status: { in: ["SENT", "VIEWED"] },
+      // Embedded recipients sign inside the sender's app; they're never emailed.
+      delivery: "EMAIL",
       reminderCount: { lt: MAX_REMINDERS },
       notifiedAt: { lt: cutoff },
       OR: [{ lastRemindedAt: null }, { lastRemindedAt: { lt: cutoff } }],
@@ -93,7 +99,7 @@ export async function sweepAbandonedUploads(now = new Date()) {
       // Missing keys are a no-op in S3, so an error here is a real outage. The row is already
       // swept; log the key so the orphaned (private) object can be removed by hand.
       await deleteObject(doc.s3Key).catch((err: unknown) =>
-        console.error(`[maintenance] could not delete ${doc.s3Key}:`, err),
+        log.error("could not delete abandoned upload", { key: doc.s3Key, err }),
       )
     }
     if (stale.length < SWEEP_BATCH) break

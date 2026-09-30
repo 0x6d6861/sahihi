@@ -43,12 +43,15 @@ export function SendControl({
   envelopeId,
   recipientCount,
   defaultTab,
+  actions,
   children,
 }: {
   envelopeId: string
   /** Recipients who will be emailed (everyone, including viewers). */
   recipientCount: number
   defaultTab: EnvelopeTab
+  /** Extra header buttons, shown before Send. */
+  actions?: React.ReactNode
   children: React.ReactNode
 }) {
   const router = useRouter()
@@ -101,6 +104,9 @@ export function SendControl({
       const issues =
         (err instanceof ApiError && (err.body as { issues?: PreflightIssue[] })?.issues) || []
       if (issues.length > 0) setProblems(toProblems(issues))
+      // Plan limit reached (docs/billing.md): keep the explanation on screen, not in a toast.
+      else if (err instanceof ApiError && err.status === 402)
+        setProblems([{ message: err.message }])
       else
         toastManager.add({
           title: "Could not send",
@@ -116,10 +122,13 @@ export function SendControl({
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         {children}
-        <Button onClick={check} disabled={checking || sending}>
-          {checking ? <Spinner aria-hidden /> : <SendIcon aria-hidden />}
-          Send
-        </Button>
+        <div className="flex items-center gap-2">
+          {actions}
+          <Button onClick={check} disabled={checking || sending}>
+            {checking ? <Spinner aria-hidden /> : <SendIcon aria-hidden />}
+            Send
+          </Button>
+        </div>
       </div>
 
       {problems.length > 0 && (

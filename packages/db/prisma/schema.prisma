@@ -38,6 +38,11 @@ model User {
 
   documents Document[]
   envelopes Envelope[]
+  templates Template[]
+  webhooks  WebhookEndpoint[]
+  exports   DataExport[]
+  apiKeys   ApiKey[]
+  bulkSends BulkSend[]
 
   @@map("user")
 }
@@ -100,8 +105,15 @@ model Organization {
   members     Member[]
   invitations Invitation[]
 
-  documents Document[]
-  envelopes Envelope[]
+  documents    Document[]
+  envelopes    Envelope[]
+  templates    Template[]
+  webhooks     WebhookEndpoint[]
+  subscription Subscription?
+  settings     WorkspaceSettings?
+  exports      DataExport[]
+  apiKeys      ApiKey[]
+  bulkSends    BulkSend[]
 
   @@map("organization")
 }
@@ -215,6 +227,7 @@ model Document {
   updatedAt        DateTime       @updatedAt
   deletedAt        DateTime?
   envelopes        Envelope[]
+  templates        Template[]
   /// Set when this document was produced by "Prepare document" from another one (same org).
   /// The source is never modified; this is lineage only.
   sourceDocumentId String?
@@ -246,6 +259,8 @@ model Envelope {
   /// Stamped + flattened output (without certificate)
   signedS3Key    String?
   signedSha256   String?
+  /// Files and personal data deleted (retention or on request); evidence kept (docs/data-retention.md)
+  purgedAt       DateTime?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
@@ -270,6 +285,8 @@ model Recipient {
   order           Int                @default(1)
   status          RecipientStatus    @default(PENDING)
   verification    VerificationMethod @default(LINK)
+  /// EMAIL: invited/reminded by email. EMBEDDED: signs inside the sender's app (docs/embedded-signing.md)
+  delivery        RecipientDelivery  @default(EMAIL)
   /// UI-only colour index for the field-placement editor
   colorIndex      Int                @default(0)
   /// SHA-256 (hex) of the signing token. The raw token is only ever in the email link.
@@ -348,7 +365,7 @@ model AuditEvent {
   seq         Int
   type        String
   recipientId String?
-  recipient   Recipient? @relation(fields: [recipientId], references: [id])
+  recipient   Recipient? @relation(fields: [recipientId], references: [id], onDelete: NoAction)
   actorUserId String?
   data        Json?
   ipAddress   String?
@@ -372,4 +389,257 @@ model Certificate {
   provider    SigningProviderKind @default(INTERNAL)
   providerRef String?
   issuedAt    DateTime            @default(now())
+}
+
+/// A reusable envelope: a document, recipient roles and a field layout (docs/templates.md).
+/// "Use" copies it into a new DRAFT envelope; the template itself never changes an envelope.
+model Template {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// Fields are normalized to this PDF's pages, so a template always carries its document.
+  /// Deleting the document is refused while templates use it.
+  documentId     String
+  document       Document     @relation(fields: [documentId], references: [id])
+  createdById    String
+  createdBy      User         @relation(fields: [createdById], references: [id])
+  name           String
+  description    String?
+  /// Default envelope message
+  message        String?
+  signingOrder   SigningOrder @default(PARALLEL)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  bulkSends BulkSend[]
+  roles     TemplateRole[]
+  fields    TemplateField[]
+
+  @@index([organizationId, createdAt])
+  @@index([documentId])
+}
+
+/// A recipient slot ("Tenant", "Landlord"). Filled with a person when the template is used,
+/// unless it has a fixed contact (e.g. the company's own countersigner).
+model TemplateRole {
+  id           String             @id @default(cuid())
+  templateId   String
+  template     Template           @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  label        String
+  role         RecipientRole      @default(SIGNER)
+  order        Int                @default(1)
+  verification VerificationMethod @default(LINK)
+  colorIndex   Int                @default(0)
+  name         String?
+  email        String?
+  phone        String?
+
+  fields TemplateField[]
+
+  @@index([templateId, order])
+}
+
+model TemplateField {
+  id         String       @id @default(cuid())
+  templateId String
+  template   Template     @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  roleId     String
+  role       TemplateRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  type       FieldType
+  page       Int
+  x          Float
+  y          Float
+  width      Float
+  height     Float
+  required   Boolean      @default(true)
+  label      String?
+
+  @@index([templateId])
+}
+
+enum WebhookDeliveryStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+/// An org's HTTPS endpoint for signed event POSTs (docs/webhooks.md). Owners/admins only.
+model WebhookEndpoint {
+  id              String            @id @default(cuid())
+  organizationId  String
+  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdById     String
+  createdBy       User              @relation(fields: [createdById], references: [id])
+  url             String
+  description     String?
+  /// WebhookEventType[] from @sahihi/core
+  events          String[]
+  enabled         Boolean           @default(true)
+  /// Signing secret, AES-GCM encrypted (encryptSecret). It must be recoverable to sign, so it's
+  /// encrypted rather than hashed, and it's only ever shown in full once.
+  secretEncrypted String
+  /// Last 4 characters, to tell secrets apart in the UI.
+  secretHint      String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  deliveries      WebhookDelivery[]
+
+  @@index([organizationId])
+}
+
+/// One event for one endpoint: written in the same transaction as the state change (outbox),
+/// then delivered by the worker with retries.
+model WebhookDelivery {
+  id             String                @id @default(cuid())
+  endpointId     String
+  endpoint       WebhookEndpoint       @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  organizationId String
+  /// Event id sent to the receiver (their idempotency key). Same for every attempt.
+  eventId        String
+  type           String
+  /// Event data snapshot at emission time
+  payload        Json
+  status         WebhookDeliveryStatus @default(PENDING)
+  attempts       Int                   @default(0)
+  lastAttemptAt  DateTime?
+  lastStatusCode Int?
+  lastError      String?
+  lastResponse   String?
+  deliveredAt    DateTime?
+  createdAt      DateTime              @default(now())
+
+  @@index([endpointId, createdAt])
+  @@index([status, createdAt])
+}
+
+/// A workspace's plan (docs/billing.md). No row = Free. `plan` is a PlanId from @sahihi/core,
+/// kept as a string so plans can change without a Prisma enum migration.
+model Subscription {
+  organizationId         String       @id
+  organization           Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan                   String       @default("free")
+  /// Reserved for a payment provider (e.g. "paystack"); null while plans are set manually.
+  provider               String?
+  providerCustomerId     String?
+  providerSubscriptionId String?
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+}
+
+/// Per-workspace data settings (docs/data-retention.md). No row = defaults (keep forever).
+model WorkspaceSettings {
+  organizationId String       @id
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// Years to keep closed envelopes before purging files and personal data; null = forever
+  retentionYears Int?
+  /// Origins allowed to show /sign in an iframe for EMBEDDED recipients (docs/embedded-signing.md)
+  embedOrigins   String[]     @default([])
+  updatedAt      DateTime     @updatedAt
+}
+
+enum ExportStatus {
+  PENDING
+  READY
+  FAILED
+}
+
+/// A ZIP of the workspace's envelopes, built by the worker (docs/data-retention.md).
+model DataExport {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  requestedById  String
+  requestedBy    User         @relation(fields: [requestedById], references: [id])
+  status         ExportStatus @default(PENDING)
+  s3Key          String?
+  sizeBytes      Int?
+  envelopeCount  Int?
+  error          String?
+  createdAt      DateTime     @default(now())
+  completedAt    DateTime?
+  /// The archive is deleted after this (EXPORT_TTL_DAYS)
+  expiresAt      DateTime?
+
+  @@index([organizationId, createdAt])
+}
+
+/// Public API key (docs/public-api.md). Only the hash is stored; the key is shown once.
+model ApiKey {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// The admin who created it: the actor recorded in audit trails for API actions
+  createdById    String
+  createdBy      User         @relation(fields: [createdById], references: [id])
+  name           String
+  /// sha256("api-key:" + key)
+  secretHash     String       @unique
+  /// "sahihi_sk_AbCd…WxYz", to tell keys apart
+  hint           String
+  /// ApiKeyScope[] from @sahihi/core
+  scopes         String[]
+  lastUsedAt     DateTime?
+  expiresAt      DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, createdAt])
+}
+
+enum BulkSendStatus {
+  PENDING
+  RUNNING
+  DONE
+}
+
+enum BulkSendItemStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+/// One template sent to many people: one envelope per row (docs/bulk-send.md).
+model BulkSend {
+  id             String         @id @default(cuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// Kept as history if the template is deleted later
+  templateId     String?
+  template       Template?      @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  createdById    String
+  createdBy      User           @relation(fields: [createdById], references: [id])
+  title          String
+  message        String?
+  status         BulkSendStatus @default(PENDING)
+  total          Int
+  sent           Int            @default(0)
+  failed         Int            @default(0)
+  /// Set when started through the public API
+  apiKeyId       String?
+  createdAt      DateTime       @default(now())
+  completedAt    DateTime?
+  items          BulkSendItem[]
+
+  @@index([organizationId, createdAt])
+}
+
+model BulkSendItem {
+  id         String             @id @default(cuid())
+  bulkSendId String
+  bulkSend   BulkSend           @relation(fields: [bulkSendId], references: [id], onDelete: Cascade)
+  /// 1-based row in the upload
+  row        Int
+  status     BulkSendItemStatus @default(PENDING)
+  /// The row's people until processed; cleared afterwards (personal data lives on the envelope)
+  recipients Json?
+  /// Set as soon as the draft exists, so a retry sends it instead of creating a duplicate
+  envelopeId String?
+  error      String?
+
+  @@unique([bulkSendId, row])
+}
+
+enum RecipientDelivery {
+  EMAIL
+  EMBEDDED
 }

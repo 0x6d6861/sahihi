@@ -5,6 +5,7 @@ import {
   consentTextSha256,
   DeclineSigningSchema,
   deriveOutcome,
+  downloadFileName,
   type FieldValueInput,
   generateOtp,
   hashOtp,
@@ -17,8 +18,15 @@ import {
   timingSafeEqual,
   VerifyOtpSchema,
 } from "@sahihi/core"
-import { appendAuditEvent, prisma } from "@sahihi/db"
-import { getQueues, keys, presignDownload, putObject } from "@sahihi/infra"
+import { appendAuditEvent, prisma, queueEnvelopeWebhook } from "@sahihi/db"
+import { activateNextRecipients } from "@sahihi/envelopes"
+import {
+  enqueueWebhookDeliveries,
+  getQueues,
+  keys,
+  presignDownload,
+  putObject,
+} from "@sahihi/infra"
 import { pngFromDataUrl } from "@sahihi/pdf"
 import { type Context, Hono } from "hono"
 import { getSignedCookie, setSignedCookie } from "hono/cookie"
@@ -26,7 +34,6 @@ import { createMiddleware } from "hono/factory"
 import { HTTPException } from "hono/http-exception"
 import { badRequest, clientMeta, conflict, parseJson } from "../lib/http"
 import { rateLimit } from "../middleware/rate-limit"
-import { activateNextRecipients } from "../services/routing"
 
 /**
  * PUBLIC signing API — authenticated ONLY by the recipient token in the URL
@@ -91,6 +98,19 @@ const maskEmail = (e: string) =>
     (_, a, b: string, d) => `${a}${"•".repeat(Math.min(b.length, 6))}${d}`,
   )
 const maskPhone = (p: string | null) => (p ? `${p.slice(0, 4)}•••${p.slice(-3)}` : null)
+
+/**
+ * Origins allowed to frame this signing page: the workspace's embed origins, only for an
+ * EMBEDDED recipient (docs/embedded-signing.md). Email recipients can never be framed.
+ */
+async function embedOriginsFor(s: Signer): Promise<string[]> {
+  if (s.delivery !== "EMBEDDED") return []
+  const settings = await prisma.workspaceSettings.findUnique({
+    where: { organizationId: s.envelope.organizationId },
+    select: { embedOrigins: true },
+  })
+  return settings?.embedOrigins ?? []
+}
 
 /** Resolves the recipient from :token or responds 404. */
 const withSigner = createMiddleware<SigningEnv>(async (c, next) => {
@@ -162,21 +182,37 @@ export const signing = new Hono<SigningEnv>()
       },
       fields,
       downloadsAvailable: state === "completed" && Boolean(e.signedS3Key && e.certificate),
+      // Embedded recipients: where the page may post its events (and be framed from).
+      embed: s.delivery === "EMBEDDED" ? { origins: await embedOriginsFor(s) } : null,
       certificateCode: state === "completed" ? (e.certificate?.code ?? null) : null,
     })
   })
 
+  /** Frame policy for /sign/<token>?embed=1, read by the web's proxy.ts to set frame-ancestors. */
+  .get("/:token/embed", withSigner, async (c) =>
+    c.json({ origins: await embedOriginsFor(c.get("signer")) }),
+  )
+
   /** After completion, every recipient receives a fresh link that lands here. */
   .get("/:token/downloads", withSigner, async (c) => {
     const s = c.get("signer")
+    if (s.envelope.purgedAt) {
+      return c.json(
+        { error: "purged", message: "These files were deleted under the data retention policy" },
+        410,
+      )
+    }
     if (linkState(s) !== "completed" || !s.envelope.signedS3Key || !s.envelope.certificate) {
       return c.json({ error: "not_available" }, 409)
     }
-    const base = s.envelope.title.replace(/[^\w\- ]+/g, "").trim() || "document"
     return c.json({
-      signed: await presignDownload(s.envelope.signedS3Key, { fileName: `${base} (signed).pdf` }),
+      signed: await presignDownload(s.envelope.signedS3Key, {
+        fileName: downloadFileName(s.envelope.title, "signed"),
+        disposition: "attachment",
+      }),
       certificate: await presignDownload(s.envelope.certificate.s3Key, {
-        fileName: `${base} (certificate).pdf`,
+        fileName: downloadFileName(s.envelope.title, "certificate"),
+        disposition: "attachment",
       }),
     })
   })
@@ -247,15 +283,19 @@ export const signing = new Hono<SigningEnv>()
       orderBy: { createdAt: "desc" },
     })
     if (!otp) badRequest("Code expired — request a new one")
-    if (otp.attempts >= OTP_MAX_ATTEMPTS)
-      throw new HTTPException(429, { message: "Too many attempts" })
+    // Claim one attempt atomically BEFORE comparing. A read-then-increment would let parallel
+    // requests all see the same count and guess far more than OTP_MAX_ATTEMPTS times.
+    const claimed = await prisma.recipientOtp.updateMany({
+      where: { id: otp.id, consumedAt: null, attempts: { lt: OTP_MAX_ATTEMPTS } },
+      data: { attempts: { increment: 1 } },
+    })
+    if (claimed.count === 0) throw new HTTPException(429, { message: "Too many attempts" })
 
     const ok = timingSafeEqual(otp.codeHash, await hashOtp(s.id, code))
     await prisma.$transaction(async (tx) => {
-      await tx.recipientOtp.update({
-        where: { id: otp.id },
-        data: ok ? { consumedAt: new Date() } : { attempts: { increment: 1 } },
-      })
+      if (ok) {
+        await tx.recipientOtp.update({ where: { id: otp.id }, data: { consumedAt: new Date() } })
+      }
       await appendAuditEvent(tx, {
         envelopeId: s.envelopeId,
         type: ok ? "recipient.otp_verified" : "recipient.otp_failed",
@@ -432,12 +472,17 @@ export const signing = new Hono<SigningEnv>()
           data: { status: "COMPLETED", completedAt: new Date() },
         })
         await appendAuditEvent(tx, { envelopeId: s.envelopeId, type: "envelope.completed" })
-        return { outcome, links: [] }
-      }
-      if (s.envelope.status === "SENT") {
+      } else if (s.envelope.status === "SENT") {
         await tx.envelope.update({ where: { id: s.envelopeId }, data: { status: "IN_PROGRESS" } })
       }
-      return { outcome, links: await activateNextRecipients(tx, s.envelopeId) }
+      // envelope.completed is emitted by finalize, once the signed PDF and certificate exist.
+      const webhooks = await queueEnvelopeWebhook(tx, {
+        envelopeId: s.envelopeId,
+        type: "recipient.signed",
+        extra: { recipientId: s.id },
+      })
+      const links = outcome === "COMPLETED" ? [] : await activateNextRecipients(tx, s.envelopeId)
+      return { outcome, links, webhooks }
     })
 
     const q = getQueues()
@@ -450,13 +495,14 @@ export const signing = new Hono<SigningEnv>()
       )
     }
     await Promise.all(result.links.map((l) => q.notifications.add("envelope.invite", l)))
+    await enqueueWebhookDeliveries(result.webhooks)
     return c.json({ ok: true, envelopeStatus: result.outcome })
   })
 
   .post("/:token/decline", withSigner, requireReady, async (c) => {
     const s = c.get("signer")
     const { reason } = await parseJson(c, DeclineSigningSchema)
-    await prisma.$transaction(async (tx) => {
+    const webhooks = await prisma.$transaction(async (tx) => {
       const claimed = await tx.recipient.updateMany({
         where: { id: s.id, status: { in: ["SENT", "VIEWED"] } },
         data: { status: "DECLINED", declinedAt: new Date(), declineReason: reason },
@@ -476,10 +522,16 @@ export const signing = new Hono<SigningEnv>()
         ...clientMeta(c),
       })
       await appendAuditEvent(tx, { envelopeId: s.envelopeId, type: "envelope.declined" })
+      return queueEnvelopeWebhook(tx, {
+        envelopeId: s.envelopeId,
+        type: "envelope.declined",
+        extra: { recipientId: s.id },
+      })
     })
     await getQueues().notifications.add("envelope.declined", {
       envelopeId: s.envelopeId,
       recipientId: s.id,
     })
+    await enqueueWebhookDeliveries(webhooks)
     return c.json({ ok: true })
   })

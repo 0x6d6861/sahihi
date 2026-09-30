@@ -1,6 +1,9 @@
 import {
-  assertTransition,
   CreateEnvelopeSchema,
+  canManageEnvelope,
+  downloadFileName,
+  hasPermission,
+  isClosed,
   isEditable,
   ReplaceFieldsSchema,
   ReplaceRecipientsSchema,
@@ -10,12 +13,27 @@ import {
   verifyAuditChain,
 } from "@sahihi/core"
 import { appendAuditEvent, forOrganization, prisma, toChainedEvent } from "@sahihi/db"
+import { rotateRecipientLink, sendEnvelope, voidEnvelope } from "@sahihi/envelopes"
 import { getQueues, presignDownload } from "@sahihi/infra"
 import { Hono } from "hono"
+import { HTTPException } from "hono/http-exception"
 import type { AppEnv } from "../lib/env"
-import { badRequest, clientMeta, conflict, notFound, parseJson } from "../lib/http"
+import { badRequest, clientMeta, conflict, forbidden, notFound, parseJson } from "../lib/http"
+import { actor, assertCanManageEnvelope } from "../lib/permissions"
 import { requireOrg } from "../middleware/session"
-import { activateNextRecipients, rotateRecipientLink } from "../services/routing"
+
+/** 410 for files deleted under retention or on request (docs/data-retention.md). */
+function gone(): never {
+  throw new HTTPException(410, {
+    res: Response.json(
+      {
+        error: "purged",
+        message: "This envelope's files were deleted under the data retention policy",
+      },
+      { status: 410 },
+    ),
+  })
+}
 
 /** Never leak token hashes to clients. */
 const recipientSelect = {
@@ -100,7 +118,17 @@ export const envelopes = new Hono<AppEnv>()
       },
     })
     if (!envelope) notFound("Envelope")
-    return c.json({ envelope })
+    return c.json({
+      envelope,
+      permissions: {
+        manage: canManageEnvelope(actor(c), envelope),
+        // Delete files + personal data now (docs/data-retention.md)
+        purge:
+          hasPermission(c.get("memberRole"), { data: ["manage"] }) &&
+          isClosed(envelope.status) &&
+          !envelope.purgedAt,
+      },
+    })
   })
 
   /** Replace the recipient list (draft only). Removed recipients lose their fields. */
@@ -112,6 +140,7 @@ export const envelopes = new Hono<AppEnv>()
       include: { recipients: { select: { id: true } } },
     })
     if (!envelope) notFound("Envelope")
+    assertCanManageEnvelope(c, envelope)
     if (!isEditable(envelope.status)) conflict("Only draft envelopes can be edited")
 
     const emails = recipients.map((r) => r.email)
@@ -131,6 +160,7 @@ export const envelopes = new Hono<AppEnv>()
           role: r.role,
           order: envelope.signingOrder === "SEQUENTIAL" ? r.order : 1,
           verification: r.verification,
+          delivery: r.delivery,
           colorIndex: i,
         }
         if (r.id && existingIds.has(r.id)) await tx.recipient.update({ where: { id: r.id }, data })
@@ -157,6 +187,7 @@ export const envelopes = new Hono<AppEnv>()
       },
     })
     if (!envelope) notFound("Envelope")
+    assertCanManageEnvelope(c, envelope)
     if (!isEditable(envelope.status)) conflict("Only draft envelopes can be edited")
 
     const owners = new Map(envelope.recipients.map((r) => [r.id, r.role]))
@@ -192,35 +223,16 @@ export const envelopes = new Hono<AppEnv>()
     const scope = forOrganization(c.get("organizationId"))
     const envelope = await prisma.envelope.findFirst({
       where: scope.envelope({ id: c.req.param("id") }),
-      include: { recipients: true, fields: { select: { recipientId: true, type: true } } },
+      select: { id: true, createdById: true },
     })
     if (!envelope) notFound("Envelope")
-    assertTransition(envelope.status, "SENT")
-
-    // ── Pre-flight validation (docs/signing-flow.md → Sending) ──
-    const issues = sendPreflight(envelope)
-    if (issues.length > 0) {
-      return c.json({ error: "preflight_failed", message: issues[0]?.message, issues }, 400)
-    }
-
-    const links = await prisma.$transaction(async (tx) => {
-      await tx.envelope.update({
-        where: { id: envelope.id },
-        data: { status: "SENT", sentAt: new Date() },
-      })
-      await appendAuditEvent(tx, {
-        envelopeId: envelope.id,
-        type: "envelope.sent",
-        actorUserId: c.get("user").id,
-        data: { recipients: envelope.recipients.length, signingOrder: envelope.signingOrder },
-        ...clientMeta(c),
-      })
-      return activateNextRecipients(tx, envelope.id)
+    assertCanManageEnvelope(c, envelope)
+    const { notified } = await sendEnvelope({
+      envelopeId: envelope.id,
+      organizationId: c.get("organizationId"),
+      actor: { userId: c.get("user").id, ...clientMeta(c) },
     })
-
-    const q = getQueues().notifications
-    await Promise.all(links.map((l) => q.add("envelope.invite", l)))
-    return c.json({ ok: true, notified: links.length })
+    return c.json({ ok: true, notified })
   })
 
   .post("/:id/void", async (c) => {
@@ -228,29 +240,16 @@ export const envelopes = new Hono<AppEnv>()
     const scope = forOrganization(c.get("organizationId"))
     const envelope = await prisma.envelope.findFirst({
       where: scope.envelope({ id: c.req.param("id") }),
+      select: { id: true, createdById: true },
     })
     if (!envelope) notFound("Envelope")
-    assertTransition(envelope.status, "VOIDED")
-
-    await prisma.$transaction(async (tx) => {
-      await tx.envelope.update({
-        where: { id: envelope.id },
-        data: { status: "VOIDED", voidedAt: new Date(), voidReason: reason },
-      })
-      // Kill all outstanding links
-      await tx.recipient.updateMany({
-        where: { envelopeId: envelope.id },
-        data: { tokenHash: null },
-      })
-      await appendAuditEvent(tx, {
-        envelopeId: envelope.id,
-        type: "envelope.voided",
-        actorUserId: c.get("user").id,
-        data: { reason },
-        ...clientMeta(c),
-      })
+    assertCanManageEnvelope(c, envelope)
+    await voidEnvelope({
+      envelopeId: envelope.id,
+      organizationId: c.get("organizationId"),
+      reason,
+      actor: { userId: c.get("user").id, ...clientMeta(c) },
     })
-    await getQueues().notifications.add("envelope.voided", { envelopeId: envelope.id })
     return c.json({ ok: true })
   })
 
@@ -261,9 +260,13 @@ export const envelopes = new Hono<AppEnv>()
         id: c.req.param("recipientId"),
         envelope: scope.envelope({ id: c.req.param("id") }),
       },
-      include: { envelope: { select: { status: true } } },
+      include: { envelope: { select: { status: true, createdById: true } } },
     })
     if (!recipient) notFound("Recipient")
+    assertCanManageEnvelope(c, recipient.envelope)
+    if (recipient.delivery === "EMBEDDED") {
+      conflict("Embedded recipients sign inside your app and aren't emailed")
+    }
     // Same rules the UI uses to enable "Send reminder" (throttled: it emails and rotates the link).
     const availability = reminderAvailability(recipient, recipient.envelope.status)
     if (!availability.ok) {
@@ -317,12 +320,42 @@ export const envelopes = new Hono<AppEnv>()
       include: { certificate: true },
     })
     if (!envelope) notFound("Envelope")
+    if (envelope.purgedAt) gone()
     if (!envelope.signedS3Key || !envelope.certificate) conflict("Envelope is not finalized yet")
-    const base = envelope.title.replace(/[^\w\- ]+/g, "").trim() || "document"
     return c.json({
-      signed: await presignDownload(envelope.signedS3Key, { fileName: `${base} (signed).pdf` }),
+      signed: await presignDownload(envelope.signedS3Key, {
+        fileName: downloadFileName(envelope.title, "signed"),
+        disposition: "attachment",
+      }),
       certificate: await presignDownload(envelope.certificate.s3Key, {
-        fileName: `${base} (certificate).pdf`,
+        fileName: downloadFileName(envelope.title, "certificate"),
+        disposition: "attachment",
       }),
     })
+  })
+
+  /**
+   * Delete this closed envelope's files and personal data now, keeping the evidence
+   * (docs/data-retention.md). Owners/admins; e.g. for a data-subject erasure request.
+   */
+  .post("/:id/purge", async (c) => {
+    if (!hasPermission(c.get("memberRole"), { data: ["manage"] })) {
+      forbidden("Only owners and admins can delete envelope data")
+    }
+    const scope = forOrganization(c.get("organizationId"))
+    const envelope = await prisma.envelope.findFirst({
+      where: scope.envelope({ id: c.req.param("id") }),
+      select: { id: true, status: true, purgedAt: true },
+    })
+    if (!envelope) notFound("Envelope")
+    if (envelope.purgedAt) conflict("This envelope's data was already deleted")
+    if (!isClosed(envelope.status)) {
+      conflict("Only completed, declined, voided or expired envelopes can be deleted")
+    }
+    await getQueues().maintenance.add(
+      "envelope.purge",
+      { envelopeId: envelope.id, reason: "manual" },
+      { jobId: `purge-${envelope.id}` },
+    )
+    return c.json({ ok: true }, 202)
   })

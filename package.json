@@ -17,7 +17,7 @@
     "test": "bun test packages apps/api/src apps/worker apps/web/lib",
     "test:integration": "bun test --preload ./apps/api/test/preload.ts --timeout 30000 ./apps/api/test/*.itest.ts ./apps/worker/test/*.itest.ts",
     "fixtures": "bun run --filter @sahihi/pdf fixtures",
-    "emails:dev": "bun run --filter @sahihi/emails dev",
+    "emails:dev": "bun run --filter @sahihi/emails preview",
     "lint": "biome check .",
     "format": "biome format --write .",
     "db:generate": "bun run --filter @sahihi/db generate",
@@ -26,7 +26,9 @@
     "auth:schema": "bunx @better-auth/cli generate --config apps/api/src/auth.ts --output packages/db/prisma/better-auth.generated.prisma",
     "infra:up": "docker compose up -d",
     "infra:down": "docker compose down",
-    "ui:bootstrap": "bash scripts/bootstrap-ui.sh"
+    "ui:bootstrap": "bash scripts/bootstrap-ui.sh",
+    "billing:set-plan": "bun --env-file=.env packages/db/scripts/set-plan.ts",
+    "test:e2e": "bun run --filter @sahihi/e2e test"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",

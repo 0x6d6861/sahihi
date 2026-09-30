@@ -2,6 +2,7 @@
 
 import type { FieldType, VerificationMethod } from "@sahihi/core"
 import { useCallback, useEffect, useRef, useState } from "react"
+import { DownloadButtons } from "@/components/app/downloads/download-buttons"
 import { SigningSurface } from "@/components/app/signing/signing-surface"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -18,6 +19,7 @@ import { OTPField, OTPFieldInput } from "@/components/ui/otp-field"
 import { Spinner } from "@/components/ui/spinner"
 import { ApiError, api } from "@/lib/api"
 import { formatCountdown } from "@/lib/countdown"
+import { embedEventFor, postEmbedEvent } from "@/lib/embed"
 
 type State = "ready" | "waiting" | "signed" | "completed" | "declined" | "expired" | "closed"
 
@@ -52,6 +54,8 @@ interface SigningSession {
   }[]
   downloadsAvailable: boolean
   certificateCode: string | null
+  /** Embedded recipients (docs/embedded-signing.md): the origins to post events to. */
+  embed: { origins: string[] } | null
 }
 
 const MESSAGES: Record<Exclude<State, "ready">, { title: string; body: string }> = {
@@ -79,6 +83,21 @@ export function SigningExperience({ token }: { token: string }) {
   const [session, setSession] = useState<SigningSession | null>(null)
   const [error, setError] = useState<string | null>(null)
   const base = `/sign/${encodeURIComponent(token)}`
+  // Embedded signing: tell the host app about state changes (ready, signed, declined).
+  const lastState = useRef<State | null>(null)
+  useEffect(() => {
+    if (!session?.embed) return
+    const event = embedEventFor(lastState.current, session.state)
+    lastState.current = session.state
+    if (event) {
+      postEmbedEvent(
+        event,
+        session.state,
+        session.embed.origins,
+        window.parent === window ? null : window.parent,
+      )
+    }
+  }, [session])
 
   const load = useCallback(async () => {
     try {
@@ -116,7 +135,7 @@ export function SigningExperience({ token }: { token: string }) {
         </CardHeader>
         {session.downloadsAvailable && (
           <CardFooter className="gap-2">
-            <DownloadButtons base={base} />
+            <DownloadButtons endpoint={`${base}/downloads`} />
           </CardFooter>
         )}
       </Card>
@@ -297,28 +316,5 @@ function OtpStep({
         </CardFooter>
       )}
     </Card>
-  )
-}
-
-function DownloadButtons({ base }: { base: string }) {
-  const [links, setLinks] = useState<{ signed: string; certificate: string } | null>(null)
-  useEffect(() => {
-    api<{ signed: string; certificate: string }>(`${base}/downloads`).then(setLinks, () =>
-      setLinks(null),
-    )
-  }, [base])
-  if (!links) return null
-  return (
-    <>
-      <Button render={<a href={links.signed} target="_blank" rel="noreferrer" />}>
-        Signed document
-      </Button>
-      <Button
-        variant="outline"
-        render={<a href={links.certificate} target="_blank" rel="noreferrer" />}
-      >
-        Certificate
-      </Button>
-    </>
   )
 }

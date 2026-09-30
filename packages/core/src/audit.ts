@@ -17,6 +17,8 @@ export const AUDIT_EVENT_TYPES = [
   "recipient.notified",
   "recipient.reminded",
   "recipient.link_opened",
+  /** An embedded signing URL was issued through the API (docs/embedded-signing.md). */
+  "recipient.link_issued",
   "recipient.otp_sent",
   "recipient.otp_verified",
   "recipient.otp_failed",
@@ -27,6 +29,8 @@ export const AUDIT_EVENT_TYPES = [
   "recipient.declined",
   "document.finalized",
   "certificate.issued",
+  /** Files and personal data deleted (retention or on request); evidence kept (docs/data-retention.md). */
+  "envelope.purged",
 ] as const
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]
 

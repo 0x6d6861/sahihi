@@ -1,12 +1,15 @@
 import {
   DeleteObjectCommand,
+  DeleteObjectsCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 import { getEnv } from "@sahihi/config"
+import { contentDisposition } from "@sahihi/core"
 
 /**
  * Private object storage. The bucket is NEVER public; clients only receive
@@ -15,6 +18,7 @@ import { getEnv } from "@sahihi/config"
  *   org/{orgId}/envelopes/{envelopeId}/fields/{fieldId}.png
  *   org/{orgId}/envelopes/{envelopeId}/signed.pdf
  *   org/{orgId}/envelopes/{envelopeId}/certificate.pdf
+ *   org/{orgId}/exports/{exportId}.zip
  */
 export const keys = {
   original: (orgId: string, documentId: string) =>
@@ -24,6 +28,11 @@ export const keys = {
   signed: (orgId: string, envelopeId: string) => `org/${orgId}/envelopes/${envelopeId}/signed.pdf`,
   certificate: (orgId: string, envelopeId: string) =>
     `org/${orgId}/envelopes/${envelopeId}/certificate.pdf`,
+  export: (orgId: string, exportId: string) => `org/${orgId}/exports/${exportId}.zip`,
+  /** Everything a workspace stores (deleted with the workspace). */
+  orgPrefix: (orgId: string) => `org/${orgId}/`,
+  /** Everything stored for one envelope (signed PDF, certificate, signature images). */
+  envelopePrefix: (orgId: string, envelopeId: string) => `org/${orgId}/envelopes/${envelopeId}/`,
 }
 
 let client: S3Client | undefined
@@ -58,9 +67,13 @@ export async function presignUpload(
   )
 }
 
+/**
+ * Short-lived GET URL. `inline` for the PDF viewers; `attachment` for "Download" buttons (the
+ * browser saves the file instead of opening it). File names may be any language (RFC 6266).
+ */
 export async function presignDownload(
   key: string,
-  opts: { fileName?: string; expiresIn?: number } = {},
+  opts: { fileName?: string; expiresIn?: number; disposition?: "inline" | "attachment" } = {},
 ) {
   return getSignedUrl(
     s3(),
@@ -68,7 +81,7 @@ export async function presignDownload(
       Bucket: bucket(),
       Key: key,
       ResponseContentDisposition: opts.fileName
-        ? `inline; filename="${opts.fileName.replace(/["\\\r\n]/g, "_")}"`
+        ? contentDisposition(opts.fileName, opts.disposition ?? "inline")
         : undefined,
     }),
     { expiresIn: opts.expiresIn ?? 300 },
@@ -87,6 +100,24 @@ export async function putObject(key: string, body: Uint8Array, contentType: stri
   )
 }
 
+/** Uploads a stream of known length (large files, e.g. export archives) without buffering it. */
+export async function putObjectStream(
+  key: string,
+  body: NodeJS.ReadableStream,
+  contentLength: number,
+  contentType: string,
+) {
+  await s3().send(
+    new PutObjectCommand({
+      Bucket: bucket(),
+      Key: key,
+      Body: body as never,
+      ContentLength: contentLength,
+      ContentType: contentType,
+    }),
+  )
+}
+
 export async function headObject(key: string) {
   try {
     const res = await s3().send(new HeadObjectCommand({ Bucket: bucket(), Key: key }))
@@ -98,4 +129,29 @@ export async function headObject(key: string) {
 
 export async function deleteObject(key: string) {
   await s3().send(new DeleteObjectCommand({ Bucket: bucket(), Key: key }))
+}
+
+/**
+ * Deletes every object under `prefix` (1000 per request). Returns how many were deleted.
+ * Refuses prefixes that aren't a workspace folder, so a bug can't empty the bucket.
+ */
+export async function deletePrefix(prefix: string): Promise<number> {
+  if (!/^org\/[^/]+\/(.+\/)?$/.test(prefix))
+    throw new Error(`Refusing to delete prefix "${prefix}"`)
+  let deleted = 0
+  let token: string | undefined
+  do {
+    const page = await s3().send(
+      new ListObjectsV2Command({ Bucket: bucket(), Prefix: prefix, ContinuationToken: token }),
+    )
+    const objects = (page.Contents ?? []).flatMap((o) => (o.Key ? [{ Key: o.Key }] : []))
+    if (objects.length > 0) {
+      await s3().send(
+        new DeleteObjectsCommand({ Bucket: bucket(), Delete: { Objects: objects, Quiet: true } }),
+      )
+      deleted += objects.length
+    }
+    token = page.IsTruncated ? page.NextContinuationToken : undefined
+  } while (token)
+  return deleted
 }

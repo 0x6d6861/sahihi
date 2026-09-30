@@ -1,5 +1,6 @@
-import { PDFDocument, type PDFFont, type PDFPage, rgb, StandardFonts } from "pdf-lib"
+import { PDFDocument, type PDFFont, type PDFPage, rgb } from "pdf-lib"
 import QRCode from "qrcode"
+import { embedUnicodeFonts } from "./fonts"
 import { sanitizeForFont, wrapText } from "./text"
 
 /**
@@ -146,8 +147,8 @@ export async function renderCertificate(input: CertificateInput): Promise<Uint8A
   doc.setProducer("Sahihi")
   doc.setCreationDate(input.envelope.completedAt)
 
-  const regular = await doc.embedFont(StandardFonts.Helvetica)
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold)
+  // Signer names, titles and org names are user input in any language.
+  const { regular, bold } = await embedUnicodeFonts(doc)
   const w = new Writer(
     doc,
     regular,
