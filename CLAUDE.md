@@ -7,7 +7,7 @@
 - Slash commands live in `.claude/commands/`:
   - `/next-task`: pick up the next unchecked roadmap item and implement it end to end
   - `/check`: run the full verification suite and fix what fails
-  - `/add-ui <name>`: install a coss or Extend component the approved way
+  - `/add-ui <name>`: install a coss, Extend or (fallback) shadcn component the approved way
   - `/new-endpoint <description>`: add an API route following the house patterns
   - `/add-job <description>`: add a BullMQ job (producer + worker + tests)
   - `/adr <title>`: record an architecture decision

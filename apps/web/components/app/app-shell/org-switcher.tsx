@@ -1,21 +1,27 @@
 "use client"
 
-import { Building2Icon, ChevronsUpDownIcon, PlusIcon } from "lucide-react"
+import { Building03Icon, PlusSignIcon, UnfoldMoreIcon } from "@hugeicons/core-free-icons"
+import { HugeiconsIcon } from "@hugeicons/react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import {
-  Menu,
-  MenuGroup,
-  MenuGroupLabel,
-  MenuLinkItem,
-  MenuPopup,
-  MenuRadioGroup,
-  MenuRadioItem,
-  MenuSeparator,
-  MenuTrigger,
-} from "@/components/ui/menu"
-import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar"
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  useSidebar,
+} from "@/components/ui/sidebar"
 import { toastManager } from "@/components/ui/toast"
 import { organization } from "@/lib/auth-client"
 
@@ -36,6 +42,7 @@ export function OrgSwitcher({
   activeOrganizationId: string
 }) {
   const router = useRouter()
+  const { isMobile } = useSidebar()
   const [pending, setPending] = useState(false)
   const active = organizations.find((o) => o.id === activeOrganizationId)
 
@@ -59,39 +66,45 @@ export function OrgSwitcher({
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <Menu>
-          <MenuTrigger
+        <DropdownMenu>
+          <DropdownMenuTrigger
             disabled={pending}
             render={<SidebarMenuButton size="lg" tooltip={active?.name ?? "Workspace"} />}
           >
-            <Building2Icon aria-hidden />
+            <div className="flex aspect-square size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+              <HugeiconsIcon icon={Building03Icon} className="size-4" aria-hidden />
+            </div>
             <div className="flex flex-col gap-0.5 leading-none">
               <span className="text-muted-foreground text-xs">Workspace</span>
               <span className="truncate font-medium">{active?.name ?? "Select a workspace"}</span>
             </div>
-            <ChevronsUpDownIcon className="ml-auto" aria-hidden />
-          </MenuTrigger>
-          <MenuPopup align="start" className="min-w-56">
-            <MenuGroup>
-              <MenuGroupLabel>Workspaces</MenuGroupLabel>
-              <MenuRadioGroup
+            <HugeiconsIcon icon={UnfoldMoreIcon} className="ml-auto" aria-hidden />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="start"
+            side={isMobile ? "bottom" : "right"}
+            className="min-w-56"
+          >
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
+              <DropdownMenuRadioGroup
                 value={activeOrganizationId}
                 onValueChange={(value) => switchTo(String(value))}
               >
                 {organizations.map((o) => (
-                  <MenuRadioItem key={o.id} value={o.id}>
+                  <DropdownMenuRadioItem key={o.id} value={o.id}>
                     {o.name}
-                  </MenuRadioItem>
+                  </DropdownMenuRadioItem>
                 ))}
-              </MenuRadioGroup>
-            </MenuGroup>
-            <MenuSeparator />
-            <MenuLinkItem render={<Link href="/onboarding" />}>
-              <PlusIcon aria-hidden />
+              </DropdownMenuRadioGroup>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem render={<Link href="/onboarding" />}>
+              <HugeiconsIcon icon={PlusSignIcon} aria-hidden />
               New workspace
-            </MenuLinkItem>
-          </MenuPopup>
-        </Menu>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </SidebarMenuItem>
     </SidebarMenu>
   )

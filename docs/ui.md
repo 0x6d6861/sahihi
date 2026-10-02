@@ -1,7 +1,7 @@
 # UI rules
 
-**Strict rule: only default components from coss ui and Extend UI.** No custom primitives and no
-other UI libraries. We compose; we don't restyle.
+**Strict rule: only default components from coss ui and Extend UI, with shadcn/ui as the fallback.**
+No custom primitives and no other UI libraries. We compose; we don't restyle.
 
 ## Sources
 
@@ -9,6 +9,10 @@ other UI libraries. We compose; we don't restyle.
 |---|---|---|---|
 | **coss ui** (`@coss/*`) | All general UI: buttons, forms, dialogs, tables, toasts, OTP… Built on **Base UI** | shadcn registry via `@coss/style` | https://coss.com/ui/docs |
 | **Extend UI** (`@extend/*`) | Document UI: PDF viewer, e-signature fields, file upload, thumbnails, viewer sidebar | `https://www.extend.ai/ui/r/styles/{style}/{name}.json` | https://ui.extend.ai/ui/docs |
+| **shadcn/ui** (no prefix) | **Fallback** when coss and Extend don't have the component. `base-nova` style = Base UI variant | `https://ui.shadcn.com/r/styles/{style}/{name}.json` | https://ui.shadcn.com/docs |
+
+Order of preference: coss → Extend (document UI) → shadcn. Some shadcn items are already vendored
+because Extend depends on them (e.g. `dropdown-menu`); use them where they fit, as the app shell does.
 
 Install everything with `bun run ui:bootstrap` (see `scripts/bootstrap-ui.sh`). Add more later with
 `/add-ui <name>` or:
@@ -17,11 +21,13 @@ Install everything with `bun run ui:bootstrap` (see `scripts/bootstrap-ui.sh`). 
 cd apps/web
 bunx shadcn@latest add @coss/<component>
 bunx shadcn@latest add @extend/<component>
+bunx shadcn@latest add <component>        # shadcn fallback
 ```
 
 `components.json` must use a **Base UI style** (we use `base-nova`) so Extend installs the Base UI
 variants that match coss. When the CLI asks about overwriting existing primitives, **keep yours**
-(answer no). Where the registries overlap, coss wins. `apps/web` turns off `noUncheckedIndexedAccess`
+(answer no), and never let a shadcn install replace a coss or Extend file. Where the registries
+overlap, coss wins. `apps/web` turns off `noUncheckedIndexedAccess`
 for vendored Extend code, and there's one local patch in `pdf-editor-properties.tsx`. See ADR 0007
 for the reinstall checklist.
 
@@ -29,14 +35,17 @@ for the reinstall checklist.
 
 1. **Don't edit `components/ui/**`** or Extend's installed files. They're vendored. Compose in
    `components/app/**` or next to the page.
-2. **Don't create primitives.** If coss has it, use it. If neither library has it, compose it from
-   coss parts and note it in the PR (and ADR if it's substantial).
+2. **Don't create primitives.** If coss has it, use it. If neither coss nor Extend has it, install
+   it from shadcn. If none of the three has it, compose it from existing parts and note it in the PR
+   (and ADR if it's substantial).
 3. **Tokens only:** `bg-background`, `bg-muted`, `text-muted-foreground`, `border`, `text-destructive`,
    plus coss's extra tokens `info`, `success`, `warning` (each with `-foreground`). No hex or rgb and no
    `bg-[#…]`. Spacing and layout utilities are fine.
 4. **Base UI idioms:** polymorphism with `render={<Link href="…" />}`, not `asChild`. Check the
    installed file for sub-component names (e.g. `CardPanel`, `DialogPopup`, `MenuPopup`).
-5. **Icons:** whatever `iconLibrary` `components.json` sets (the coss default). Don't mix icon sets.
+5. **Icons:** vendored `components/ui/**` keeps the `iconLibrary` from `components.json` (lucide).
+   The app shell (`components/app/app-shell/`) uses **HugeIcons**: `<HugeiconsIcon icon={…} />` from
+   `@hugeicons/react` with glyphs from `@hugeicons/core-free-icons`. Don't add a third icon set.
 6. **Toasts:** `ToastProvider` (+ `AnchoredToastProvider`) wraps the app in `app/layout.tsx`. Trigger
    with `toastManager.add({ title, description, type })` from `@/components/ui/toast`. A single
    `TooltipProvider` sits inside them, so don't add another one per page.
@@ -49,7 +58,7 @@ for the reinstall checklist.
 
 | Screen | Components |
 |---|---|
-| App shell | coss `Sidebar` (or Sheet on mobile), `Menu` (user/org switcher), `Avatar`, `Breadcrumb`, `Separator` |
+| App shell | coss `Sidebar` (`variant="inset"`, `collapsible="icon"`, Sheet on mobile), `DropdownMenu` (shadcn, Base UI: org switcher; user menu with Settings and sign out), `Avatar`, `Breadcrumb`, `Separator`; HugeIcons |
 | Auth pages | `Card`, `Form`, `Field`, `Input`, `Button`, `Alert` |
 | Onboarding (create org) | `Card`, `Form`, `Field`, `Input` |
 | Documents list | `Table`, `Badge`, `Pagination`, `Empty`, `Skeleton`, Extend `FileThumbnail` |

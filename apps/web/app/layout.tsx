@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import "./globals.css"
+import "./app.css"
 import { Geist_Mono, Inter } from "next/font/google"
 import { connection } from "next/server"
 import { AnchoredToastProvider, ToastProvider } from "@/components/ui/toast"

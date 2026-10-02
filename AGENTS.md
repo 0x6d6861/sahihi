@@ -24,7 +24,7 @@ Read this file first, then the doc for the area you're touching (see **Doc map**
 | API | **Hono** on Bun — `apps/api` |
 | Jobs | **BullMQ** + Redis — `apps/worker` |
 | Web | **Next.js 16** App Router, React 19, Tailwind v4 — `apps/web` |
-| UI | **coss ui** (Base UI + shadcn registry) and **Extend UI** document components. **Defaults only** — see UI rules |
+| UI | **coss ui** (Base UI + shadcn registry), **Extend UI** document components, **shadcn/ui** (`base-nova`, Base UI) as fallback. **Defaults only** — see UI rules |
 | Auth | **better-auth** + Organization plugin (senders only) |
 | DB | PostgreSQL + **Prisma 7** (`prisma-client` generator, `@prisma/adapter-pg`) |
 | PDF | **pdf-lib** (server-side stamping, certificate rendering) |
@@ -89,14 +89,16 @@ the relevant doc in `docs/` is updated if behaviour changed, and the matching ch
 ## Golden rules (non-negotiable)
 
 ### UI — defaults only
-1. Use **only** components installed from the coss registry (`@coss/*`) and the Extend registry
-   (`@extend/*`) via `bun run ui:bootstrap` / `bunx shadcn@latest add …`. **Do not hand-write
-   primitives** (no custom Button/Dialog/Input), and don't install another UI kit (no Radix, MUI, Mantine,
-   Headless UI, react-pdf, etc.).
+1. Use **only** registry components, in this order: coss (`@coss/*`) for general UI, Extend
+   (`@extend/*`) for document/PDF UI, and **shadcn/ui as the fallback** when neither has the
+   component (`bunx shadcn@latest add <name>`, no prefix; `components.json` style `base-nova` makes
+   it the Base UI variant). Never let a shadcn install overwrite a coss/Extend file. **Do not
+   hand-write primitives** (no custom Button/Dialog/Input), and don't install another UI kit (no
+   Radix, MUI, Mantine, Headless UI, react-pdf, etc.).
 2. **Never edit files under `apps/web/components/ui/`** (or wherever the Extend CLI put its files).
    They're vendored registry output. Put composition in `apps/web/components/app/` and page folders.
    If a vendored component really must change, write an ADR in `docs/decisions/` first.
-3. coss is **Base UI**, not Radix. Use `render={<Link …/>}` for polymorphism, **not** `asChild`.
+3. coss and our shadcn style are **Base UI**, not Radix. Use `render={<Link …/>}` for polymorphism, **not** `asChild`.
    Card body is `CardPanel`. Check the real props in `components/ui/<name>.tsx` before using them.
 4. Style with Tailwind **theme tokens only** (`bg-background`, `text-muted-foreground`, `border-info`, …).
    No hex colours and no arbitrary colour values. Full rules are in `docs/ui.md`.
@@ -180,7 +182,8 @@ the relevant doc in `docs/` is updated if behaviour changed, and the matching ch
 - **Same-origin API:** the browser calls `/api/*` on the web origin and Next rewrites the request to
   the Hono API. That's why `BETTER_AUTH_URL` points at the **web** origin. Server Components use
   `lib/api-server.ts`, which forwards cookies.
-- **coss ≠ shadcn/Radix:** prop names differ (`render`, `CardPanel`, `Form` with `errors`, `toastManager`).
+- **coss ≠ shadcn ≠ Radix:** prop names differ between coss and shadcn's Base UI components
+  (`MenuPopup` vs `DropdownMenuContent`) and from Radix-era docs (`render`, `CardPanel`, `Form` with `errors`, `toastManager`).
   Open the installed source before guessing.
 - **Extend blocks are demos:** `ESignatureBlock` only takes `file` and builds the PDF in the browser.
   Build the field editor on `PDFEditor` in view-only mode (`renderPageOverlay`) + `lib/field-geometry.ts`,

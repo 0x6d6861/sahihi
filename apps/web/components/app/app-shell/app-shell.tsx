@@ -1,8 +1,10 @@
 "use client"
 
-import { FileTextIcon, LayoutTemplateIcon, SendIcon, SettingsIcon } from "lucide-react"
+import { File02Icon, LicenseDraftIcon, SentIcon, SidebarLeftIcon } from "@hugeicons/core-free-icons"
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import {
   Sidebar,
@@ -17,20 +19,22 @@ import {
   SidebarMenuItem,
   SidebarProvider,
   SidebarRail,
-  SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import { APP_NAV, type AppNavHref, isNavActive } from "@/lib/nav"
 import { OrgSwitcher, type ShellOrganization } from "./org-switcher"
 import { type ShellUser, UserMenu } from "./user-menu"
 
-const NAV_ICONS: Record<AppNavHref, React.ComponentType<{ "aria-hidden"?: boolean }>> = {
-  "/documents": FileTextIcon,
-  "/envelopes": SendIcon,
-  "/templates": LayoutTemplateIcon,
-  "/settings/members": SettingsIcon,
+const NAV_ICONS: Record<AppNavHref, IconSvgElement> = {
+  "/documents": File02Icon,
+  "/envelopes": SentIcon,
+  "/templates": LicenseDraftIcon,
 }
 
-/** Authenticated app shell: coss Sidebar (sheet on mobile) + inset content area. */
+/**
+ * Authenticated app shell: coss Sidebar in its inset variant (sheet on mobile, icon rail when
+ * collapsed) with the page content on a raised panel beside it.
+ */
 export function AppShell({
   user,
   organizations,
@@ -46,7 +50,7 @@ export function AppShell({
 
   return (
     <SidebarProvider>
-      <Sidebar collapsible="icon">
+      <Sidebar variant="inset" collapsible="icon">
         <SidebarHeader>
           <OrgSwitcher organizations={organizations} activeOrganizationId={activeOrganizationId} />
         </SidebarHeader>
@@ -55,15 +59,14 @@ export function AppShell({
             <SidebarGroupContent>
               <SidebarMenu>
                 {APP_NAV.map((item) => {
-                  const Icon = NAV_ICONS[item.href]
                   return (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton
-                        isActive={isNavActive(pathname, item.match ?? item.href)}
+                        isActive={isNavActive(pathname, item.href)}
                         tooltip={item.label}
                         render={<Link href={item.href} />}
                       >
-                        <Icon aria-hidden />
+                        <HugeiconsIcon icon={NAV_ICONS[item.href]} aria-hidden />
                         <span>{item.label}</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -80,12 +83,28 @@ export function AppShell({
       </Sidebar>
       <SidebarInset>
         <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger aria-label="Toggle sidebar" />
+          <ShellSidebarTrigger />
           <Separator orientation="vertical" className="h-4" />
           <span className="font-semibold">Sahihi</span>
         </header>
         <main className="mx-auto w-full max-w-6xl flex-1 p-4 md:p-8">{children}</main>
       </SidebarInset>
     </SidebarProvider>
+  )
+}
+
+/** Same behaviour as coss `SidebarTrigger`, with the HugeIcons glyph the shell uses. */
+function ShellSidebarTrigger() {
+  const { toggleSidebar } = useSidebar()
+  return (
+    <Button
+      className="-ms-1"
+      size="icon-sm"
+      variant="ghost"
+      aria-label="Toggle sidebar"
+      onClick={toggleSidebar}
+    >
+      <HugeiconsIcon icon={SidebarLeftIcon} aria-hidden />
+    </Button>
   )
 }

@@ -2,14 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation"
 import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs"
-
-const TABS = [
-  { href: "/settings/members", label: "Members" },
-  { href: "/settings/webhooks", label: "Webhooks" },
-  { href: "/settings/billing", label: "Plan & usage" },
-  { href: "/settings/data", label: "Data" },
-  { href: "/settings/api", label: "API" },
-] as const
+import { SETTINGS_NAV as TABS } from "@/lib/nav"
 
 /** Settings sub-navigation. Each tab is its own page, so choosing one navigates. */
 export function SettingsTabs() {

@@ -1,12 +1,25 @@
 "use client"
 
-import { ChevronsUpDownIcon, LogOutIcon } from "lucide-react"
+import { Logout01Icon, Settings02Icon, UnfoldMoreIcon } from "@hugeicons/core-free-icons"
+import { HugeiconsIcon } from "@hugeicons/react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@/components/ui/menu"
-import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  useSidebar,
+} from "@/components/ui/sidebar"
 import { signOut } from "@/lib/auth-client"
-import { initials } from "@/lib/nav"
+import { initials, SETTINGS_NAV } from "@/lib/nav"
 
 export interface ShellUser {
   name: string
@@ -14,8 +27,10 @@ export interface ShellUser {
   image?: string | null
 }
 
+/** Account menu in the sidebar footer: workspace settings and sign out. */
 export function UserMenu({ user }: { user: ShellUser }) {
   const router = useRouter()
+  const { isMobile } = useSidebar()
 
   async function onSignOut() {
     await signOut()
@@ -26,8 +41,8 @@ export function UserMenu({ user }: { user: ShellUser }) {
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <Menu>
-          <MenuTrigger render={<SidebarMenuButton size="lg" tooltip={user.email} />}>
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<SidebarMenuButton size="lg" tooltip={user.email} />}>
             <Avatar className="size-8">
               {user.image && <AvatarImage src={user.image} alt="" />}
               <AvatarFallback>{initials(user.name, user.email)}</AvatarFallback>
@@ -36,15 +51,20 @@ export function UserMenu({ user }: { user: ShellUser }) {
               <span className="truncate font-medium">{user.name || user.email}</span>
               <span className="truncate text-muted-foreground text-xs">{user.email}</span>
             </div>
-            <ChevronsUpDownIcon className="ml-auto" aria-hidden />
-          </MenuTrigger>
-          <MenuPopup align="start" side="top" className="min-w-56">
-            <MenuItem onClick={onSignOut}>
-              <LogOutIcon aria-hidden />
+            <HugeiconsIcon icon={UnfoldMoreIcon} className="ml-auto" aria-hidden />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" side={isMobile ? "top" : "right"} className="min-w-56">
+            <DropdownMenuItem render={<Link href={SETTINGS_NAV[0].href} />}>
+              <HugeiconsIcon icon={Settings02Icon} aria-hidden />
+              Settings
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onSignOut}>
+              <HugeiconsIcon icon={Logout01Icon} aria-hidden />
               Sign out
-            </MenuItem>
-          </MenuPopup>
-        </Menu>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </SidebarMenuItem>
     </SidebarMenu>
   )

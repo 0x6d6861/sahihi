@@ -1,15 +1,23 @@
 /**
  * Primary navigation of the authenticated app shell. Icons are attached in the component.
- * `match` is the path prefix that marks the item active (defaults to `href`).
+ * Settings is a single entry in the user menu, not here.
  */
-export const APP_NAV: readonly { href: AppNavHref; label: string; match?: string }[] = [
+export const APP_NAV: readonly { href: AppNavHref; label: string }[] = [
   { href: "/documents", label: "Documents" },
   { href: "/envelopes", label: "Envelopes" },
   { href: "/templates", label: "Templates" },
-  { href: "/settings/members", label: "Settings", match: "/settings" },
 ]
 
-export type AppNavHref = "/documents" | "/envelopes" | "/templates" | "/settings/members"
+export type AppNavHref = "/documents" | "/envelopes" | "/templates"
+
+/** Settings pages: the tab bar on every settings page. The user menu links to the first one. */
+export const SETTINGS_NAV = [
+  { href: "/settings/members", label: "Members" },
+  { href: "/settings/webhooks", label: "Webhooks" },
+  { href: "/settings/billing", label: "Plan & usage" },
+  { href: "/settings/data", label: "Data" },
+  { href: "/settings/api", label: "API" },
+] as const
 
 /** True when `pathname` is `href` itself or a page below it (`/envelopes/abc` → `/envelopes`). */
 export function isNavActive(pathname: string, href: string): boolean {
