@@ -34,5 +34,13 @@ left.
 - `useSendCheck`, `stepProgress`, the step titles and `components/app/envelope-editor/step-rail.tsx`
   are gone; `isFullBleed` is now `isFullPage`.
 - The draft editor no longer uses coss `Sidebar`; the app has no coss `SidebarProvider` left.
-- The menu is labelled "Actions", not "More": the PDF editor's toolbar already has a "More actions"
-  button on the same screen.
+- The menu was labelled "Actions", not "More": the PDF editor's toolbar already has a "More actions"
+  button on the same screen. (Since replaced by a split button, see the amendment.)
+
+## Amendment (2026-10-07): a split button instead of the Actions menu
+The right side of the bar is an Arc `split-button` (installed with `/add-ui`, not edited) instead of
+the "Actions" `DropdownMenu`. **Save as template** is its main half, the action people reach for
+most from a draft. Download original, Open document and Activity sit behind its chevron. On a
+draft with no recipients the main half still opens the dialog, which explains that a template needs
+one and offers **Add recipients** (to that step), rather than a disabled button with no reason.
+The split button doesn't shrink, so below `sm` the buttons take their own row under the title.

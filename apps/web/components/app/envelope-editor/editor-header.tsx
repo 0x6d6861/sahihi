@@ -26,7 +26,7 @@ import { PillNav } from "@/components/app/pill-nav"
 import { SaveTemplateDialog } from "@/components/app/templates/save-template-dialog"
 import { Badge } from "@/components/arc/badge/badge"
 import { Drawer, DrawerContent } from "@/components/arc/drawer/drawer"
-import { type DropdownItem, DropdownMenu } from "@/components/arc/dropdown-menu/dropdown-menu"
+import { SplitButton, type SplitButtonAction } from "@/components/arc/split-button/split-button"
 import { Tooltip } from "@/components/arc/tooltip/tooltip"
 import { Button } from "@/components/ui/button"
 import { ENVELOPE_STATUS_BADGE } from "@/lib/constants"
@@ -50,8 +50,8 @@ const STEP_ICONS: Record<EditorStep, IconSvgElement> = {
 /**
  * The draft editor's own top bar (ADR 0031; the app shell hides its bar on this page): the way
  * back, title and status on the left; the steps as the app's pill in the middle (its own row below
- * `md`); an Arc "Actions" menu (save as template, the original PDF, the document, activity) and Send
- * on the right.
+ * `md`, the buttons get their own row below `sm`); an Arc split button (Save as template, with the original PDF, the document and activity
+ * behind its chevron) and Send on the right.
  */
 export function EditorHeader({
   envelope: e,
@@ -74,14 +74,8 @@ export function EditorHeader({
   const [activityOpen, setActivityOpen] = useState(false)
   const recipientNames = Object.fromEntries(e.recipients.map((r) => [r.id, r.name]))
 
-  const actions: DropdownItem[] = []
-  if (e.recipients.length > 0) {
-    actions.push({
-      label: "Save as template",
-      icon: <LayoutTemplateIcon />,
-      onSelect: () => setTemplateOpen(true),
-    })
-  }
+  // The split button's menu: the other envelope actions (Save as template is its main half).
+  const actions: SplitButtonAction[] = []
   if (fileUrl) {
     actions.push({
       label: "Download original",
@@ -99,14 +93,13 @@ export function EditorHeader({
       label: "Activity",
       icon: <ActivityIcon />,
       onSelect: () => setActivityOpen(true),
-      separatorBefore: true,
     })
   }
 
   return (
     <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b bg-background px-4 py-2.5 md:grid md:grid-cols-[1fr_auto_1fr] md:px-6">
-      {/* Grows below md, so the title (not the actions) gives way on a phone's first row. */}
-      <div className="flex min-w-0 flex-1 items-center gap-2">
+      {/* Phones: title row, then the buttons (the split button doesn't shrink), then the steps. */}
+      <div className="flex min-w-0 items-center gap-2 max-sm:w-full sm:flex-1">
         <Tooltip content="Back to envelopes" side="bottom">
           <Button
             variant="ghost"
@@ -142,20 +135,28 @@ export function EditorHeader({
         }))}
       />
 
-      <div className="ml-auto flex shrink-0 items-center gap-2 md:ml-0 md:justify-self-end">
-        <DropdownMenu label="Actions" items={actions} />
+      <div className="ml-auto flex shrink-0 items-center gap-2 max-sm:w-full max-sm:justify-end md:ml-0 md:justify-self-end">
+        <SplitButton
+          variant="secondary"
+          label="Save as template"
+          icon={<LayoutTemplateIcon />}
+          onClick={() => setTemplateOpen(true)}
+          actions={actions}
+        />
         <SendButton />
       </div>
 
-      {e.recipients.length > 0 && (
-        <SaveTemplateDialog
-          envelopeId={e.id}
-          envelopeTitle={e.title}
-          recipients={e.recipients}
-          open={templateOpen}
-          onOpenChange={setTemplateOpen}
-        />
-      )}
+      <SaveTemplateDialog
+        envelopeId={e.id}
+        envelopeTitle={e.title}
+        recipients={e.recipients}
+        open={templateOpen}
+        onOpenChange={setTemplateOpen}
+        onAddRecipients={() => {
+          setTemplateOpen(false)
+          onStepChange("recipients")
+        }}
+      />
       {audit && (
         <Drawer open={activityOpen} onOpenChange={setActivityOpen}>
           <DrawerContent

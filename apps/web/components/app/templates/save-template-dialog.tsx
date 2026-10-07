@@ -31,6 +31,7 @@ export function SaveTemplateDialog({
   recipients,
   open: openProp,
   onOpenChange: onOpenChangeProp,
+  onAddRecipients,
 }: {
   envelopeId: string
   envelopeTitle: string
@@ -41,6 +42,8 @@ export function SaveTemplateDialog({
    */
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  /** Without recipients there's nothing to save yet: this offers the way to add them. */
+  onAddRecipients?: () => void
 }) {
   const draft = useDraftState()
   const initialLabels = defaultRoleLabels(recipients)
@@ -146,6 +149,23 @@ export function SaveTemplateDialog({
               <ButtonLink variant="primary" href={`/templates/${savedId}/use`}>
                 Use it now
               </ButtonLink>
+            </DialogActions>
+          </div>
+        ) : recipients.length === 0 ? (
+          <div className="flex flex-col gap-4">
+            <Alert tone="info" title="Add a recipient first">
+              A template keeps each recipient's role and fields, so this draft needs at least one
+              recipient before it can be saved as a template.
+            </Alert>
+            <DialogActions>
+              <Button variant="ghost" onClick={() => setOpen(false)}>
+                Close
+              </Button>
+              {onAddRecipients && (
+                <Button variant="primary" onClick={onAddRecipients}>
+                  Add recipients
+                </Button>
+              )}
             </DialogActions>
           </div>
         ) : (
