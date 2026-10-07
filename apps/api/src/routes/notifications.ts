@@ -2,6 +2,7 @@ import {
   isNotificationEnabled,
   ListNotificationsQuerySchema,
   MarkNotificationsReadSchema,
+  NotificationIdsSchema,
   type NotificationSettings,
   notificationTypesFor,
   parseNotificationSettings,
@@ -91,6 +92,32 @@ export const notifications = new Hono<AppEnv>()
       data: { readAt: new Date() },
     })
     return c.json({ updated: count })
+  })
+
+  /** Back to unread (the bell's "Mark unread"). Ids that aren't yours are ignored. */
+  .post("/unread", async (c) => {
+    const { ids } = await parseJson(c, NotificationIdsSchema)
+    const { count } = await prisma.notification.updateMany({
+      where: forOrganization(c.get("organizationId")).notification({
+        userId: c.get("user").id,
+        id: { in: ids },
+        readAt: { not: null },
+      }),
+      data: { readAt: null },
+    })
+    return c.json({ updated: count })
+  })
+
+  /** Deletes your notifications (the bell's "Dismiss" and "Clear read"). Others' ids are ignored. */
+  .post("/dismiss", async (c) => {
+    const { ids } = await parseJson(c, NotificationIdsSchema)
+    const { count } = await prisma.notification.deleteMany({
+      where: forOrganization(c.get("organizationId")).notification({
+        userId: c.get("user").id,
+        id: { in: ids },
+      }),
+    })
+    return c.json({ deleted: count })
   })
 
   /** The types this member can receive (members don't get workspace ones) and whether each is on. */

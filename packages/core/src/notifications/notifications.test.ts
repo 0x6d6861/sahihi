@@ -7,6 +7,7 @@ import {
   NOTIFICATION_CATALOG,
   NOTIFICATION_REASON_MAX,
   NOTIFICATION_TYPES,
+  NotificationIdsSchema,
   notificationTypesFor,
   parseNotificationSettings,
   quotaNotificationFor,
@@ -73,6 +74,18 @@ describe("preferences", () => {
   })
 })
 
+describe("tones", () => {
+  test("done is success, needs attention is warning", () => {
+    const tone = (type: string, data: object = {}) => describeNotification({ type, data }).tone
+    expect(tone("envelope.completed")).toBe("success")
+    expect(tone("export.ready")).toBe("success")
+    expect(tone("bulk_send.finished", { sent: 3 })).toBe("success")
+    expect(tone("envelope.declined")).toBe("warning")
+    expect(tone("billing.quota_reached")).toBe("warning")
+    expect(tone("recipient.signed")).toBe("info")
+  })
+})
+
 describe("requests", () => {
   test("list query", () => {
     expect(ListNotificationsQuerySchema.parse({})).toEqual({ limit: 20, unread: false })
@@ -82,6 +95,10 @@ describe("requests", () => {
       cursor: "abc",
     })
     expect(ListNotificationsQuerySchema.safeParse({ limit: "500" }).success).toBe(false)
+  })
+  test("ids-only actions refuse all", () => {
+    expect(NotificationIdsSchema.safeParse({ ids: ["a"] }).success).toBe(true)
+    expect(NotificationIdsSchema.safeParse({ all: true }).success).toBe(false)
   })
   test("mark read takes ids or all", () => {
     expect(MarkNotificationsReadSchema.safeParse({ ids: ["a"] }).success).toBe(true)
@@ -128,6 +145,7 @@ describe("describeNotification", () => {
     expect(v).toEqual({
       title: "Amina signed “Lease”",
       body: "Waiting on the other recipients.",
+      tone: "info",
       href: "/envelopes/env1",
     })
     expect(
@@ -139,9 +157,9 @@ describe("describeNotification", () => {
     ).toBe("“NDA” is complete")
   })
   test("missing data falls back to generic words", () => {
-    expect(describeNotification({ type: "envelope.declined", data: null }).title).toBe(
-      "Someone declined an envelope",
-    )
+    const declined = describeNotification({ type: "envelope.declined", data: null })
+    expect(declined.title).toBe("Someone declined an envelope")
+    expect(declined.body).toBe("No reason given.")
     expect(describeNotification({ type: "envelope.expired", data: {} }).title).toBe(
       "An envelope expired",
     )
@@ -154,7 +172,8 @@ describe("describeNotification", () => {
   test("workspace events link to settings", () => {
     expect(describeNotification({ type: "member.joined", data: { memberName: "Kip" } })).toEqual({
       title: "Kip joined the workspace",
-      body: null,
+      body: "They accepted your invitation. Manage roles in Settings → Members.",
+      tone: "info",
       href: "/settings/members",
     })
     expect(
@@ -174,12 +193,15 @@ describe("describeNotification", () => {
     ).toEqual({
       title: "Bulk send “Offers” finished",
       body: "9 sent, 1 failed",
+      tone: "warning",
       href: "/bulk-sends/b1",
     })
   })
-  test("every type has a specific title", () => {
+  test("every type has a specific title and a body", () => {
     for (const type of NOTIFICATION_TYPES) {
-      expect(describeNotification({ type, data: {} }).title).not.toBe("Notification")
+      const v = describeNotification({ type, data: {} })
+      expect(v.title).not.toBe("Notification")
+      expect(v.body.length).toBeGreaterThan(0)
     }
     expect(describeNotification({ type: "from.the.future", data: {} }).title).toBe("Notification")
   })

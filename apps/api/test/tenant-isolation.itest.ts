@@ -261,6 +261,8 @@ const NOT_TENANT = [
   // only ever match the caller's rows (notifications.itest.ts).
   "GET /api/notifications/unread-count",
   "POST /api/notifications/read",
+  "POST /api/notifications/unread",
+  "POST /api/notifications/dismiss",
   "GET /api/notifications/preferences",
   "PUT /api/notifications/preferences",
   // A user's picture, for themselves and people sharing a workspace (account.itest.ts).

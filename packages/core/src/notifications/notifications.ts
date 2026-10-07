@@ -183,11 +183,17 @@ export const ListNotificationsQuerySchema = z.object({
     .transform((v) => v !== undefined),
 })
 
+const NotificationIds = z.array(z.string().min(1).max(64)).min(1).max(100)
+
 export const MarkNotificationsReadSchema = z.union([
-  z.object({ ids: z.array(z.string().min(1).max(64)).min(1).max(100) }),
+  z.object({ ids: NotificationIds }),
   z.object({ all: z.literal(true) }),
 ])
 export type MarkNotificationsReadInput = z.infer<typeof MarkNotificationsReadSchema>
+
+/** Mark unread, dismiss: always by id. */
+export const NotificationIdsSchema = z.object({ ids: NotificationIds })
+export type NotificationIdsInput = z.infer<typeof NotificationIdsSchema>
 
 // ── Quota thresholds ─────────────────────────────────────────────────────────
 
@@ -235,7 +241,10 @@ export interface NotificationData {
 
 export interface NotificationView {
   title: string
-  body: string | null
+  /** One sentence shown under the title; always present */
+  body: string
+  /** success: done, warning: needs attention, info: everything else */
+  tone: "info" | "success" | "warning"
   /** In-app path to open */
   href: string | null
 }
@@ -257,37 +266,43 @@ export function describeNotification(n: {
     case "recipient.viewed":
       return {
         title: `${someone(d.recipientName)} opened ${title}`,
-        body: null,
+        body: "They opened it for the first time and haven't signed yet.",
+        tone: "info",
         href: envelopeHref,
       }
     case "recipient.signed":
       return {
         title: `${someone(d.recipientName)} signed ${title}`,
         body: "Waiting on the other recipients.",
+        tone: "info",
         href: envelopeHref,
       }
     case "envelope.completed":
       return {
         title: `${capitalize(title)} is complete`,
         body: "Everyone has signed. The signed PDF and certificate are ready.",
+        tone: "success",
         href: envelopeHref,
       }
     case "envelope.declined":
       return {
         title: `${someone(d.recipientName)} declined ${title}`,
-        body: d.reason ? `“${d.reason}”` : null,
+        body: d.reason ? `“${d.reason}”` : "No reason given.",
+        tone: "warning",
         href: envelopeHref,
       }
     case "envelope.expired":
       return {
         title: `${capitalize(title)} expired`,
         body: "Not everyone signed before the deadline.",
+        tone: "warning",
         href: envelopeHref,
       }
     case "envelope.voided":
       return {
         title: `${someone(d.actorName)} voided ${title}`,
-        body: d.reason ? `“${d.reason}”` : null,
+        body: d.reason ? `“${d.reason}”` : "No reason given.",
+        tone: "warning",
         href: envelopeHref,
       }
     case "bulk_send.finished": {
@@ -296,6 +311,7 @@ export function describeNotification(n: {
       return {
         title: `Bulk send ${d.bulkSendTitle ? `“${d.bulkSendTitle}” ` : ""}finished`,
         body: parts.join(", "),
+        tone: d.failed ? "warning" : "success",
         href: d.bulkSendId ? `/bulk-sends/${d.bulkSendId}` : null,
       }
     }
@@ -306,18 +322,21 @@ export function describeNotification(n: {
           d.envelopeCount === undefined
             ? "Download it from Settings → Data."
             : `${d.envelopeCount} ${d.envelopeCount === 1 ? "envelope" : "envelopes"}. Download it from Settings → Data.`,
+        tone: "success",
         href: "/settings/data",
       }
     case "export.failed":
       return {
         title: "Your workspace export failed",
         body: "Try again from Settings → Data.",
+        tone: "warning",
         href: "/settings/data",
       }
     case "member.joined":
       return {
         title: `${someone(d.memberName)} joined the workspace`,
-        body: null,
+        body: "They accepted your invitation. Manage roles in Settings → Members.",
+        tone: "info",
         href: "/settings/members",
       }
     case "billing.quota_warning":
@@ -326,17 +345,19 @@ export function describeNotification(n: {
         body:
           d.used !== undefined && d.limit !== undefined
             ? `${d.used} of ${d.limit} envelopes sent this month${d.planName ? ` on the ${d.planName} plan` : ""}.`
-            : null,
+            : "Most of this month's envelopes are used. See Settings → Plan & usage.",
+        tone: "warning",
         href: "/settings/billing",
       }
     case "billing.quota_reached":
       return {
         title: "Envelope limit reached",
         body: `No more envelopes can be sent until next month${d.limit !== undefined ? ` (${d.limit} a month${d.planName ? ` on the ${d.planName} plan` : ""})` : ""}.`,
+        tone: "warning",
         href: "/settings/billing",
       }
     default:
-      return { title: "Notification", body: null, href: envelopeHref }
+      return { title: "Notification", body: "Something changed.", tone: "info", href: envelopeHref }
   }
 }
 

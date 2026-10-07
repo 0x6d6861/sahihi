@@ -292,6 +292,30 @@ describe("API", () => {
     expect((await list(alice)).unreadCount).toBe(0)
   })
 
+  test("mark unread and dismiss", async () => {
+    await seed(alice, 3)
+    const [a, b] = (await list(alice)).items
+    await request(alice, "/api/notifications/read", { method: "POST", json: { all: true } })
+    const unread = await request(alice, "/api/notifications/unread", {
+      method: "POST",
+      json: { ids: [a?.id] },
+    })
+    expect(await unread.json()).toEqual({ updated: 1 })
+    expect((await list(alice)).unreadCount).toBe(1)
+
+    const dismissed = await request(alice, "/api/notifications/dismiss", {
+      method: "POST",
+      json: { ids: [a?.id, b?.id] },
+    })
+    expect(await dismissed.json()).toEqual({ deleted: 2 })
+    expect((await list(alice)).items).toHaveLength(1)
+    const all = await request(alice, "/api/notifications/dismiss", {
+      method: "POST",
+      json: { all: true },
+    })
+    expect(all.status).toBe(400)
+  })
+
   test("other users and other workspaces can't see or mark yours", async () => {
     await seed(alice, 2)
     const colleague = await joinOrganization(alice, "colleague", "admin")
@@ -303,10 +327,18 @@ describe("API", () => {
       expect((await list(s)).items).toEqual([])
       const res = await request(s, "/api/notifications/read", { method: "POST", json: { ids } })
       expect(await res.json()).toEqual({ updated: 0 })
+      const unread = await request(s, "/api/notifications/unread", {
+        method: "POST",
+        json: { ids },
+      })
+      expect(await unread.json()).toEqual({ updated: 0 })
+      const gone = await request(s, "/api/notifications/dismiss", { method: "POST", json: { ids } })
+      expect(await gone.json()).toEqual({ deleted: 0 })
       const cursor = await request(s, `/api/notifications?cursor=${ids[0]}`)
       expect(cursor.status).toBe(400)
     }
     expect((await list(alice)).unreadCount).toBe(2)
+    expect((await list(alice)).items).toHaveLength(2)
   })
 
   test("a notification in another workspace of yours stays there", async () => {

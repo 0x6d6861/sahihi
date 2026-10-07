@@ -52,6 +52,8 @@ Every query is scoped to the signed-in user **and** the active workspace.
 | `GET /` | Newest first. `?limit` (1–50, default 20), `?cursor` (the last id of the previous page), `?unread=1`. Returns `{ items, nextCursor, unreadCount }` |
 | `GET /unread-count` | `{ count }`, for the badge |
 | `POST /read` | `{ ids: [...] }` or `{ all: true }`. Ids that aren't yours are ignored. Returns `{ updated }` |
+| `POST /unread` | `{ ids: [...] }`, back to unread. Returns `{ updated }` |
+| `POST /dismiss` | `{ ids: [...] }`, deletes them. Returns `{ deleted }` |
 | `GET /preferences` | `{ items: [{ type, enabled }] }`, only the types this member can receive |
 | `PUT /preferences` | `{ settings: { [type]: boolean } }`, merged into what's stored. Returns the same as GET |
 
@@ -63,14 +65,23 @@ switch per type, saved as soon as it changes. Members don't see workspace types 
 
 ## The bell (web)
 
-`components/app/notifications/notification-bell.tsx`, in the app shell next to the account menu
-and keyed by workspace, so switching workspaces starts it over.
+Arc's `notification-center` block (`components/arc/notification-center/`, vendored, not edited),
+wrapped by `components/app/notifications/notification-bell.tsx` in the app shell next to the
+account menu. It's keyed by workspace, so switching workspaces starts it over.
 
-- Polls `GET /unread-count` every 60 s (`NOTIFICATIONS_POLL_MS`) while the tab is visible, and on
-  focus. There's no websocket or SSE (ADR 0029).
-- Opening it loads the newest page into an Arc `Popover`. "Show older" follows `nextCursor`.
-- Choosing an item marks it read and opens its page (envelope, bulk send, Settings → Data /
-  Members / Plan & usage). "Mark all read" clears the badge.
+- It loads the newest 50 (`BELL_PAGE_SIZE`; the block has no paging) and reloads every 60 s
+  (`NOTIFICATIONS_POLL_MS`) while the tab is visible, and on focus. There's no websocket or SSE
+  (ADR 0029).
+- The block keeps its own copy of the list after mount. The bell remounts it with the new list when
+  the ids or read states changed (`notificationsSignature`), and waits while it's open.
+- Rows show the title, a one-line body, a time ("5m", "3h") and a tone icon (`toCenterItems`, text
+  and tone from `describeNotification`). Choosing a row expands it with **Mark read / Mark unread**
+  and **Dismiss**. The header has All / Unread and **Mark all read**, and the footer **Clear read**.
+- The block reports every change one item at a time. `createActionBatcher` sends one request per
+  action on the next tick (`/read`, `/unread`, `/dismiss`), and a failure shows a toast and
+  reloads the server's state on the next poll.
+- Rows don't link anywhere: the block has no link slot. The body says where to look ("Download it
+  from Settings → Data"), and the envelope is on the Envelopes page.
 
 ## Retention
 

@@ -1,12 +1,17 @@
-import { NOTIFICATION_CATALOG, type NotificationGroup, type NotificationType } from "@sahihi/core"
+import {
+  describeNotification,
+  NOTIFICATION_CATALOG,
+  type NotificationGroup,
+  type NotificationType,
+} from "@sahihi/core"
 import { formatDate } from "./format"
 
 /**
- * Helpers for the bell and Settings → Notifications (docs/notifications.md). Titles and links come
- * from `describeNotification` in @sahihi/core so the API and the web agree.
+ * Helpers for the bell (Arc's notification center) and Settings → Notifications
+ * (docs/notifications.md). Titles, text and tones come from `describeNotification` in @sahihi/core.
  */
 
-/** How often the bell asks for the unread count while the tab is visible. */
+/** How often the bell reloads its list while the tab is visible. */
 export const NOTIFICATIONS_POLL_MS = 60_000
 
 export interface NotificationItem {
@@ -29,41 +34,105 @@ export interface NotificationPreference {
   enabled: boolean
 }
 
-/** The badge text: nothing at zero, "99+" past 99. */
-export function unreadBadge(count: number): string | null {
-  if (count <= 0) return null
-  return count > 99 ? "99+" : String(count)
-}
+/** How many the bell loads. Arc's notification center keeps them all in memory (no paging). */
+export const BELL_PAGE_SIZE = 50
 
-/** Accessible name for the bell button. */
-export function bellLabel(count: number): string {
-  if (count <= 0) return "Notifications"
-  return `Notifications, ${count > 99 ? "more than 99" : count} unread`
+/** The item shape of Arc's `NotificationCenter` (components/arc/notification-center). */
+export interface CenterItem {
+  id: string
+  title: string
+  description: string
+  time: string
+  read: boolean
+  tone: "info" | "success" | "warning"
 }
 
 const MINUTE = 60_000
 const HOUR = 60 * MINUTE
 const DAY = 24 * HOUR
 
-/** "Just now", "5 min ago", "3 h ago", "Yesterday", "4 days ago", then the date. */
+/** Compact age for the bell's time column: "now", "5m", "3h", "2d", then the date. */
 export function timeAgo(value: string | Date, now: Date = new Date()): string {
   const then = value instanceof Date ? value : new Date(value)
   const ms = now.getTime() - then.getTime()
-  if (ms < MINUTE) return "Just now"
-  if (ms < HOUR) return `${Math.floor(ms / MINUTE)} min ago`
-  if (ms < DAY) return `${Math.floor(ms / HOUR)} h ago`
-  if (ms < 2 * DAY) return "Yesterday"
-  if (ms < 7 * DAY) return `${Math.floor(ms / DAY)} days ago`
+  if (ms < MINUTE) return "now"
+  if (ms < HOUR) return `${Math.floor(ms / MINUTE)}m`
+  if (ms < DAY) return `${Math.floor(ms / HOUR)}h`
+  if (ms < 7 * DAY) return `${Math.floor(ms / DAY)}d`
   return formatDate(then)
 }
 
-/** Merges a newer first page into what's loaded: new items on top, no duplicates. */
-export function mergeNewest(
-  loaded: readonly NotificationItem[],
-  fresh: readonly NotificationItem[],
-): NotificationItem[] {
-  const seen = new Set(fresh.map((n) => n.id))
-  return [...fresh, ...loaded.filter((n) => !seen.has(n.id))]
+/** Our notifications as Arc notification center items (text and tone from @sahihi/core). */
+export function toCenterItems(
+  items: readonly NotificationItem[],
+  now: Date = new Date(),
+): CenterItem[] {
+  return items.map((n) => {
+    const view = describeNotification(n)
+    return {
+      id: n.id,
+      title: view.title,
+      description: view.body,
+      time: timeAgo(n.createdAt, now),
+      read: n.readAt !== null,
+      tone: view.tone,
+    }
+  })
+}
+
+/**
+ * What the bell shows, as a comparable string: ids in order plus read state. The notification
+ * center only takes its list on mount, so the bell remounts it when this changes.
+ */
+export function notificationsSignature(items: readonly NotificationItem[]): string {
+  return items.map((n) => `${n.id}:${n.readAt ? 1 : 0}`).join(",")
+}
+
+export type NotificationAction = "read" | "unread" | "dismiss"
+
+/**
+ * Collects the notification center's per-item callbacks ("Mark all read" calls back once per
+ * item) and sends one request per action on the next tick, in chunks of 100 (the API's limit).
+ * A later read/unread for the same id replaces the earlier one.
+ */
+export function createActionBatcher(
+  send: (action: NotificationAction, ids: string[]) => Promise<unknown>,
+  onError: (err: unknown) => void,
+  schedule: (flush: () => void) => void = (flush) => {
+    setTimeout(flush, 0)
+  },
+) {
+  const queues: Record<NotificationAction, Set<string>> = {
+    read: new Set(),
+    unread: new Set(),
+    dismiss: new Set(),
+  }
+  let scheduled = false
+
+  async function flush() {
+    scheduled = false
+    for (const action of ["read", "unread", "dismiss"] as const) {
+      const ids = [...queues[action]]
+      queues[action].clear()
+      for (let i = 0; i < ids.length; i += 100) {
+        try {
+          await send(action, ids.slice(i, i + 100))
+        } catch (err) {
+          onError(err)
+        }
+      }
+    }
+  }
+
+  return (action: NotificationAction, id: string) => {
+    if (action === "read") queues.unread.delete(id)
+    if (action === "unread") queues.read.delete(id)
+    queues[action].add(id)
+    if (!scheduled) {
+      scheduled = true
+      schedule(() => void flush())
+    }
+  }
 }
 
 export const PREFERENCE_GROUPS: readonly {
