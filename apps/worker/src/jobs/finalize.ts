@@ -5,7 +5,7 @@ import {
   readConsentEvidence,
   sha256Hex,
 } from "@sahihi/core"
-import { appendAuditEvent, prisma, queueEnvelopeWebhook } from "@sahihi/db"
+import { appendAuditEvent, notifyEnvelopeOwner, prisma, queueEnvelopeWebhook } from "@sahihi/db"
 import { enqueueWebhookDeliveries, getObjectBytes, getQueues, keys, putObject } from "@sahihi/infra"
 import { renderCertificate, type StampField, stampFields } from "@sahihi/pdf"
 import { getSigningProvider } from "../providers"
@@ -182,6 +182,7 @@ export async function finalizeEnvelope(envelopeId: string) {
       type: "certificate.issued",
       data: { code, sha256: certSha },
     })
+    await notifyEnvelopeOwner(tx, { envelopeId, type: "envelope.completed" })
     // Emitted here, not at the last signature, so receivers can fetch the signed PDF right away.
     return queueEnvelopeWebhook(tx, { envelopeId, type: "envelope.completed" })
   })

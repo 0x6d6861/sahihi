@@ -8,13 +8,14 @@ import {
   EXPORT_TTL_DAYS,
   exportFolderName,
   isClosed,
+  NOTIFICATION_TTL_DAYS,
   type PurgeReason,
   REDACTED,
   type RetentionYears,
   retentionCutoff,
   verifyAuditChain,
 } from "@sahihi/core"
-import { appendAuditEvent, prisma, toChainedEvent } from "@sahihi/db"
+import { appendAuditEvent, notifyUsers, prisma, toChainedEvent } from "@sahihi/db"
 import {
   deleteObject,
   deletePrefix,
@@ -87,6 +88,8 @@ export async function purgeEnvelope(envelopeId: string, reason: PurgeReason) {
       where: { envelopeId: e.id },
       data: { value: null, imageS3Key: null, label: null },
     })
+    // Notifications quote the title and recipients' names (docs/notifications.md).
+    await tx.notification.deleteMany({ where: { envelopeId: e.id } })
     // Webhook payloads are snapshots with recipients' names and emails.
     await tx.webhookDelivery.updateMany({
       where: { payload: { path: ["envelope", "id"], equals: e.id } },
@@ -279,25 +282,40 @@ export async function buildExport(exportId: string) {
     const { size } = await stat(path)
     await putObjectStream(key, createReadStream(path), size, "application/zip")
     const now = new Date()
-    await prisma.dataExport.update({
-      where: { id: job.id },
-      data: {
-        status: "READY",
-        s3Key: key,
-        sizeBytes: size,
-        envelopeCount: envelopes.length,
-        completedAt: now,
-        expiresAt: new Date(now.getTime() + EXPORT_TTL_DAYS * 24 * 3600 * 1000),
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.dataExport.update({
+        where: { id: job.id },
+        data: {
+          status: "READY",
+          s3Key: key,
+          sizeBytes: size,
+          envelopeCount: envelopes.length,
+          completedAt: now,
+          expiresAt: new Date(now.getTime() + EXPORT_TTL_DAYS * 24 * 3600 * 1000),
+        },
+      })
+      await notifyUsers(tx, {
+        organizationId: job.organizationId,
+        userIds: [job.requestedById],
+        type: "export.ready",
+        data: { envelopeCount: envelopes.length },
+      })
     })
     return { envelopes: envelopes.length, sizeBytes: size }
   } catch (err) {
-    await prisma.dataExport.update({
-      where: { id: job.id },
-      data: {
-        status: "FAILED",
-        error: err instanceof Error ? err.message.slice(0, 500) : "Export failed",
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.dataExport.update({
+        where: { id: job.id },
+        data: {
+          status: "FAILED",
+          error: err instanceof Error ? err.message.slice(0, 500) : "Export failed",
+        },
+      })
+      await notifyUsers(tx, {
+        organizationId: job.organizationId,
+        userIds: [job.requestedById],
+        type: "export.failed",
+      })
     })
     throw err
   } finally {
@@ -321,4 +339,13 @@ export async function cleanupExports(now: Date = new Date()) {
 /** After a workspace is deleted (DB rows cascade): remove its stored files. */
 export async function purgeOrganizationStorage(organizationId: string) {
   return { deleted: await deletePrefix(keys.orgPrefix(organizationId)) }
+}
+
+// ── Notifications ────────────────────────────────────────────────────────────
+
+/** Daily: delete in-app notifications older than NOTIFICATION_TTL_DAYS, read or not. */
+export async function cleanupNotifications(now: Date = new Date()) {
+  const cutoff = new Date(now.getTime() - NOTIFICATION_TTL_DAYS * 24 * 3600 * 1000)
+  const { count } = await prisma.notification.deleteMany({ where: { createdAt: { lt: cutoff } } })
+  return { deleted: count }
 }

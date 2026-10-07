@@ -20,6 +20,7 @@ import { handleNotification } from "./jobs/notifications"
 import {
   buildExport,
   cleanupExports,
+  cleanupNotifications,
   purgeEnvelope,
   purgeOrganizationStorage,
   retentionSweep,
@@ -51,6 +52,7 @@ const workers = [
       if (job.name === "webhooks.sweep") return sweepWebhookOutbox()
       if (job.name === "retention.sweep") return retentionSweep()
       if (job.name === "exports.cleanup") return cleanupExports()
+      if (job.name === "notifications.cleanup") return cleanupNotifications()
       if (job.name === "envelope.purge") {
         const data = job.data as MaintenanceJobs["envelope.purge"]
         return purgeEnvelope(data.envelopeId, data.reason)
@@ -137,6 +139,11 @@ await maintenance.raw.upsertJobScheduler(
   "exports-cleanup-daily",
   { pattern: "45 2 * * *", tz: "Africa/Nairobi" },
   { name: "exports.cleanup", data: {} },
+)
+await maintenance.raw.upsertJobScheduler(
+  "notifications-cleanup-daily",
+  { pattern: "50 2 * * *", tz: "Africa/Nairobi" },
+  { name: "notifications.cleanup", data: {} },
 )
 await maintenance.raw.upsertJobScheduler(
   "remind-daily",

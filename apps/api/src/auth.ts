@@ -1,6 +1,6 @@
 import { getEnv } from "@sahihi/config"
 import { canAddSeat, orgAc, orgRoles, seatLimitMessage } from "@sahihi/core"
-import { countSeats, getOrgPlan, prisma } from "@sahihi/db"
+import { countSeats, getOrgPlan, notifyWorkspaceAdmins, prisma } from "@sahihi/db"
 import { getQueues } from "@sahihi/infra"
 import { betterAuth } from "better-auth"
 import { prismaAdapter } from "better-auth/adapters/prisma"
@@ -127,6 +127,15 @@ export const auth = betterAuth({
           if (!canAddSeat(plan, members, pendingInvitations)) {
             throw new APIError("FORBIDDEN", { message: seatLimitMessage(plan) })
           }
+        },
+        // Bell notification for the workspace's owners and admins (docs/notifications.md).
+        afterAcceptInvitation: async ({ member, user, organization }) => {
+          await notifyWorkspaceAdmins(prisma, {
+            organizationId: organization.id,
+            type: "member.joined",
+            exceptUserId: member.userId,
+            data: { memberName: user.name || user.email },
+          })
         },
         // The DB rows cascade; stored files (PDFs, signatures, exports) are removed by the worker
         // (docs/data-retention.md → Deleting a workspace).

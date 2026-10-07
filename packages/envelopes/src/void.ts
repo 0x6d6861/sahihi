@@ -1,5 +1,5 @@
-import { assertTransition } from "@sahihi/core"
-import { appendAuditEvent, prisma, queueEnvelopeWebhook } from "@sahihi/db"
+import { assertTransition, truncateReason } from "@sahihi/core"
+import { appendAuditEvent, notifyEnvelopeOwner, prisma, queueEnvelopeWebhook } from "@sahihi/db"
 import { enqueueWebhookDeliveries, getQueues } from "@sahihi/infra"
 import { notFound } from "./errors"
 import { type Actor, actorData } from "./send"
@@ -33,6 +33,17 @@ export async function voidEnvelope(input: {
       data: { reason: input.reason, ...actorData(input.actor) },
       ipAddress: input.actor.ipAddress ?? null,
       userAgent: input.actor.userAgent ?? null,
+    })
+    // Only when someone else voided it: the creator knows what they did.
+    const actorUser = await tx.user.findUnique({
+      where: { id: input.actor.userId },
+      select: { name: true },
+    })
+    await notifyEnvelopeOwner(tx, {
+      envelopeId: e.id,
+      type: "envelope.voided",
+      exceptUserId: input.actor.userId,
+      data: { actorName: actorUser?.name, reason: truncateReason(input.reason) },
     })
     return queueEnvelopeWebhook(tx, { envelopeId: e.id, type: "envelope.voided" })
   })

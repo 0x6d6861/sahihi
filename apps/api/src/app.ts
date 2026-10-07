@@ -20,6 +20,7 @@ import { embedding } from "./routes/embedding"
 import { envelopes } from "./routes/envelopes"
 import { folders } from "./routes/folders"
 import { me } from "./routes/me"
+import { notifications } from "./routes/notifications"
 import { signing } from "./routes/signing"
 import { templates } from "./routes/templates"
 import { v1 } from "./routes/v1"
@@ -71,6 +72,7 @@ export function createApp() {
     .route("/api/bulk-sends", bulkSends)
     .route("/api/billing", billing)
     .route("/api/me", me)
+    .route("/api/notifications", notifications)
     .route("/api/avatars", avatars)
     .route("/api/workspace", workspace)
     .route("/api/branding", branding)

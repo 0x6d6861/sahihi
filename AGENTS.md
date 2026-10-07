@@ -162,6 +162,7 @@ the relevant doc in `docs/` is updated if behaviour changed, and the matching ch
 | Field editor, signing page, stamping maths | `docs/coordinates.md` |
 | Upload, stamping, finalize job | `docs/pdf-pipeline.md` |
 | Send / sign / decline / void / reminders / OTP | `docs/signing-flow.md` |
+| In-app notifications (bell, preferences) | `docs/notifications.md` |
 | Templates (save as / use) | `docs/templates.md` |
 | Webhooks (events, signing, delivery) | `docs/webhooks.md` |
 | Public API `/api/v1`, API keys and scopes | `docs/public-api.md` |

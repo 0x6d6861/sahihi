@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation"
 import { motionTokens } from "@/components/arc/lib/motion-tokens"
 import { Separator } from "@/components/ui/separator"
 import { APP_NAV, type AppNavHref, isFullBleed, isNavActive } from "@/lib/nav"
+import { NotificationBell } from "../notifications/notification-bell"
 import { OrgSwitcher, type ShellOrganization } from "./org-switcher"
 import { type ShellUser, UserMenu } from "./user-menu"
 
@@ -20,8 +21,8 @@ const NAV_ICONS: Record<AppNavHref, IconSvgElement> = {
 /**
  * Authenticated app shell (ADR 0026): one top bar. The logo and the workspace switcher on the left,
  * the primary navigation as a segmented pill in the middle (the active item is a raised pill that
- * glides between items), and the account menu on the right, which also holds Settings. Below `md`
- * the navigation moves to its own row under the bar.
+ * glides between items), and on the right the notification bell and the account menu, which also
+ * holds Settings. Below `md` the navigation moves to its own row under the bar.
  */
 export function AppShell({
   user,
@@ -85,7 +86,9 @@ export function AppShell({
           </LayoutGroup>
         </nav>
 
-        <div className="ml-auto flex items-center md:ml-0 md:justify-self-end">
+        <div className="ml-auto flex items-center gap-3 md:ml-0 md:justify-self-end">
+          {/* Keyed by workspace: switching starts the bell over for the new one. */}
+          <NotificationBell key={activeOrganizationId} />
           <UserMenu user={user} />
         </div>
       </header>

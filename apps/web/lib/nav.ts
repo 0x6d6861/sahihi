@@ -11,12 +11,13 @@ export const APP_NAV: readonly { href: AppNavHref; label: string }[] = [
 export type AppNavHref = "/documents" | "/envelopes" | "/templates"
 
 /**
- * Settings pages: the tab bar on every settings page. Your account first (profile, security), then
- * the active workspace. The user menu links to the first one.
+ * Settings pages: the tab bar on every settings page. Your account first (profile, security,
+ * notifications), then the active workspace. The user menu links to the first one.
  */
 export const SETTINGS_NAV = [
   { href: "/settings/profile", label: "Profile" },
   { href: "/settings/security", label: "Security" },
+  { href: "/settings/notifications", label: "Notifications" },
   { href: "/settings/workspace", label: "Workspace" },
   { href: "/settings/members", label: "Members" },
   { href: "/settings/billing", label: "Plan & usage" },

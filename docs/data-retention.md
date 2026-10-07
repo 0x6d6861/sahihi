@@ -12,7 +12,7 @@ admins manage this under **Settings → Data** (`data:manage`).
 | The original PDF, once no other live envelope and no template uses it (the `Document` row is renamed "Deleted document" and soft-deleted; its `sha256` stays) | Document hash, `signedSha256`, the `Certificate` row (code, hash) so `/verify/<code>` still answers |
 | Recipients' names, emails (→ `deleted-<id>@redacted.invalid`), phones, signing IPs and user agents, decline reasons, OTP rows, link tokens | Recipient roles, order, statuses and `signedAt`/`viewedAt`/`declinedAt` |
 | Field values and labels; envelope title and message; void reason | Field positions and types |
-| Webhook delivery payloads for that envelope (→ `{ redacted: true }`) | The hash-chained **audit trail**, append-only (ADR 0010), plus an `envelope.purged` event with the reason |
+| Webhook delivery payloads for that envelope (→ `{ redacted: true }`); in-app notifications about it (deleted, docs/notifications.md) | The hash-chained **audit trail**, append-only (ADR 0010), plus an `envelope.purged` event with the reason |
 
 The audit trail is kept as it is under the lawful-basis exception: it's the evidence that a
 signature happened. Its rows can't be edited (ADR 0010), so personal data inside older audit
@@ -54,7 +54,7 @@ e.g. for a data subject's erasure request. It's the "Delete data" button on the 
 The owner uses **Settings → Data → Delete workspace** and types the name to confirm. That calls
 better-auth's `organization.delete`:
 - DB rows cascade: documents, envelopes, recipients, fields, audit trails, certificates,
-  templates, webhooks, exports, settings.
+  templates, webhooks, exports, settings, notifications.
 - The `afterDeleteOrganization` hook queues `organization.purge-storage`, which deletes everything
   under `org/<id>/` in storage (`deletePrefix`, which refuses any prefix that isn't a workspace
   folder).
@@ -69,4 +69,5 @@ the storage wipe after workspace deletion. The new routes are in `tenant-isolati
 ## Not in v1
 
 Erasing one person across every envelope in a single action (purge their envelopes one by one),
-exports larger than 2,000 envelopes, and emailing the owner when an export is ready.
+exports larger than 2,000 envelopes, and emailing the owner when an export is ready (the bell
+tells them, docs/notifications.md).
