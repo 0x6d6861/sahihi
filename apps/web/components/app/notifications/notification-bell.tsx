@@ -1,5 +1,7 @@
 "use client"
 
+import { describeNotification } from "@sahihi/core"
+import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toastManager } from "@/components/app/toast"
 import { NotificationCenter } from "@/components/arc/notification-center/notification-center"
@@ -25,9 +27,12 @@ const ACTION_PATH = {
  * The bell in the top bar: Arc's notification center (docs/notifications.md) fed from
  * `/api/notifications`. The center keeps its own copy of the list after mount, so the bell polls
  * while the tab is visible and remounts it with the new list when something changed, but never
- * while it's open. Read, unread and dismiss are sent back in batches.
+ * while it's open. Read, unread and dismiss are sent back in batches. An item's "Open" action
+ * (ADR 0030) closes the panel, marks it read and goes to its page.
  */
 export function NotificationBell() {
+  const router = useRouter()
+  const [isOpen, setIsOpen] = useState(false)
   const [seed, setSeed] = useState<{ key: number; items: CenterItem[] }>({ key: 0, items: [] })
   /** What the server has, as last loaded and changed locally since */
   const current = useRef<NotificationItem[]>([])
@@ -98,7 +103,19 @@ export function NotificationBell() {
     queue("dismiss", item.id)
   }
 
+  function onOpen(item: { id: string }) {
+    const n = current.current.find((x) => x.id === item.id)
+    const href = n ? describeNotification(n).href : null
+    if (!n || !href) return
+    if (!n.readAt) onReadChange(n, true)
+    onOpenChange(false)
+    // The center still shows it unread: remount it from the local list, which has it read.
+    mount(current.current)
+    router.push(href)
+  }
+
   function onOpenChange(next: boolean) {
+    setIsOpen(next)
     open.current = next
     if (next || !pending.current) return
     const items = pending.current
@@ -112,6 +129,8 @@ export function NotificationBell() {
       notifications={seed.items}
       onReadChange={onReadChange}
       onDismiss={onDismiss}
+      onOpen={onOpen}
+      open={isOpen}
       onOpenChange={onOpenChange}
     />
   )

@@ -65,7 +65,8 @@ switch per type, saved as soon as it changes. Members don't see workspace types 
 
 ## The bell (web)
 
-Arc's `notification-center` block (`components/arc/notification-center/`, vendored, not edited),
+Arc's `notification-center` block (`components/arc/notification-center/`, vendored, one local
+patch: ADR 0030),
 wrapped by `components/app/notifications/notification-bell.tsx` in the app shell next to the
 account menu. It's keyed by workspace, so switching workspaces starts it over.
 
@@ -80,8 +81,9 @@ account menu. It's keyed by workspace, so switching workspaces starts it over.
 - The block reports every change one item at a time. `createActionBatcher` sends one request per
   action on the next tick (`/read`, `/unread`, `/dismiss`), and a failure shows a toast and
   reloads the server's state on the next poll.
-- Rows don't link anywhere: the block has no link slot. The body says where to look ("Download it
-  from Settings → Data"), and the envelope is on the Envelopes page.
+- An expanded row also has an **Open …** action ("Open envelope", "Open Data settings";
+  `openLabelFor`) through a local patch to the block (ADR 0030). It closes the panel, marks the item
+  read and goes to its page (`describeNotification(...).href`).
 
 ## Retention
 

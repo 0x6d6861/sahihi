@@ -27,9 +27,11 @@ version.
 variants that match coss. When the CLI asks about overwriting existing primitives, **keep yours**
 (answer no). `apps/web` turns off `noUncheckedIndexedAccess` for vendored Extend code. Local patches
 to re-apply after a reinstall: `spacing` in `pdf-editor-properties.tsx` (ADR 0007), `customPanels`
-in `pdf-editor.tsx` (ADR 0019, lines marked `sahihi patch (ADR 0019)`), and the Tailwind `accent`
-mapping in `app/globals.css` (ADR 0023, lines marked `sahihi patch (ADR 0023)`), and the radii in
-`components/arc/user-menu/user-menu.module.css` (ADR 0027, listed in the comment at its top).
+in `pdf-editor.tsx` (ADR 0019, lines marked `sahihi patch (ADR 0019)`), the Tailwind `accent`
+mapping in `app/globals.css` (ADR 0023, lines marked `sahihi patch (ADR 0023)`), the radii in
+`components/arc/user-menu/user-menu.module.css` (ADR 0027, listed in the comment at its top), and
+the open action in `components/arc/notification-center/notification-center.tsx` (ADR 0030, lines
+marked `sahihi patch (ADR 0030)`).
 
 ## Theme and tokens (ADR 0023)
 

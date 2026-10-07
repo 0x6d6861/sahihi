@@ -45,6 +45,8 @@ export interface CenterItem {
   time: string
   read: boolean
   tone: "info" | "success" | "warning"
+  /** The open action's text (ADR 0030); absent when there's nowhere to go */
+  openLabel?: string
 }
 
 const MINUTE = 60_000
@@ -62,6 +64,17 @@ export function timeAgo(value: string | Date, now: Date = new Date()): string {
   return formatDate(then)
 }
 
+/** The open action's text for a notification's page (ADR 0030). */
+export function openLabelFor(href: string | null): string | undefined {
+  if (!href) return undefined
+  if (href.startsWith("/envelopes/")) return "Open envelope"
+  if (href.startsWith("/bulk-sends/")) return "Open bulk send"
+  if (href === "/settings/data") return "Open Data settings"
+  if (href === "/settings/members") return "Open Members"
+  if (href === "/settings/billing") return "Open Plan & usage"
+  return "Open"
+}
+
 /** Our notifications as Arc notification center items (text and tone from @sahihi/core). */
 export function toCenterItems(
   items: readonly NotificationItem[],
@@ -76,6 +89,7 @@ export function toCenterItems(
       time: timeAgo(n.createdAt, now),
       read: n.readAt !== null,
       tone: view.tone,
+      ...(view.href ? { openLabel: openLabelFor(view.href) } : {}),
     }
   })
 }

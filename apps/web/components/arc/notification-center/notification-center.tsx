@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { AnimatePresence, animate, motion, useIsPresent, useMotionValue, useReducedMotion, type AnimationPlaybackControls, type HTMLMotionProps, type TargetAndTransition, type Transition, type Variants } from "motion/react";
-import { Bell, Check, CheckCheck, CircleCheck, CircleDot, MessageCircle, TriangleAlert, X } from "lucide-react";
+import { ArrowUpRight, Bell, Check, CheckCheck, CircleCheck, CircleDot, MessageCircle, TriangleAlert, X } from "lucide-react"; // sahihi patch (ADR 0030): ArrowUpRight
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { Avatar } from "../avatar/avatar";
 import { motionTokens } from "../lib/motion-tokens";
@@ -17,6 +17,8 @@ export interface NotificationItem {
   tone?: "info" | "success" | "warning";
   /** A local portrait asset for person-generated updates. */
   actor?: { name: string; photo: string };
+  /** sahihi patch (ADR 0030): text of the item's open action; shown when `onOpen` is set. */
+  openLabel?: string;
 }
 
 export interface NotificationCenterProps {
@@ -24,6 +26,8 @@ export interface NotificationCenterProps {
   label?: string;
   onReadChange?: (notification: NotificationItem, read: boolean) => void;
   onDismiss?: (notification: NotificationItem) => void;
+  /** sahihi patch (ADR 0030): called by an item's open action (items with `openLabel`). */
+  onOpen?: (notification: NotificationItem) => void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   avoidCollisions?: boolean;
@@ -106,7 +110,7 @@ function NotificationVisual({ item }: { item: NotificationItem }) {
   </span>;
 }
 
-export function NotificationCenter({ notifications: initial, label = "Notifications", onReadChange, onDismiss, open, onOpenChange, avoidCollisions = true }: NotificationCenterProps) {
+export function NotificationCenter({ notifications: initial, label = "Notifications", onReadChange, onDismiss, onOpen, open, onOpenChange, avoidCollisions = true }: NotificationCenterProps) { // sahihi patch (ADR 0030): onOpen
   const reduce = useReducedMotion();
   const layoutId = useId();
   const [internalOpen, setInternalOpen] = useState(false);
@@ -213,6 +217,8 @@ export function NotificationCenter({ notifications: initial, label = "Notificati
                   {expandedId === item.id && <motion.div className={styles.details} initial={reduce ? { opacity: 0 } : { height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={reduce ? fadeOut : { height: 0, opacity: 0, transition: { height: motionTokens.spring.smooth, opacity: exitFast } }} transition={height}>
                     <p>{item.description ?? (item.actor ? `${item.actor.name} shared an update with you.` : "This update is ready to review.")}</p>
                     <div className={styles.itemActions}>
+                      {/* sahihi patch (ADR 0030): open action */}
+                      {onOpen && item.openLabel && <button type="button" onClick={() => onOpen(item)}><ArrowUpRight size={14} strokeWidth={1.75} aria-hidden="true" />{item.openLabel}</button>}
                       <button type="button" onClick={() => toggleRead(item)}><MorphWidth reduce={reduce} morphKey={item.read ? "read" : "unread"}>
                         <span className={styles.actionIcon}><AnimatePresence mode="popLayout" initial={false}><Swap key={item.read ? "unread" : "read"} className={styles.actionGlyph} initial={reduce ? { opacity: 0 } : iconIn} animate={shown} exit={reduce ? fadeOut : { ...iconIn, transition: exitFast }} transition={reduce ? instant : motionTokens.spring.snappy}>{item.read ? <CircleDot size={14} strokeWidth={1.75} aria-hidden="true" /> : <Check size={14} strokeWidth={1.75} aria-hidden="true" />}</Swap></AnimatePresence></span>
                         <SwapText reduce={reduce}>{item.read ? "Mark unread" : "Mark read"}</SwapText>

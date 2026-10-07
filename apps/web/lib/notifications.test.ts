@@ -6,6 +6,7 @@ import {
   type NotificationAction,
   type NotificationItem,
   notificationsSignature,
+  openLabelFor,
   timeAgo,
   toCenterItems,
 } from "./notifications"
@@ -59,7 +60,24 @@ describe("toCenterItems", () => {
       time: "5m",
       read: true,
       tone: "success",
+      openLabel: "Open envelope",
     })
+  })
+  test("no open action without a page", () => {
+    const [item] = toCenterItems([n("a", { type: "recipient.signed", envelopeId: null })])
+    expect(item?.openLabel).toBeUndefined()
+  })
+})
+
+describe("openLabelFor", () => {
+  test("names the destination", () => {
+    expect(openLabelFor("/envelopes/e1")).toBe("Open envelope")
+    expect(openLabelFor("/bulk-sends/b1")).toBe("Open bulk send")
+    expect(openLabelFor("/settings/data")).toBe("Open Data settings")
+    expect(openLabelFor("/settings/members")).toBe("Open Members")
+    expect(openLabelFor("/settings/billing")).toBe("Open Plan & usage")
+    expect(openLabelFor("/somewhere")).toBe("Open")
+    expect(openLabelFor(null)).toBeUndefined()
   })
 })
 
