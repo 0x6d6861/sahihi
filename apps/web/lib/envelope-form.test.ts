@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import {
   buildCreateEnvelopeInput,
+  buildEnvelopeDetailsInput,
+  detailsFromEnvelope,
   expiryFromDate,
   issuesToFormErrors,
   type NewEnvelopeValues,
@@ -64,5 +66,42 @@ describe("issuesToFormErrors", () => {
         { path: [], message: "whole form" },
       ]),
     ).toEqual({ title: "first", form: "whole form" })
+  })
+})
+
+describe("detailsFromEnvelope / buildEnvelopeDetailsInput", () => {
+  test("round-trips a saved envelope through the dialog values", () => {
+    const expiresAt = expiryFromDate(new Date(2026, 9, 3)).toISOString()
+    const values = detailsFromEnvelope({
+      title: "Lease",
+      message: null,
+      signingOrder: "SEQUENTIAL",
+      expiresAt,
+    })
+    expect(values).toEqual({
+      title: "Lease",
+      message: "",
+      sequential: true,
+      expiresOn: new Date(2026, 9, 3),
+    })
+    expect(buildEnvelopeDetailsInput(values, now)).toEqual({
+      ok: true,
+      input: { title: "Lease", signingOrder: "SEQUENTIAL", expiresAt: new Date(expiresAt) },
+    })
+  })
+  test("no expiry is sent as null so the API clears it; blank message is dropped", () => {
+    const r = buildEnvelopeDetailsInput({ ...base, message: "  " }, now)
+    expect(r).toEqual({
+      ok: true,
+      input: { title: "Lease", signingOrder: "PARALLEL", expiresAt: null },
+    })
+  })
+  test("maps errors onto the dialog's fields", () => {
+    const r = buildEnvelopeDetailsInput(
+      { ...base, title: " ", expiresOn: new Date(2026, 8, 1) },
+      now,
+    )
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(Object.keys(r.errors).sort()).toEqual(["expiresAt", "title"])
   })
 })

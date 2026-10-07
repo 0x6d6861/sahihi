@@ -25,7 +25,7 @@ organization removes its templates.
 | `GET /api/templates/:id` | Roles and fields, plus `permissions.manage` |
 | `PATCH /api/templates/:id` | Rename / describe (`UpdateTemplateSchema`) |
 | `DELETE /api/templates/:id` | 204 |
-| `POST /api/templates/:id/envelopes` | Use it: `{ title, message?, expiresAt?, recipients: [{ roleId, name, email, phone? }] }` → **DRAFT** envelope (201) |
+| `POST /api/templates/:id/envelopes` | Use it: `{ title, message?, expiresAt?, recipients: [{ roleId, name, email, phone? }], send? }` → **DRAFT** envelope (201). `send: true` also sends it and answers `{ envelope, sent }`; a refused send keeps the draft with `sent: false` and the reason (ADR 0018) |
 
 **Using a template** (`draftFromTemplate`, `@sahihi/core`):
 1. Each role gets a person: the input, or its fixed contact.
@@ -52,7 +52,9 @@ delete need the creator, or `template:manage-any` (admin, owner). Other orgs get
   has "Always send to <email>" to keep the contact. On a draft, pending field edits are saved first
   (`DraftState.settle`, like Send).
 - **Use template** (`/templates/[id]/use`): title, one block per role (fixed contacts shown locked,
-  a phone input for SMS roles), message → the new draft's envelope page.
+  a phone input for SMS roles), message. **Create draft** → the new draft's envelope page;
+  **Send now** creates and sends it in one call, then opens the envelope (if sending is refused,
+  e.g. the plan limit, it opens as a draft with a toast saying why).
 
 ## Not in v1
 

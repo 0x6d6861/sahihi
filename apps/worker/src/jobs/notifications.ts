@@ -45,6 +45,20 @@ export async function handleNotification(job: AnyNotification) {
         })),
       })
     }
+    case "auth.change-email": {
+      const d = job.data
+      return sendEmail({
+        to: d.email,
+        tag: "auth",
+        ...(await t.authLink({
+          name: d.name,
+          heading: "Confirm your new email",
+          body: `You asked to change the email on your Sahihi account to ${d.newEmail}. Confirm it here, then follow the link we send to the new address. If this wasn't you, ignore this email and change your password.`,
+          label: "Confirm change",
+          url: d.url,
+        })),
+      })
+    }
     case "auth.org-invitation": {
       const d = job.data
       return sendEmail({
@@ -72,7 +86,7 @@ export async function handleNotification(job: AnyNotification) {
         // Replies reach the person who sent it, not a no-reply mailbox.
         replyTo: r.envelope.createdBy.email,
         ...(await t.signingInvite({
-          brand: brandFor(r.envelope.organization),
+          brand: brandFor(r.envelope.organization, web),
           recipientName: r.name,
           senderName: r.envelope.createdBy.name,
           title: r.envelope.title,
@@ -104,7 +118,7 @@ export async function handleNotification(job: AnyNotification) {
         where: { id: job.data.envelopeId },
         include: { recipients: true, createdBy: true, organization: true },
       })
-      const brand = brandFor(e.organization)
+      const brand = brandFor(e.organization, web)
       // Fresh links for every recipient (signers + viewers) to fetch the final documents
       const links = await prisma.$transaction(async (tx) => {
         const out: { name: string; email: string; token: string }[] = []
@@ -147,7 +161,7 @@ export async function handleNotification(job: AnyNotification) {
       })
       const decliner = e.recipients.find((r) => r.id === job.data.recipientId)
       const payload = {
-        brand: brandFor(e.organization),
+        brand: brandFor(e.organization, web),
         title: e.title,
         declinedBy: decliner?.name ?? "A recipient",
         reason: decliner?.declineReason ?? null,
@@ -173,7 +187,7 @@ export async function handleNotification(job: AnyNotification) {
         where: { id: job.data.envelopeId },
         include: { recipients: true, createdBy: true, organization: true },
       })
-      const brand = brandFor(e.organization)
+      const brand = brandFor(e.organization, web)
       for (const r of e.recipients.filter((x) => x.notifiedAt && x.status !== "SIGNED")) {
         await sendEmail({
           to: r.email,

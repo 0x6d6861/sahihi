@@ -55,6 +55,7 @@ tenants must never see each other's data.**
 | `/api/sign/:token*` | 120 / min / IP |
 | `/api/sign/:token/otp` | 5 / 15 min / token |
 | `/api/verify/*` | 30 / min / IP |
+| `/api/branding/:orgId/logo.png` (public workspace logo, ADR 0028) | 300 / min / IP |
 | `/api/v1/*` (public API) | 1200 / min / IP, then 600 / min / API key |
 
 better-auth applies its own limits to `/api/auth/*`.
@@ -131,7 +132,7 @@ checks are strict (`docs/webhooks.md`, ADR 0013):
 ## Consent & evidence (ESIGN / UETA / Kenya)
 
 - Record exactly which consent text each signer agreed to. The wordings live in `CONSENT_TEXTS`
-  (`packages/core/src/consent.ts`), keyed by version, and `CONSENT_VERSION` is the one shown now.
+  (`packages/core/src/signing/consent.ts`), keyed by version, and `CONSENT_VERSION` is the one shown now.
   - The signing page submits the `consentVersion` it displayed. The API refuses an outdated one
     with 409 `consent_outdated` before storing anything, and the page reloads to show the current
     text.

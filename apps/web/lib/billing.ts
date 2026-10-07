@@ -14,16 +14,16 @@ export function quotaBanner(
   used: number,
   limit: number | null,
   resetsOn: string,
-): { variant: "warning" | "error"; title: string; description: string } | null {
+): { tone: "warning" | "danger"; title: string; description: string } | null {
   if (limit === null || level === "ok") return null
   if (level === "exceeded")
     return {
-      variant: "error",
+      tone: "danger",
       title: "Monthly envelope limit reached",
       description: `All ${limit} envelopes on your plan have been sent this month. Drafts are kept; sending resumes on ${resetsOn}.`,
     }
   return {
-    variant: "warning",
+    tone: "warning",
     title: `${limit - used} ${limit - used === 1 ? "envelope" : "envelopes"} left this month`,
     description: `You've sent ${used} of ${limit}. The count resets on ${resetsOn}.`,
   }

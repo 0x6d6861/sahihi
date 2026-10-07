@@ -45,8 +45,8 @@
   --color-card: var(--card);
   --color-border: var(--border);
   --color-background: var(--background);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
+  --color-accent-foreground: var(--ui-hover-foreground); /* sahihi patch (ADR 0023) */
+  --color-accent: var(--ui-hover); /* sahihi patch (ADR 0023) */
   --color-warning-foreground: var(--warning-foreground);
   --color-warning: var(--warning);
   --color-success-foreground: var(--success-foreground);

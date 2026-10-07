@@ -1,7 +1,7 @@
 # Bulk send
 
 One template, many rows, **one envelope per row**, all sent straight away (ADR 0017). Used for
-lease renewals, offer letters, policy acknowledgements. Code: `packages/core/src/bulk-send.ts`
+lease renewals, offer letters, policy acknowledgements. Code: `packages/core/src/templates/bulk-send.ts`
 (pure), `packages/envelopes/src/bulk-send.ts` (service), `apps/api/src/routes/bulk-sends.ts`,
 worker job `bulk.send`.
 

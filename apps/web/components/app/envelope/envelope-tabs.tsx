@@ -1,8 +1,7 @@
 "use client"
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { useCallback } from "react"
-import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs"
+import { useSearchParamState } from "@/components/app/use-search-param"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/arc/tabs/tabs"
 
 export const ENVELOPE_TABS = ["document", "recipients", "activity"] as const
 export type EnvelopeTab = (typeof ENVELOPE_TABS)[number]
@@ -17,56 +16,41 @@ function isTab(v: string | null): v is EnvelopeTab {
   return ENVELOPE_TABS.includes(v as EnvelopeTab)
 }
 
-/** Switches tabs through `?tab=` so a reload (or a "Fix" link) lands on the same one. */
+/** Switches tabs through `?tab=` so a reload lands on the same one. */
 export function useEnvelopeTab(defaultTab: EnvelopeTab) {
-  const router = useRouter()
-  const pathname = usePathname()
-  const params = useSearchParams()
-  const raw = params.get("tab")
-  const tab = isTab(raw) ? raw : defaultTab
-  const setTab = useCallback(
-    (next: EnvelopeTab) => {
-      const q = new URLSearchParams(params.toString())
-      q.set("tab", next)
-      router.replace(`${pathname}?${q.toString()}`, { scroll: false })
-    },
-    [params, pathname, router],
-  )
-  return [tab, setTab] as const
+  return useSearchParamState("tab", (raw) => (isTab(raw) ? raw : defaultTab))
 }
 
 /**
- * Document / Recipients / Activity. While drafting, the editor panels stay mounted when hidden
- * (`keepMounted`), so switching tabs never drops a pending autosave or unsaved recipient edits.
+ * Document / Recipients / Activity, read-only. Drafts are edited in the draft editor
+ * (`/envelopes/:id/edit`, ADR 0021) instead.
  */
 export function EnvelopeTabs({
   defaultTab,
-  keepMounted,
   panels,
   counts,
 }: {
   defaultTab: EnvelopeTab
-  keepMounted: boolean
   panels: Record<EnvelopeTab, React.ReactNode>
   counts?: Partial<Record<EnvelopeTab, number>>
 }) {
   const [tab, setTab] = useEnvelopeTab(defaultTab)
   return (
     <Tabs value={tab} onValueChange={(v) => isTab(v) && setTab(v)}>
-      <TabsList>
+      <TabsList aria-label="Envelope">
         {ENVELOPE_TABS.map((t) => (
-          <TabsTab key={t} value={t}>
+          <TabsTrigger key={t} value={t}>
             {LABELS[t]}
             {counts?.[t] !== undefined && (
-              <span className="text-muted-foreground tabular-nums">{counts[t]}</span>
+              <span className="ms-1.5 text-muted-foreground tabular-nums">{counts[t]}</span>
             )}
-          </TabsTab>
+          </TabsTrigger>
         ))}
       </TabsList>
       {ENVELOPE_TABS.map((t) => (
-        <TabsPanel key={t} value={t} keepMounted={keepMounted} className="pt-4">
+        <TabsContent key={t} value={t} className="pt-4">
           {panels[t]}
-        </TabsPanel>
+        </TabsContent>
       ))}
     </Tabs>
   )

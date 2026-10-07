@@ -2,9 +2,9 @@
 
 import { useParams, useRouter } from "next/navigation"
 import { useState } from "react"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
-import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Panel } from "@/components/app/panel"
+import { Alert } from "@/components/arc/alert/alert"
+import { Button } from "@/components/arc/button/button"
 import { organization } from "@/lib/auth-client"
 
 export default function AcceptInvitationPage() {
@@ -28,24 +28,17 @@ export default function AcceptInvitationPage() {
 
   return (
     <main className="flex min-h-dvh items-center justify-center p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>Join workspace</CardTitle>
-          <CardDescription>You've been invited to a Sahihi workspace.</CardDescription>
-        </CardHeader>
-        {error && (
-          <div className="px-6">
-            <Alert variant="error">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          </div>
-        )}
-        <CardFooter>
-          <Button className="w-full" onClick={accept} disabled={pending}>
-            Accept invitation
-          </Button>
-        </CardFooter>
-      </Card>
+      <Panel
+        title="Join workspace"
+        description="You've been invited to a Sahihi workspace."
+        headingLevel={1}
+        className="w-full max-w-sm"
+      >
+        {error && <Alert tone="danger" title={error} />}
+        <Button className="w-full" onClick={accept} loading={pending}>
+          Accept invitation
+        </Button>
+      </Panel>
     </main>
   )
 }

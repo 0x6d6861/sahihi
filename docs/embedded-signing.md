@@ -1,7 +1,7 @@
 # Embedded signing
 
 Recipients sign **inside the customer's own site**, in an iframe, instead of following an email
-link (ADR 0017). Code: `packages/core/src/embed.ts`, `packages/envelopes/src/embedded.ts`,
+link (ADR 0017). Code: `packages/core/src/integrations/embed.ts`, `packages/envelopes/src/embedded.ts`,
 `apps/api/src/routes/{embedding,signing}.ts`, `apps/web/proxy.ts`, `apps/web/lib/embed.ts`.
 
 ## Setup

@@ -1,17 +1,35 @@
-import type { EnvelopeStatus, FieldType } from "@sahihi/core"
+import type { DocumentStatus, EnvelopeStatus, FieldType, RecipientStatus } from "@sahihi/core"
 
-/** Badge variants available in coss: default, secondary, outline, info, success, warning, error, destructive */
-export const ENVELOPE_STATUS_BADGE: Record<
-  EnvelopeStatus,
-  { label: string; variant: "secondary" | "info" | "warning" | "success" | "error" | "outline" }
-> = {
-  DRAFT: { label: "Draft", variant: "secondary" },
-  SENT: { label: "Sent", variant: "info" },
-  IN_PROGRESS: { label: "In progress", variant: "warning" },
-  COMPLETED: { label: "Completed", variant: "success" },
-  DECLINED: { label: "Declined", variant: "error" },
-  VOIDED: { label: "Voided", variant: "outline" },
-  EXPIRED: { label: "Expired", variant: "outline" },
+/**
+ * Arc badge tones (`components/arc/badge`). Status colour means status: success = done, danger =
+ * failed or declined, warning = needs attention, info = moving along, neutral = idle or closed.
+ */
+export type BadgeTone = "neutral" | "success" | "info" | "warning" | "danger"
+type BadgeStyle = { label: string; tone: BadgeTone }
+
+export const ENVELOPE_STATUS_BADGE: Record<EnvelopeStatus, BadgeStyle> = {
+  DRAFT: { label: "Draft", tone: "neutral" },
+  SENT: { label: "Sent", tone: "info" },
+  IN_PROGRESS: { label: "In progress", tone: "info" },
+  COMPLETED: { label: "Completed", tone: "success" },
+  DECLINED: { label: "Declined", tone: "danger" },
+  VOIDED: { label: "Voided", tone: "neutral" },
+  EXPIRED: { label: "Expired", tone: "warning" },
+}
+
+export const DOCUMENT_STATUS_BADGE: Record<DocumentStatus, BadgeStyle> = {
+  UPLOADING: { label: "Uploading", tone: "neutral" },
+  READY: { label: "Ready", tone: "success" },
+  FAILED: { label: "Failed", tone: "danger" },
+}
+
+/** A recipient's progress, as the sender sees it. PENDING = not their turn yet. */
+export const RECIPIENT_STATUS_BADGE: Record<RecipientStatus, BadgeStyle> = {
+  PENDING: { label: "Waiting", tone: "neutral" },
+  SENT: { label: "Sent", tone: "info" },
+  VIEWED: { label: "Viewed", tone: "info" },
+  SIGNED: { label: "Signed", tone: "success" },
+  DECLINED: { label: "Declined", tone: "danger" },
 }
 
 export const FIELD_LABELS: Record<FieldType, string> = {

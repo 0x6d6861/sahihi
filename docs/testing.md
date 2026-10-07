@@ -6,9 +6,9 @@ Runner: **`bun test`** (Jest-compatible `bun:test` API). No vitest or jest.
 
 | Layer | Where | Needs infra? | Run |
 |---|---|---|---|
-| Unit: pure logic | `packages/core/src/*.test.ts` | no | `bun test` |
-| Unit: PDF | `packages/pdf/src/pdf.test.ts` (generates PDFs in-memory with pdf-lib) | no | `bun test` |
-| Fixtures & stamp placement | `packages/pdf/src/fixtures.test.ts` (committed `fixtures/*.pdf` match the builders; stamped images land inside their field, centred and upright, on every fixture page) | no | `bun test` |
+| Unit: pure logic | `packages/core/src/**/*.test.ts` | no | `bun test` |
+| Unit: PDF | `packages/pdf/src/render/pdf.test.ts` (generates PDFs in-memory with pdf-lib) | no | `bun test` |
+| Fixtures & stamp placement | `packages/pdf/src/fixtures/fixtures.test.ts` (committed `fixtures/*.pdf` match the builders; stamped images land inside their field, centred and upright, on every fixture page) | no | `bun test` |
 | Contract | `packages/db/src/enums.test.ts` (Prisma enums ⇄ core unions) | no | `bun test` |
 | API smoke | `apps/api/src/app.test.ts` (health, 401 without a session) | no | `bun test` |
 | Web helpers | `apps/web/lib/*.test.ts` (DOM-free only) | no | `bun test apps/web` |

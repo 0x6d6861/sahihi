@@ -1,12 +1,22 @@
 import {
+  anchorRanges,
   CreateUploadSchema,
   canDeleteDocument,
+  canMoveDocument,
+  createTextRuleScanner,
   DOCUMENTS_PAGE_SIZE,
   ListDocumentsQuerySchema,
   MAX_UPLOAD_BYTES,
+  mergeSuggestions,
+  type PageBox,
+  periodStart,
   sha256Hex,
+  suggestFieldsFromAnchors,
+  suggestFieldsFromForm,
+  suggestFieldsFromText,
+  UpdateDocumentSchema,
 } from "@sahihi/core"
-import { forOrganization, prisma } from "@sahihi/db"
+import { forOrganization, type Prisma, prisma } from "@sahihi/db"
 import {
   deleteObject,
   getObjectBytes,
@@ -15,11 +25,12 @@ import {
   presignDownload,
   presignUpload,
 } from "@sahihi/infra"
-import { inspectPdf, PdfInspectionError } from "@sahihi/pdf"
+import { inspectPdf, PdfInspectionError, readFormWidgets, readPageText } from "@sahihi/pdf"
 import { Hono } from "hono"
 import type { AppEnv } from "../lib/env"
 import { badRequest, conflict, notFound, parseJson, parseQuery } from "../lib/http"
-import { actor, assertCanDeleteDocument } from "../lib/permissions"
+import { colorsInUse, hasTag, resolveTags, TAG_SELECT, tagMatches, tagsInUse } from "../lib/labels"
+import { actor, assertCanDeleteDocument, assertCanMoveDocument } from "../lib/permissions"
 import { requireOrg } from "../middleware/session"
 
 /**
@@ -42,6 +53,13 @@ export const documents = new Hono<AppEnv>()
       })
       if (!source) notFound("Source document")
     }
+    if (input.folderId) {
+      const folder = await prisma.folder.findFirst({
+        where: forOrganization(orgId).folder({ id: input.folderId }),
+        select: { id: true },
+      })
+      if (!folder) notFound("Folder")
+    }
     const id = crypto.randomUUID()
     const s3Key = keys.original(orgId, id)
     const document = await prisma.document.create({
@@ -53,6 +71,7 @@ export const documents = new Hono<AppEnv>()
         s3Key,
         sizeBytes: input.sizeBytes,
         sourceDocumentId: input.sourceDocumentId ?? null,
+        folderId: input.folderId ?? null,
       },
     })
     const uploadUrl = await presignUpload(s3Key, input.contentType, input.sizeBytes)
@@ -96,35 +115,95 @@ export const documents = new Hono<AppEnv>()
     }
   })
 
+  /**
+   * One folder's documents (root when `folderId` is omitted), newest first. `q` (names and tags),
+   * `tag` and `color` search every folder; `status`, `senderId` and `period` narrow either view
+   * (ADR 0022, 0025).
+   */
   .get("/", async (c) => {
-    const scope = forOrganization(c.get("organizationId"))
-    const { page } = parseQuery(c, ListDocumentsQuerySchema)
+    const orgId = c.get("organizationId")
+    const scope = forOrganization(orgId)
+    const query = parseQuery(c, ListDocumentsQuerySchema)
     const pageSize = DOCUMENTS_PAGE_SIZE
-    const where = scope.document({ status: { not: "UPLOADING" } })
-    const [items, total] = await prisma.$transaction([
+    if (query.folderId) {
+      const folder = await prisma.folder.findFirst({
+        where: scope.folder({ id: query.folderId }),
+        select: { id: true },
+      })
+      if (!folder) notFound("Folder")
+    }
+    const everywhere = Boolean(query.q || query.tag || query.color)
+    const filters: Prisma.DocumentWhereInput = {
+      status: query.status ?? { not: "UPLOADING" },
+      ...(!everywhere && { folderId: query.folderId ?? null }),
+      ...(query.q && {
+        OR: [{ name: { contains: query.q, mode: "insensitive" } }, { tags: tagMatches(query.q) }],
+      }),
+      ...(query.tag && { tags: hasTag(query.tag) }),
+      ...(query.color && { color: query.color }),
+      ...(query.senderId && { uploadedById: query.senderId }),
+      ...(query.period && { createdAt: { gte: periodStart(query.period, new Date()) } }),
+    }
+    const where = scope.document(filters)
+    const [items, total, senders, tags] = await prisma.$transaction([
       prisma.document.findMany({
         where,
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        skip: (page - 1) * pageSize,
+        skip: (query.page - 1) * pageSize,
         take: pageSize,
         include: {
-          _count: { select: { envelopes: true } },
+          // Sent envelopes freeze the name (it's on the signing page and the certificate).
+          _count: { select: { envelopes: { where: { status: { not: "DRAFT" } } } } },
           source: { select: { id: true, name: true, deletedAt: true } },
+          uploadedBy: { select: { id: true, name: true } },
+          folder: { select: { id: true, name: true } },
+          tags: TAG_SELECT,
         },
       }),
       prisma.document.count({ where }),
+      // "Sender" filter options: everyone who uploaded a listed document in this workspace.
+      prisma.user.findMany({
+        where: { documents: { some: scope.document({ status: { not: "UPLOADING" } }) } },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      }),
+      // "Tag" filter options and the tag picker's suggestions.
+      tagsInUse(orgId),
     ])
-    return c.json({ items, page, pageSize, total })
+    const me = actor(c)
+    return c.json({
+      items: items.map((d) => {
+        const mine = canMoveDocument(me, d)
+        return {
+          ...d,
+          permissions: { move: mine, label: mine, rename: mine && d._count.envelopes === 0 },
+        }
+      }),
+      page: query.page,
+      pageSize,
+      total,
+      senders,
+      tags,
+      // Color filter options.
+      colors: await colorsInUse(orgId),
+    })
   })
 
   .get("/:id", async (c) => {
     const scope = forOrganization(c.get("organizationId"))
     const doc = await prisma.document.findFirst({
       where: scope.document({ id: c.req.param("id") }),
-      include: { source: { select: { id: true, name: true, deletedAt: true } } },
+      include: {
+        source: { select: { id: true, name: true, deletedAt: true } },
+        tags: TAG_SELECT,
+      },
     })
     if (!doc) notFound("Document")
-    return c.json({ document: doc, permissions: { delete: canDeleteDocument(actor(c), doc) } })
+    const me = actor(c)
+    return c.json({
+      document: doc,
+      permissions: { delete: canDeleteDocument(me, doc), label: canMoveDocument(me, doc) },
+    })
   })
 
   /** Short-lived URL the PDF viewer loads. */
@@ -135,6 +214,80 @@ export const documents = new Hono<AppEnv>()
     })
     if (!doc) notFound("Document")
     return c.json({ url: await presignDownload(doc.s3Key, { fileName: doc.name }) })
+  })
+
+  /**
+   * Detected fields (ADR 0020): anchor tags like `{{s1:signature}}` and the PDF's own form widgets;
+   * only when neither finds anything, labels next to signature lines ("Signature: ____"), which
+   * are a guess. One PDFium pass serves both text detectors. Read-only: the editor shows them and
+   * the sender decides what to keep. Rects are normalized (docs/coordinates.md).
+   */
+  .get("/:id/field-suggestions", async (c) => {
+    const scope = forOrganization(c.get("organizationId"))
+    const doc = await prisma.document.findFirst({
+      where: scope.document({ id: c.req.param("id"), status: "READY" }),
+      select: { s3Key: true, pages: true },
+    })
+    if (!doc) notFound("Document")
+    const bytes = await getObjectBytes(doc.s3Key)
+    const pages = (doc.pages ?? []) as unknown as PageBox[]
+    const scanRules = createTextRuleScanner()
+    const text = await readPageText(bytes, {
+      measure: (t, lines) => [...anchorRanges(t), ...scanRules(t, lines)],
+      lines: true,
+    })
+    const anchors = suggestFieldsFromAnchors(text, pages)
+    const form = suggestFieldsFromForm(await readFormWidgets(bytes), pages)
+    const rules =
+      anchors.suggestions.length + form.suggestions.length === 0
+        ? suggestFieldsFromText(text, pages).suggestions
+        : []
+    return c.json({
+      suggestions: mergeSuggestions(anchors.suggestions, form.suggestions, rules),
+      skipped: anchors.skipped + form.skipped,
+    })
+  })
+
+  /**
+   * Rename, move to a folder (`folderId: null` = root) and/or set the colour and tags (ADR 0025).
+   * Moving and labelling are organisation only. A rename is refused (409) once a sent envelope
+   * uses the document: signers and the certificate show its name.
+   */
+  .patch("/:id", async (c) => {
+    const input = await parseJson(c, UpdateDocumentSchema)
+    const orgId = c.get("organizationId")
+    const scope = forOrganization(orgId)
+    const doc = await prisma.document.findFirst({
+      where: scope.document({ id: c.req.param("id"), status: { not: "UPLOADING" } }),
+      select: { id: true, uploadedById: true, name: true },
+    })
+    if (!doc) notFound("Document")
+    assertCanMoveDocument(c, doc)
+    if (input.name !== undefined && input.name !== doc.name) {
+      const sent = await prisma.envelope.count({
+        where: scope.envelope({ documentId: doc.id, status: { not: "DRAFT" } }),
+      })
+      if (sent > 0) conflict("This document was sent for signature, so its name can't change")
+    }
+    if (input.folderId) {
+      const folder = await prisma.folder.findFirst({
+        where: scope.folder({ id: input.folderId }),
+        select: { id: true },
+      })
+      if (!folder) notFound("Folder")
+    }
+    const tags = input.tags && (await resolveTags(orgId, input.tags))
+    const document = await prisma.document.update({
+      where: { id: doc.id },
+      data: {
+        ...(input.name !== undefined && { name: input.name }),
+        ...(input.folderId !== undefined && { folderId: input.folderId }),
+        ...(input.color !== undefined && { color: input.color }),
+        ...(tags && { tags: { set: tags } }),
+      },
+      select: { id: true, name: true, folderId: true, color: true, tags: TAG_SELECT },
+    })
+    return c.json({ document })
   })
 
   .delete("/:id", async (c) => {

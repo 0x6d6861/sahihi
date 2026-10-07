@@ -2,8 +2,8 @@ import type { RetentionYears } from "@sahihi/core"
 import { DeleteWorkspace } from "@/components/app/data/delete-workspace"
 import { type ExportRow, ExportsPanel } from "@/components/app/data/exports-panel"
 import { RetentionForm } from "@/components/app/data/retention-form"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Card, CardDescription, CardHeader, CardPanel, CardTitle } from "@/components/ui/card"
+import { Panel } from "@/components/app/panel"
+import { Alert } from "@/components/arc/alert/alert"
 import { apiServer, getServerSession } from "@/lib/api-server"
 
 export const metadata = { title: "Data" }
@@ -20,12 +20,9 @@ export default async function DataPage() {
   ])
   if (settings.status === 403) {
     return (
-      <Alert variant="info">
-        <AlertTitle>Owners and admins only</AlertTitle>
-        <AlertDescription>
-          Data retention and exports cover every envelope in the workspace, so only owners and
-          admins can manage them.
-        </AlertDescription>
+      <Alert tone="info" title="Owners and admins only">
+        Data retention and exports cover every envelope in the workspace, so only owners and admins
+        can manage them.
       </Alert>
     )
   }
@@ -38,44 +35,30 @@ export default async function DataPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Retention</CardTitle>
-          <CardDescription>
-            How long signed agreements are kept (Kenya Data Protection Act: keep personal data only
-            as long as needed).
-          </CardDescription>
-        </CardHeader>
-        <CardPanel>
-          <RetentionForm initial={settings.data?.retentionYears ?? null} />
-        </CardPanel>
-      </Card>
+      <Panel
+        title="Retention"
+        description="How long signed agreements are kept (Kenya Data Protection Act: keep personal data only as long as needed)."
+      >
+        <RetentionForm initial={settings.data?.retentionYears ?? null} />
+      </Panel>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Export</CardTitle>
-          <CardDescription>
-            A ZIP with every sent envelope: details and recipients (JSON), the audit trail with its
-            verification, the original, signed PDF and certificate. Downloads are kept for 7 days.
-          </CardDescription>
-        </CardHeader>
-        <CardPanel>
-          <ExportsPanel exports={exports.data?.items ?? []} />
-        </CardPanel>
-      </Card>
+      <Panel
+        title="Export"
+        description="A ZIP with every sent envelope: details and recipients (JSON), the audit trail with its verification, the original, signed PDF and certificate. Downloads are kept for 7 days."
+      >
+        <ExportsPanel exports={exports.data?.items ?? []} />
+      </Panel>
 
       {isOwner && org.data && (
-        <Card className="border-destructive/32">
-          <CardHeader>
-            <CardTitle>Delete workspace</CardTitle>
-            <CardDescription>
-              Permanently deletes {org.data.name} and all of its data, files and members.
-            </CardDescription>
-          </CardHeader>
-          <CardPanel>
+        <Panel
+          className="border-destructive/30"
+          title="Delete workspace"
+          description={`Permanently deletes ${org.data.name} and all of its data, files and members.`}
+        >
+          <div>
             <DeleteWorkspace id={org.data.id} name={org.data.name} />
-          </CardPanel>
-        </Card>
+          </div>
+        </Panel>
       )}
     </div>
   )

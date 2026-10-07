@@ -1,13 +1,12 @@
 "use client"
 
 import type { InvitationState, OrgRole } from "@sahihi/core"
-import { EllipsisIcon, MailIcon, XIcon } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@/components/ui/menu"
-import { Spinner } from "@/components/ui/spinner"
+import { MailIcon, XIcon } from "@/components/app/icons"
+import { toastManager } from "@/components/app/toast"
+import { Badge } from "@/components/arc/badge/badge"
+import { type DropdownItem, DropdownMenu } from "@/components/arc/dropdown-menu/dropdown-menu"
 import {
   Table,
   TableBody,
@@ -16,8 +15,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { toastManager } from "@/components/ui/toast"
 import { organization } from "@/lib/auth-client"
+import { formatDateTime } from "@/lib/format"
 import { INVITATION_BADGE, roleLabel } from "@/lib/members"
 
 export interface InvitationRow {
@@ -27,12 +26,6 @@ export interface InvitationRow {
   status: string
   expiresAt: string
 }
-
-const dateTime = new Intl.DateTimeFormat("en-GB", {
-  dateStyle: "medium",
-  timeStyle: "short",
-  timeZone: "Africa/Nairobi",
-})
 
 /**
  * Outstanding invitations. Resend re-sends the email (and refreshes the expiry) when the viewer
@@ -57,7 +50,7 @@ export function InvitationsTable({
           <TableHead>Status</TableHead>
           <TableHead>Expires</TableHead>
           {withActions && (
-            <TableHead className="w-10">
+            <TableHead className="w-0">
               <span className="sr-only">Actions</span>
             </TableHead>
           )}
@@ -130,42 +123,42 @@ function InvitationRowView({
       <TableCell className="font-medium">{invitation.email}</TableCell>
       <TableCell>{roleLabel(invitation.role)}</TableCell>
       <TableCell>
-        <Badge variant={badge.variant}>{badge.label}</Badge>
+        <Badge tone={badge.tone} size="sm">
+          {badge.label}
+        </Badge>
       </TableCell>
       <TableCell className="text-muted-foreground">
-        {dateTime.format(new Date(invitation.expiresAt))}
+        {formatDateTime(new Date(invitation.expiresAt))}
       </TableCell>
       {withActions && (
         <TableCell>
           {(canResend || canCancel) && (
-            <Menu>
-              <MenuTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`Actions for ${invitation.email}`}
-                    disabled={busy}
-                  />
-                }
-              >
-                {busy ? <Spinner aria-hidden /> : <EllipsisIcon aria-hidden />}
-              </MenuTrigger>
-              <MenuPopup align="end">
-                {canResend && (
-                  <MenuItem onClick={resend}>
-                    <MailIcon aria-hidden />
-                    Resend invitation
-                  </MenuItem>
-                )}
-                {canCancel && (
-                  <MenuItem variant="destructive" onClick={cancel}>
-                    <XIcon aria-hidden />
-                    Cancel invitation
-                  </MenuItem>
-                )}
-              </MenuPopup>
-            </Menu>
+            <DropdownMenu
+              label="Actions"
+              items={[
+                ...(canResend
+                  ? [
+                      {
+                        label: "Resend invitation",
+                        icon: <MailIcon />,
+                        disabled: busy,
+                        onSelect: () => void resend(),
+                      } satisfies DropdownItem,
+                    ]
+                  : []),
+                ...(canCancel
+                  ? [
+                      {
+                        label: "Cancel invitation",
+                        icon: <XIcon />,
+                        destructive: true,
+                        disabled: busy,
+                        onSelect: () => void cancel(),
+                      } satisfies DropdownItem,
+                    ]
+                  : []),
+              ]}
+            />
           )}
         </TableCell>
       )}

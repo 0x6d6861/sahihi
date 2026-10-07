@@ -327,6 +327,17 @@ export type PDFEditorHandle = {
   redo: () => void
   getViewportElement: () => HTMLDivElement | null
 }
+// sahihi patch (ADR 0019): app-provided right panels
+export type PdfEditorCustomPanel = {
+  id: string
+  /** Toolbar button tooltip and accessible name. */
+  label: string
+  icon: React.ReactNode
+  /** Panel body, shown in the editor's right panel. `close` hides it. */
+  render: (panel: { close: () => void }) => React.ReactNode
+  /** Set false to toggle it from the app's own control (e.g. in `ribbonContent`). */
+  toolbarButton?: boolean
+}
 export type PDFEditorProps = {
   className?: string
   /** A URL, or the PDF bytes as an ArrayBuffer, Uint8Array, Blob, or File. */
@@ -343,6 +354,18 @@ export type PDFEditorProps = {
   showUpload?: boolean
   showDownload?: boolean
   toolbarActions?: React.ReactNode
+  // sahihi patch (ADR 0019): app-provided right panels
+  customPanels?: PdfEditorCustomPanel[]
+  /** Id of a custom panel to open on load. */
+  defaultCustomPanel?: string
+  /** Controlled open custom panel (id or null); pair with `onCustomPanelChange`. */
+  customPanel?: string | null
+  onCustomPanelChange?: (id: string | null) => void
+  /**
+   * sahihi patch (ADR 0019): replaces the second toolbar row (mode switch and mode tools) with
+   * app tools, e.g. the field-placement tools.
+   */
+  ribbonContent?: React.ReactNode
   /** Extra actions for the text selection menu. Each receives normalized page coordinates. */
   selectionActions?: PdfEditorSelectionAction[]
   /** Persist saved signatures in localStorage. Pass a string to use a custom storage key. */
@@ -1815,6 +1838,12 @@ type PdfEditorInnerProps = {
   showUpload: boolean
   showDownload: boolean
   toolbarActions?: React.ReactNode
+  // sahihi patch (ADR 0019): app-provided right panels
+  customPanels?: PdfEditorCustomPanel[]
+  defaultCustomPanel?: string
+  customPanel?: string | null // sahihi patch (ADR 0019)
+  onCustomPanelChange?: (id: string | null) => void
+  ribbonContent?: React.ReactNode // sahihi patch (ADR 0019)
   selectionActions: PdfEditorSelectionAction[]
   signatureFontsStylesheetUrl: string | null
   renderPageOverlay?: (props: PDFEditorPageOverlayProps) => React.ReactNode
@@ -1908,6 +1937,11 @@ function PdfEditorInner({
   showUpload,
   showDownload,
   toolbarActions,
+  customPanels,
+  defaultCustomPanel,
+  customPanel: controlledCustomPanel,
+  onCustomPanelChange,
+  ribbonContent,
   selectionActions,
   signatureFontsStylesheetUrl,
   renderPageOverlay,
@@ -1948,6 +1982,27 @@ function PdfEditorInner({
   const [mode, setModeState] = React.useState<PdfEditorMode>(defaultMode)
   const [rightPanel, setRightPanel] =
     React.useState<PdfEditorRightPanel | null>(null)
+  // sahihi patch (ADR 0019): app-provided right panels: at most one of rightPanel / customPanel is open.
+  const [uncontrolledCustomPanel, setUncontrolledCustomPanel] = React.useState<
+    string | null
+  >(defaultCustomPanel ?? null)
+  const customPanel =
+    controlledCustomPanel !== undefined
+      ? controlledCustomPanel
+      : uncontrolledCustomPanel
+  const setCustomPanel = (
+    next: string | null | ((previous: string | null) => string | null)
+  ) => {
+    const value = typeof next === "function" ? next(customPanel) : next
+    setUncontrolledCustomPanel(value)
+    onCustomPanelChange?.(value)
+  }
+  // An app-toggled panel (controlled) closes any built-in right panel.
+  React.useEffect(() => {
+    if (customPanel) setRightPanel(null)
+  }, [customPanel])
+  const activeCustomPanel =
+    customPanels?.find((panel) => panel.id === customPanel) ?? null
   const [dialog, setDialog] = React.useState<PdfEditorDialogRequest | null>(
     null
   )
@@ -3280,10 +3335,32 @@ function PdfEditorInner({
                           label="Details panel"
                           active={rightPanel !== null}
                           disabled={controlsDisabled}
-                          onClick={() => toggleRightPanel("properties")}
+                          onClick={() => {
+                            setCustomPanel(null) // sahihi patch (ADR 0019)
+                            toggleRightPanel("properties")
+                          }}
                         >
                           <PanelRightGlyph className="size-4" />
                         </PdfEditorToolButton>
+                        {/* sahihi patch (ADR 0019): one button per app panel */}
+                        {customPanels
+                          ?.filter((panel) => panel.toolbarButton !== false)
+                          .map((panel) => (
+                          <PdfEditorToolButton
+                            key={panel.id}
+                            label={panel.label}
+                            active={customPanel === panel.id}
+                            disabled={controlsDisabled}
+                            onClick={() => {
+                              setRightPanel(null)
+                              setCustomPanel((previous) =>
+                                previous === panel.id ? null : panel.id
+                              )
+                            }}
+                          >
+                            {panel.icon}
+                          </PdfEditorToolButton>
+                        ))}
                         {toolbarActions ? (
                           <>
                             <PdfEditorToolbarSeparator />
@@ -3478,23 +3555,32 @@ function PdfEditorInner({
                     data-slot="pdf-editor-ribbon"
                     className="flex min-h-10 items-center gap-1 border-b bg-muted/30 px-3 py-1.5"
                   >
-                    <PdfEditorModeSwitch
-                      mode={mode}
-                      features={features}
-                      compact={compactToolbar}
-                      onModeChange={setMode}
-                    />
-                    <PdfEditorToolbarSeparator className="mx-1.5" />
-                    <InlineScrollArea2
-                      orientation="horizontal"
-                      scrollFade
-                      scrollbarOverflowOnly
-                      className="min-w-0 flex-1 self-stretch"
-                    >
-                      <div className="flex w-max min-w-full items-center gap-0.5 py-0.5">
-                        {ribbon}
+                    {/* sahihi patch (ADR 0019): app tools replace this row */}
+                    {ribbonContent ? (
+                      <div className="flex min-w-0 flex-1 items-center gap-1">
+                        {ribbonContent}
                       </div>
-                    </InlineScrollArea2>
+                    ) : (
+                      <>
+                        <PdfEditorModeSwitch
+                          mode={mode}
+                          features={features}
+                          compact={compactToolbar}
+                          onModeChange={setMode}
+                        />
+                        <PdfEditorToolbarSeparator className="mx-1.5" />
+                        <InlineScrollArea2
+                          orientation="horizontal"
+                          scrollFade
+                          scrollbarOverflowOnly
+                          className="min-w-0 flex-1 self-stretch"
+                        >
+                          <div className="flex w-max min-w-full items-center gap-0.5 py-0.5">
+                            {ribbon}
+                          </div>
+                        </InlineScrollArea2>
+                      </>
+                    )}
                   </div>
                 </fieldset>
               </TooltipProvider>
@@ -3525,7 +3611,14 @@ function PdfEditorInner({
                   ) : null
                 }
                 right={
-                  rightPanel !== null ? (
+                  /* sahihi patch (ADR 0019) */
+                  activeCustomPanel ? (
+                    <div className="flex h-full flex-col">
+                      {activeCustomPanel.render({
+                        close: () => setCustomPanel(null),
+                      })}
+                    </div>
+                  ) : rightPanel !== null ? (
                     <div className="flex h-full flex-col">
                       <PanelTabStrip
                         tabs={visibleRightTabs}
@@ -3854,6 +3947,11 @@ export const PDFEditor = React.forwardRef<PDFEditorHandle, PDFEditorProps>(
       showUpload = true,
       showDownload = true,
       toolbarActions,
+      customPanels, // sahihi patch (ADR 0019)
+      defaultCustomPanel,
+      customPanel,
+      onCustomPanelChange,
+      ribbonContent,
       selectionActions,
       persistSignatures = true,
       stampManifests,
@@ -4044,6 +4142,11 @@ export const PDFEditor = React.forwardRef<PDFEditorHandle, PDFEditorProps>(
         showUpload={showUpload}
         showDownload={showDownload}
         toolbarActions={toolbarActions}
+        customPanels={customPanels} // sahihi patch (ADR 0019)
+        defaultCustomPanel={defaultCustomPanel}
+        customPanel={customPanel}
+        onCustomPanelChange={onCustomPanelChange}
+        ribbonContent={ribbonContent}
         selectionActions={resolvedSelectionActions}
         signatureFontsStylesheetUrl={signatureFontsStylesheetUrl}
         renderPageOverlay={renderPageOverlay}

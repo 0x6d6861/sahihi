@@ -1,4 +1,5 @@
 import type { InvitationState, OrgRole } from "@sahihi/core"
+import type { BadgeTone } from "./constants"
 
 /** Org roles as shown on the members page (docs/auth.md → Roles). */
 export const MEMBER_ROLE_LABELS: Record<OrgRole, string> = {
@@ -22,15 +23,12 @@ export function roleLabel(role: string): string {
   return parts.map((r) => MEMBER_ROLE_LABELS[r as OrgRole] ?? r).join(", ")
 }
 
-export const INVITATION_BADGE: Record<
-  InvitationState,
-  { label: string; variant: "outline" | "warning" | "success" | "secondary" }
-> = {
-  pending: { label: "Pending", variant: "outline" },
-  expired: { label: "Expired", variant: "warning" },
-  accepted: { label: "Accepted", variant: "success" },
-  rejected: { label: "Declined", variant: "secondary" },
-  canceled: { label: "Canceled", variant: "secondary" },
+export const INVITATION_BADGE: Record<InvitationState, { label: string; tone: BadgeTone }> = {
+  pending: { label: "Pending", tone: "info" },
+  expired: { label: "Expired", tone: "warning" },
+  accepted: { label: "Accepted", tone: "success" },
+  rejected: { label: "Declined", tone: "neutral" },
+  canceled: { label: "Canceled", tone: "neutral" },
 }
 
 /** Invitations worth listing: still pending, or expired and waiting to be resent or canceled. */

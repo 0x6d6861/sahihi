@@ -1,28 +1,16 @@
 "use client"
 
 import { defaultRoleLabels, type RecipientRole, SaveTemplateSchema } from "@sahihi/core"
-import { LayoutTemplateIcon } from "lucide-react"
-import Link from "next/link"
-import { useState } from "react"
+import { cloneElement, useState } from "react"
+import { ButtonLink } from "@/components/app/button-link"
+import { DialogActions } from "@/components/app/confirm-dialog"
 import { useDraftState } from "@/components/app/envelope/draft-state"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Dialog,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogPanel,
-  DialogPopup,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field"
-import { Form } from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
-import { Spinner } from "@/components/ui/spinner"
-import { toastManager } from "@/components/ui/toast"
+import { LayoutTemplateIcon } from "@/components/app/icons"
+import { Alert } from "@/components/arc/alert/alert"
+import { Button } from "@/components/arc/button/button"
+import { Checkbox } from "@/components/arc/checkbox/checkbox"
+import { Dialog, DialogContent, DialogTrigger } from "@/components/arc/dialog/dialog"
+import { Input } from "@/components/arc/input/input"
 import { ApiError, api } from "@/lib/api"
 import { type FormErrors, issuesToFormErrors } from "@/lib/envelope-form"
 
@@ -41,10 +29,13 @@ export function SaveTemplateDialog({
   envelopeId,
   envelopeTitle,
   recipients,
+  trigger,
 }: {
   envelopeId: string
   envelopeTitle: string
   recipients: TemplateSourceRecipient[]
+  /** Element the trigger renders as (e.g. a sidebar menu button); a secondary Button by default. */
+  trigger?: React.ReactElement
 }) {
   const draft = useDraftState()
   const initialLabels = defaultRoleLabels(recipients)
@@ -99,8 +90,8 @@ export function SaveTemplateDialog({
         method: "POST",
         json: parsed.data,
       })
+      // Confirmed in place: the dialog switches to its "Saved" view.
       setSavedId(template.id)
-      toastManager.add({ title: "Template saved", description: parsed.data.name, type: "success" })
     } catch (err) {
       if (err instanceof ApiError && err.body?.issues?.length) {
         setErrors(issuesToFormErrors(err.body.issues))
@@ -112,97 +103,95 @@ export function SaveTemplateDialog({
     }
   }
 
+  const label = (
+    <>
+      <LayoutTemplateIcon aria-hidden />
+      <span>Save as template</span>
+    </>
+  )
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger render={<Button variant="outline" />}>
-        <LayoutTemplateIcon aria-hidden />
-        Save as template
+      <DialogTrigger asChild>
+        {trigger ? (
+          cloneElement(trigger, undefined, label)
+        ) : (
+          <Button variant="secondary">{label}</Button>
+        )}
       </DialogTrigger>
-      <DialogPopup className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Save as template</DialogTitle>
-          <DialogDescription>
-            Reuse this document, its recipients' roles and every field. This envelope isn't changed.
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent
+        title={savedId ? "Template saved" : "Save as template"}
+        description="Reuse this document, its recipients' roles and every field. This envelope isn't changed."
+      >
         {savedId ? (
-          <>
-            <DialogPanel>
-              <p className="text-sm">
-                Saved. Next time, start from <span className="font-medium">{name}</span> on the
-                Templates page and just fill in who signs.
-              </p>
-            </DialogPanel>
-            <DialogFooter>
+          <div className="flex flex-col gap-4">
+            <p className="text-sm">
+              Next time, start from <span className="font-medium">{name}</span> on the Templates
+              page and just fill in who signs.
+            </p>
+            <DialogActions>
               <Button variant="ghost" onClick={() => setOpen(false)}>
                 Close
               </Button>
-              <Button render={<Link href={`/templates/${savedId}/use`} />}>Use it now</Button>
-            </DialogFooter>
-          </>
+              <ButtonLink variant="primary" href={`/templates/${savedId}/use`}>
+                Use it now
+              </ButtonLink>
+            </DialogActions>
+          </div>
         ) : (
-          <Form errors={errors} onSubmit={onSubmit} className="contents">
-            <DialogPanel className="flex flex-col gap-5">
-              {problems.length > 0 && (
-                <Alert variant="warning">
-                  <AlertDescription>
-                    <ul className="flex flex-col gap-1">
-                      {problems.map((p) => (
-                        <li key={p}>{p}</li>
-                      ))}
-                    </ul>
-                  </AlertDescription>
-                </Alert>
-              )}
-              <Field name="name">
-                <FieldLabel>Template name</FieldLabel>
-                <Input value={name} maxLength={120} onChange={(e) => setName(e.target.value)} />
-                <FieldError />
-              </Field>
-              <Field name="description">
-                <FieldLabel>Description (optional)</FieldLabel>
-                <Input
-                  value={description}
-                  maxLength={500}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="e.g. 12-month residential lease, Nairobi"
-                />
-                <FieldError />
-              </Field>
-              <div className="flex flex-col gap-4">
-                <p className="font-medium text-sm">Roles</p>
-                {recipients.map((r, i) => (
-                  <div key={r.id} className="flex flex-col gap-2 rounded-lg border p-3">
-                    <Field name={`roles.${i}.label`}>
-                      <FieldLabel>Role for {r.name}</FieldLabel>
-                      <Input
-                        value={labels[i] ?? ""}
-                        maxLength={60}
-                        onChange={(e) =>
-                          setLabels((all) => all.map((l, j) => (j === i ? e.target.value : l)))
-                        }
-                      />
-                      <FieldError />
-                    </Field>
-                    <Field name={`roles.${i}.keepContact`}>
-                      <FieldLabel className="flex items-center gap-2 font-normal">
-                        <Checkbox
-                          checked={keep[i] ?? false}
-                          onCheckedChange={(checked) =>
-                            setKeep((all) => all.map((k, j) => (j === i ? checked === true : k)))
-                          }
-                        />
-                        Always send to {r.email}
-                      </FieldLabel>
-                      <FieldDescription>
-                        For someone who signs every time, like your own countersigner.
-                      </FieldDescription>
-                    </Field>
-                  </div>
-                ))}
-              </div>
-            </DialogPanel>
-            <DialogFooter>
+          <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
+            {problems.length > 0 && (
+              <Alert tone="warning" title="Before you save">
+                <ul className="flex flex-col gap-1">
+                  {problems.map((p) => (
+                    <li key={p}>{p}</li>
+                  ))}
+                </ul>
+              </Alert>
+            )}
+            <Input
+              label="Template name"
+              name="name"
+              value={name}
+              maxLength={120}
+              error={errors.name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <Input
+              label="Description (optional)"
+              name="description"
+              value={description}
+              maxLength={500}
+              error={errors.description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="For example, 12-month residential lease, Nairobi"
+            />
+            <fieldset className="flex flex-col gap-3">
+              <legend className="pb-3 font-medium text-sm">Roles</legend>
+              {recipients.map((r, i) => (
+                <div key={r.id} className="flex flex-col gap-3 rounded-2xl border p-4">
+                  <Input
+                    label={`Role for ${r.name}`}
+                    name={`roles.${i}.label`}
+                    value={labels[i] ?? ""}
+                    maxLength={60}
+                    error={errors[`roles.${i}.label`]}
+                    onChange={(e) =>
+                      setLabels((all) => all.map((l, j) => (j === i ? e.target.value : l)))
+                    }
+                  />
+                  <Checkbox
+                    label={`Always send to ${r.email}`}
+                    description="For someone who signs every time, like your own countersigner."
+                    checked={keep[i] ?? false}
+                    onCheckedChange={(checked) =>
+                      setKeep((all) => all.map((k, j) => (j === i ? checked === true : k)))
+                    }
+                  />
+                </div>
+              ))}
+            </fieldset>
+            <DialogActions>
               <Button
                 variant="ghost"
                 type="button"
@@ -211,14 +200,13 @@ export function SaveTemplateDialog({
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={pending}>
-                {pending && <Spinner aria-hidden />}
+              <Button type="submit" loading={pending}>
                 Save template
               </Button>
-            </DialogFooter>
-          </Form>
+            </DialogActions>
+          </form>
         )}
-      </DialogPopup>
+      </DialogContent>
     </Dialog>
   )
 }

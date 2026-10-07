@@ -1,7 +1,7 @@
 "use client"
 
 import { orgAc, orgRoles } from "@sahihi/core"
-import { organizationClient } from "better-auth/client/plugins"
+import { organizationClient, twoFactorClient } from "better-auth/client/plugins"
 import { createAuthClient } from "better-auth/react"
 
 /**
@@ -9,8 +9,21 @@ import { createAuthClient } from "better-auth/react"
  * and are proxied to the API (next.config.ts rewrites).
  */
 export const authClient = createAuthClient({
-  plugins: [organizationClient({ ac: orgAc, roles: orgRoles })],
+  // The sign-in form handles `twoFactorRedirect` itself (it keeps `?next=`), so no global redirect.
+  plugins: [organizationClient({ ac: orgAc, roles: orgRoles }), twoFactorClient()],
 })
 
-export const { signIn, signUp, signOut, useSession, organization, useActiveOrganization } =
-  authClient
+export const {
+  signIn,
+  signUp,
+  signOut,
+  useSession,
+  organization,
+  useActiveOrganization,
+  twoFactor,
+  updateUser,
+  changeEmail,
+  changePassword,
+  revokeSession,
+  revokeOtherSessions,
+} = authClient

@@ -32,7 +32,8 @@ test("sender signs up, sends an envelope; the signer signs; a certificate is iss
   await settle(page)
   await page.getByLabel("Full name").fill(sender.name)
   await page.getByLabel("Work email").fill(sender.email)
-  await page.getByLabel("Password").fill(sender.password)
+  // exact: Arc's password field also has a "Show password" toggle.
+  await page.getByLabel("Password", { exact: true }).fill(sender.password)
   await page.getByRole("button", { name: /create account|sign up/i }).click()
   await expect(page.getByText("Check your email")).toBeVisible()
 
@@ -58,20 +59,20 @@ test("sender signs up, sends an envelope; the signer signs; a certificate is iss
   await page.waitForURL(/\/envelopes\/new/)
   await settle(page)
   await page.getByRole("button", { name: "Create draft" }).click()
-  await page.waitForURL(/\/envelopes\/[a-z0-9]{20,}$/)
+  // A new draft opens in the draft editor, on its first step (Prepare document, optional).
+  await page.waitForURL(/\/envelopes\/[a-z0-9]{20,}\/edit/)
   await settle(page)
-  await page.getByRole("tab", { name: /Recipients/ }).click()
+  await page.getByRole("button", { name: /^Recipients/ }).click()
   await page.getByLabel("Name").first().fill(signer.name)
   await page.getByLabel("Email").first().fill(signer.email)
   await page.getByRole("button", { name: "Save recipients" }).click()
   await expect(page.getByText("All changes saved").first()).toBeVisible()
 
   // ── Place a signature field on page 1 ──
-  await page.getByRole("tab", { name: /Document/ }).click()
+  await page.getByRole("button", { name: /^Add fields/ }).click()
   await page
-    .getByRole("radio", { name: "Signature" })
-    .or(page.getByRole("button", { name: "Signature" }))
-    .first()
+    .getByRole("complementary", { name: "Field tools" })
+    .getByRole("button", { name: "Signature", exact: true })
     .click()
   const layer = page.locator("[data-field-layer]").first()
   await expect(layer).toBeVisible({ timeout: 60_000 })
@@ -82,8 +83,13 @@ test("sender signs up, sends an envelope; the signer signs; a certificate is iss
 
   // ── Send ──
   await page.getByRole("button", { name: "Send", exact: true }).click()
-  await page.getByRole("alertdialog").getByRole("button", { name: "Send", exact: true }).click()
+  // "Review & send": the details can be changed before sending.
+  const review = page.getByRole("dialog", { name: "Review & send" })
+  await review.getByLabel("Message (optional)").fill("Please sign the lease.")
+  await review.getByRole("button", { name: "Send", exact: true }).click()
   await expect(page.getByText("Envelope sent")).toBeVisible()
+  // Sent: back on the read-only envelope page.
+  await page.waitForURL(/\/envelopes\/[a-z0-9]{20,}(\?|$)/)
   const envelopeUrl = page.url()
 
   // ── The signer signs (no account, separate browser context) ──

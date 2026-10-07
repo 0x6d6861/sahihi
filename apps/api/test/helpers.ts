@@ -114,13 +114,45 @@ export function request(
  * The xref offsets are computed, so strict parsers accept it too.
  */
 export function minimalPdf(pages = 1): Uint8Array {
-  const objects: string[] = []
   const kids = Array.from({ length: pages }, (_, i) => `${3 + i} 0 R`).join(" ")
-  objects.push("<< /Type /Catalog /Pages 2 0 R >>")
-  objects.push(`<< /Type /Pages /Kids [${kids}] /Count ${pages} >>`)
-  for (let i = 0; i < pages; i++) {
-    objects.push("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << >> >>")
-  }
+  return buildPdf([
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    `<< /Type /Pages /Kids [${kids}] /Count ${pages} >>`,
+    ...Array.from(
+      { length: pages },
+      () => "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << >> >>",
+    ),
+  ])
+}
+
+/** One US Letter page with an AcroForm: a "Buyer Signature" signature widget and a "Seller Date" text widget. */
+export function formPdf(): Uint8Array {
+  return buildPdf([
+    "<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [4 0 R 5 0 R] >> >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << >> /Annots [4 0 R 5 0 R] >>",
+    "<< /Type /Annot /Subtype /Widget /FT /Sig /T (Buyer Signature) /Rect [61.2 79.2 183.6 118.8] /F 4 >>",
+    "<< /Type /Annot /Subtype /Widget /FT /Tx /T (Seller Date) /Rect [306 79.2 428.4 99] /F 4 >>",
+  ])
+}
+
+/** One US Letter page with `lines` of Helvetica text, one per 40pt from the top (y = 700, 660, …). */
+export function textPdf(...lines: string[]): Uint8Array {
+  const esc = (t: string) => t.replace(/[\\()]/g, "\\$&")
+  const content = lines
+    .map((t, i) => `BT /F1 12 Tf 72 ${700 - i * 40} Td (${esc(t)}) Tj ET`)
+    .join("\n")
+  return buildPdf([
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+  ])
+}
+
+/** Objects (numbered from 1, object 1 is the catalog) → PDF bytes with a computed xref. */
+function buildPdf(objects: string[]): Uint8Array {
   let body = "%PDF-1.7\n"
   const offsets: number[] = []
   objects.forEach((obj, i) => {
@@ -152,10 +184,11 @@ export async function uploadDocument(
   sender: Sender,
   bytes: Uint8Array = minimalPdf(),
   name = "contract.pdf",
+  { folderId }: { folderId?: string } = {},
 ): Promise<{ status: number; document: UploadedDocument }> {
   const created = await request(sender, "/api/documents/uploads", {
     method: "POST",
-    json: { name, sizeBytes: bytes.byteLength, contentType: "application/pdf" },
+    json: { name, sizeBytes: bytes.byteLength, contentType: "application/pdf", folderId },
   })
   if (created.status !== 201) throw new Error(`create upload: ${created.status}`)
   const { document, uploadUrl } = (await created.json()) as {

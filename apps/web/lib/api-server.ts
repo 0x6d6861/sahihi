@@ -19,7 +19,14 @@ export async function apiServer<T>(
 }
 
 export interface ServerSession {
-  user: { id: string; name: string; email: string; emailVerified: boolean; image?: string | null }
+  user: {
+    id: string
+    name: string
+    email: string
+    emailVerified: boolean
+    image?: string | null
+    twoFactorEnabled?: boolean | null
+  }
   session: { id: string; activeOrganizationId?: string | null; expiresAt: string }
 }
 

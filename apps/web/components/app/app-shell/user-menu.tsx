@@ -1,25 +1,14 @@
 "use client"
 
-import { Logout01Icon, Settings02Icon, UnfoldMoreIcon } from "@hugeicons/core-free-icons"
+import { Settings02Icon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  useSidebar,
-} from "@/components/ui/sidebar"
+import { useEffect, useState } from "react"
+import { applyThemePreference, currentThemePreference } from "@/components/app/theme"
+import { UserMenu as ArcUserMenu } from "@/components/arc/user-menu/user-menu"
 import { signOut } from "@/lib/auth-client"
-import { initials, SETTINGS_NAV } from "@/lib/nav"
+import { SETTINGS_NAV } from "@/lib/nav"
+import type { ThemePreference } from "@/lib/theme"
 
 export interface ShellUser {
   name: string
@@ -27,10 +16,21 @@ export interface ShellUser {
   image?: string | null
 }
 
-/** Account menu in the sidebar footer: workspace settings and sign out. */
+/**
+ * Account menu at the right of the top bar (avatar only): Settings (the only way in, ADR 0026),
+ * appearance (light, dark, system) and sign out.
+ */
 export function UserMenu({ user }: { user: ShellUser }) {
   const router = useRouter()
-  const { isMobile } = useSidebar()
+  const [theme, setTheme] = useState<ThemePreference>("system")
+
+  // The preference is on <html>, which only exists in the browser; read it after mount.
+  useEffect(() => setTheme(currentThemePreference()), [])
+
+  function onThemeChange(next: ThemePreference) {
+    setTheme(next)
+    applyThemePreference(next)
+  }
 
   async function onSignOut() {
     await signOut()
@@ -39,33 +39,24 @@ export function UserMenu({ user }: { user: ShellUser }) {
   }
 
   return (
-    <SidebarMenu>
-      <SidebarMenuItem>
-        <DropdownMenu>
-          <DropdownMenuTrigger render={<SidebarMenuButton size="lg" tooltip={user.email} />}>
-            <Avatar className="size-8">
-              {user.image && <AvatarImage src={user.image} alt="" />}
-              <AvatarFallback>{initials(user.name, user.email)}</AvatarFallback>
-            </Avatar>
-            <div className="flex min-w-0 flex-col gap-0.5 leading-none">
-              <span className="truncate font-medium">{user.name || user.email}</span>
-              <span className="truncate text-muted-foreground text-xs">{user.email}</span>
-            </div>
-            <HugeiconsIcon icon={UnfoldMoreIcon} className="ml-auto" aria-hidden />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" side={isMobile ? "top" : "right"} className="min-w-56">
-            <DropdownMenuItem render={<Link href={SETTINGS_NAV[0].href} />}>
-              <HugeiconsIcon icon={Settings02Icon} aria-hidden />
-              Settings
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onSignOut}>
-              <HugeiconsIcon icon={Logout01Icon} aria-hidden />
-              Sign out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </SidebarMenuItem>
-    </SidebarMenu>
+    <ArcUserMenu
+      user={{
+        name: user.name || user.email,
+        email: user.email,
+        avatarSrc: user.image ?? undefined,
+      }}
+      theme={theme}
+      onThemeChange={onThemeChange}
+      items={[
+        {
+          label: "Settings",
+          icon: <HugeiconsIcon icon={Settings02Icon} size={16} strokeWidth={1.75} aria-hidden />,
+          onSelect: () => router.push(SETTINGS_NAV[0].href),
+        },
+      ]}
+      onSignOut={onSignOut}
+      align="end"
+      showName={false}
+    />
   )
 }

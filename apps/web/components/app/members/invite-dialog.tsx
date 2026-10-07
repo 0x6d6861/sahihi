@@ -1,26 +1,15 @@
 "use client"
 
 import { InviteMemberSchema, type OrgRole } from "@sahihi/core"
-import { UserPlusIcon } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogPanel,
-  DialogPopup,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field"
-import { Form } from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
-import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Spinner } from "@/components/ui/spinner"
-import { toastManager } from "@/components/ui/toast"
+import { DialogActions } from "@/components/app/confirm-dialog"
+import { UserPlusIcon } from "@/components/app/icons"
+import { toastManager } from "@/components/app/toast"
+import { Button } from "@/components/arc/button/button"
+import { Dialog, DialogContent, DialogTrigger } from "@/components/arc/dialog/dialog"
+import { Input } from "@/components/arc/input/input"
+import { RadioGroup } from "@/components/arc/radio-group/radio-group"
 import { organization } from "@/lib/auth-client"
 import { type FormErrors, issuesToFormErrors } from "@/lib/envelope-form"
 import { MEMBER_ROLE_DESCRIPTIONS, MEMBER_ROLE_LABELS } from "@/lib/members"
@@ -71,63 +60,54 @@ export function InviteDialog({ roles }: { roles: OrgRole[] }) {
 
   return (
     <Dialog open={open} onOpenChange={reset}>
-      <DialogTrigger render={<Button />}>
-        <UserPlusIcon aria-hidden />
-        Invite member
+      <DialogTrigger asChild>
+        <Button>
+          <UserPlusIcon aria-hidden />
+          Invite member
+        </Button>
       </DialogTrigger>
-      <DialogPopup>
-        <DialogHeader>
-          <DialogTitle>Invite a member</DialogTitle>
-          <DialogDescription>
-            They get an email with a link to join. The link works for 48 hours.
-          </DialogDescription>
-        </DialogHeader>
-        <Form errors={errors} onSubmit={onSubmit} className="contents">
-          <DialogPanel className="flex flex-col gap-5">
-            <Field name="email">
-              <FieldLabel>Email</FieldLabel>
-              <Input
-                type="email"
-                value={email}
-                autoComplete="off"
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@company.co.ke"
-              />
-              <FieldError />
-            </Field>
-            <Field name="role">
-              <FieldLabel>Role</FieldLabel>
-              <Select
-                items={roles.map((r) => ({ value: r, label: MEMBER_ROLE_LABELS[r] }))}
-                value={role}
-                onValueChange={(v) => v && setRole(v as OrgRole)}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectPopup>
-                  {roles.map((r) => (
-                    <SelectItem key={r} value={r}>
-                      {MEMBER_ROLE_LABELS[r]}
-                    </SelectItem>
-                  ))}
-                </SelectPopup>
-              </Select>
-              <FieldDescription>{MEMBER_ROLE_DESCRIPTIONS[role]}</FieldDescription>
-              <FieldError />
-            </Field>
-          </DialogPanel>
-          <DialogFooter>
+      <DialogContent
+        title="Invite a member"
+        description="They get an email with a link to join. The link works for 48 hours."
+      >
+        <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
+          <Input
+            label="Email"
+            name="email"
+            type="email"
+            value={email}
+            autoComplete="off"
+            error={errors.email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="name@company.co.ke"
+          />
+          {/* Up to three roles, each with what it can do: a radio group, not a select. */}
+          <RadioGroup
+            label="Role"
+            name="role"
+            value={role}
+            onValueChange={(v) => setRole(v as OrgRole)}
+            options={roles.map((r) => ({
+              value: r,
+              label: MEMBER_ROLE_LABELS[r],
+              description: MEMBER_ROLE_DESCRIPTIONS[r],
+            }))}
+          />
+          {errors.role && (
+            <p role="alert" className="text-destructive-foreground text-sm">
+              {errors.role}
+            </p>
+          )}
+          <DialogActions>
             <Button variant="ghost" type="button" disabled={pending} onClick={() => reset(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={pending}>
-              {pending && <Spinner aria-hidden />}
+            <Button type="submit" loading={pending}>
               Send invitation
             </Button>
-          </DialogFooter>
-        </Form>
-      </DialogPopup>
+          </DialogActions>
+        </form>
+      </DialogContent>
     </Dialog>
   )
 }

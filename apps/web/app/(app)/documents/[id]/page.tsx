@@ -1,21 +1,16 @@
 import type { DocumentStatus } from "@sahihi/core"
-import { FilePenLineIcon, SendIcon } from "lucide-react"
 import Link from "next/link"
 import { notFound } from "next/navigation"
+import { ButtonLink } from "@/components/app/button-link"
 import { DocumentViewer } from "@/components/app/document-viewer"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import { Button } from "@/components/ui/button"
+import { FilePenLineIcon, SendIcon } from "@/components/app/icons"
+import { Alert } from "@/components/arc/alert/alert"
+import { Badge } from "@/components/arc/badge/badge"
+import { Breadcrumb } from "@/components/arc/breadcrumb/breadcrumb"
 import { apiServer } from "@/lib/api-server"
+import { DOCUMENT_STATUS_BADGE } from "@/lib/constants"
 import { shortHash } from "@/lib/documents"
+import { formatDate } from "@/lib/format"
 
 interface DocumentDetail {
   id: string
@@ -46,31 +41,21 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="flex flex-col gap-6">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink render={<Link href="/documents" />}>Documents</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage className="max-w-64 truncate">{doc.name}</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+      <Breadcrumb items={[{ label: "Documents", href: "/documents" }, { label: doc.name }]} />
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-2">
-          <h1 className="truncate font-semibold text-xl">{doc.name}</h1>
+          <h1 className="truncate font-medium text-2xl tracking-tight">{doc.name}</h1>
           <div className="flex flex-wrap items-center gap-2 text-muted-foreground text-sm">
-            <Badge variant={doc.status === "READY" ? "success" : "error"}>
-              {doc.status.toLowerCase()}
+            <Badge tone={DOCUMENT_STATUS_BADGE[doc.status].tone} size="sm">
+              {DOCUMENT_STATUS_BADGE[doc.status].label}
             </Badge>
             {doc.pageCount !== null && (
               <span>
                 {doc.pageCount} {doc.pageCount === 1 ? "page" : "pages"}
               </span>
             )}
-            <span>Uploaded {new Date(doc.createdAt).toLocaleDateString()}</span>
+            <span>Uploaded {formatDate(doc.createdAt)}</span>
             {doc.source && (
               <span>
                 Prepared from{" "}
@@ -92,19 +77,17 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
         </div>
         {doc.status === "READY" && (
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              render={<Link href={`/documents/${encodeURIComponent(doc.id)}/prepare`} />}
-            >
+            <ButtonLink href={`/documents/${encodeURIComponent(doc.id)}/prepare`}>
               <FilePenLineIcon aria-hidden />
               Prepare
-            </Button>
-            <Button
-              render={<Link href={`/envelopes/new?documentId=${encodeURIComponent(doc.id)}`} />}
+            </ButtonLink>
+            <ButtonLink
+              variant="primary"
+              href={`/envelopes/new?documentId=${encodeURIComponent(doc.id)}`}
             >
               <SendIcon aria-hidden />
               Create envelope
-            </Button>
+            </ButtonLink>
           </div>
         )}
       </div>
@@ -112,15 +95,13 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
       {doc.status === "READY" && file?.data ? (
         <DocumentViewer src={file.data.url} fileName={doc.name} />
       ) : (
-        <Alert variant={doc.status === "FAILED" ? "error" : "warning"}>
-          <AlertTitle>
-            {doc.status === "FAILED" ? "This PDF could not be processed" : "Not ready yet"}
-          </AlertTitle>
-          <AlertDescription>
-            {doc.status === "FAILED"
-              ? (doc.failureReason ?? "Upload a new copy of the file.")
-              : "The upload hasn't finished. Upload the file again if this persists."}
-          </AlertDescription>
+        <Alert
+          tone={doc.status === "FAILED" ? "danger" : "warning"}
+          title={doc.status === "FAILED" ? "This PDF could not be processed" : "Not ready yet"}
+        >
+          {doc.status === "FAILED"
+            ? (doc.failureReason ?? "Upload a new copy of the file.")
+            : "The upload hasn't finished. Upload the file again if this persists."}
         </Alert>
       )}
     </div>

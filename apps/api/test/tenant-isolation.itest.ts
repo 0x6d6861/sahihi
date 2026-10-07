@@ -25,6 +25,7 @@ const ids = {
   export: "",
   apiKey: "",
   bulkSend: "",
+  folder: "",
 }
 
 type Case = () => { path: string; init?: RequestInit & { json?: unknown } }
@@ -48,6 +49,9 @@ const TENANT: Record<string, Case> = {
   }),
   "GET /api/documents/:id": () => ({ path: `/api/documents/${ids.document}` }),
   "GET /api/documents/:id/file": () => ({ path: `/api/documents/${ids.document}/file` }),
+  "GET /api/documents/:id/field-suggestions": () => ({
+    path: `/api/documents/${ids.document}/field-suggestions`,
+  }),
   "DELETE /api/documents/:id": () => ({
     path: `/api/documents/${ids.document}`,
     init: { method: "DELETE" },
@@ -57,6 +61,17 @@ const TENANT: Record<string, Case> = {
     init: { method: "POST", json: { documentId: ids.document, title: "Stolen" } },
   }),
   "GET /api/envelopes/:id": () => ({ path: `/api/envelopes/${ids.envelope}` }),
+  "PUT /api/envelopes/:id/document": () => ({
+    path: `/api/envelopes/${ids.envelope}/document`,
+    init: { method: "PUT", json: { documentId: ids.document } },
+  }),
+  "PUT /api/envelopes/:id/details": () => ({
+    path: `/api/envelopes/${ids.envelope}/details`,
+    init: {
+      method: "PUT",
+      json: { title: "Stolen", signingOrder: "PARALLEL", expiresAt: null },
+    },
+  }),
   "PUT /api/envelopes/:id/recipients": () => ({
     path: `/api/envelopes/${ids.envelope}/recipients`,
     init: {
@@ -162,6 +177,23 @@ const TENANT: Record<string, Case> = {
     path: `/api/webhooks/${ids.webhook}/deliveries/${ids.delivery}/retry`,
     init: { method: "POST" },
   }),
+  "PATCH /api/documents/:id": () => ({
+    path: `/api/documents/${ids.document}`,
+    init: { method: "PATCH", json: { folderId: null } },
+  }),
+  // Creating is in the caller's org, but the parent id must be theirs too.
+  "POST /api/folders": () => ({
+    path: "/api/folders",
+    init: { method: "POST", json: { name: "Inside Alice's", parentId: ids.folder } },
+  }),
+  "PATCH /api/folders/:id": () => ({
+    path: `/api/folders/${ids.folder}`,
+    init: { method: "PATCH", json: { name: "Renamed" } },
+  }),
+  "DELETE /api/folders/:id": () => ({
+    path: `/api/folders/${ids.folder}`,
+    init: { method: "DELETE" },
+  }),
   "POST /api/templates/:id/envelopes": () => ({
     path: `/api/templates/${ids.template}/envelopes`,
     init: {
@@ -177,6 +209,7 @@ const TENANT: Record<string, Case> = {
 /** Org-scoped lists: 200, but only the caller's rows. */
 const LISTS = [
   "GET /api/documents",
+  "GET /api/folders",
   "GET /api/envelopes",
   "GET /api/templates",
   "GET /api/webhooks",
@@ -217,6 +250,19 @@ const NOT_TENANT = [
   "GET /api/data/settings",
   "PUT /api/data/settings",
   "POST /api/data/exports",
+  // The caller's own saved signature, keyed by their user id; no ids (account.itest.ts).
+  "GET /api/me/signatures",
+  "PUT /api/me/signatures",
+  "DELETE /api/me/signatures/:kind",
+  "PUT /api/me/avatar",
+  "DELETE /api/me/avatar",
+  // A user's picture, for themselves and people sharing a workspace (account.itest.ts).
+  "GET /api/avatars/:userId",
+  // The caller's own workspace logo; no ids.
+  "PUT /api/workspace/logo",
+  "DELETE /api/workspace/logo",
+  // Public logo of any workspace, by design (ADR 0028); serves nothing else.
+  "GET /api/branding/:orgId/logo.png",
   "GET /health",
   "GET /api/auth/*",
   "POST /api/auth/*",
@@ -234,30 +280,50 @@ const NOT_TENANT = [
 
 /** Everything of alice's that a cross-tenant request could touch. */
 async function snapshot() {
-  const [documents, envelopes, recipients, fields, auditEvents, templates, webhooks, apiKeys] =
-    await Promise.all([
-      prisma.document.findMany({
-        where: { organizationId: alice.organizationId },
-        orderBy: { id: "asc" },
-      }),
-      prisma.envelope.findMany({
-        where: { organizationId: alice.organizationId },
-        orderBy: { id: "asc" },
-      }),
-      prisma.recipient.findMany({ where: { envelopeId: ids.envelope }, orderBy: { id: "asc" } }),
-      prisma.field.findMany({ where: { envelopeId: ids.envelope }, orderBy: { id: "asc" } }),
-      prisma.auditEvent.findMany({ where: { envelopeId: ids.envelope }, orderBy: { seq: "asc" } }),
-      prisma.template.findMany({
-        where: { organizationId: alice.organizationId },
-        include: { roles: true, fields: true },
-      }),
-      prisma.webhookEndpoint.findMany({
-        where: { organizationId: alice.organizationId },
-        include: { deliveries: true },
-      }),
-      prisma.apiKey.findMany({ where: { organizationId: alice.organizationId } }),
-    ])
-  return { documents, envelopes, recipients, fields, auditEvents, templates, webhooks, apiKeys }
+  const [
+    documents,
+    envelopes,
+    recipients,
+    fields,
+    auditEvents,
+    templates,
+    webhooks,
+    apiKeys,
+    folders,
+  ] = await Promise.all([
+    prisma.document.findMany({
+      where: { organizationId: alice.organizationId },
+      orderBy: { id: "asc" },
+    }),
+    prisma.envelope.findMany({
+      where: { organizationId: alice.organizationId },
+      orderBy: { id: "asc" },
+    }),
+    prisma.recipient.findMany({ where: { envelopeId: ids.envelope }, orderBy: { id: "asc" } }),
+    prisma.field.findMany({ where: { envelopeId: ids.envelope }, orderBy: { id: "asc" } }),
+    prisma.auditEvent.findMany({ where: { envelopeId: ids.envelope }, orderBy: { seq: "asc" } }),
+    prisma.template.findMany({
+      where: { organizationId: alice.organizationId },
+      include: { roles: true, fields: true },
+    }),
+    prisma.webhookEndpoint.findMany({
+      where: { organizationId: alice.organizationId },
+      include: { deliveries: true },
+    }),
+    prisma.apiKey.findMany({ where: { organizationId: alice.organizationId } }),
+    prisma.folder.findMany({ where: { organizationId: alice.organizationId } }),
+  ])
+  return {
+    documents,
+    envelopes,
+    recipients,
+    fields,
+    auditEvents,
+    templates,
+    webhooks,
+    apiKeys,
+    folders,
+  }
 }
 
 beforeAll(async () => {
@@ -324,6 +390,8 @@ beforeAll(async () => {
     },
   })
   ids.bulkSend = bulk.id
+  const folder = await request(alice, "/api/folders", { method: "POST", json: { name: "Leases" } })
+  ids.folder = ((await folder.json()) as { folder: { id: string } }).folder.id
   // A failed delivery, so "retry" would otherwise be allowed.
   await prisma.webhookDelivery.update({ where: { id: ids.delivery }, data: { status: "FAILED" } })
 })
@@ -357,11 +425,27 @@ describe("tenant isolation", () => {
     expect(await prisma.envelope.count({ where: { organizationId: mallory.organizationId } })).toBe(
       0,
     )
+    expect(await prisma.folder.count({ where: { organizationId: mallory.organizationId } })).toBe(0)
+  })
+
+  test("another org's folder ids are unknown in query strings and bodies", async () => {
+    for (const path of [
+      `/api/folders?parentId=${ids.folder}`,
+      `/api/documents?folderId=${ids.folder}`,
+    ]) {
+      expect({ path, status: (await request(mallory, path)).status }).toEqual({ path, status: 404 })
+    }
+    const upload = await request(mallory, "/api/documents/uploads", {
+      method: "POST",
+      json: { name: "x.pdf", sizeBytes: 100, contentType: "application/pdf", folderId: ids.folder },
+    })
+    expect(upload.status).toBe(404)
   })
 
   test("lists only return the caller's rows", async () => {
     for (const path of [
       "/api/documents",
+      "/api/folders",
       "/api/envelopes",
       "/api/templates",
       "/api/webhooks",

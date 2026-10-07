@@ -3,7 +3,7 @@ import {
   SaveTemplateSchema,
   templateRolesFromEnvelope,
   UpdateTemplateSchema,
-  UseTemplateSchema,
+  UseTemplateRequestSchema,
 } from "@sahihi/core"
 import { forOrganization, prisma } from "@sahihi/db"
 import { createEnvelopeFromTemplate } from "@sahihi/envelopes"
@@ -11,6 +11,7 @@ import { Hono } from "hono"
 import type { AppEnv } from "../lib/env"
 import { badRequest, clientMeta, notFound, parseJson } from "../lib/http"
 import { actor, assertCanManageTemplate } from "../lib/permissions"
+import { sendAfterCreate } from "../lib/send-after-create"
 import { requireOrg } from "../middleware/session"
 
 /**
@@ -172,14 +173,21 @@ export const templates = new Hono<AppEnv>()
     return c.body(null, 204)
   })
 
-  /** Use the template: fill every role, get a DRAFT envelope with the fields copied. */
+  /**
+   * Use the template: fill every role, get a DRAFT envelope with the fields copied. `send: true`
+   * ("Send now") sends it too; a refused send still answers 201 with `sent: false`.
+   */
   .post("/:id/envelopes", async (c) => {
-    const data = await parseJson(c, UseTemplateSchema)
+    const { send, ...data } = await parseJson(c, UseTemplateRequestSchema)
+    const organizationId = c.get("organizationId")
+    const by = { userId: c.get("user").id, ...clientMeta(c) }
     const envelope = await createEnvelopeFromTemplate({
       templateId: c.req.param("id"),
-      organizationId: c.get("organizationId"),
-      actor: { userId: c.get("user").id, ...clientMeta(c) },
+      organizationId,
+      actor: by,
       data,
     })
-    return c.json({ envelope }, 201)
+    if (!send) return c.json({ envelope, sent: false }, 201)
+    const result = await sendAfterCreate({ envelopeId: envelope.id, organizationId, actor: by })
+    return c.json({ ...result, envelope }, 201)
   })

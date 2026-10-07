@@ -1,175 +1,113 @@
+/*
+ * Theme bridge (ADR 0023). Arc's foundation.css owns the palette, type, radii and spacing; this file maps
+ * the coss/shadcn tokens that `components/ui/**`, Extend and Tailwind utilities read onto Arc's roles, so
+ * vendored coss and Extend UI look like Arc in both themes.
+ *
+ * Load order matters: globals.css (coss) → components/arc/foundation.css → this file.
+ * Dark mode sets both `.dark` (coss, Tailwind `dark:`) and `data-theme="dark"` (Arc) on <html> (lib/theme.ts).
+ *
+ * `--accent` is Arc's brand accent. coss used the same name for hover fills, so globals.css maps
+ * Tailwind's `accent` colour to `--ui-hover` instead (reinstall patch, ADR 0007 list).
+ */
+
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.2174 0.0019 106.5582);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2174 0.0019 106.5582);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2174 0.0019 106.5582);
-  --primary: oklch(0.4054 0.0441 186.8865);
-  --primary-foreground: oklch(0.944 0.011 182.8656);
-  --secondary: oklch(0.9313 0.0013 286.374);
-  --secondary-foreground: oklch(0.215 0.0025 325.6623);
-  --muted: oklch(0.9266 0.0029 128.4947);
-  --muted-foreground: oklch(0.5372 0.0099 128.6667);
-  --accent: oklch(0.9266 0.0029 128.4947);
-  --accent-foreground: oklch(0.2174 0.0019 106.5582);
-  --destructive: oklch(0.5566 0.0632 60.7852);
-  --destructive-foreground: var(--color-red-800);
-  --border: oklch(0.8901 0.0029 128.4965);
-  --input: oklch(0.8901 0.0029 128.4965);
-  --ring: oklch(0.6932 0.0062 128.5601);
-  --chart-1: oklch(0.7269 0.0891 140.7879);
-  --chart-2: oklch(0.5448 0.1034 141.7916);
-  --chart-3: oklch(0.4655 0.0884 142.6579);
-  --chart-4: oklch(0.3853 0.0689 142.2306);
-  --chart-5: oklch(0.3341 0.0589 141.8368);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.2174 0.0019 106.5582);
-  --sidebar-primary: oklch(0.4054 0.0441 186.8865);
-  --sidebar-primary-foreground: oklch(0.944 0.011 182.8656);
-  --sidebar-accent: oklch(0.9266 0.0029 128.4947);
-  --sidebar-accent-foreground: oklch(0.2174 0.0019 106.5582);
-  --sidebar-border: oklch(0.8901 0.0029 128.4965);
-  --sidebar-ring: oklch(0.6932 0.0062 128.5601);
-  --font-sans: Geist, ui-sans-serif, sans-serif, system-ui;
-  --font-serif: Merriweather, ui-serif, serif;
-  --font-mono: Geist Mono, ui-monospace, monospace;
-  --radius: 0.45rem;
-  --shadow-x: 0px;
-  --shadow-y: 0px;
-  --shadow-blur: 0px;
-  --shadow-spread: 1px;
-  --shadow-opacity: 0.08;
-  --shadow-color: #000000;
-  --shadow-2xs: 0px 0px 0px 1px hsl(0 0% 0% / 0.04);
-  --shadow-xs: 0px 0px 0px 1px hsl(0 0% 0% / 0.04);
-  --shadow-sm: 0px 0px 0px 1px hsl(0 0% 0% / 0.08), 0px 1px 2px 0px hsl(0 0% 0% / 0.08);
-  --shadow: 0px 0px 0px 1px hsl(0 0% 0% / 0.08), 0px 1px 2px 0px hsl(0 0% 0% / 0.08);
-  --shadow-md: 0px 0px 0px 1px hsl(0 0% 0% / 0.08), 0px 2px 4px 0px hsl(0 0% 0% / 0.08);
-  --shadow-lg: 0px 0px 0px 1px hsl(0 0% 0% / 0.08), 0px 4px 6px 0px hsl(0 0% 0% / 0.08);
-  --shadow-xl: 0px 0px 0px 1px hsl(0 0% 0% / 0.08), 0px 8px 10px 0px hsl(0 0% 0% / 0.08);
-  --shadow-2xl: 0px 0px 0px 1px hsl(0 0% 0% / 0.2);
-  --tracking-normal: 0em;
-  --spacing: 0.25rem;
+  /* Field edges must reach 3:1 against every surface (WCAG 1.4.11, docs/ui.md); Arc's default is 1.75:1. */
+  --border-strong: oklch(64% 0 0);
+  --font-sans: var(--font-body);
+  --font-heading: var(--font-display);
+
+  --card: var(--surface);
+  --card-foreground: var(--foreground);
+  --popover: var(--surface-raised);
+  --popover-foreground: var(--foreground);
+  --primary: var(--foreground);
+  --primary-foreground: var(--background);
+  --secondary: var(--surface-muted);
+  --secondary-foreground: var(--foreground);
+  --muted: var(--surface-muted);
+  --muted-foreground: var(--text-secondary);
+  --input: var(--border-strong);
+  --ring: color-mix(in oklab, var(--accent-strong) 72%, transparent);
+
+  --ui-hover: var(--surface-muted);
+  --ui-hover-foreground: var(--foreground);
+
+  /* Solid fills carry white text; `-foreground` variants are text-safe on the page surface. */
+  --destructive: oklch(54% 0.21 25);
+  --destructive-foreground: var(--danger);
+  --success-foreground: var(--success);
+  --warning-foreground: oklch(50% 0.14 70);
+  --info: oklch(55% 0.17 255);
+  --info-foreground: oklch(48% 0.17 255);
+
+  --chart-1: var(--series-1);
+  --chart-2: var(--series-2);
+  --chart-3: var(--series-3);
+  --chart-4: var(--series-4);
+  --chart-5: var(--text-muted);
+
+  --code: var(--surface-muted);
+  --code-foreground: var(--foreground);
+  --code-highlight: var(--accent-subtle);
+
+  /* coss radius scale: lg = Arc control, xl ≈ panel, 2xl ≈ surface. */
+  --radius: var(--radius-control);
+
+  /* Flat sidebar on the page background with a hairline edge; hover is a faint fill, and the active
+     item's indicator uses --accent-subtle (components/app/app-shell). */
+  --sidebar: var(--background);
+  --sidebar-foreground: var(--text-secondary);
+  --sidebar-primary: var(--foreground);
+  --sidebar-primary-foreground: var(--background);
+  --sidebar-accent: color-mix(in oklab, var(--foreground) 4%, transparent);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
 }
 
-.dark {
-  --background: oklch(0.2174 0.0019 106.5582);
-  --foreground: oklch(0.9481 0.0017 145.5617);
-  --card: oklch(0.2174 0.0019 106.5582);
-  --card-foreground: oklch(0.9481 0.0017 145.5617);
-  --popover: oklch(0.2174 0.0019 106.5582);
-  --popover-foreground: oklch(0.9481 0.0017 145.5617);
-  --primary: oklch(0.3452 0.0341 192.7683);
-  --primary-foreground: oklch(0.944 0.011 182.8656);
-  --secondary: oklch(0.269 0.0018 286.2762);
-  --secondary-foreground: oklch(0.9232 0.0026 48.7171);
-  --muted: oklch(0.2665 0.0056 121.835);
-  --muted-foreground: oklch(0.6932 0.0062 128.5601);
-  --accent: oklch(0.2665 0.0056 121.835);
-  --accent-foreground: oklch(0.9481 0.0017 145.5617);
-  --destructive: oklch(0.7485 0.0479 65.9135);
-  --destructive-foreground: var(--color-red-600);
-  --border: oklch(0.2677 0.0045 17.4367);
-  --input: oklch(0.3803 0.0043 145.4909);
-  --ring: oklch(0.5372 0.0099 128.6667);
-  --chart-1: oklch(0.7269 0.0891 140.7879);
-  --chart-2: oklch(0.5448 0.1034 141.7916);
-  --chart-3: oklch(0.4655 0.0884 142.6579);
-  --chart-4: oklch(0.3853 0.0689 142.2306);
-  --chart-5: oklch(0.3341 0.0589 141.8368);
-  --sidebar: oklch(0.2174 0.0019 106.5582);
-  --sidebar-foreground: oklch(0.9481 0.0017 145.5617);
-  --sidebar-primary: oklch(0.3452 0.0341 192.7683);
-  --sidebar-primary-foreground: oklch(0.944 0.011 182.8656);
-  --sidebar-accent: oklch(0.2665 0.0056 121.835);
-  --sidebar-accent-foreground: oklch(0.9481 0.0017 145.5617);
-  --sidebar-border: oklch(0.2677 0.0045 17.4367);
-  --sidebar-ring: oklch(0.5372 0.0099 128.6667);
-  --font-sans: Geist, ui-sans-serif, sans-serif, system-ui;
-  --font-serif: Merriweather, ui-serif, serif;
-  --font-mono: Geist Mono, ui-monospace, monospace;
-  --radius: 0.45rem;
-  --shadow-x: 0px;
-  --shadow-y: 0px;
-  --shadow-blur: 0px;
-  --shadow-spread: 1px;
-  --shadow-opacity: 0.08;
-  --shadow-color: #d5d3d2;
-  --shadow-2xs: 0px 0px 0px 1px hsl(20 3.4483% 82.9412% / 0.04);
-  --shadow-xs: 0px 0px 0px 1px hsl(20 3.4483% 82.9412% / 0.04);
-  --shadow-sm:
-    0px 0px 0px 1px hsl(20 3.4483% 82.9412% / 0.08), 0px 1px 2px 0px hsl(20 3.4483% 82.9412% / 0.08);
-  --shadow:
-    0px 0px 0px 1px hsl(20 3.4483% 82.9412% / 0.08), 0px 1px 2px 0px hsl(20 3.4483% 82.9412% / 0.08);
-  --shadow-md:
-    0px 0px 0px 1px hsl(20 3.4483% 82.9412% / 0.08), 0px 2px 4px 0px hsl(20 3.4483% 82.9412% / 0.08);
-  --shadow-lg:
-    0px 0px 0px 1px hsl(20 3.4483% 82.9412% / 0.08), 0px 4px 6px 0px hsl(20 3.4483% 82.9412% / 0.08);
-  --shadow-xl:
-    0px 0px 0px 1px hsl(20 3.4483% 82.9412% / 0.08),
-    0px 8px 10px 0px hsl(20 3.4483% 82.9412% / 0.08);
-  --shadow-2xl: 0px 0px 0px 1px hsl(20 3.4483% 82.9412% / 0.2);
+.dark,
+:root[data-theme="dark"] {
+  --border-strong: oklch(54% 0 0);
+  --destructive: oklch(54% 0.21 25);
+  --warning-foreground: var(--warning);
+  --info-foreground: oklch(78% 0.12 255);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
-
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-mono);
-  --font-serif: var(--font-serif);
-
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-
-  --shadow-2xs: var(--shadow-2xs);
-  --shadow-xs: var(--shadow-xs);
-  --shadow-sm: var(--shadow-sm);
-  --shadow: var(--shadow);
-  --shadow-md: var(--shadow-md);
-  --shadow-lg: var(--shadow-lg);
-  --shadow-xl: var(--shadow-xl);
-  --shadow-2xl: var(--shadow-2xl);
+body {
+  letter-spacing: var(--tracking-body);
+  line-height: var(--leading-body);
 }
 
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
+/*
+ * Field overlays drawn on a PDF page. The page is white paper in both themes, so anything on it uses
+ * the light values (Arc's neutral ramp doesn't change with the theme). Popovers and dialogs opened
+ * from a field are portaled out of this scope and follow the theme as usual.
+ */
+.on-paper {
+  color-scheme: light;
+  /* `color` is inherited already resolved from <body>, so set it again from the redefined token. */
+  color: var(--foreground);
+  --background: var(--neutral-0);
+  --surface: var(--neutral-0);
+  --surface-muted: var(--neutral-2);
+  --foreground: var(--neutral-11);
+  --text-secondary: var(--neutral-8);
+  --text-muted: var(--neutral-7);
+  --border: oklch(93.5% 0 0);
+  --muted: var(--neutral-2);
+  --muted-foreground: var(--neutral-8);
+  --card: var(--neutral-0);
+  --card-foreground: var(--neutral-11);
+  --primary: var(--neutral-11);
+  --primary-foreground: var(--neutral-0);
+  --input: var(--neutral-5);
+  --destructive: oklch(54% 0.21 25);
+  --destructive-foreground: oklch(54% 0.21 25);
+  --success: oklch(49% 0.19 150);
+  --success-foreground: oklch(49% 0.19 150);
+  --warning: oklch(58% 0.18 75);
+  --warning-foreground: oklch(50% 0.14 70);
+  --info: oklch(55% 0.17 255);
+  --info-foreground: oklch(48% 0.17 255);
+  --ring: oklch(33% 0 0 / 0.72);
 }

@@ -19,11 +19,14 @@ tokens unlock anything outside their own envelope.
 - `emailAndPassword` with `requireEmailVerification: true`, minimum 10 characters
 - Verification, reset and invitation emails are **enqueued** (`notifications` queue), never sent inline
 - `organization()` plugin with `allowUserToCreateOrganization: true`
+- `twoFactor()` plugin (TOTP + backup codes, issuer "Sahihi")
+- `user.changeEmail` with `sendChangeEmailConfirmation` (job `auth.change-email` to the current address)
 - `basePath: "/api/auth"`, `cookiePrefix: "sahihi"`, `trustedOrigins: [WEB_URL]`
 - Prisma adapter. Tables are in section 1 of `schema.prisma`
 
-Client: `apps/web/lib/auth-client.ts` (`createAuthClient` + `organizationClient()`), exporting `signIn`,
-`signUp`, `signOut`, `useSession`, `organization` and `useActiveOrganization`.
+Client: `apps/web/lib/auth-client.ts` (`createAuthClient` + `organizationClient()` + `twoFactorClient()`),
+exporting `signIn`, `signUp`, `signOut`, `useSession`, `organization`, `useActiveOrganization`,
+`twoFactor`, `updateUser`, `changeEmail`, `changePassword`, `revokeSession` and `revokeOtherSessions`.
 
 ### Changing plugins
 
@@ -33,7 +36,84 @@ Client: `apps/web/lib/auth-client.ts` (`createAuthClient` + `organizationClient(
    (`documents`, `envelopes`).
 4. `bun run db:migrate`.
 
-Likely next plugins: `twoFactor` (senders), `magicLink`, and `admin` for internal staff.
+`bun run auth:schema` needs network access (it fetches the better-auth CLI). Offline, copy the
+plugin's `schema.mjs` into section 1 by hand, as was done for `twoFactor` (model `TwoFactor`,
+`User.twoFactorEnabled`).
+
+Likely next plugins: see **What better-auth offers next** below.
+
+## Account settings
+
+Settings has three account tabs before the workspace ones (`SETTINGS_NAV` in `lib/nav.ts`):
+**Profile**, **Security**, **Workspace**, then Members, Plan & usage, Data and API. The user menu
+opens Profile.
+
+### Profile (`/settings/profile`, any signed-in user)
+
+| What | How |
+|---|---|
+| Name | better-auth `update-user` (`UpdateProfileSchema`) |
+| Email | better-auth `change-email`. A verified user gets a confirmation link at the **current** address (`auth.change-email` job); following it sends the usual verification link to the new address, and the email changes once that's followed |
+| Saved signature and initials | `GET/PUT /api/me/signatures`, `DELETE /api/me/signatures/:kind` (`apps/api/src/routes/me.ts`, `requireUser`: session, no active org needed). PNGs (`SaveSignatureSchema`, same cap as signing) at `user/{userId}/{kind}-{version}.png`; row `SavedSignature` |
+
+The saved signature is offered on signing pages: `SigningSurface` calls `GET /api/me/signatures`
+(it returns the user's email too) and, when `offersSavedSignature(user.email, recipient.email)`
+holds, pre-fills the capture dialog's "Use this signature". The signing routes don't change and
+never look at the session (signers still don't need accounts); the PNG is submitted like a freshly
+drawn one. Signed-out signers and embedded iframes (no cookie) get a 401 and see nothing new.
+
+### Security (`/settings/security`)
+
+| What | How |
+|---|---|
+| Change password | better-auth `change-password` (`ChangePasswordSchema`), "Sign out of other devices" on by default |
+| Two-factor authentication | `twoFactor` plugin. Turn on: password → `enable` (returns the `otpauth://` URI, shown as a QR code with `qrcode`, plus 10 backup codes) → `verify-totp` with a code from the app → backup codes shown once (copy / download). Also: new backup codes, turn off (both need the password) |
+| Sessions | better-auth `list-sessions`, `revoke-session`, `revoke-other-sessions`. Device names come from `describeUserAgent` |
+
+Sign-in with 2FA: `signIn.email` answers `{ twoFactorRedirect: true }` and sets a 10-minute
+two-factor cookie instead of a session. The sign-in form sends the user to
+`/sign-in/two-factor?next=…`, which calls `verify-totp` or `verify-backup-code` (optionally
+"trust this device" for 30 days). better-auth locks the account for 15 minutes after 10 failed codes.
+
+### Workspace (`/settings/workspace`)
+
+| What | Who | How |
+|---|---|---|
+| Rename | owner, admin (`canEditWorkspace` = `organization:update`) | better-auth `organization.update` |
+| Logo | owner, admin | `PUT/DELETE /api/workspace/logo` (`routes/workspace.ts`) |
+| Leave | everyone except the last owner (`canLeaveWorkspace`) | better-auth `organization.leave`, then the next workspace becomes active (or `/onboarding`) |
+
+Deleting the workspace stays under Data.
+
+**Logos.** The browser resizes the image into 640×160 and re-encodes it as PNG; the API checks the
+PNG signature and size (`logoProblem`), stores it at `org/{orgId}/branding/logo-{version}.png`
+(`WorkspaceSettings.logoKey`) and sets `Organization.logo` to
+`{WEB_URL}/api/branding/{orgId}/logo.png?v={version}` (`workspaceLogoUrl`). That public route
+(`routes/branding.ts`, rate-limited) streams the stored PNG with long caching and
+`Cross-Origin-Resource-Policy: cross-origin` so webmail can show it. It reads the key from the
+database, never from the request.
+
+Every consumer reads `Organization.logo`: signing emails (`brandFor(org, WEB_URL)`; https only,
+plus the web origin itself so Mailpit shows it in development), the signing page header
+(`brandingLogoPath` keeps only our branding path, served same-origin). better-auth's
+`beforeCreateOrganization` / `beforeUpdateOrganization` hooks refuse a `logo`, so it can't be set
+to an arbitrary remote image (a tracking pixel in every email).
+
+### What better-auth offers next
+
+Available in better-auth 1.7 and not enabled yet, roughly in order of value:
+
+| Feature | What it takes |
+|---|---|
+| Passkeys | `@better-auth/passkey` package (new dependency) + a `passkey` table; sign-in button and a Security panel |
+| Delete account | `user.deleteUser` with `sendDeleteAccountVerification` and a `beforeDelete` that refuses while the user is the last owner of a workspace (and handles their envelopes' `createdById`) |
+| Email OTP as a second factor | `twoFactor({ otpOptions: { sendOTP } })` + a notifications job; fallback for users without an authenticator app |
+| Forgot password page | `sendResetPassword` is already wired; needs `/forgot-password` and `/reset-password` pages |
+| Social sign-in (Google, Microsoft) | `socialProviders` + env vars; Security would list linked accounts (`list-accounts`, `unlink-account`) |
+| Breached-password check | `haveIBeenPwned()` plugin (calls an external API on sign-up and password change) |
+| Last login method, multi-session | `lastLoginMethod()`, `multiSession()` plugins |
+| SSO (SAML/OIDC) per workspace | `@better-auth/sso`, for enterprise plans |
+| Admin (staff) | `admin()` plugin: impersonation, bans, for internal support |
 
 ## Cookies (why the API is proxied)
 
@@ -71,6 +151,9 @@ The better-auth defaults are `owner`, `admin` and `member`. The creator of an or
 | Delete a document | any | any | own only |
 | Use templates / save envelopes as templates | ✓ | ✓ | ✓ |
 | Rename or delete a template | any | any | own only |
+| Create folders (Documents page) | ✓ | ✓ | ✓ |
+| Rename, move or delete a folder | any | any | own only |
+| Move a document between folders | any | any | own only |
 | Webhooks (view, add, edit, rotate, delete) | ✓ | ✓ | – |
 | API keys and embedded-signing origins (`api:manage`) | ✓ | ✓ | – |
 | Bulk send from a template | ✓ | ✓ | ✓ |
@@ -79,12 +162,13 @@ The better-auth defaults are `owner`, `admin` and `member`. The creator of an or
 | Billing (`billing:manage`, reserved for self-serve plan changes), delete org | ✓ | – | – |
 | See the plan and usage (Settings → Plan & usage) | ✓ | ✓ | ✓ |
 
-"Own" means `Envelope.createdById` / `Document.uploadedById` is the caller. Owners and admins get
-"any" from the `envelope:manage-any` and `document:delete-any` permissions.
+"Own" means `Envelope.createdById` / `Document.uploadedById` / `Folder.createdById` is the caller.
+Owners and admins get "any" from the `envelope:manage-any`, `document:delete-any` and
+`folder:manage-any` permissions. Moving a document follows the delete rule (`canMoveDocument`).
 
-**One definition:** `packages/core/src/permissions.ts` builds the access control with better-auth's
+**One definition:** `packages/core/src/workspace/permissions.ts` builds the access control with better-auth's
 `createAccessControl`: the default org statements plus `document`, `envelope`, `template`,
-`webhook`, `data`, `api` and `billing`. It exports `orgAc` and `orgRoles`, which are passed to `organization()` in `auth.ts` and to
+`folder`, `webhook`, `data`, `api` and `billing`. It exports `orgAc` and `orgRoles`, which are passed to `organization()` in `auth.ts` and to
 `organizationClient()` in `auth-client.ts`. better-auth enforces its own resources (members,
 invitations, org delete) with them. Our routes use the pure helpers from the same file:
 
@@ -97,7 +181,8 @@ invitations, org delete) with them. Our routes use the pure helpers from the sam
 (`PUT recipients|fields`, `send`, `void`, `remind`) call `assertCanManageEnvelope`, and
 `DELETE /documents/:id` calls `assertCanDeleteDocument`. A refusal is `403 { error: "forbidden" }`.
 Another org's rows are still a 404. `GET /envelopes/:id` returns `permissions: { manage }` and
-`GET /documents/:id` returns `permissions: { delete }`, so the web can hide what the viewer can't do.
+`GET /documents/:id` returns `permissions: { delete }` (list rows: `permissions: { move }`, folders:
+`permissions: { manage }`), so the web can hide what the viewer can't do.
 The API stays the guard.
 
 **Web:** without `manage`, the envelope page renders read-only: document viewer, recipients table,
@@ -113,7 +198,7 @@ Static roles need no schema change. Dynamic (per-org custom) roles would need be
 `/settings/members` (nav "Members", `app/(app)/settings/members/page.tsx`) loads
 `GET /api/auth/organization/get-full-organization` for the active org. It has two tabs:
 
-- **Members:** role `Select` and Remove (`AlertDialog`) → `organization.updateMemberRole` /
+- **Members:** role `Select` and Remove (`ConfirmDialog`) → `organization.updateMemberRole` /
   `organization.removeMember`.
 - **Invitations:** pending and expired invitations, with Resend (`inviteMember({ resend: true })`, which
   resets the 48 h expiry) and Cancel (`cancelInvitation`).
@@ -123,7 +208,7 @@ Static roles need no schema change. Dynamic (per-org custom) roles would need be
   field.
 
 better-auth owns these endpoints and enforces them. The page only offers what it will accept, using
-pure helpers in `packages/core/src/members.ts`:
+pure helpers in `packages/core/src/workspace/members.ts`:
 
 | Rule | Helper |
 |---|---|

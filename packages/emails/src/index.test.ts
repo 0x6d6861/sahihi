@@ -22,6 +22,12 @@ describe("safeLogoUrl", () => {
       expect(safeLogoUrl(bad)).toBeNull()
     }
   })
+  test("the app's own origin is trusted over http (local development)", () => {
+    const own = "http://localhost:3000/api/branding/org_1/logo.png?v=1"
+    expect(safeLogoUrl(own, "http://localhost:3000")).toBe(own)
+    expect(safeLogoUrl("http://evil.test/logo.png", "http://localhost:3000")).toBeNull()
+    expect(safeLogoUrl("javascript:alert(1)", "http://localhost:3000")).toBeNull()
+  })
   test("brandFor keeps the name and drops unsafe logos", () => {
     expect(brandFor({ name: "Acme", logo: "http://x.test/l.png" })).toEqual({
       organizationName: "Acme",

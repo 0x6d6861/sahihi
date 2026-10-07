@@ -1,18 +1,14 @@
 "use client"
 
-import { CalendarIcon, XIcon } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
-import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field"
-import { Form } from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
-import { Popover, PopoverPopup, PopoverTrigger } from "@/components/ui/popover"
-import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
-import { Textarea } from "@/components/ui/textarea"
-import { toastManager } from "@/components/ui/toast"
+import { toastManager } from "@/components/app/toast"
+import { Button } from "@/components/arc/button/button"
+import { Combobox } from "@/components/arc/combobox/combobox"
+import { DatePicker } from "@/components/arc/date-picker/date-picker"
+import { Input } from "@/components/arc/input/input"
+import { Switch } from "@/components/arc/switch/switch"
+import { Textarea } from "@/components/arc/textarea/textarea"
 import { ApiError, api } from "@/lib/api"
 import { envelopeTitleFromFileName } from "@/lib/documents"
 import { buildCreateEnvelopeInput, type FormErrors, issuesToFormErrors } from "@/lib/envelope-form"
@@ -21,8 +17,6 @@ export interface ReadyDocument {
   id: string
   name: string
 }
-
-const dateLabel = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" })
 
 function startOfToday() {
   const d = new Date()
@@ -45,7 +39,6 @@ export function NewEnvelopeForm({
   const [message, setMessage] = useState("")
   const [sequential, setSequential] = useState(false)
   const [expiresOn, setExpiresOn] = useState<Date | null>(null)
-  const [dateOpen, setDateOpen] = useState(false)
   const [errors, setErrors] = useState<FormErrors>({})
   const [pending, setPending] = useState(false)
 
@@ -82,110 +75,84 @@ export function NewEnvelopeForm({
   }
 
   return (
-    <Form className="flex flex-col gap-5" errors={errors} onSubmit={onSubmit}>
-      <Field name="documentId">
-        <FieldLabel>Document</FieldLabel>
-        <Select
-          items={documents.map((d) => ({ value: d.id, label: d.name }))}
-          value={documentId || null}
-          onValueChange={(v) => chooseDocument(String(v ?? ""))}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Choose a ready PDF" />
-          </SelectTrigger>
-          <SelectPopup>
-            {documents.map((d) => (
-              <SelectItem key={d.id} value={d.id}>
-                {d.name}
-              </SelectItem>
-            ))}
-          </SelectPopup>
-        </Select>
-        <FieldError />
-      </Field>
-
-      <Field name="title">
-        <FieldLabel>Title</FieldLabel>
-        <Input
-          value={title}
-          maxLength={200}
-          onChange={(e) => {
-            setTitle(e.target.value)
-            setTitleEdited(true)
-          }}
+    <form className="flex flex-col gap-5" noValidate onSubmit={onSubmit}>
+      <div className="flex flex-col gap-1.5">
+        <Combobox
+          label="Document"
+          name="documentId"
+          options={documents.map((d) => ({ value: d.id, label: d.name }))}
+          value={documentId}
+          onValueChange={chooseDocument}
+          placeholder="Choose a ready PDF"
+          emptyMessage="No ready document matches"
         />
-        <FieldDescription>Recipients see this in the email subject.</FieldDescription>
-        <FieldError />
-      </Field>
+        {errors.documentId && (
+          <p role="alert" className="text-destructive-foreground text-sm">
+            {errors.documentId}
+          </p>
+        )}
+      </div>
 
-      <Field name="message">
-        <FieldLabel>Message (optional)</FieldLabel>
-        <Textarea
-          value={message}
-          maxLength={2000}
-          rows={4}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="Hi, please review and sign."
-        />
-        <FieldError />
-      </Field>
+      <Input
+        label="Title"
+        name="title"
+        value={title}
+        maxLength={200}
+        description="Recipients see this in the email subject."
+        error={errors.title}
+        onChange={(e) => {
+          setTitle(e.target.value)
+          setTitleEdited(true)
+        }}
+      />
 
-      <Field name="signingOrder">
-        <FieldLabel className="flex items-center gap-3">
-          <Switch checked={sequential} onCheckedChange={setSequential} />
-          Sign in order
-        </FieldLabel>
-        <FieldDescription>
+      <Textarea
+        label="Message (optional)"
+        name="message"
+        value={message}
+        maxLength={2000}
+        rows={4}
+        error={errors.message}
+        onChange={(e) => setMessage(e.target.value)}
+        placeholder="Hi, please review and sign."
+      />
+
+      <div className="flex flex-col gap-1.5">
+        <Switch label="Sign in order" checked={sequential} onCheckedChange={setSequential} />
+        <p className="text-muted-foreground text-sm">
           {sequential
             ? "Recipients are invited one after another, following their order."
             : "Everyone is invited at the same time."}
-        </FieldDescription>
-      </Field>
+        </p>
+      </div>
 
-      <Field name="expiresAt">
-        <FieldLabel>Expires (optional)</FieldLabel>
-        <div className="flex items-center gap-2">
-          <Popover open={dateOpen} onOpenChange={setDateOpen}>
-            <PopoverTrigger render={<Button variant="outline" className="justify-start" />}>
-              <CalendarIcon aria-hidden />
-              {expiresOn ? dateLabel.format(expiresOn) : "No expiry"}
-            </PopoverTrigger>
-            <PopoverPopup align="start">
-              <Calendar
-                mode="single"
-                selected={expiresOn ?? undefined}
-                onSelect={(day: Date | undefined) => {
-                  setExpiresOn(day ?? null)
-                  setDateOpen(false)
-                }}
-                disabled={{ before: startOfToday() }}
-                defaultMonth={expiresOn ?? undefined}
-              />
-            </PopoverPopup>
-          </Popover>
-          {expiresOn && (
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Clear expiry"
-              onClick={() => setExpiresOn(null)}
-            >
-              <XIcon aria-hidden />
-            </Button>
-          )}
+      <div className="flex items-end gap-2">
+        <div className="min-w-0 flex-1">
+          <DatePicker
+            label="Expires (optional)"
+            value={expiresOn ?? undefined}
+            onChange={(day) => setExpiresOn(day ?? null)}
+            minDate={startOfToday()}
+            placeholder="No expiry"
+            locale="en-GB"
+            description={errors.expiresAt ?? "Links stop working at the end of this day."}
+          />
         </div>
-        <FieldDescription>Links stop working at the end of this day.</FieldDescription>
-        <FieldError />
-      </Field>
+        {expiresOn && (
+          <Button type="button" variant="ghost" onClick={() => setExpiresOn(null)}>
+            Clear
+          </Button>
+        )}
+      </div>
 
-      <div className="flex justify-end gap-2">
+      <div className="flex justify-end gap-2 pt-2">
         <Button variant="ghost" type="button" onClick={() => router.back()}>
           Cancel
         </Button>
-        <Button type="submit" disabled={pending}>
-          {pending ? "Creating…" : "Create draft"}
+        <Button type="submit" loading={pending}>
+          Create draft
         </Button>
       </div>
-    </Form>
+    </form>
   )
 }

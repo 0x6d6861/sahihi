@@ -4,11 +4,13 @@ import { prisma } from "@sahihi/db"
 import { headObject } from "@sahihi/infra"
 import {
   createSender,
+  formPdf,
   minimalPdf,
   request,
   resetDb,
   type Sender,
   sha256,
+  textPdf,
   uploadDocument,
 } from "./helpers"
 
@@ -73,6 +75,62 @@ describe("documents: upload flow", () => {
   })
 })
 
+describe("documents: field suggestions", () => {
+  type Body = {
+    suggestions: {
+      type: string
+      roleHint: string | null
+      source: string
+      page: number
+      x: number
+      y: number
+    }[]
+    skipped: number
+  }
+  const suggest = async (bytes: Uint8Array) => {
+    const { document } = await uploadDocument(alice, bytes, "doc.pdf")
+    const res = await request(alice, `/api/documents/${document.id}/field-suggestions`)
+    expect(res.status).toBe(200)
+    return (await res.json()) as Body
+  }
+
+  test("form widgets: normalized and in reading order", async () => {
+    const body = await suggest(formPdf())
+    expect(body.skipped).toBe(0)
+    expect(body.suggestions.map((s) => [s.type, s.roleHint, s.source, s.page])).toEqual([
+      ["SIGNATURE", "buyer", "form", 1],
+      ["DATE_SIGNED", "seller", "form", 1],
+    ])
+    expect(body.suggestions[0]?.x).toBeCloseTo(0.1, 6)
+    expect(body.suggestions[0]?.y).toBeCloseTo(1 - 118.8 / 792, 6)
+  })
+
+  test("anchor tags on the text layer; invalid tags are counted as skipped", async () => {
+    const body = await suggest(
+      textPdf("Signed: {{s1:signature}}", "Date: {{s2:date}}", "{{s1:stamp}}"),
+    )
+    expect(body.skipped).toBe(1)
+    expect(body.suggestions.map((s) => [s.type, s.roleHint, s.source])).toEqual([
+      ["SIGNATURE", "s1", "anchor"],
+      ["DATE_SIGNED", "s2", "anchor"],
+    ])
+  })
+
+  test("labels next to blanks, only when there are no anchors or form fields", async () => {
+    const body = await suggest(textPdf("LANDLORD", "Signature: ______________", "Date:"))
+    expect(body.suggestions.map((s) => [s.type, s.roleHint, s.source])).toEqual([
+      ["SIGNATURE", "landlord", "text"],
+      ["DATE_SIGNED", "landlord", "text"],
+    ])
+    const tagged = await suggest(textPdf("Signature: ______________", "{{s1:date}}"))
+    expect(tagged.suggestions.map((s) => s.source)).toEqual(["anchor"])
+  })
+
+  test("a PDF without a form, anchors or labelled blanks has no suggestions", async () => {
+    expect(await suggest(minimalPdf())).toEqual({ suggestions: [], skipped: 0 })
+  })
+})
+
 describe("documents: list", () => {
   test("pages newest first and hides UPLOADING rows", async () => {
     const first = await uploadDocument(alice, minimalPdf(), "first.pdf")
@@ -128,6 +186,7 @@ describe("documents: access control", () => {
     const attempts: [string, string][] = [
       ["GET", `/api/documents/${id}`],
       ["GET", `/api/documents/${id}/file`],
+      ["GET", `/api/documents/${id}/field-suggestions`],
       ["POST", `/api/documents/${id}/complete`],
       ["DELETE", `/api/documents/${id}`],
     ]

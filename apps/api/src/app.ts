@@ -10,27 +10,37 @@ import { ADMIN_QUEUES_PATH, adminDashboard } from "./admin"
 import { auth } from "./auth"
 import { reportRequestError, requestIdOf, requestLog } from "./middleware/request-log"
 import { apiKeys } from "./routes/api-keys"
+import { avatars } from "./routes/avatars"
 import { billing } from "./routes/billing"
+import { branding } from "./routes/branding"
 import { bulkSends, startBulkSendRoute } from "./routes/bulk-sends"
 import { data } from "./routes/data"
 import { documents } from "./routes/documents"
 import { embedding } from "./routes/embedding"
 import { envelopes } from "./routes/envelopes"
+import { folders } from "./routes/folders"
+import { me } from "./routes/me"
 import { signing } from "./routes/signing"
 import { templates } from "./routes/templates"
 import { v1 } from "./routes/v1"
 import { verify } from "./routes/verify"
 import { webhooks } from "./routes/webhooks"
+import { workspace } from "./routes/workspace"
 
 const jsonLimit = bodyLimit({ maxSize: 8 * 1024 * 1024 })
 const uploadLimit = bodyLimit({ maxSize: MAX_UPLOAD_BYTES })
+const defaultHeaders = secureHeaders()
+// Logos are embedded by mail clients on other origins, so they may be loaded cross-origin.
+const brandingHeaders = secureHeaders({ crossOriginResourcePolicy: "cross-origin" })
 
 export function createApp() {
   const env = getEnv()
 
   const app = new Hono()
     .use(requestLog)
-    .use(secureHeaders())
+    .use((c, next) =>
+      c.req.path.startsWith("/api/branding/") ? brandingHeaders(c, next) : defaultHeaders(c, next),
+    )
     .use(
       "/api/*",
       cors({
@@ -54,11 +64,16 @@ export function createApp() {
     .on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw))
 
     .route("/api/documents", documents)
+    .route("/api/folders", folders)
     .route("/api/envelopes", envelopes)
     .route("/api/templates", templates)
     .route("/api/templates/:id/bulk-sends", startBulkSendRoute)
     .route("/api/bulk-sends", bulkSends)
     .route("/api/billing", billing)
+    .route("/api/me", me)
+    .route("/api/avatars", avatars)
+    .route("/api/workspace", workspace)
+    .route("/api/branding", branding)
     .route("/api/data", data)
     .route("/api/api-keys", apiKeys)
     .route("/api/embedding", embedding)

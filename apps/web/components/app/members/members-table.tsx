@@ -1,24 +1,16 @@
 "use client"
 
 import { memberActions, type OrgRole } from "@sahihi/core"
-import { UserMinusIcon } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import {
-  AlertDialog,
-  AlertDialogClose,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogPopup,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
+import { ConfirmDialog } from "@/components/app/confirm-dialog"
+import { UserMinusIcon } from "@/components/app/icons"
+import { toastManager } from "@/components/app/toast"
+import { Avatar } from "@/components/arc/avatar/avatar"
+import { Badge } from "@/components/arc/badge/badge"
 import { Button } from "@/components/ui/button"
+// coss Select inside the table: the column header is its label (Arc's Select shows its own).
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Spinner } from "@/components/ui/spinner"
 import {
   Table,
   TableBody,
@@ -27,10 +19,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { toastManager } from "@/components/ui/toast"
 import { organization } from "@/lib/auth-client"
+import { formatDate } from "@/lib/format"
 import { MEMBER_ROLE_LABELS, roleLabel } from "@/lib/members"
-import { initials } from "@/lib/nav"
 
 export interface MemberRow {
   id: string
@@ -38,8 +29,6 @@ export interface MemberRow {
   createdAt: string
   user: { name: string; email: string; image?: string | null }
 }
-
-const joined = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: "Africa/Nairobi" })
 
 /**
  * Members of the active workspace. Role Select and Remove appear only where `memberActions`
@@ -85,7 +74,6 @@ function MemberRowView({
 }) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
-  const [removing, setRemoving] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const name = member.user.name || member.user.email
   const roleItems = [member.role, ...actions.assignableRoles].map((r) => ({
@@ -106,14 +94,11 @@ function MemberRowView({
   }
 
   async function remove() {
-    setRemoving(true)
     const { error } = await organization.removeMember({ memberIdOrEmail: member.id })
-    setRemoving(false)
     if (error) {
       toastManager.add({ title: "Member not removed", description: error.message, type: "error" })
-      return
+      throw new Error(error.message)
     }
-    setConfirmOpen(false)
     toastManager.add({ title: `${name} was removed`, type: "success" })
     router.refresh()
   }
@@ -122,10 +107,7 @@ function MemberRowView({
     <TableRow>
       <TableCell>
         <div className="flex items-center gap-3">
-          <Avatar className="size-8">
-            {member.user.image && <AvatarImage src={member.user.image} alt="" />}
-            <AvatarFallback>{initials(member.user.name, member.user.email)}</AvatarFallback>
-          </Avatar>
+          <Avatar name={name} src={member.user.image ?? undefined} size="sm" />
           <div className="min-w-0">
             <div className="truncate font-medium">
               {member.user.name}
@@ -155,39 +137,32 @@ function MemberRowView({
             </SelectPopup>
           </Select>
         ) : (
-          <Badge variant="outline">{roleLabel(member.role)}</Badge>
+          <Badge size="sm">{roleLabel(member.role)}</Badge>
         )}
       </TableCell>
       <TableCell className="text-muted-foreground">
-        {joined.format(new Date(member.createdAt))}
+        {formatDate(new Date(member.createdAt))}
       </TableCell>
       <TableCell>
         {actions.canRemove && (
-          <AlertDialog open={confirmOpen} onOpenChange={(o) => !removing && setConfirmOpen(o)}>
-            <AlertDialogTrigger
-              render={<Button variant="ghost" size="icon-sm" aria-label={`Remove ${name}`} />}
+          <>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Remove ${name}`}
+              onClick={() => setConfirmOpen(true)}
             >
               <UserMinusIcon aria-hidden />
-            </AlertDialogTrigger>
-            <AlertDialogPopup>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Remove {name}?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  They lose access to this workspace immediately. Their documents and envelopes
-                  stay, and envelopes they sent keep working. You can invite them again later.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogClose render={<Button variant="ghost" disabled={removing} />}>
-                  Cancel
-                </AlertDialogClose>
-                <Button variant="destructive" onClick={remove} disabled={removing}>
-                  {removing && <Spinner aria-hidden />}
-                  Remove member
-                </Button>
-              </AlertDialogFooter>
-            </AlertDialogPopup>
-          </AlertDialog>
+            </Button>
+            <ConfirmDialog
+              open={confirmOpen}
+              onOpenChange={setConfirmOpen}
+              title={`Remove ${name}?`}
+              description="They lose access to this workspace immediately. Their documents and envelopes stay, and envelopes they sent keep working. You can invite them again later."
+              confirmLabel="Remove member"
+              onConfirm={remove}
+            />
+          </>
         )}
       </TableCell>
     </TableRow>

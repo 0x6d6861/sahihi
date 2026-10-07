@@ -2,19 +2,10 @@
 
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardPanel,
-  CardTitle,
-} from "@/components/ui/card"
-import { Field, FieldLabel } from "@/components/ui/field"
-import { Form } from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
+import { Panel } from "@/components/app/panel"
+import { Alert } from "@/components/arc/alert/alert"
+import { Button } from "@/components/arc/button/button"
+import { Input } from "@/components/arc/input/input"
 import { organization } from "@/lib/auth-client"
 
 const slugify = (s: string) =>
@@ -48,29 +39,19 @@ export default function OnboardingPage() {
   }
 
   return (
-    <Card className="w-full max-w-sm">
-      <CardHeader>
-        <CardTitle>Name your workspace</CardTitle>
-        <CardDescription>Usually your company or team name.</CardDescription>
-      </CardHeader>
-      <Form className="contents" onSubmit={onSubmit}>
-        <CardPanel className="flex flex-col gap-4">
-          {error && (
-            <Alert variant="error">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          <Field>
-            <FieldLabel>Workspace name</FieldLabel>
-            <Input name="name" required maxLength={80} />
-          </Field>
-        </CardPanel>
-        <CardFooter>
-          <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? "Creating…" : "Continue"}
-          </Button>
-        </CardFooter>
-      </Form>
-    </Card>
+    <Panel
+      title="Name your workspace"
+      description="Usually your company or team name."
+      headingLevel={1}
+      className="w-full max-w-sm"
+    >
+      <form className="flex flex-col gap-4" onSubmit={onSubmit}>
+        {error && <Alert tone="danger" title={error} />}
+        <Input label="Workspace name" name="name" required maxLength={80} />
+        <Button type="submit" className="mt-2 w-full" loading={pending}>
+          Continue
+        </Button>
+      </form>
+    </Panel>
   )
 }

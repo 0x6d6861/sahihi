@@ -3,7 +3,7 @@
 Every workspace is on a **plan** that limits **envelopes sent per month** and **seats**. There's
 no payment provider yet: the Sahihi team sets plans (ADR 0014).
 
-## Plans (`packages/core/src/billing.ts`)
+## Plans (`packages/core/src/workspace/billing.ts`)
 
 | Plan | Envelopes / month | Seats |
 |---|---|---|

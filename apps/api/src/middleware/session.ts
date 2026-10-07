@@ -27,3 +27,15 @@ export const requireOrg = createMiddleware<AppEnv>(async (c, next) => {
   c.set("memberRole", member.role)
   await next()
 })
+
+/**
+ * Requires a signed-in user, with or without an active organization: account settings
+ * (`/api/me`) belong to the person, not to a workspace. Sets c.var.user / session.
+ */
+export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
+  const result = await auth.api.getSession({ headers: c.req.raw.headers })
+  if (!result) return c.json({ error: "unauthorized" }, 401)
+  c.set("user", result.user)
+  c.set("session", result.session)
+  await next()
+})

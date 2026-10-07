@@ -5,7 +5,7 @@ import { getQueues } from "@sahihi/infra"
 import { betterAuth } from "better-auth"
 import { prismaAdapter } from "better-auth/adapters/prisma"
 import { APIError } from "better-auth/api"
-import { organization } from "better-auth/plugins"
+import { organization, twoFactor } from "better-auth/plugins"
 
 /**
  * better-auth — authentication for SENDERS (SaaS users) only.
@@ -15,6 +15,8 @@ import { organization } from "better-auth/plugins"
  * Docs: docs/auth.md
  */
 const env = getEnv()
+
+const LOGO_MESSAGE = "Upload the logo in Settings → Workspace"
 
 export const auth = betterAuth({
   appName: "Sahihi",
@@ -48,7 +50,34 @@ export const auth = betterAuth({
     },
   },
 
+  // Settings → Profile. A verified user confirms from their current address first; better-auth then
+  // sends the usual verification email to the new one (docs/auth.md → Account settings).
+  user: {
+    changeEmail: {
+      enabled: true,
+      sendChangeEmailConfirmation: async ({ user, newEmail, url }) => {
+        await getQueues().notifications.add("auth.change-email", {
+          email: user.email,
+          name: user.name,
+          newEmail,
+          url,
+        })
+      },
+    },
+  },
+
   databaseHooks: {
+    user: {
+      update: {
+        // The picture is uploaded through PUT /api/me/avatar, which sets `image` to our own URL.
+        // Refusing it here keeps `update-user` from pointing it anywhere else.
+        before: async (user, ctx) => {
+          if (ctx && "image" in user) {
+            throw new APIError("BAD_REQUEST", { message: "Upload a picture in Settings → Profile" })
+          }
+        },
+      },
+    },
     session: {
       create: {
         // New sessions start with no active org. Without this, every sign-in of an existing member
@@ -69,6 +98,9 @@ export const auth = betterAuth({
   },
 
   plugins: [
+    // Settings → Security: TOTP authenticator apps plus one-time backup codes. Sign-in answers
+    // `twoFactorRedirect` and the web finishes it on /sign-in/two-factor.
+    twoFactor({ issuer: "Sahihi" }),
     organization({
       // Every user can create their own workspace on sign-up
       allowUserToCreateOrganization: true,
@@ -80,6 +112,14 @@ export const auth = betterAuth({
       membershipLimit: async (_user, organization) =>
         (await getOrgPlan(prisma, organization.id)).seats ?? 100_000,
       organizationHooks: {
+        // The logo is uploaded through PUT /api/workspace/logo, which stores our own public URL.
+        // Refusing it here keeps arbitrary remote images (tracking pixels) out of emails.
+        beforeCreateOrganization: async ({ organization }) => {
+          if (organization.logo) throw new APIError("BAD_REQUEST", { message: LOGO_MESSAGE })
+        },
+        beforeUpdateOrganization: async ({ organization }) => {
+          if ("logo" in organization) throw new APIError("BAD_REQUEST", { message: LOGO_MESSAGE })
+        },
         // Pending invitations hold a seat, so an invite that could never be accepted is refused now.
         beforeCreateInvitation: async ({ organization }) => {
           const plan = await getOrgPlan(prisma, organization.id)

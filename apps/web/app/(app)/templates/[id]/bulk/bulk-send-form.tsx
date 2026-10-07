@@ -11,15 +11,16 @@ import {
   rowsFromCsv,
   type TemplateForUse,
 } from "@sahihi/core"
-import { DownloadIcon, FileSpreadsheetIcon, SendIcon } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { DownloadIcon, FileSpreadsheetIcon, SendIcon } from "@/components/app/icons"
+import { Panel } from "@/components/app/panel"
+import { toastManager } from "@/components/app/toast"
+import { Alert } from "@/components/arc/alert/alert"
+import { Button } from "@/components/arc/button/button"
+import { Input } from "@/components/arc/input/input"
+import { Textarea } from "@/components/arc/textarea/textarea"
 import { FileUpload } from "@/components/extend/file-upload"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Spinner } from "@/components/ui/spinner"
 import {
   Table,
   TableBody,
@@ -28,8 +29,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Textarea } from "@/components/ui/textarea"
-import { toastManager } from "@/components/ui/toast"
 import { ApiError, api } from "@/lib/api"
 
 const CSV_ONLY = [{ label: "CSV", icon: FileSpreadsheetIcon }]
@@ -50,7 +49,7 @@ export function BulkSendForm({
   const router = useRouter()
   const firstOpen = template.roles.find((r) => !hasFixedContact(r))
   const [title, setTitle] = useState(
-    firstOpen ? `${templateName} – {{${firstOpen.label} name}}` : templateName,
+    firstOpen ? `${templateName}: {{${firstOpen.label} name}}` : templateName,
   )
   const [message, setMessage] = useState("")
   const [fileName, setFileName] = useState<string | null>(null)
@@ -71,7 +70,7 @@ export function BulkSendForm({
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `${templateName.replace(/[^\w -]+/g, "").trim() || "template"} – bulk send.csv`
+    a.download = `${templateName.replace(/[^\w -]+/g, "").trim() || "template"} bulk send.csv`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -97,13 +96,18 @@ export function BulkSendForm({
   }
 
   const ready = rows.length > 0 && issues.length === 0 && title.trim().length > 0
+  const blocker =
+    rows.length === 0
+      ? "Upload a CSV to continue."
+      : issues.length > 0
+        ? `Fix ${issues.length === 1 ? "the problem" : `the ${issues.length} problems`} in the CSV first.`
+        : "Give the envelopes a title."
   // Row numbers match the CSV (row 1 = first line under the header).
   const preview = rows.slice(0, 5).map((r, i) => ({ ...r, row: i + 1 }))
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
-        <p className="font-medium text-sm">1. Prepare a CSV</p>
+      <Panel title="1. Prepare a CSV">
         <p className="text-muted-foreground text-sm">
           One row per envelope, with these columns:{" "}
           {columns.map((c, i) => (
@@ -115,15 +119,14 @@ export function BulkSendForm({
           . Up to {BULK_SEND_MAX_ROWS} rows.
         </p>
         <div>
-          <Button variant="outline" onClick={downloadTemplate}>
+          <Button variant="secondary" onClick={downloadTemplate}>
             <DownloadIcon aria-hidden />
             Download CSV template
           </Button>
         </div>
-      </div>
+      </Panel>
 
-      <div className="flex flex-col gap-2">
-        <p className="font-medium text-sm">2. Upload it</p>
+      <Panel title="2. Upload it">
         <FileUpload
           className="w-full"
           accept=".csv,text/csv"
@@ -138,52 +141,46 @@ export function BulkSendForm({
           }}
         />
         {fileName && issues.length > 0 && (
-          <Alert variant="error">
-            <AlertTitle>
-              {issues.length} problem{issues.length === 1 ? "" : "s"} to fix in {fileName}
-            </AlertTitle>
-            <AlertDescription>
-              <ul className="flex flex-col gap-1">
-                {issues.slice(0, 20).map((iss) => (
-                  <li key={`${iss.row}-${iss.message}`}>
-                    {iss.row === 0 ? "" : `Row ${iss.row}: `}
-                    {iss.message}
-                  </li>
-                ))}
-                {issues.length > 20 && <li>…and {issues.length - 20} more</li>}
-              </ul>
-            </AlertDescription>
+          <Alert
+            tone="danger"
+            title={`${issues.length} problem${issues.length === 1 ? "" : "s"} to fix in ${fileName}`}
+          >
+            <ul className="flex flex-col gap-1">
+              {issues.slice(0, 20).map((iss) => (
+                <li key={`${iss.row}-${iss.message}`}>
+                  {iss.row === 0 ? "" : `Row ${iss.row}: `}
+                  {iss.message}
+                </li>
+              ))}
+              {issues.length > 20 && <li>…and {issues.length - 20} more</li>}
+            </ul>
           </Alert>
         )}
         {rows.length > 0 && issues.length === 0 && (
-          <Alert variant="success">
-            <AlertTitle>
-              {rows.length} envelope{rows.length === 1 ? "" : "s"} ready
-            </AlertTitle>
-            <AlertDescription>Every row checks out.</AlertDescription>
+          <Alert
+            tone="success"
+            title={`${rows.length} envelope${rows.length === 1 ? "" : "s"} ready`}
+          >
+            Every row checks out.
           </Alert>
         )}
-      </div>
+      </Panel>
 
-      <div className="flex flex-col gap-4">
-        <p className="font-medium text-sm">3. Check and send</p>
-        <Field>
-          <FieldLabel>Envelope title</FieldLabel>
-          <Input value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} />
-          <FieldDescription>
-            Placeholders like <span className="font-mono">{"{{Tenant name}}"}</span> are filled per
-            row.
-          </FieldDescription>
-        </Field>
-        <Field>
-          <FieldLabel>Message (optional)</FieldLabel>
-          <Textarea
-            value={message}
-            rows={3}
-            maxLength={2000}
-            onChange={(e) => setMessage(e.target.value)}
-          />
-        </Field>
+      <Panel title="3. Check and send">
+        <Input
+          label="Envelope title"
+          value={title}
+          maxLength={200}
+          description="Placeholders like {{Tenant name}} are filled per row."
+          onChange={(e) => setTitle(e.target.value)}
+        />
+        <Textarea
+          label="Message (optional)"
+          value={message}
+          rows={3}
+          maxLength={2000}
+          onChange={(e) => setMessage(e.target.value)}
+        />
         {preview.length > 0 && (
           <Table>
             <TableHeader>
@@ -211,13 +208,15 @@ export function BulkSendForm({
             …and {rows.length - preview.length} more rows.
           </p>
         )}
-        <div>
-          <Button onClick={send} disabled={!ready || busy}>
-            {busy ? <Spinner aria-hidden /> : <SendIcon aria-hidden />}
+        <div className="flex flex-col gap-3 border-t pt-5 sm:flex-row sm:items-center">
+          <Button onClick={send} loading={busy} disabled={!ready}>
+            <SendIcon aria-hidden />
             Send {rows.length > 0 ? rows.length : ""} envelope{rows.length === 1 ? "" : "s"}
           </Button>
+          {/* A disabled button always says why. */}
+          {!ready && <p className="text-muted-foreground text-sm">{blocker}</p>}
         </div>
-      </div>
+      </Panel>
     </div>
   )
 }

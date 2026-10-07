@@ -2,7 +2,7 @@
 
 ## v1: Certificate of Completion (INTERNAL provider)
 
-Every completed envelope gets `certificate.pdf`, rendered by `packages/pdf/src/certificate.ts`. It
+Every completed envelope gets `certificate.pdf`, rendered by `packages/pdf/src/render/certificate.ts`. It
 is stored **separately** from `signed.pdf` so it can quote the signed document's hash.
 
 Contents:
@@ -44,7 +44,7 @@ Web (public, no account):
 
 ## CA integration (later)
 
-`packages/core/src/signing-provider.ts`:
+`packages/core/src/signing/signing-provider.ts`:
 
 ```ts
 interface SigningProvider {

@@ -8,24 +8,12 @@ import {
 } from "@sahihi/core"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { CheckboxGroup } from "@/components/ui/checkbox-group"
-import {
-  Dialog,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogPanel,
-  DialogPopup,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field"
-import { Form } from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Spinner } from "@/components/ui/spinner"
-import { toastManager } from "@/components/ui/toast"
+import { DialogActions } from "@/components/app/confirm-dialog"
+import { toastManager } from "@/components/app/toast"
+import { Button } from "@/components/arc/button/button"
+import { Checkbox } from "@/components/arc/checkbox/checkbox"
+import { Dialog, DialogContent } from "@/components/arc/dialog/dialog"
+import { Input } from "@/components/arc/input/input"
 import { ApiError, api } from "@/lib/api"
 import { type FormErrors, issuesToFormErrors } from "@/lib/envelope-form"
 import { SecretReveal } from "./secret-reveal"
@@ -116,65 +104,62 @@ export function WebhookFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={change}>
-      <DialogPopup className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{editing ? "Edit webhook" : "Add a webhook"}</DialogTitle>
-          <DialogDescription>
-            Sahihi POSTs signed JSON to this URL when the events you pick happen in this workspace.
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent
+        title={secret ? "Copy the signing secret" : editing ? "Edit webhook" : "Add a webhook"}
+        description="Sahihi POSTs signed JSON to this URL when the events you pick happen in this workspace."
+      >
         {secret ? (
-          <>
-            <DialogPanel>
-              <SecretReveal secret={secret} />
-            </DialogPanel>
-            <DialogFooter>
+          <div className="flex flex-col gap-4">
+            <SecretReveal secret={secret} />
+            <DialogActions>
               <Button onClick={() => onOpenChange(false)}>Done</Button>
-            </DialogFooter>
-          </>
+            </DialogActions>
+          </div>
         ) : (
-          <Form errors={errors} onSubmit={onSubmit} className="contents">
-            <DialogPanel className="flex flex-col gap-5">
-              <Field name="url">
-                <FieldLabel>Endpoint URL</FieldLabel>
-                <Input
-                  type="url"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://erp.example.co.ke/webhooks/sahihi"
+          <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
+            <Input
+              label="Endpoint URL"
+              name="url"
+              type="url"
+              value={url}
+              description="HTTPS, reachable from the internet."
+              error={errors.url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://erp.example.co.ke/webhooks/sahihi"
+            />
+            <Input
+              label="Description (optional)"
+              name="description"
+              value={description}
+              maxLength={200}
+              error={errors.description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="For example, contracts sync in our ERP"
+            />
+            <fieldset className="flex flex-col gap-3">
+              <legend className="pb-3 font-medium text-sm">Events</legend>
+              {WEBHOOK_EVENT_TYPES.map((type: WebhookEventType) => (
+                <Checkbox
+                  key={type}
+                  name="events"
+                  value={type}
+                  label={type}
+                  description={WEBHOOK_EVENT_DESCRIPTIONS[type]}
+                  checked={events.includes(type)}
+                  onCheckedChange={(checked) =>
+                    setEvents((all) =>
+                      checked === true ? [...all, type] : all.filter((x) => x !== type),
+                    )
+                  }
                 />
-                <FieldDescription>HTTPS, reachable from the internet.</FieldDescription>
-                <FieldError />
-              </Field>
-              <Field name="description">
-                <FieldLabel>Description (optional)</FieldLabel>
-                <Input
-                  value={description}
-                  maxLength={200}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="e.g. Contracts sync in our ERP"
-                />
-                <FieldError />
-              </Field>
-              <Field name="events">
-                <FieldLabel>Events</FieldLabel>
-                <CheckboxGroup value={events} onValueChange={(v) => setEvents(v as string[])}>
-                  {WEBHOOK_EVENT_TYPES.map((type: WebhookEventType) => (
-                    <Label key={type} className="flex items-start gap-2 font-normal">
-                      <Checkbox name="events" value={type} />
-                      <span className="flex flex-col">
-                        <span className="font-mono text-xs">{type}</span>
-                        <span className="text-muted-foreground text-xs">
-                          {WEBHOOK_EVENT_DESCRIPTIONS[type]}
-                        </span>
-                      </span>
-                    </Label>
-                  ))}
-                </CheckboxGroup>
-                <FieldError />
-              </Field>
-            </DialogPanel>
-            <DialogFooter>
+              ))}
+              {errors.events && (
+                <p role="alert" className="text-destructive-foreground text-sm">
+                  {errors.events}
+                </p>
+              )}
+            </fieldset>
+            <DialogActions>
               <Button
                 variant="ghost"
                 type="button"
@@ -183,14 +168,13 @@ export function WebhookFormDialog({
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={pending}>
-                {pending && <Spinner aria-hidden />}
+              <Button type="submit" loading={pending}>
                 {editing ? "Save" : "Add webhook"}
               </Button>
-            </DialogFooter>
-          </Form>
+            </DialogActions>
+          </form>
         )}
-      </DialogPopup>
+      </DialogContent>
     </Dialog>
   )
 }

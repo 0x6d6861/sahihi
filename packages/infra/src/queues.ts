@@ -11,6 +11,8 @@ import { Redis } from "ioredis"
 export interface NotificationJobs {
   "auth.verify-email": { email: string; name: string; url: string }
   "auth.reset-password": { email: string; name: string; url: string }
+  /** Sent to the CURRENT address; the link then verifies the new one. */
+  "auth.change-email": { email: string; name: string; newEmail: string; url: string }
   "auth.org-invitation": {
     email: string
     inviterName: string

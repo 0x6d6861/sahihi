@@ -1,13 +1,15 @@
+import type { BadgeTone } from "./constants"
+
 /** Export status as a badge; READY archives expire after EXPORT_TTL_DAYS. */
 export function exportStatus(
   x: { status: "PENDING" | "READY" | "FAILED"; downloadable: boolean },
   _now: Date,
-): { label: string; variant: "outline" | "success" | "error" | "secondary" } {
-  if (x.status === "PENDING") return { label: "Preparing", variant: "outline" }
-  if (x.status === "FAILED") return { label: "Failed", variant: "error" }
+): { label: string; tone: BadgeTone } {
+  if (x.status === "PENDING") return { label: "Preparing", tone: "info" }
+  if (x.status === "FAILED") return { label: "Failed", tone: "danger" }
   return x.downloadable
-    ? { label: "Ready", variant: "success" }
-    : { label: "Expired", variant: "secondary" }
+    ? { label: "Ready", tone: "success" }
+    : { label: "Expired", tone: "neutral" }
 }
 
 /** 1536 → "1.5 KB", 5_242_880 → "5.0 MB". */

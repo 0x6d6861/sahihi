@@ -1,15 +1,15 @@
 "use client"
 
-import { PlusIcon } from "lucide-react"
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
+import { PlusIcon } from "@/components/app/icons"
+import { Button } from "@/components/arc/button/button"
 import { WebhookFormDialog } from "./webhook-form-dialog"
 
 export function AddWebhookButton() {
   const [open, setOpen] = useState(false)
   return (
     <>
-      <Button onClick={() => setOpen(true)}>
+      <Button variant="secondary" onClick={() => setOpen(true)}>
         <PlusIcon aria-hidden />
         Add webhook
       </Button>

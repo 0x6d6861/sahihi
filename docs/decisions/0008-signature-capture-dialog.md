@@ -36,3 +36,10 @@ No vendored files change.
 - The typed-signature fonts load from Google Fonts when the dialog opens. A future CSP (roadmap P5)
   must allow `fonts.googleapis.com` and `fonts.gstatic.com`, or the fonts must be self-hosted.
 - If Extend exports a standalone, controlled signature dialog, revisit this ADR.
+
+## Amendment (2026-10-07, ADR 0023)
+The dialog is now composed from Arc parts (`Dialog`, `Tabs`, `Input`, `Select`, `Button`, `Alert`).
+**Draw** uses Arc's `SignaturePad` (pressure-aware ink, undo, its own cropped PNG export) instead of
+`signature_pad`; the PNG blob is read into a data URL and must still pass `isAcceptablePng`. Type and
+Upload are unchanged and still crop with `inkBounds`.
+

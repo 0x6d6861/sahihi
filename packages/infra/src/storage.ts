@@ -19,6 +19,9 @@ import { contentDisposition } from "@sahihi/core"
  *   org/{orgId}/envelopes/{envelopeId}/signed.pdf
  *   org/{orgId}/envelopes/{envelopeId}/certificate.pdf
  *   org/{orgId}/exports/{exportId}.zip
+ *   org/{orgId}/branding/logo-{version}.png
+ *   user/{userId}/{signature|initials}-{version}.png
+ *   user/{userId}/avatar-{version}.png
  */
 export const keys = {
   original: (orgId: string, documentId: string) =>
@@ -29,6 +32,13 @@ export const keys = {
   certificate: (orgId: string, envelopeId: string) =>
     `org/${orgId}/envelopes/${envelopeId}/certificate.pdf`,
   export: (orgId: string, exportId: string) => `org/${orgId}/exports/${exportId}.zip`,
+  /** Workspace logo (Settings → Workspace), served publicly by /api/branding. */
+  logo: (orgId: string, version: string) => `org/${orgId}/branding/logo-${version}.png`,
+  /** A user's saved signature or initials (Settings → Profile). Not workspace data. */
+  savedSignature: (userId: string, kind: "signature" | "initials", version: string) =>
+    `user/${userId}/${kind}-${version}.png`,
+  /** A user's profile picture (Settings → Profile), served by /api/avatars. */
+  avatar: (userId: string, version: string) => `user/${userId}/avatar-${version}.png`,
   /** Everything a workspace stores (deleted with the workspace). */
   orgPrefix: (orgId: string) => `org/${orgId}/`,
   /** Everything stored for one envelope (signed PDF, certificate, signature images). */

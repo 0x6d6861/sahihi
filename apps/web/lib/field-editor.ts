@@ -1,4 +1,9 @@
-import type { FieldInput, FieldType, NormalizedRect } from "@sahihi/core"
+import {
+  type FieldInput,
+  type FieldType,
+  type NormalizedRect,
+  withoutDuplicates,
+} from "@sahihi/core"
 import { moveRect, type Point, rectAtPoint, rectFromDrag } from "./field-geometry"
 
 /**
@@ -52,6 +57,8 @@ export type EditorAction =
   | { type: "delete"; key: string }
   | { type: "select"; key: string | null }
   | { type: "syncRecipients"; allowed: string[] }
+  /** Add detected fields (ADR 0020). Ones on top of an existing field are skipped. */
+  | { type: "import"; fields: Omit<EditorField, "key">[] }
 
 export function initialState(fields: EditorField[]): EditorState {
   return { fields, selected: null, revision: 0 }
@@ -111,6 +118,10 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
       )
     case "select":
       return s.selected === a.key ? s : { ...s, selected: a.key }
+    case "import": {
+      const added = withoutDuplicates(s.fields, a.fields).map((f) => ({ ...f, key: fieldKey() }))
+      return added.length ? changed(s, [...s.fields, ...added], null) : s
+    }
     case "syncRecipients": {
       // Recipients were removed or turned into viewers: their fields go too (the API does the same).
       const allowed = new Set(a.allowed)

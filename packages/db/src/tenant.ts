@@ -16,6 +16,11 @@ export function forOrganization(organizationId: string) {
       ...where,
       organizationId,
     }),
+    folder: (where: Prisma.FolderWhereInput = {}): Prisma.FolderWhereInput => ({
+      ...where,
+      organizationId,
+    }),
+    tag: (where: Prisma.TagWhereInput = {}): Prisma.TagWhereInput => ({ ...where, organizationId }),
     template: (where: Prisma.TemplateWhereInput = {}): Prisma.TemplateWhereInput => ({
       ...where,
       organizationId,

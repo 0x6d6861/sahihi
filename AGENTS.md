@@ -24,10 +24,10 @@ Read this file first, then the doc for the area you're touching (see **Doc map**
 | API | **Hono** on Bun — `apps/api` |
 | Jobs | **BullMQ** + Redis — `apps/worker` |
 | Web | **Next.js 16** App Router, React 19, Tailwind v4 — `apps/web` |
-| UI | **coss ui** (Base UI + shadcn registry), **Extend UI** document components, **shadcn/ui** (`base-nova`, Base UI) as fallback. **Defaults only** — see UI rules |
+| UI | **Arc** (`@uiarc/*`, CSS modules + Motion) for primitives and the design tokens, **coss ui** (Base UI) where Arc has no equivalent, **Extend UI** document components, **shadcn/ui** (`base-nova`) as fallback. Light + dark. **Defaults only**, see UI rules and ADR 0023 |
 | Auth | **better-auth** + Organization plugin (senders only) |
 | DB | PostgreSQL + **Prisma 7** (`prisma-client` generator, `@prisma/adapter-pg`) |
-| PDF | **pdf-lib** (server-side stamping, certificate rendering) |
+| PDF | **pdf-lib** (server-side stamping, certificate rendering), **PDFium WASM** (`@embedpdf/pdfium`, text extraction for field detection) |
 | Storage | S3-compatible (MinIO locally), presigned URLs only |
 | Email / SMS | **React Email** templates in `packages/emails` (preview: `bun run emails:dev`), SMTP→Mailpit in dev, Postmark in prod / Africa's Talking for SMS OTP |
 | Lint / format | **Biome** |
@@ -44,15 +44,19 @@ apps/
               sign/[token], verify/[code]
 packages/
   config/     Env schema (zod) + queue names. The ONLY place process.env is parsed.
-  core/       Pure domain logic, no I/O: enums, state machines, routing, coordinates, crypto, audit chain, zod schemas
+  core/       Pure domain logic, no I/O, one folder per domain under src/: envelope/ (state machine, routing),
+              field-detection/, geometry/ (coordinates), integrations/ (API keys, webhooks, embed),
+              security/ (crypto, audit chain), shared/ (enums, zod schemas), signing/, templates/,
+              workspace/ (billing, members, permissions, retention). Import only from `@sahihi/core`
   db/         Prisma schema + client, tenant scoping, appendAuditEvent, issueSigningLink
   envelopes/  Envelope services shared by api + worker: send, void, create (document/template), routing,
               bulk send, embedded links. Throws EnvelopeError (mapped to HTTP in app.onError)
   infra/      S3 storage + typed BullMQ queues + Redis
-  pdf/        inspectPdf, stampFields, renderCertificate (pdf-lib)
+  pdf/        src/parse/ (inspectPdf, readFormWidgets, readPageText), src/render/ (stampFields, renderCertificate),
+              src/text/ (Noto fonts, text fitting), src/fixtures/ (test PDF builders)
   emails/     React Email templates → { subject, html, text }; preview server (see its README)
 docs/         Design docs, roadmap, ADRs  ← read before changing an area
-scripts/      bootstrap-ui.sh (installs coss + Extend components)
+scripts/      bootstrap-ui.sh (installs coss + Extend components; Arc lives in components/arc, see /add-ui)
 .claude/      Slash commands for Claude Code
 ```
 
@@ -89,25 +93,33 @@ the relevant doc in `docs/` is updated if behaviour changed, and the matching ch
 ## Golden rules (non-negotiable)
 
 ### UI — defaults only
-1. Use **only** registry components, in this order: coss (`@coss/*`) for general UI, Extend
-   (`@extend/*`) for document/PDF UI, and **shadcn/ui as the fallback** when neither has the
-   component (`bunx shadcn@latest add <name>`, no prefix; `components.json` style `base-nova` makes
-   it the Base UI variant). Never let a shadcn install overwrite a coss/Extend file. **Do not
-   hand-write primitives** (no custom Button/Dialog/Input), and don't install another UI kit (no
-   Radix, MUI, Mantine, Headless UI, react-pdf, etc.).
-2. **Never edit files under `apps/web/components/ui/`** (or wherever the Extend CLI put its files).
-   They're vendored registry output. Put composition in `apps/web/components/app/` and page folders.
-   If a vendored component really must change, write an ADR in `docs/decisions/` first.
-3. coss and our shadcn style are **Base UI**, not Radix. Use `render={<Link …/>}` for polymorphism, **not** `asChild`.
-   Card body is `CardPanel`. Check the real props in `components/ui/<name>.tsx` before using them.
-4. Style with Tailwind **theme tokens only** (`bg-background`, `text-muted-foreground`, `border-info`, …).
-   No hex colours and no arbitrary colour values. Full rules are in `docs/ui.md`.
+1. Use **only** registry components, in this order (ADR 0023): **Arc** (`@uiarc/*`) for every
+   primitive it ships (button, inputs, select, checkbox, switch, dialog, drawer, popover, tooltip,
+   tabs, dropdown menus, alert, badge, empty state, toasts…), **coss** (`@coss/*`) where Arc has
+   nothing (table, sidebar, icon-only buttons…), **Extend** (`@extend/*`) for document/PDF UI, and
+   **shadcn/ui as the last fallback**. Install Arc with the style swap in `/add-ui`, never with a
+   plain `shadcn add` (the `base-nova` transform breaks Arc's Radix files). Never let an install
+   overwrite a coss/Extend/Arc file. **Do not hand-write primitives**, and don't install another UI
+   kit (no MUI, Mantine, Headless UI, react-pdf, etc.). Radix is allowed **only** as a dependency of
+   vendored Arc items; app code never imports Radix.
+2. **Never edit files under `apps/web/components/ui/`, `components/arc/`** (or wherever the Extend
+   CLI put its files). They're vendored registry output. Put composition in `apps/web/components/app/`
+   and page folders (`Panel`, `ButtonLink`, `ConfirmDialog` already exist). If a vendored component
+   really must change, write an ADR in `docs/decisions/` first.
+3. **Arc is Radix** (`asChild` on triggers, Arc's own props like `label`/`error`/`tone`/`options`);
+   **coss is Base UI** (`render={<Link …/>}`, `CardPanel`). Open the installed file
+   (`components/arc/<id>/<id>.tsx` or `components/ui/<name>.tsx`) before using it. Arc's CSS
+   modules beat Tailwind utilities on the same property, so wrap an Arc component to hide or place it.
+4. Style with **theme tokens only** (`bg-background`, `text-muted-foreground`, `border-info`, …; Arc
+   tokens like `var(--font-mono)` in an inline `style` when a utility can't reach an Arc element).
+   No hex colours and no arbitrary colour values. Every screen must work in light and dark. Full
+   rules are in `docs/ui.md`.
 
 ### Data & security
 5. **Tenant isolation:** every query on a tenant-owned model in an authenticated route goes through
    `forOrganization(orgId)` from `@sahihi/db` (or filters by `organizationId` explicitly). Routes sit
    behind `requireOrg`. See `docs/security.md`.
-6. **State changes go through `assertTransition()`** (`packages/core/src/envelope-state.ts`). No other
+6. **State changes go through `assertTransition()`** (`packages/core/src/envelope/envelope-state.ts`). No other
    code may decide whether a status change is legal.
 7. **Audit:** every state change writes an audit event with `appendAuditEvent(tx, …)` **inside the
    same `prisma.$transaction`**. Never update or delete `AuditEvent` rows (the database refuses:
@@ -127,17 +139,18 @@ the relevant doc in `docs/` is updated if behaviour changed, and the matching ch
     never return token hashes, other recipients' PII or data from another envelope.
 
 ### Code conventions
-13. Validate every request body with a zod schema from `@sahihi/core/schemas` via `parseJson()`.
+13. Validate every request body with a zod schema from `@sahihi/core` (`src/shared/schemas.ts`) via `parseJson()`.
     Shared schemas live in core so web forms and the API agree.
 14. Env vars: add them to `packages/config/src/index.ts` **and** `.env.example`. Never read
     `process.env` elsewhere, with two exceptions: `apps/web` for `API_URL`, `STORAGE_ORIGIN`,
     `NODE_ENV` and the Sentry DSNs (`SENTRY_*`, `NEXT_PUBLIC_SENTRY_*`, docs/observability.md), and
     `packages/db/prisma.config.ts` for `MIGRATE_DATABASE_URL` / `DATABASE_URL`.
-15. Prisma enums must mirror the unions in `packages/core/src/enums.ts`. `packages/db/src/enums.test.ts`
+15. Prisma enums must mirror the unions in `packages/core/src/shared/enums.ts`. `packages/db/src/enums.test.ts`
     enforces this, so update both.
 16. When you change better-auth plugins, run `bun run auth:schema` and reconcile section 1 of
     `schema.prisma` by hand.
-17. Pure logic goes in `packages/core` with a `*.test.ts` next to it. Keep route handlers thin.
+17. Pure logic goes in `packages/core`, in the folder for its domain, with a `*.test.ts` next to it
+    and an export in `src/index.ts`. Keep route handlers thin.
 18. Don't add dependencies casually. Pin exact versions (the repo uses exact pins).
 
 ## Doc map — read before you touch
@@ -182,9 +195,13 @@ the relevant doc in `docs/` is updated if behaviour changed, and the matching ch
 - **Same-origin API:** the browser calls `/api/*` on the web origin and Next rewrites the request to
   the Hono API. That's why `BETTER_AUTH_URL` points at the **web** origin. Server Components use
   `lib/api-server.ts`, which forwards cookies.
-- **coss ≠ shadcn ≠ Radix:** prop names differ between coss and shadcn's Base UI components
-  (`MenuPopup` vs `DropdownMenuContent`) and from Radix-era docs (`render`, `CardPanel`, `Form` with `errors`, `toastManager`).
+- **Arc ≠ coss ≠ shadcn:** Arc components take props (`<Input label error />`, `<Select options />`,
+  `<Alert tone title />`, Radix `asChild`); coss/shadcn are Base UI compound parts (`render`, `MenuPopup`
+  vs `DropdownMenuContent`). Toasts: `toastManager` from `@/components/app/toast` (Arc toast stack).
   Open the installed source before guessing.
+- **Theme:** `lib/theme.ts` + the account menu. Dark sets both `.dark` and `data-theme="dark"`. Field
+  overlays on a PDF page sit inside `.on-paper` (always light). Re-apply the `sahihi patch (ADR 0023)`
+  line in `app/globals.css` after `ui:bootstrap`.
 - **Extend blocks are demos:** `ESignatureBlock` only takes `file` and builds the PDF in the browser.
   Build the field editor on `PDFEditor` in view-only mode (`renderPageOverlay`) + `lib/field-geometry.ts`,
   and the signing page on the lighter `PDFViewer`. Never use `PDFEditor`'s sign or forms modes for

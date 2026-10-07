@@ -13,7 +13,7 @@ describe("billing labels", () => {
     expect(quotaBanner("ok", 1, 5, "1 October")).toBeNull()
     expect(quotaBanner("exceeded", 9, null, "1 October")).toBeNull()
     expect(quotaBanner("warning", 4, 5, "1 October")).toMatchObject({
-      variant: "warning",
+      tone: "warning",
       title: "1 envelope left this month",
     })
     expect(quotaBanner("exceeded", 5, 5, "1 October")?.description).toContain(

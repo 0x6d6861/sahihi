@@ -1,8 +1,8 @@
 "use client"
 
 import type { RefObject } from "react"
+import { toastManager } from "@/components/app/toast"
 import { PDFEditor, type PDFEditorHandle } from "@/components/extend/pdf-editor"
-import { toastManager } from "@/components/ui/toast"
 
 // Prepare-document configuration (docs/ui.md → PDFEditor configurations #2): keep redact, pages and
 // forms; no annotations, signing, stamps, comments or security. Never download from here, and never

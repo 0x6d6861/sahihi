@@ -1,7 +1,7 @@
 # Webhooks
 
 Per-organization HTTPS endpoints that receive **signed JSON events** when envelopes change
-(ADR 0013). Owners and admins manage them under **Settings → Webhooks**.
+(ADR 0013). Owners and admins manage them under **Settings → API** (Webhooks section).
 
 ## Events
 
@@ -52,7 +52,7 @@ slow work asynchronously.
 
 `v1` is the hex HMAC-SHA256 of `"<t>.<raw request body>"`, keyed with the endpoint's signing secret
 (`whsec_…`). Always verify against the **raw** body before parsing it. The reference implementation
-is `verifyWebhookSignature` in `packages/core/src/webhooks.ts`:
+is `verifyWebhookSignature` in `packages/core/src/integrations/webhooks.ts`:
 
 ```ts
 import { createHmac, timingSafeEqual } from "node:crypto"

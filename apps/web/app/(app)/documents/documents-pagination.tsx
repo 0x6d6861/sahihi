@@ -1,64 +1,39 @@
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination"
-import { pageWindow } from "@/lib/pagination"
+"use client"
 
-const href = (page: number) => (page <= 1 ? "/documents" : `/documents?page=${page}`)
-const disabledLink = { "aria-disabled": true, className: "pointer-events-none opacity-50" }
+import { useRouter } from "next/navigation"
+import { Pagination } from "@/components/arc/pagination/pagination"
+import { type DocumentsView, documentsHref } from "@/lib/documents-list"
 
-/** coss Pagination for the documents list. Plain links, so the page stays a Server Component. */
+/** Arc Pagination for the documents list; the page lives in the URL, so moving is a navigation. */
 export function DocumentsPagination({
+  view,
   page,
   pageCount,
   total,
   pageSize,
 }: {
+  /** Folder and filters the links keep. */
+  view: DocumentsView
   page: number
   pageCount: number
   total: number
   pageSize: number
 }) {
+  const router = useRouter()
   const first = (page - 1) * pageSize + 1
   const last = Math.min(page * pageSize, total)
 
   return (
     <div className="flex flex-col items-center justify-between gap-3 pt-4 sm:flex-row">
-      <p className="text-muted-foreground text-sm">
-        {first}–{last} of {total}
+      <p className="text-muted-foreground text-sm tabular-nums">
+        {first} to {last} of {total}
       </p>
-      <Pagination className="sm:mx-0 sm:w-auto">
-        <PaginationContent>
-          <PaginationItem>
-            <PaginationPrevious {...(page > 1 ? { href: href(page - 1) } : disabledLink)} />
-          </PaginationItem>
-          {pageWindow(page, pageCount).map((item) =>
-            typeof item === "number" ? (
-              <PaginationItem key={item}>
-                <PaginationLink
-                  href={href(item)}
-                  isActive={item === page}
-                  aria-current={item === page ? "page" : undefined}
-                >
-                  {item}
-                </PaginationLink>
-              </PaginationItem>
-            ) : (
-              <PaginationItem key={item}>
-                <PaginationEllipsis />
-              </PaginationItem>
-            ),
-          )}
-          <PaginationItem>
-            <PaginationNext {...(page < pageCount ? { href: href(page + 1) } : disabledLink)} />
-          </PaginationItem>
-        </PaginationContent>
-      </Pagination>
+      <Pagination
+        page={page}
+        pageCount={pageCount}
+        label="Documents pages"
+        onPageChange={(p) => router.push(documentsHref(view, { page: p }))}
+      />
     </div>
   )
 }

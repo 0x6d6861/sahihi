@@ -24,25 +24,30 @@ datasource db {
 // ═══ 1. better-auth ══════════════════════════════════════════════════════════
 
 model User {
-  id            String       @id
-  name          String
-  email         String       @unique
-  emailVerified Boolean      @default(false)
-  image         String?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  sessions      Session[]
-  accounts      Account[]
-  members       Member[]
-  invitations   Invitation[]
+  id               String       @id
+  name             String
+  email            String       @unique
+  emailVerified    Boolean      @default(false)
+  image            String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  twoFactorEnabled Boolean?     @default(false)
+  sessions         Session[]
+  accounts         Account[]
+  members          Member[]
+  invitations      Invitation[]
+  twoFactors       TwoFactor[]
 
-  documents Document[]
-  envelopes Envelope[]
-  templates Template[]
-  webhooks  WebhookEndpoint[]
-  exports   DataExport[]
-  apiKeys   ApiKey[]
-  bulkSends BulkSend[]
+  documents      Document[]
+  envelopes      Envelope[]
+  templates      Template[]
+  folders        Folder[]
+  webhooks       WebhookEndpoint[]
+  exports        DataExport[]
+  apiKeys        ApiKey[]
+  bulkSends      BulkSend[]
+  savedSignature SavedSignature?
+  avatar         UserAvatar?
 
   @@map("user")
 }
@@ -95,6 +100,22 @@ model Verification {
   @@map("verification")
 }
 
+/// twoFactor plugin: TOTP secret and backup codes (both encrypted by better-auth).
+model TwoFactor {
+  id                      String    @id
+  secret                  String
+  backupCodes             String
+  userId                  String
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verified                Boolean?  @default(true)
+  failedVerificationCount Int?      @default(0)
+  lockedUntil             DateTime?
+
+  @@index([secret])
+  @@index([userId])
+  @@map("twoFactor")
+}
+
 model Organization {
   id          String       @id
   name        String
@@ -108,6 +129,8 @@ model Organization {
   documents    Document[]
   envelopes    Envelope[]
   templates    Template[]
+  folders      Folder[]
+  tags         Tag[]
   webhooks     WebhookEndpoint[]
   subscription Subscription?
   settings     WorkspaceSettings?
@@ -233,9 +256,54 @@ model Document {
   sourceDocumentId String?
   source           Document?      @relation("DocumentLineage", fields: [sourceDocumentId], references: [id], onDelete: SetNull)
   derived          Document[]     @relation("DocumentLineage")
+  /// Folder on the Documents page (null = workspace root). Organisation only, no effect on signing.
+  folderId         String?
+  folder           Folder?        @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  /// Label colour (`#RRGGBB`, `LabelColorSchema`) and tags on the Documents page (ADR 0025).
+  /// Organisation only, like folders.
+  color            String?
+  tags             Tag[]
 
   @@index([organizationId, createdAt])
+  @@index([organizationId, folderId, createdAt])
   @@index([sourceDocumentId])
+}
+
+/// Nested folders for organising documents (ADR 0022). Deleting a folder moves its documents
+/// and subfolders up to its parent (done in the API; `NoAction` refuses orphaning yet lets an org delete cascade).
+model Folder {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  parentId       String?
+  parent         Folder?      @relation("FolderTree", fields: [parentId], references: [id], onDelete: NoAction)
+  children       Folder[]     @relation("FolderTree")
+  createdById    String
+  createdBy      User         @relation(fields: [createdById], references: [id])
+  name           String
+  /// Label colour (`#RRGGBB`, `LabelColorSchema`) and tags (ADR 0025).
+  color          String?
+  tags           Tag[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  documents      Document[]
+
+  @@index([organizationId, parentId])
+}
+
+/// A workspace tag on folders and documents (ADR 0025). Created on first use; `key` is the
+/// lowercased name, so "NDA" and "nda" are one tag. Unused tags are left in place (harmless).
+model Tag {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  key            String
+  createdAt      DateTime     @default(now())
+  documents      Document[]
+  folders        Folder[]
+
+  @@unique([organizationId, key])
 }
 
 /// A signing request for one document with N recipients.
@@ -534,7 +602,28 @@ model WorkspaceSettings {
   retentionYears Int?
   /// Origins allowed to show /sign in an iframe for EMBEDDED recipients (docs/embedded-signing.md)
   embedOrigins   String[]     @default([])
+  /// Workspace logo (PNG) in storage; Organization.logo holds its public /api/branding URL
+  logoKey        String?
   updatedAt      DateTime     @updatedAt
+}
+
+/// A user's profile picture (Settings → Profile): a square PNG in storage under user/{userId}/.
+/// User.image holds its /api/avatars URL, served to the user and people sharing a workspace.
+model UserAvatar {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key       String
+  updatedAt DateTime @updatedAt
+}
+
+/// A user's own signature and initials (Settings → Profile), offered on signing pages addressed
+/// to their email. PNGs in storage under user/{userId}/; never shared across users.
+model SavedSignature {
+  userId       String   @id
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  signatureKey String?
+  initialsKey  String?
+  updatedAt    DateTime @updatedAt
 }
 
 enum ExportStatus {

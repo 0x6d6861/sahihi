@@ -9,9 +9,10 @@
   "scripts": {
     "typecheck": "tsc -p .",
     "test": "bun test",
-    "fixtures": "bun src/fixtures.cli.ts"
+    "fixtures": "bun src/fixtures/fixtures.cli.ts"
   },
   "dependencies": {
+    "@embedpdf/pdfium": "2.15.1",
     "@pdf-lib/fontkit": "1.1.1",
     "@sahihi/core": "workspace:*",
     "pdf-lib": "1.17.1",

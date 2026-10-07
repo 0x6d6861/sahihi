@@ -5,15 +5,23 @@ import {
   hasPermission,
   isClosed,
   isEditable,
+  ReplaceEnvelopeDocumentSchema,
   ReplaceFieldsSchema,
   ReplaceRecipientsSchema,
   reminderAvailability,
   sendPreflight,
+  UpdateEnvelopeDetailsSchema,
   VoidEnvelopeSchema,
   verifyAuditChain,
 } from "@sahihi/core"
 import { appendAuditEvent, forOrganization, prisma, toChainedEvent } from "@sahihi/db"
-import { rotateRecipientLink, sendEnvelope, voidEnvelope } from "@sahihi/envelopes"
+import {
+  EnvelopeError,
+  replaceEnvelopeDocument,
+  rotateRecipientLink,
+  sendEnvelope,
+  voidEnvelope,
+} from "@sahihi/envelopes"
 import { getQueues, presignDownload } from "@sahihi/infra"
 import { Hono } from "hono"
 import { HTTPException } from "hono/http-exception"
@@ -129,6 +137,78 @@ export const envelopes = new Hono<AppEnv>()
           !envelope.purgedAt,
       },
     })
+  })
+
+  /**
+   * Title, message, signing order and expiry of a draft (the draft editor's "Review & send").
+   * Turning on "sign in order" numbers the recipients by their list position; turning it off puts
+   * everyone on step 1, as `PUT …/recipients` stores parallel envelopes.
+   */
+  .put("/:id/details", async (c) => {
+    const details = await parseJson(c, UpdateEnvelopeDetailsSchema)
+    const scope = forOrganization(c.get("organizationId"))
+    const envelope = await prisma.envelope.findFirst({
+      where: scope.envelope({ id: c.req.param("id") }),
+      select: { id: true, createdById: true, status: true, signingOrder: true },
+    })
+    if (!envelope) notFound("Envelope")
+    assertCanManageEnvelope(c, envelope)
+    if (!isEditable(envelope.status)) conflict("Only draft envelopes can be edited")
+    if (details.expiresAt && details.expiresAt <= new Date()) {
+      throw new EnvelopeError(400, "validation_error", "Pick a date in the future", {
+        issues: [{ path: "expiresAt", message: "Pick a date in the future" }],
+      })
+    }
+
+    const saved = await prisma.$transaction(async (tx) => {
+      const updated = await tx.envelope.update({
+        where: { id: envelope.id },
+        data: {
+          title: details.title,
+          message: details.message?.trim() || null,
+          signingOrder: details.signingOrder,
+          expiresAt: details.expiresAt,
+        },
+        select: { id: true, title: true, message: true, signingOrder: true, expiresAt: true },
+      })
+      if (details.signingOrder !== envelope.signingOrder) {
+        const recipients = await tx.recipient.findMany({
+          where: { envelopeId: envelope.id },
+          orderBy: [{ colorIndex: "asc" }, { createdAt: "asc" }],
+          select: { id: true },
+        })
+        for (const [i, r] of recipients.entries()) {
+          await tx.recipient.update({
+            where: { id: r.id },
+            data: { order: details.signingOrder === "SEQUENTIAL" ? i + 1 : 1 },
+          })
+        }
+      }
+      return updated
+    })
+    return c.json({ envelope: saved })
+  })
+
+  /**
+   * Switch a draft to another READY document of the workspace (the draft editor's "Prepare
+   * document" step saves a new one, then calls this). All fields are removed; audited.
+   */
+  .put("/:id/document", async (c) => {
+    const { documentId } = await parseJson(c, ReplaceEnvelopeDocumentSchema)
+    const scope = forOrganization(c.get("organizationId"))
+    const envelope = await prisma.envelope.findFirst({
+      where: scope.envelope({ id: c.req.param("id") }),
+      select: { id: true, createdById: true },
+    })
+    if (!envelope) notFound("Envelope")
+    assertCanManageEnvelope(c, envelope)
+    const result = await replaceEnvelopeDocument({
+      envelopeId: envelope.id,
+      organizationId: c.get("organizationId"),
+      documentId,
+      actor: { userId: c.get("user").id, ...clientMeta(c) },
+    })
+    return c.json(result)
   })
 
   /** Replace the recipient list (draft only). Removed recipients lose their fields. */

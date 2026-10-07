@@ -21,6 +21,7 @@
   },
   "registries": {
     "@coss": "https://coss.com/ui/r/{name}.json",
-    "@extend": "https://www.extend.ai/ui/r/styles/{style}/{name}.json"
+    "@extend": "https://www.extend.ai/ui/r/styles/{style}/{name}.json",
+    "@uiarc": "https://uiarc.dev/r/{name}.json"
   }
 }

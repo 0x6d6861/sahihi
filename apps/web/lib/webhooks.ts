@@ -1,13 +1,11 @@
 import type { WebhookDeliveryStatus } from "@sahihi/core"
+import type { BadgeTone } from "./constants"
 
 /** Delivery status as a coss Badge variant + label (docs/webhooks.md). */
-export const DELIVERY_BADGE: Record<
-  WebhookDeliveryStatus,
-  { label: string; variant: "success" | "error" | "outline" }
-> = {
-  SUCCEEDED: { label: "Delivered", variant: "success" },
-  FAILED: { label: "Failed", variant: "error" },
-  PENDING: { label: "Pending", variant: "outline" },
+export const DELIVERY_BADGE: Record<WebhookDeliveryStatus, { label: string; tone: BadgeTone }> = {
+  SUCCEEDED: { label: "Delivered", tone: "success" },
+  FAILED: { label: "Failed", tone: "danger" },
+  PENDING: { label: "Pending", tone: "info" },
 }
 
 /** One-line outcome of the latest attempt, e.g. "HTTP 500 · 3 attempts". */

@@ -7,7 +7,7 @@ describe("data helpers", () => {
     expect(exportStatus({ status: "PENDING", downloadable: false }, now).label).toBe("Preparing")
     expect(exportStatus({ status: "READY", downloadable: true }, now).label).toBe("Ready")
     expect(exportStatus({ status: "READY", downloadable: false }, now).label).toBe("Expired")
-    expect(exportStatus({ status: "FAILED", downloadable: false }, now).variant).toBe("error")
+    expect(exportStatus({ status: "FAILED", downloadable: false }, now).tone).toBe("danger")
   })
 
   test("formatBytes", () => {

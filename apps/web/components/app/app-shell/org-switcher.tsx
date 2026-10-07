@@ -1,28 +1,11 @@
 "use client"
 
-import { Building03Icon, PlusSignIcon, UnfoldMoreIcon } from "@hugeicons/core-free-icons"
+import { Building03Icon, PlusSignIcon, Tick02Icon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  useSidebar,
-} from "@/components/ui/sidebar"
-import { toastManager } from "@/components/ui/toast"
+import { toastManager } from "@/components/app/toast"
+import { type DropdownItem, DropdownMenu } from "@/components/arc/dropdown-menu/dropdown-menu"
 import { organization } from "@/lib/auth-client"
 
 export interface ShellOrganization {
@@ -42,7 +25,6 @@ export function OrgSwitcher({
   activeOrganizationId: string
 }) {
   const router = useRouter()
-  const { isMobile } = useSidebar()
   const [pending, setPending] = useState(false)
   const active = organizations.find((o) => o.id === activeOrganizationId)
 
@@ -63,49 +45,33 @@ export function OrgSwitcher({
     router.refresh()
   }
 
+  // Arc items are keyed by label, so two workspaces with the same name get a short suffix.
+  const seen = new Map<string, number>()
+  const items: DropdownItem[] = organizations.map((o) => {
+    const n = (seen.get(o.name) ?? 0) + 1
+    seen.set(o.name, n)
+    const current = o.id === activeOrganizationId
+    return {
+      label: n > 1 ? `${o.name} (${n})` : o.name,
+      // The check marks the active workspace; an empty slot keeps the names aligned.
+      icon: current ? <HugeiconsIcon icon={Tick02Icon} size={16} aria-label="Current" /> : <span />,
+      disabled: pending || current,
+      onSelect: () => void switchTo(o.id),
+    }
+  })
+  items.push({
+    label: "New workspace",
+    icon: <HugeiconsIcon icon={PlusSignIcon} size={16} />,
+    separatorBefore: true,
+    onSelect: () => router.push("/onboarding"),
+  })
+
+  // The shell hides this in the icon rail, so the trigger always has room for the name.
   return (
-    <SidebarMenu>
-      <SidebarMenuItem>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            disabled={pending}
-            render={<SidebarMenuButton size="lg" tooltip={active?.name ?? "Workspace"} />}
-          >
-            <div className="flex aspect-square size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-              <HugeiconsIcon icon={Building03Icon} className="size-4" aria-hidden />
-            </div>
-            <div className="flex flex-col gap-0.5 leading-none">
-              <span className="text-muted-foreground text-xs">Workspace</span>
-              <span className="truncate font-medium">{active?.name ?? "Select a workspace"}</span>
-            </div>
-            <HugeiconsIcon icon={UnfoldMoreIcon} className="ml-auto" aria-hidden />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="start"
-            side={isMobile ? "bottom" : "right"}
-            className="min-w-56"
-          >
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
-              <DropdownMenuRadioGroup
-                value={activeOrganizationId}
-                onValueChange={(value) => switchTo(String(value))}
-              >
-                {organizations.map((o) => (
-                  <DropdownMenuRadioItem key={o.id} value={o.id}>
-                    {o.name}
-                  </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem render={<Link href="/onboarding" />}>
-              <HugeiconsIcon icon={PlusSignIcon} aria-hidden />
-              New workspace
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </SidebarMenuItem>
-    </SidebarMenu>
+    <DropdownMenu
+      label={active?.name ?? "Select a workspace"}
+      icon={<HugeiconsIcon icon={Building03Icon} size={16} />}
+      items={items}
+    />
   )
 }

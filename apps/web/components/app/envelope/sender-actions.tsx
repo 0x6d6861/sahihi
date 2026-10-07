@@ -6,25 +6,15 @@ import {
   type RecipientStatus,
   reminderAvailability,
 } from "@sahihi/core"
-import { BanIcon, BellIcon, ClipboardCopyIcon, EllipsisIcon, MailIcon } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
-import {
-  AlertDialog,
-  AlertDialogClose,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogPopup,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
-import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@/components/ui/menu"
-import { Spinner } from "@/components/ui/spinner"
-import { Textarea } from "@/components/ui/textarea"
-import { toastManager } from "@/components/ui/toast"
+import { useEffect, useState } from "react"
+import { ConfirmDialog } from "@/components/app/confirm-dialog"
+import { BanIcon, BellIcon, MailIcon } from "@/components/app/icons"
+import { toastManager } from "@/components/app/toast"
+import { Button as ArcButton } from "@/components/arc/button/button"
+import { CopyButton } from "@/components/arc/copy-button/copy-button"
+import { type DropdownItem, DropdownMenu } from "@/components/arc/dropdown-menu/dropdown-menu"
+import { Textarea } from "@/components/arc/textarea/textarea"
 import { ApiError, api } from "@/lib/api"
 import { reminderHint, statusSummary } from "@/lib/envelope-status"
 
@@ -60,17 +50,14 @@ export function EnvelopeHeaderActions({
   const router = useRouter()
   const [reason, setReason] = useState("")
   const [open, setOpen] = useState(false)
-  const [voiding, setVoiding] = useState(false)
   const canVoid = allowed && (summary.status === "SENT" || summary.status === "IN_PROGRESS")
 
   async function voidEnvelope() {
-    setVoiding(true)
     try {
       await api(`/envelopes/${envelopeId}/void`, {
         method: "POST",
         json: { reason: reason.trim() },
       })
-      setOpen(false)
       toastManager.add({
         title: "Envelope voided",
         description: "Signing links no longer work and recipients have been told.",
@@ -79,62 +66,40 @@ export function EnvelopeHeaderActions({
       router.refresh()
     } catch (err) {
       toastManager.add({ title: "Could not void", description: errorMessage(err), type: "error" })
-    } finally {
-      setVoiding(false)
+      throw err
     }
   }
 
   return (
     <div className="flex flex-wrap items-center gap-2">
       {actions}
-      <Button variant="outline" onClick={() => copy(statusSummary(summary), "Status")}>
-        <ClipboardCopyIcon aria-hidden />
-        Copy status
-      </Button>
+      <CopyButton value={statusSummary(summary)} label="Copy status" />
       {canVoid && (
-        <AlertDialog open={open} onOpenChange={(o) => !voiding && setOpen(o)}>
-          <AlertDialogTrigger render={<Button variant="destructive-outline" />}>
+        <>
+          <ArcButton variant="danger" onClick={() => setOpen(true)}>
             <BanIcon aria-hidden />
             Void
-          </AlertDialogTrigger>
-          <AlertDialogPopup>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Void this envelope?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Every signing link stops working immediately and recipients are emailed. Signatures
-                already given are kept in the audit trail. This can't be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <div className="px-6">
-              <Field>
-                <FieldLabel>Reason</FieldLabel>
-                <Textarea
-                  value={reason}
-                  maxLength={500}
-                  rows={3}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="e.g. Sent the wrong version"
-                />
-                <FieldDescription>
-                  Included in the email to recipients and the audit trail.
-                </FieldDescription>
-              </Field>
-            </div>
-            <AlertDialogFooter>
-              <AlertDialogClose render={<Button variant="ghost" disabled={voiding} />}>
-                Cancel
-              </AlertDialogClose>
-              <Button
-                variant="destructive"
-                onClick={voidEnvelope}
-                disabled={voiding || !reason.trim()}
-              >
-                {voiding && <Spinner aria-hidden />}
-                Void envelope
-              </Button>
-            </AlertDialogFooter>
-          </AlertDialogPopup>
-        </AlertDialog>
+          </ArcButton>
+          <ConfirmDialog
+            open={open}
+            onOpenChange={setOpen}
+            title="Void this envelope?"
+            description="Every signing link stops working immediately and recipients are emailed. Signatures already given are kept in the audit trail. This can't be undone."
+            confirmLabel="Void envelope"
+            disabled={!reason.trim()}
+            onConfirm={voidEnvelope}
+          >
+            <Textarea
+              label="Reason"
+              description="Included in the email to recipients and the audit trail."
+              value={reason}
+              maxLength={500}
+              rows={3}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="For example, sent the wrong version"
+            />
+          </ConfirmDialog>
+        </>
       )}
     </div>
   )
@@ -162,20 +127,29 @@ export function RecipientActionsMenu({
   }
 }) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
   const [sending, setSending] = useState(false)
+  const [availability, setAvailability] = useState<ReturnType<typeof reminderAvailability> | null>(
+    null,
+  )
 
-  // Computed when the menu opens (not during SSR), so the countdown text is always current.
-  const availability = open
-    ? reminderAvailability(
-        {
-          status: recipient.status,
-          notifiedAt: recipient.notifiedAt ? new Date(recipient.notifiedAt) : null,
-          lastRemindedAt: recipient.lastRemindedAt ? new Date(recipient.lastRemindedAt) : null,
-        },
-        envelopeStatus,
+  // Time-based, so computed in the browser only (never during SSR) and refreshed every 30 s to keep
+  // the cooldown text current.
+  useEffect(() => {
+    const compute = () =>
+      setAvailability(
+        reminderAvailability(
+          {
+            status: recipient.status,
+            notifiedAt: recipient.notifiedAt ? new Date(recipient.notifiedAt) : null,
+            lastRemindedAt: recipient.lastRemindedAt ? new Date(recipient.lastRemindedAt) : null,
+          },
+          envelopeStatus,
+        ),
       )
-    : null
+    compute()
+    const timer = setInterval(compute, 30_000)
+    return () => clearInterval(timer)
+  }, [recipient.status, recipient.notifiedAt, recipient.lastRemindedAt, envelopeStatus])
   const hint = availability ? reminderHint(availability) : null
 
   async function remind() {
@@ -204,29 +178,30 @@ export function RecipientActionsMenu({
   }
 
   return (
-    <Menu open={open} onOpenChange={setOpen}>
-      <MenuTrigger
-        render={
-          <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${recipient.name}`} />
-        }
-      >
-        {sending ? <Spinner aria-hidden /> : <EllipsisIcon aria-hidden />}
-      </MenuTrigger>
-      <MenuPopup align="end" className="min-w-56">
-        {canRemind && recipient.role !== "VIEWER" && (
-          <MenuItem disabled={!availability?.ok || sending} onClick={remind}>
-            <BellIcon aria-hidden />
-            <span className="flex flex-col">
-              <span>Send reminder</span>
-              {hint && <span className="text-muted-foreground text-xs">{hint}</span>}
-            </span>
-          </MenuItem>
-        )}
-        <MenuItem onClick={() => copy(recipient.email, "Email address")}>
-          <MailIcon aria-hidden />
-          Copy email
-        </MenuItem>
-      </MenuPopup>
-    </Menu>
+    <DropdownMenu
+      label="Actions"
+      items={[
+        ...(canRemind && recipient.role !== "VIEWER"
+          ? [
+              {
+                // Arc items are one line, so the reason it's unavailable goes in the label.
+                label: sending
+                  ? "Sending reminder…"
+                  : hint
+                    ? `Send reminder (${hint.toLowerCase()})`
+                    : "Send reminder",
+                icon: <BellIcon />,
+                disabled: !availability?.ok || sending,
+                onSelect: () => void remind(),
+              } satisfies DropdownItem,
+            ]
+          : []),
+        {
+          label: "Copy email",
+          icon: <MailIcon />,
+          onSelect: () => void copy(recipient.email, "Email address"),
+        },
+      ]}
+    />
   )
 }

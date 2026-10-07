@@ -1,14 +1,15 @@
 "use client"
 
-import { ClipboardCopyIcon } from "lucide-react"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { toastManager } from "@/components/ui/toast"
+import { Alert } from "@/components/arc/alert/alert"
+import { CopyButton } from "@/components/arc/copy-button/copy-button"
+import { Input } from "@/components/arc/input/input"
+
+/** Arc inputs reset `font`, so a utility class can't switch them to mono; the token can. */
+const MONO = { fontFamily: "var(--font-mono)" }
 
 /**
  * Shows a secret the one time the API returns it: a webhook signing secret (create / rotate) or
- * an API key (create).
+ * an API key (create). The copy button confirms in place.
  */
 export function SecretReveal({
   secret,
@@ -19,30 +20,16 @@ export function SecretReveal({
   label?: string
   hint?: string
 }) {
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(secret)
-      toastManager.add({ title: `${label} copied`, type: "success" })
-    } catch {
-      toastManager.add({ title: "Couldn't copy; select the text instead", type: "error" })
-    }
-  }
   return (
     <div className="flex flex-col gap-3">
-      <Alert variant="warning">
-        <AlertTitle>Copy the {label.toLowerCase()} now</AlertTitle>
-        <AlertDescription>It won't be shown again. {hint}</AlertDescription>
+      <Alert tone="warning" title={`Copy the ${label.toLowerCase()} now`}>
+        It won't be shown again. {hint}
       </Alert>
-      <div className="flex items-center gap-2">
-        <Input readOnly value={secret} className="font-mono" aria-label={label} />
-        <Button
-          variant="outline"
-          size="icon"
-          aria-label={`Copy ${label.toLowerCase()}`}
-          onClick={copy}
-        >
-          <ClipboardCopyIcon aria-hidden />
-        </Button>
+      <div className="flex items-end gap-2">
+        <div className="min-w-0 flex-1">
+          <Input label={label} readOnly value={secret} style={MONO} />
+        </div>
+        <CopyButton value={secret} label={`Copy ${label.toLowerCase()}`} />
       </div>
     </div>
   )

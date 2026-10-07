@@ -1,10 +1,10 @@
 import { normalizeCertificateCode } from "@sahihi/core"
 import type { Metadata } from "next"
 import Link from "next/link"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardDescription, CardHeader, CardPanel, CardTitle } from "@/components/ui/card"
+import { Panel } from "@/components/app/panel"
+import { Alert } from "@/components/arc/alert/alert"
+import { Badge } from "@/components/arc/badge/badge"
+import { formatDateTime } from "@/lib/format"
 
 export const metadata: Metadata = { title: "Verify certificate" }
 
@@ -54,54 +54,52 @@ export default async function VerifyPage({
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col gap-4 p-4 md:p-8">
       {!data.valid || !data.envelope || !data.certificate ? (
-        <Alert variant="error">
-          <AlertTitle>Certificate not found</AlertTitle>
-          <AlertDescription>No certificate matches code {code ?? raw}.</AlertDescription>
+        <Alert tone="danger" title="Certificate not found">
+          No certificate matches code {code ?? raw}.
         </Alert>
       ) : (
         <>
           {matchText && (
-            <Alert variant="success">
-              <AlertTitle>File verified</AlertTitle>
-              <AlertDescription>{matchText}</AlertDescription>
+            <Alert tone="success" title="File verified">
+              {matchText}
             </Alert>
           )}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                {data.envelope.title} <Badge variant="success">Verified</Badge>
-              </CardTitle>
-              <CardDescription>
-                {data.envelope.organization} · completed{" "}
-                {new Date(data.envelope.completedAt).toUTCString()}
-              </CardDescription>
-            </CardHeader>
-            <CardPanel className="flex flex-col gap-4 text-sm">
-              <ul className="flex flex-col gap-1">
-                {data.envelope.signers.map((s) => (
-                  <li key={s.email}>
-                    <span className="font-medium">{s.name}</span>{" "}
-                    <span className="text-muted-foreground">{s.email}</span>
-                    {s.signedAt && (
-                      <span className="text-muted-foreground">
-                        {" "}
-                        · {new Date(s.signedAt).toUTCString()}
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-              <div className="break-all font-mono text-muted-foreground text-xs">
-                <div>Original SHA-256: {data.envelope.originalSha256}</div>
-                <div>Signed SHA-256: {data.envelope.signedSha256}</div>
-              </div>
-            </CardPanel>
-          </Card>
+          <Panel
+            headingLevel={1}
+            title={
+              <span className="flex flex-wrap items-center gap-2">
+                {data.envelope.title} <Badge tone="success">Verified</Badge>
+              </span>
+            }
+            description={`${data.envelope.organization} · completed ${formatDateTime(new Date(data.envelope.completedAt))}`}
+          >
+            <ul className="flex flex-col gap-1 text-sm">
+              {data.envelope.signers.map((s) => (
+                <li key={s.email}>
+                  <span className="font-medium">{s.name}</span>{" "}
+                  <span className="text-muted-foreground">{s.email}</span>
+                  {s.signedAt && (
+                    <span className="text-muted-foreground">
+                      {" "}
+                      · {formatDateTime(new Date(s.signedAt))}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <div className="break-all font-mono text-muted-foreground text-xs">
+              <div>Original SHA-256: {data.envelope.originalSha256}</div>
+              <div>Signed SHA-256: {data.envelope.signedSha256}</div>
+            </div>
+          </Panel>
         </>
       )}
-      <Button variant="link" className="self-start px-0" render={<Link href="/verify" />}>
+      <Link
+        href="/verify"
+        className="self-start text-muted-foreground text-sm underline-offset-4 hover:text-foreground hover:underline"
+      >
         Verify another document
-      </Button>
+      </Link>
     </main>
   )
 }

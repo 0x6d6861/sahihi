@@ -5,7 +5,7 @@ argument-hint: "<what the endpoint does>"
 Endpoint: $ARGUMENTS
 
 Follow `docs/architecture.md` (request lifecycle) and the checklist at the end of `docs/security.md`:
-- zod schema in `packages/core/src/schemas.ts` (shared with web), parsed via `parseJson`
+- zod schema in `packages/core/src/shared/schemas.ts` (shared with web), parsed via `parseJson`
 - sender routes go in the existing router behind `requireOrg`, using `forOrganization`; public routes
   use `rateLimit` + `withSigner`
 - state changes via `assertTransition` + `appendAuditEvent` inside `prisma.$transaction`; new

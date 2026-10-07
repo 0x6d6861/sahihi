@@ -1,34 +1,30 @@
 "use client"
 
-import { EraserIcon, ImageUpIcon } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
-import type SignaturePad from "signature_pad"
+import { DialogActions } from "@/components/app/confirm-dialog"
+import { ImageUpIcon } from "@/components/app/icons"
+import { Alert } from "@/components/arc/alert/alert"
+import { Button } from "@/components/arc/button/button"
+import { Dialog, DialogContent } from "@/components/arc/dialog/dialog"
+import { Input } from "@/components/arc/input/input"
+import { Select } from "@/components/arc/select/select"
+import {
+  type InkStroke,
+  SignaturePad,
+  signatureToPng,
+} from "@/components/arc/signature-pad/signature-pad"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/arc/tabs/tabs"
 import {
   PDF_EDITOR_DEFAULT_SIGNATURE_FONTS_URL,
   PDF_EDITOR_SIGNATURE_FONTS,
 } from "@/components/extend/pdf-editor-shared"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogPanel,
-  DialogPopup,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Field, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs"
 import { inkBounds, isAcceptablePng } from "@/lib/signing"
 
 /**
- * Draw / type / upload a signature or initials → trimmed PNG data URL.
- * Composed from coss parts + `signature_pad` (the library Extend's own dialog uses) because Extend's
- * signature dialogs aren't exported for reuse (ADR 0008). Typed signatures use Extend's exported
- * signature fonts.
+ * Draw / type / upload a signature or initials → trimmed PNG data URL (ADR 0008, ADR 0023).
+ * Draw is Arc's signature pad (pressure-aware ink, undo, cropped PNG export). Type renders with
+ * Extend's exported signature fonts; Upload scales and crops an image. Every result is a data URL
+ * that must pass `isAcceptablePng` before it can be adopted.
  */
 
 export type SignatureKind = "signature" | "initials"
@@ -66,56 +62,47 @@ function useSignatureFonts(enabled: boolean) {
   }, [enabled])
 }
 
-function DrawPad({ onChange }: { onChange: (dataUrl: string | null) => void }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const padRef = useRef<SignaturePad | null>(null)
+const blobToDataUrl = (blob: Blob) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(blob)
+  })
+
+function DrawPad({
+  signerName,
+  label,
+  onChange,
+}: {
+  signerName: string
+  label: string
+  onChange: (dataUrl: string | null) => void
+}) {
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
+  // Strokes arrive after every change; only the latest export may win.
+  const latest = useRef(0)
 
-  useEffect(() => {
-    let cancelled = false
-    const canvas = canvasRef.current
-    if (!canvas) return
-    void import("signature_pad").then(({ default: Pad }) => {
-      if (cancelled) return
-      // Crisp lines on high-DPI screens: back the canvas with device pixels.
-      const ratio = Math.max(window.devicePixelRatio || 1, 1)
-      canvas.width = canvas.offsetWidth * ratio
-      canvas.height = canvas.offsetHeight * ratio
-      canvas.getContext("2d")?.scale(ratio, ratio)
-      const pad = new Pad(canvas, { penColor: INK, minWidth: 0.8, maxWidth: 2.6 })
-      pad.addEventListener("endStroke", () => onChangeRef.current(exportTrimmed(canvas)))
-      padRef.current = pad
-    })
-    return () => {
-      cancelled = true
-      padRef.current?.off()
-      padRef.current = null
+  async function exportStrokes(strokes: InkStroke[]) {
+    const run = ++latest.current
+    if (strokes.length === 0) return onChangeRef.current(null)
+    try {
+      // Arc crops to the ink; scale 2 keeps the PNG well under the API's data-URL cap.
+      const dataUrl = await blobToDataUrl(await signatureToPng(strokes, 2))
+      if (run === latest.current) onChangeRef.current(dataUrl)
+    } catch {
+      if (run === latest.current) onChangeRef.current(null)
     }
-  }, [])
+  }
 
   return (
-    <div className="flex flex-col gap-2">
-      <canvas
-        ref={canvasRef}
-        aria-label="Signature drawing area"
-        className="h-44 w-full touch-none rounded-lg border border-dashed bg-background"
-      />
-      <div className="flex items-center justify-between text-muted-foreground text-xs">
-        <span>Draw with your mouse, finger or stylus.</span>
-        <Button
-          variant="ghost"
-          size="xs"
-          onClick={() => {
-            padRef.current?.clear()
-            onChange(null)
-          }}
-        >
-          <EraserIcon aria-hidden />
-          Clear
-        </Button>
-      </div>
-    </div>
+    <SignaturePad
+      signer={signerName}
+      label={`Draw your ${label}`}
+      fileName={label}
+      onChange={(strokes) => void exportStrokes(strokes)}
+    />
   )
 }
 
@@ -156,33 +143,21 @@ function TypePad({
   const fontItems = PDF_EDITOR_SIGNATURE_FONTS.map((f) => ({ value: f.family, label: f.name }))
   return (
     <div className="flex flex-col gap-3">
-      <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-        <Field>
-          <FieldLabel>Type your name</FieldLabel>
-          <Input value={text} maxLength={60} onChange={(e) => setText(e.target.value)} />
-        </Field>
-        <Field>
-          <FieldLabel>Style</FieldLabel>
-          <Select items={fontItems} value={font} onValueChange={(v) => v && setFont(String(v))}>
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectPopup>
-              {fontItems.map((f) => (
-                <SelectItem key={f.value} value={f.value}>
-                  <span style={{ fontFamily: f.value }}>{f.label}</span>
-                </SelectItem>
-              ))}
-            </SelectPopup>
-          </Select>
-        </Field>
+      <div className="grid gap-3 sm:grid-cols-[1fr_12rem]">
+        <Input
+          label="Type your name"
+          value={text}
+          maxLength={60}
+          onChange={(e) => setText(e.target.value)}
+        />
+        <Select label="Style" options={fontItems} value={font} onValueChange={setFont} />
       </div>
       <canvas
         ref={canvasRef}
         width={900}
         height={200}
         aria-label="Typed signature preview"
-        className="h-28 w-full rounded-lg border border-dashed bg-background"
+        className="h-28 w-full rounded-2xl border border-dashed bg-background"
       />
     </div>
   )
@@ -224,16 +199,14 @@ function UploadPad({ onChange }: { onChange: (dataUrl: string | null) => void })
           e.target.value = ""
         }}
       />
-      <Button variant="outline" className="self-start" onClick={() => inputRef.current?.click()}>
-        <ImageUpIcon aria-hidden />
-        Choose an image
-      </Button>
-      {error && (
-        <Alert variant="error">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-      <div className="flex h-28 items-center justify-center rounded-lg border border-dashed bg-background p-2">
+      <div>
+        <Button variant="secondary" onClick={() => inputRef.current?.click()}>
+          <ImageUpIcon aria-hidden />
+          Choose an image
+        </Button>
+      </div>
+      {error && <Alert tone="danger" title={error} />}
+      <div className="flex h-28 items-center justify-center rounded-2xl border border-dashed bg-background p-2">
         {preview ? (
           // biome-ignore lint/performance/noImgElement: local data URL preview, not a remote asset
           <img src={preview} alt="Uploaded signature preview" className="max-h-full max-w-full" />
@@ -252,6 +225,8 @@ export function SignatureCaptureDialog({
   signerName,
   adopted,
   onConfirm,
+  description,
+  confirmLabel = "Adopt and place",
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -260,6 +235,9 @@ export function SignatureCaptureDialog({
   /** A signature/initials already created in this session, offered for reuse. */
   adopted: string | null
   onConfirm: (dataUrl: string) => void
+  /** Defaults to the signing page's wording; Settings → Profile saves instead of placing. */
+  description?: string
+  confirmLabel?: string
 }) {
   const [tab, setTab] = useState<Tab>("draw")
   const [value, setValue] = useState<string | null>(null)
@@ -283,22 +261,21 @@ export function SignatureCaptureDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogPopup className="sm:max-w-xl">
-        <DialogHeader>
-          <DialogTitle>
-            {kind === "initials" ? "Add your initials" : "Add your signature"}
-          </DialogTitle>
-          <DialogDescription>
-            Your {label} will be placed on the document when you finish signing.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogPanel className="flex flex-col gap-4">
+      <DialogContent
+        // Wider than Arc's 440px default: the drawing pad is 600px wide.
+        style={{ width: "min(calc(100vw - 2rem), 40rem)" }}
+        title={kind === "initials" ? "Add your initials" : "Add your signature"}
+        description={
+          description ?? `Your ${label} will be placed on the document when you finish signing.`
+        }
+      >
+        <div className="flex flex-col gap-4">
           {adopted && (
-            <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+            <div className="flex items-center justify-between gap-3 rounded-2xl border p-3">
               {/* biome-ignore lint/performance/noImgElement: local data URL preview */}
               <img src={adopted} alt={`Your ${label}`} className="h-10 max-w-48 object-contain" />
               <Button
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 onClick={() => {
                   onConfirm(adopted)
@@ -316,43 +293,45 @@ export function SignatureCaptureDialog({
               setValue(null)
             }}
           >
-            <TabsList>
-              <TabsTab value="draw">Draw</TabsTab>
-              <TabsTab value="type">Type</TabsTab>
-              <TabsTab value="upload">Upload</TabsTab>
+            <TabsList aria-label={`How to add your ${label}`}>
+              <TabsTrigger value="draw">Draw</TabsTrigger>
+              <TabsTrigger value="type">Type</TabsTrigger>
+              <TabsTrigger value="upload">Upload</TabsTrigger>
             </TabsList>
-            <TabsPanel value="draw" className="pt-3">
-              {tab === "draw" && <DrawPad onChange={setValue} />}
-            </TabsPanel>
-            <TabsPanel value="type" className="pt-3">
+            <TabsContent value="draw" className="pt-3">
+              {tab === "draw" && (
+                <DrawPad signerName={signerName} label={label} onChange={setValue} />
+              )}
+            </TabsContent>
+            <TabsContent value="type" className="pt-3">
               {tab === "type" && (
                 <TypePad
                   defaultText={kind === "initials" ? initials : signerName}
                   onChange={setValue}
                 />
               )}
-            </TabsPanel>
-            <TabsPanel value="upload" className="pt-3">
+            </TabsContent>
+            <TabsContent value="upload" className="pt-3">
               {tab === "upload" && <UploadPad onChange={setValue} />}
-            </TabsPanel>
+            </TabsContent>
           </Tabs>
-        </DialogPanel>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button
-            disabled={!usable}
-            onClick={() => {
-              if (!value) return
-              onConfirm(value)
-              onOpenChange(false)
-            }}
-          >
-            Adopt and place
-          </Button>
-        </DialogFooter>
-      </DialogPopup>
+          <DialogActions>
+            <Button variant="ghost" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!usable}
+              onClick={() => {
+                if (!value) return
+                onConfirm(value)
+                onOpenChange(false)
+              }}
+            >
+              {confirmLabel}
+            </Button>
+          </DialogActions>
+        </div>
+      </DialogContent>
     </Dialog>
   )
 }

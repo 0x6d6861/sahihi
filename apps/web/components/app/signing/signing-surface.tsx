@@ -1,33 +1,25 @@
 "use client"
 
-import { CONSENT_TEXT, CONSENT_VERSION } from "@sahihi/core"
-import { ArrowDownIcon } from "lucide-react"
+import { CONSENT_TEXT, CONSENT_VERSION, offersSavedSignature } from "@sahihi/core"
 import dynamic from "next/dynamic"
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
+import { ConfirmDialog } from "@/components/app/confirm-dialog"
+import { ArrowDownIcon } from "@/components/app/icons"
+import { Panel } from "@/components/app/panel"
+import { toastManager } from "@/components/app/toast"
+import { Alert } from "@/components/arc/alert/alert"
+import { Button } from "@/components/arc/button/button"
+import { Checkbox } from "@/components/arc/checkbox/checkbox"
+import { Input } from "@/components/arc/input/input"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/arc/popover/popover"
+import { Progress } from "@/components/arc/progress/progress"
+import { Textarea } from "@/components/arc/textarea/textarea"
 import type { PDFViewerHandle, PDFViewerPageOverlayProps } from "@/components/extend/pdf-viewer"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import {
-  AlertDialog,
-  AlertDialogClose,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogPopup,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
-import { Card, CardDescription, CardHeader, CardPanel, CardTitle } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Field, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Popover, PopoverPopup, PopoverTrigger } from "@/components/ui/popover"
-import { Progress } from "@/components/ui/progress"
+// coss on the PDF itself: a checkbox field stretches to its box (Arc's is fixed-size), and the
+// viewer placeholder is a block the size of the page (Arc's skeleton draws text lines).
+import { Checkbox as FieldCheckbox } from "@/components/ui/checkbox"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Spinner } from "@/components/ui/spinner"
-import { Textarea } from "@/components/ui/textarea"
-import { toastManager } from "@/components/ui/toast"
+import { brandingLogoPath } from "@/lib/account"
 import { ApiError, api } from "@/lib/api"
 import { FIELD_LABELS } from "@/lib/constants"
 import {
@@ -113,7 +105,7 @@ function SignerFieldLayer({ page }: { page: number }) {
     useSurface()
   const rot = rotationOf(page)
   return (
-    <div className="pointer-events-none absolute inset-0">
+    <div className="on-paper pointer-events-none absolute inset-0">
       {fields
         .filter((f) => f.page === page)
         .map((f) => {
@@ -155,7 +147,7 @@ function SignerFieldLayer({ page }: { page: number }) {
             return (
               <div key={f.id} style={style} className="pointer-events-auto absolute" {...stop}>
                 <Upright rotation={rot} className="justify-center">
-                  <Checkbox
+                  <FieldCheckbox
                     data-field-id={f.id}
                     aria-label={`${label}${f.required ? " (required)" : ""}`}
                     checked={checked}
@@ -178,34 +170,35 @@ function SignerFieldLayer({ page }: { page: number }) {
             const text = fieldValue(values, f.id, "text")?.value ?? ""
             return (
               <Popover key={f.id} open={activeId === f.id} onOpenChange={(o) => !o && activate(f)}>
-                <PopoverTrigger
-                  data-field-id={f.id}
-                  aria-label={`${label}${f.required ? " (required)" : ""}`}
-                  style={style}
-                  className={cn(tone, "pointer-events-auto")}
-                  {...stop}
-                  onClick={() => activate(f)}
-                >
-                  <Upright rotation={rot} className="px-1">
-                    <span className={cn("truncate", !text && "text-muted-foreground")}>
-                      {text || `${label}${f.required ? " *" : ""}`}
-                    </span>
-                  </Upright>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    data-field-id={f.id}
+                    aria-label={`${label}${f.required ? " (required)" : ""}`}
+                    style={style}
+                    className={cn(tone, "pointer-events-auto")}
+                    {...stop}
+                    onClick={() => activate(f)}
+                  >
+                    <Upright rotation={rot} className="px-1">
+                      <span className={cn("truncate", !text && "text-muted-foreground")}>
+                        {text || `${label}${f.required ? " *" : ""}`}
+                      </span>
+                    </Upright>
+                  </button>
                 </PopoverTrigger>
-                <PopoverPopup className="w-72">
-                  <Field>
-                    <FieldLabel>{label}</FieldLabel>
-                    <Input
-                      autoFocus
-                      value={text}
-                      maxLength={500}
-                      onChange={(e) => setValue(f.id, { kind: "text", value: e.target.value })}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") activate(f)
-                      }}
-                    />
-                  </Field>
-                </PopoverPopup>
+                <PopoverContent className="w-72">
+                  <Input
+                    label={label}
+                    autoFocus
+                    value={text}
+                    maxLength={500}
+                    onChange={(e) => setValue(f.id, { kind: "text", value: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") activate(f)
+                    }}
+                  />
+                </PopoverContent>
               </Popover>
             )
           }
@@ -251,7 +244,7 @@ export function SigningSurface({
     envelope: {
       title: string
       message: string | null
-      organization: { name: string }
+      organization: { name: string; logo?: string | null }
       sender: { name: string }
     }
     recipient: { name: string; email?: string | null }
@@ -279,7 +272,26 @@ export function SigningSurface({
   const [consent, setConsent] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [declineReason, setDeclineReason] = useState("")
-  const [declining, setDeclining] = useState(false)
+  const [declineOpen, setDeclineOpen] = useState(false)
+
+  // Signed in as this recipient? Offer the signature and initials saved in Settings → Profile.
+  // Signed-out signers (and embedded iframes, which get no cookie) get a 401 and nothing changes.
+  useEffect(() => {
+    if (!recipient.email) return
+    let cancelled = false
+    api<{ email: string; signature: string | null; initials: string | null }>("/me/signatures")
+      .then((saved) => {
+        if (cancelled || !offersSavedSignature(saved.email, recipient.email)) return
+        setAdopted((a) => ({
+          signature: a.signature ?? saved.signature,
+          initials: a.initials ?? saved.initials,
+        }))
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [recipient.email])
 
   // First call marks the recipient VIEWED (and audits it) on the server.
   useEffect(() => {
@@ -381,7 +393,6 @@ export function SigningSurface({
   }
 
   async function decline() {
-    setDeclining(true)
     try {
       await api(`${base}/decline`, { method: "POST", json: { reason: declineReason.trim() } })
       onDone()
@@ -391,57 +402,66 @@ export function SigningSurface({
         description: err instanceof Error ? err.message : "Please try again.",
         type: "error",
       })
-      setDeclining(false)
+      throw err
     }
   }
 
   const captureField = capture ? fields.find((f) => f.id === capture.fieldId) : null
+  const logoPath = brandingLogoPath(session.envelope.organization.logo)
 
   return (
     <SurfaceContext.Provider value={ctx}>
       <div className="flex flex-col gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>{session.envelope.title}</CardTitle>
-            <CardDescription>
-              {session.envelope.sender.name} ({session.envelope.organization.name}) asked you to
-              sign {session.document.name}.
-            </CardDescription>
-          </CardHeader>
+        <Panel
+          headingLevel={1}
+          title={session.envelope.title}
+          description={`${session.envelope.sender.name} (${session.envelope.organization.name}) asked you to sign ${session.document.name}.`}
+          actions={
+            logoPath && (
+              // Logos are drawn for white backgrounds (emails), so they sit on paper in dark mode too.
+              <span className="on-paper rounded-lg bg-background px-2 py-1">
+                {/* biome-ignore lint/performance/noImgElement: same-origin branding route */}
+                <img
+                  src={logoPath}
+                  alt={session.envelope.organization.name}
+                  className="h-8 w-auto max-w-40 object-contain"
+                />
+              </span>
+            )
+          }
+        >
           {session.envelope.message && (
-            <CardPanel>
-              <p className="whitespace-pre-line text-sm">{session.envelope.message}</p>
-            </CardPanel>
+            <p className="whitespace-pre-line text-sm">{session.envelope.message}</p>
           )}
-        </Card>
+        </Panel>
 
-        <div className="sticky top-0 z-10 flex flex-wrap items-center gap-3 rounded-xl border bg-background p-3">
-          <Progress
-            value={progress.total ? (progress.done / progress.total) * 100 : 100}
-            className="w-40"
-          />
+        <div className="sticky top-0 z-10 flex flex-wrap items-center gap-3 rounded-2xl border bg-background p-3">
+          <div className="w-40">
+            <Progress value={progress.done} max={progress.total || 1} />
+          </div>
           <span className="text-muted-foreground text-sm tabular-nums" aria-live="polite">
             {progress.done} of {progress.total} required
           </span>
-          <Button
-            variant="outline"
-            size="sm"
-            className="ml-auto"
-            disabled={!next}
-            onClick={() => next && goTo(next)}
-          >
-            <ArrowDownIcon aria-hidden />
-            {complete ? "Next optional field" : "Next field"}
-          </Button>
+          <span className="ml-auto">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={!next}
+              onClick={() => next && goTo(next)}
+            >
+              <ArrowDownIcon aria-hidden />
+              {complete ? "Next optional field" : "Next field"}
+            </Button>
+          </span>
         </div>
 
-        <div className="h-[70dvh] min-h-96 overflow-hidden rounded-xl border">
+        <div className="h-[70dvh] min-h-96 overflow-hidden rounded-2xl border">
           {fileError ? (
-            <Alert variant="error" className="m-4 w-auto">
-              <AlertDescription>
-                The document could not be loaded. Refresh to try again.
-              </AlertDescription>
-            </Alert>
+            <div className="p-4">
+              <Alert tone="danger" title="The document could not be loaded">
+                Refresh to try again.
+              </Alert>
+            </div>
           ) : fileUrl ? (
             <SigningViewer
               src={fileUrl}
@@ -454,72 +474,45 @@ export function SigningSurface({
           )}
         </div>
 
-        <Card>
-          <CardPanel className="flex flex-col gap-4">
-            {missing.size > 0 && !complete && (
-              <Alert variant="warning">
-                <AlertTitle>Some required fields are empty</AlertTitle>
-                <AlertDescription>
-                  They're outlined in red. Use “Next field” to go through them.
-                </AlertDescription>
-              </Alert>
-            )}
-            <Label className="flex items-start gap-3 font-normal">
-              <Checkbox
-                checked={consent}
-                onCheckedChange={(c) => setConsent(c === true)}
-                className="mt-0.5"
-              />
-              <span className="text-sm">{CONSENT_TEXT}</span>
-            </Label>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <AlertDialog>
-                <AlertDialogTrigger render={<Button variant="ghost" disabled={submitting} />}>
-                  Decline to sign
-                </AlertDialogTrigger>
-                <AlertDialogPopup>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Decline to sign?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      The sender is told you declined and the envelope is closed for everyone. This
-                      can't be undone.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <div className="px-6">
-                    <Field>
-                      <FieldLabel>Reason (shared with the sender)</FieldLabel>
-                      <Textarea
-                        value={declineReason}
-                        maxLength={500}
-                        rows={3}
-                        onChange={(e) => setDeclineReason(e.target.value)}
-                      />
-                    </Field>
-                  </div>
-                  <AlertDialogFooter>
-                    <AlertDialogClose render={<Button variant="ghost" disabled={declining} />}>
-                      Cancel
-                    </AlertDialogClose>
-                    <Button
-                      variant="destructive"
-                      disabled={declining || !declineReason.trim()}
-                      onClick={decline}
-                    >
-                      {declining && <Spinner aria-hidden />}
-                      Decline
-                    </Button>
-                  </AlertDialogFooter>
-                </AlertDialogPopup>
-              </AlertDialog>
-              <Button onClick={submit} disabled={!consent || submitting}>
-                {submitting && <Spinner aria-hidden />}
-                {complete
-                  ? "Finish signing"
-                  : `Finish signing (${progress.total - progress.done} left)`}
-              </Button>
-            </div>
-          </CardPanel>
-        </Card>
+        <Panel>
+          {missing.size > 0 && !complete && (
+            <Alert tone="warning" title="Some required fields are empty">
+              They're outlined in red. Use “Next field” to go through them.
+            </Alert>
+          )}
+          <Checkbox
+            label={CONSENT_TEXT}
+            checked={consent}
+            onCheckedChange={(c) => setConsent(c === true)}
+          />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Button variant="ghost" disabled={submitting} onClick={() => setDeclineOpen(true)}>
+              Decline to sign
+            </Button>
+            <Button onClick={submit} loading={submitting} disabled={!consent}>
+              {complete
+                ? "Finish signing"
+                : `Finish signing (${progress.total - progress.done} left)`}
+            </Button>
+          </div>
+        </Panel>
+        <ConfirmDialog
+          open={declineOpen}
+          onOpenChange={setDeclineOpen}
+          title="Decline to sign?"
+          description="The sender is told you declined and the envelope is closed for everyone. This can't be undone."
+          confirmLabel="Decline"
+          disabled={!declineReason.trim()}
+          onConfirm={decline}
+        >
+          <Textarea
+            label="Reason (shared with the sender)"
+            value={declineReason}
+            maxLength={500}
+            rows={3}
+            onChange={(e) => setDeclineReason(e.target.value)}
+          />
+        </ConfirmDialog>
       </div>
 
       <SignatureCaptureDialog

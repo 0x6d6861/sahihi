@@ -3,7 +3,7 @@
 A versioned REST API under **`/api/v1`** for a customer's own systems (ADR 0017). It shares
 envelope logic with the web app through `@sahihi/envelopes`, so quotas, state transitions, audit
 events and webhooks behave identically. Code: `apps/api/src/routes/v1.ts`,
-`apps/api/src/middleware/api-key.ts`, `packages/core/src/{api-keys,public-api}.ts`.
+`apps/api/src/middleware/api-key.ts`, `packages/core/src/integrations/{api-keys,public-api}.ts`.
 
 ## API keys
 

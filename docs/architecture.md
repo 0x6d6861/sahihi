@@ -57,7 +57,7 @@ See `packages/db/prisma/schema.prisma`. The schema comments are part of the spec
 
 ### Status machines
 
-The only source of truth is `packages/core/src/envelope-state.ts`.
+The only source of truth is `packages/core/src/envelope/envelope-state.ts`.
 
 ```
 Envelope:  DRAFT → SENT → IN_PROGRESS → COMPLETED
@@ -67,7 +67,7 @@ Document:  UPLOADING → READY | FAILED
 ```
 
 - Recipients and fields can only be edited while the envelope is `DRAFT` (`isEditable`).
-- Routing (who may act now) lives in `packages/core/src/routing.ts`. `PARALLEL` activates everyone;
+- Routing (who may act now) lives in `packages/core/src/envelope/routing.ts`. `PARALLEL` activates everyone;
   `SEQUENTIAL` activates the lowest `order` still pending, and equal orders sign in parallel.
 - `VIEWER` recipients (CC) never have fields and don't block completion.
 
@@ -94,6 +94,8 @@ Error body shape: `{ error: string, message?: string, issues?: {path, message}[]
 | DELETE | `/api/documents/:id` | org | Soft delete |
 | POST | `/api/envelopes` | org | Create draft |
 | GET | `/api/envelopes` · `/:id` | org | List / detail (no token hashes) |
+| PUT | `/api/envelopes/:id/document` | org | Switch a draft to another READY document; removes fields, audited (ADR 0024) |
+| PUT | `/api/envelopes/:id/details` | org | Title, message, signing order, expiry (draft) |
 | PUT | `/api/envelopes/:id/recipients` | org | Replace recipient list (draft) |
 | PUT | `/api/envelopes/:id/fields` | org | Replace all fields (editor autosave, draft) |
 | POST | `/api/envelopes/:id/send` | org | Preflight → `SENT`, issue links |
@@ -154,6 +156,9 @@ org/{orgId}/documents/{documentId}/original.pdf
 org/{orgId}/envelopes/{envelopeId}/fields/{fieldId}.png
 org/{orgId}/envelopes/{envelopeId}/signed.pdf
 org/{orgId}/envelopes/{envelopeId}/certificate.pdf
+org/{orgId}/exports/{exportId}.zip
+org/{orgId}/branding/logo-{version}.png      (public via /api/branding, docs/auth.md → Logos)
+user/{userId}/{signature|initials}-{version}.png   (saved signature, not workspace data)
 ```
 
 Objects are write-once. `original.pdf` is never overwritten, because its SHA-256 is on the certificate.

@@ -1,25 +1,18 @@
 "use client"
 
+import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useState } from "react"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardPanel,
-  CardTitle,
-} from "@/components/ui/card"
-import { Field, FieldLabel } from "@/components/ui/field"
-import { Form } from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
+import { Panel } from "@/components/app/panel"
+import { Alert } from "@/components/arc/alert/alert"
+import { Button } from "@/components/arc/button/button"
+import { Input } from "@/components/arc/input/input"
+import { PasswordField } from "@/components/arc/password-field/password-field"
 import { signIn } from "@/lib/auth-client"
 
 /**
- * REFERENCE PATTERN for forms: coss Form + Field + Input, server errors in an
- * Alert, pending state on the Button. Copy this shape for new forms.
+ * REFERENCE PATTERN for forms: a native form with Arc fields (label, description and error on the
+ * field itself), server errors in an Alert, pending state on the Button. Copy this shape for new forms.
  */
 function SignInForm() {
   const router = useRouter()
@@ -32,48 +25,42 @@ function SignInForm() {
     const form = new FormData(e.currentTarget)
     setPending(true)
     setError(null)
-    const { error } = await signIn.email({
+    const { data, error } = await signIn.email({
       email: String(form.get("email")),
       password: String(form.get("password")),
     })
     setPending(false)
     if (error) return setError(error.message ?? "Could not sign in")
+    // Two-factor accounts get no session yet: the second step finishes signing in.
+    if (data && "twoFactorRedirect" in data && data.twoFactorRedirect) {
+      return router.push(`/sign-in/two-factor?next=${encodeURIComponent(next)}`)
+    }
     router.push(next)
     router.refresh()
   }
 
   return (
-    <Card className="w-full max-w-sm">
-      <CardHeader>
-        <CardTitle>Sign in</CardTitle>
-        <CardDescription>Welcome back to Sahihi.</CardDescription>
-      </CardHeader>
-      <Form className="contents" onSubmit={onSubmit}>
-        <CardPanel className="flex flex-col gap-4">
-          {error && (
-            <Alert variant="error">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          <Field>
-            <FieldLabel>Email</FieldLabel>
-            <Input name="email" type="email" autoComplete="email" required />
-          </Field>
-          <Field>
-            <FieldLabel>Password</FieldLabel>
-            <Input name="password" type="password" autoComplete="current-password" required />
-          </Field>
-        </CardPanel>
-        <CardFooter className="flex flex-col gap-2">
-          <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? "Signing in…" : "Sign in"}
-          </Button>
-          <Button variant="link" render={<a href="/sign-up" />}>
-            Create an account
-          </Button>
-        </CardFooter>
-      </Form>
-    </Card>
+    <Panel
+      title="Sign in"
+      description="Welcome back to Sahihi."
+      headingLevel={1}
+      className="w-full max-w-sm"
+    >
+      <form className="flex flex-col gap-4" onSubmit={onSubmit}>
+        {error && <Alert tone="danger" title={error} />}
+        <Input label="Email" name="email" type="email" autoComplete="email" required />
+        <PasswordField label="Password" name="password" autoComplete="current-password" required />
+        <Button type="submit" className="mt-2 w-full" loading={pending}>
+          Sign in
+        </Button>
+      </form>
+      <p className="text-center text-muted-foreground text-sm">
+        New to Sahihi?{" "}
+        <Link href="/sign-up" className="text-foreground underline-offset-4 hover:underline">
+          Create an account
+        </Link>
+      </p>
+    </Panel>
   )
 }
 

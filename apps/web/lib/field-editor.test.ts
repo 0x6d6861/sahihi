@@ -106,6 +106,40 @@ describe("editing", () => {
   })
 })
 
+describe("import", () => {
+  const imported = (x: number, page = 1): Omit<EditorField, "key"> => ({
+    recipientId: "r1",
+    type: "TEXT",
+    page,
+    required: true,
+    x,
+    y: 0.5,
+    width: 0.2,
+    height: 0.05,
+  })
+
+  test("adds fields, skipping ones on top of an existing or earlier imported field", () => {
+    let s = editorReducer(initialState([]), { type: "import", fields: [imported(0.1)] })
+    expect(s.fields).toHaveLength(1)
+    expect(s.revision).toBe(1)
+    s = editorReducer(s, {
+      type: "import",
+      fields: [imported(0.11), imported(0.5), imported(0.51), imported(0.1, 2)],
+    })
+    expect(s.fields.map((f) => [f.page, f.x])).toEqual([
+      [1, 0.1],
+      [1, 0.5],
+      [2, 0.1],
+    ])
+    expect(new Set(s.fields.map((f) => f.key)).size).toBe(3)
+  })
+
+  test("importing only duplicates changes nothing", () => {
+    const s = editorReducer(initialState([]), { type: "import", fields: [imported(0.1)] })
+    expect(editorReducer(s, { type: "import", fields: [imported(0.1)] })).toBe(s)
+  })
+})
+
 describe("payload", () => {
   test("round-trips saved fields and passes FieldInputSchema", () => {
     const fields = fieldsFromSaved([

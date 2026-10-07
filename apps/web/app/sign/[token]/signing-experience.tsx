@@ -3,20 +3,12 @@
 import type { FieldType, VerificationMethod } from "@sahihi/core"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { DownloadButtons } from "@/components/app/downloads/download-buttons"
+import { Panel } from "@/components/app/panel"
 import { SigningSurface } from "@/components/app/signing/signing-surface"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardPanel,
-  CardTitle,
-} from "@/components/ui/card"
-import { Form } from "@/components/ui/form"
-import { OTPField, OTPFieldInput } from "@/components/ui/otp-field"
-import { Spinner } from "@/components/ui/spinner"
+import { Alert } from "@/components/arc/alert/alert"
+import { Button } from "@/components/arc/button/button"
+import { OtpInput } from "@/components/arc/otp-input/otp-input"
+import { Skeleton } from "@/components/arc/skeleton/skeleton"
 import { ApiError, api } from "@/lib/api"
 import { formatCountdown } from "@/lib/countdown"
 import { embedEventFor, postEmbedEvent } from "@/lib/embed"
@@ -61,7 +53,7 @@ interface SigningSession {
 const MESSAGES: Record<Exclude<State, "ready">, { title: string; body: string }> = {
   waiting: { title: "Not your turn yet", body: "You'll get an email when it's your turn to sign." },
   signed: {
-    title: "Thanks — you've signed",
+    title: "Thanks, you've signed",
     body: "We'll email you the final document once everyone has signed.",
   },
   completed: {
@@ -117,28 +109,30 @@ export function SigningExperience({ token }: { token: string }) {
 
   if (error) {
     return (
-      <Alert variant="error">
-        <AlertTitle>Can't open this document</AlertTitle>
-        <AlertDescription>{error}</AlertDescription>
+      <Alert tone="danger" title="Can't open this document">
+        {error}
       </Alert>
     )
   }
-  if (!session) return <Spinner className="m-auto" />
+  if (!session) {
+    return (
+      <Panel className="mx-auto w-full max-w-md">
+        <Skeleton label="Opening the document" lines={4} />
+      </Panel>
+    )
+  }
 
   if (session.state !== "ready") {
     const m = MESSAGES[session.state]
     return (
-      <Card className="mx-auto w-full max-w-md">
-        <CardHeader>
-          <CardTitle>{m.title}</CardTitle>
-          <CardDescription>{m.body}</CardDescription>
-        </CardHeader>
-        {session.downloadsAvailable && (
-          <CardFooter className="gap-2">
-            <DownloadButtons endpoint={`${base}/downloads`} />
-          </CardFooter>
-        )}
-      </Card>
+      <Panel
+        headingLevel={1}
+        title={m.title}
+        description={m.body}
+        className="mx-auto w-full max-w-md"
+      >
+        {session.downloadsAvailable && <DownloadButtons endpoint={`${base}/downloads`} />}
+      </Panel>
     )
   }
 
@@ -189,12 +183,6 @@ function OtpStep({
   const [sending, setSending] = useState(false)
   const [verifying, setVerifying] = useState(false)
   const [resendIn, setResendIn] = useCountdown()
-  const firstSlot = useRef<HTMLInputElement>(null)
-
-  // After a wrong code the slots are cleared; put the cursor back in the first one.
-  useEffect(() => {
-    if (sentTo && error && !verifying) firstSlot.current?.focus()
-  }, [sentTo, error, verifying])
 
   async function send() {
     setError(null)
@@ -243,78 +231,63 @@ function OtpStep({
   }
 
   return (
-    <Card className="mx-auto w-full max-w-sm">
-      <CardHeader>
-        <CardTitle>Verify it's you</CardTitle>
-        <CardDescription>
-          {sentTo
-            ? `Enter the 6-digit code sent to ${sentTo}.`
-            : `We'll send a code to ${channel}.`}
-        </CardDescription>
-      </CardHeader>
+    <Panel
+      headingLevel={1}
+      title="Verify it's you"
+      description={
+        sentTo ? `Enter the 6-digit code sent to ${sentTo}.` : `We'll send a code to ${channel}.`
+      }
+      className="mx-auto w-full max-w-sm"
+    >
       {sentTo ? (
-        <Form
-          className="contents"
+        <form
+          className="flex flex-col gap-4"
           onSubmit={(e) => {
             e.preventDefault()
             void verify(code)
           }}
         >
-          <CardPanel className="flex flex-col items-center gap-4">
-            {error && (
-              <Alert variant="error" className="w-full">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-            <OTPField
-              length={CODE_LENGTH}
-              value={code}
-              onValueChange={setCode}
-              onValueComplete={(v) => void verify(v)}
-              validationType="numeric"
-              autoComplete="one-time-code"
-              disabled={verifying}
-              aria-label="Verification code"
-            >
-              {Array.from({ length: CODE_LENGTH }, (_, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: fixed-length code slots
-                <OTPFieldInput key={i} autoFocus={i === 0} ref={i === 0 ? firstSlot : undefined} />
-              ))}
-            </OTPField>
-          </CardPanel>
-          <CardFooter className="flex flex-col gap-2">
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={verifying || code.length !== CODE_LENGTH}
-            >
-              {verifying && <Spinner aria-hidden />}
-              Verify
-            </Button>
-            <Button
-              type="button"
-              variant="link"
-              onClick={send}
-              disabled={sending || resendIn > 0}
-              aria-live="polite"
-            >
-              {resendIn > 0 ? `Resend code in ${formatCountdown(resendIn)}` : "Resend code"}
-            </Button>
-          </CardFooter>
-        </Form>
+          {/* A wrong code clears the slots; the error sits on the field itself. */}
+          <OtpInput
+            label="Verification code"
+            length={CODE_LENGTH}
+            value={code}
+            onChange={(value) => {
+              setCode(value)
+              if (value.length === CODE_LENGTH) void verify(value)
+            }}
+            error={error ?? undefined}
+            disabled={verifying}
+            autoFocus
+          />
+          <Button
+            type="submit"
+            className="w-full"
+            loading={verifying}
+            disabled={code.length !== CODE_LENGTH}
+          >
+            Verify
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full"
+            onClick={send}
+            loading={sending}
+            disabled={resendIn > 0}
+            aria-live="polite"
+          >
+            {resendIn > 0 ? `Resend code in ${formatCountdown(resendIn)}` : "Resend code"}
+          </Button>
+        </form>
       ) : (
-        <CardFooter className="flex flex-col gap-2">
-          {error && (
-            <Alert variant="error" className="w-full">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          <Button className="w-full" onClick={send} disabled={sending}>
-            {sending && <Spinner aria-hidden />}
+        <div className="flex flex-col gap-4">
+          {error && <Alert tone="danger" title={error} />}
+          <Button className="w-full" onClick={send} loading={sending}>
             Send code
           </Button>
-        </CardFooter>
+        </div>
       )}
-    </Card>
+    </Panel>
   )
 }

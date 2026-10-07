@@ -1,14 +1,6 @@
-import Link from "next/link"
 import { notFound } from "next/navigation"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import { Card, CardDescription, CardHeader, CardPanel, CardTitle } from "@/components/ui/card"
+import { Panel } from "@/components/app/panel"
+import { Breadcrumb } from "@/components/arc/breadcrumb/breadcrumb"
 import { apiServer } from "@/lib/api-server"
 import { BulkProgress, type BulkSendView } from "./bulk-progress"
 
@@ -22,30 +14,21 @@ export default async function BulkSendStatusPage({ params }: { params: Promise<{
   if (status === 404 || !data) notFound()
   const b = data.bulkSend
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink render={<Link href="/templates" />}>Templates</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage className="max-w-64 truncate">Bulk send</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-      <Card>
-        <CardHeader>
-          <CardTitle>{b.title}</CardTitle>
-          <CardDescription>
-            {b.template ? `From “${b.template.name}”` : "From a deleted template"} · {b.total}{" "}
-            {b.total === 1 ? "envelope" : "envelopes"}
-          </CardDescription>
-        </CardHeader>
-        <CardPanel>
-          <BulkProgress bulk={b} />
-        </CardPanel>
-      </Card>
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
+      <header className="flex flex-col gap-2">
+        <Breadcrumb items={[{ label: "Templates", href: "/templates" }, { label: "Bulk send" }]} />
+        {/* The batch title is a pattern ("…: {{Tenant name}}"), so the template names the page. */}
+        <h1 className="truncate font-medium text-2xl tracking-tight">
+          {b.template ? `Bulk send: ${b.template.name}` : "Bulk send"}
+        </h1>
+        <p className="text-muted-foreground text-sm">
+          {b.total} {b.total === 1 ? "envelope" : "envelopes"}, titled “{b.title}”
+          {b.template ? "" : ". The template has since been deleted"}
+        </p>
+      </header>
+      <Panel>
+        <BulkProgress bulk={b} />
+      </Panel>
     </div>
   )
 }

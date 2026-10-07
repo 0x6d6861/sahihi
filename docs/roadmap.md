@@ -30,6 +30,10 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
 - [x] Extend `FileThumbnail` in the list; `Pagination` (`GET /documents?page=N` → `{ items, page, pageSize, total }`)
 - [x] Integration test harness (`apps/api/test/`, see `docs/testing.md`) + documents tests incl. cross-tenant 404
 - [x] Worker job to clean up `UPLOADING` documents older than 1 hour (`documents.sweep-uploads`, every 15 min)
+- [x] Folders on the Documents page (nested; create, rename, move, delete → contents move up) +
+      search and Status / Sender / Period filters (ADR 0022)
+- [x] Color and tags on folders and documents, searchable (`q` matches tags; Tag and Color filters
+      search every folder) (ADR 0025)
 
 ## P2: Envelope drafting & field placement
 
@@ -74,6 +78,11 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
 - [x] Retention settings + data export/delete (Kenya DPA)
 - [x] Playwright E2E: sign-up → upload → place → send → sign (Mailpit) → certificate
 - [x] Observability: structured logs, BullMQ dashboard, error tracking
+- [x] Arc design system: Arc primitives and tokens over coss/Extend, light + dark with a theme switch (ADR 0023, `docs/ui.md`)
+- [x] Account settings: profile (name, email change, saved signature), security (password, TOTP 2FA +
+      backup codes, sessions), workspace (name, logo in emails and signing page, leave) (`docs/auth.md`
+      → Account settings, ADR 0028)
+- [ ] Passkeys, delete account, forgot-password pages (`docs/auth.md` → What better-auth offers next)
 
 ## Later
 
@@ -82,3 +91,8 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
 - [x] Bulk send, public API + API keys, embedded signing (docs/public-api.md, docs/bulk-send.md,
       docs/embedded-signing.md, ADR 0017)
 - [ ] SMS/WhatsApp delivery of signing links (Africa's Talking)
+- Automatic field detection, local only (ADR 0020):
+  - [x] Import the PDF's own form fields (AcroForm) as suggested fields, roles from field names
+  - [x] Anchor tags (`{{s1:signature}}`) on the text layer (PDFium WASM, `docs/pdf-pipeline.md`)
+  - [x] Text-layer rules: labels + signature lines, signature blocks, parties-clause roles
+  - [ ] Scanned PDFs: local OCR (tesseract.js) feeding the same rules

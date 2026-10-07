@@ -30,14 +30,18 @@ export async function uploadPdf(
   file: File,
   opts: {
     sourceDocumentId?: string
+    /** Folder the document lands in (ADR 0022); omitted = workspace root. */
+    folderId?: string
     onStage?: (stage: UploadStage, fraction?: number) => void
   } = {},
 ): Promise<{ id: string; name: string }> {
   const prepared = prepareUpload(file)
   if (!prepared.ok) throw new UploadRejectedError(prepared.message)
-  const input = opts.sourceDocumentId
-    ? { ...prepared.input, sourceDocumentId: opts.sourceDocumentId }
-    : prepared.input
+  const input = {
+    ...prepared.input,
+    ...(opts.sourceDocumentId && { sourceDocumentId: opts.sourceDocumentId }),
+    ...(opts.folderId && { folderId: opts.folderId }),
+  }
 
   opts.onStage?.("creating")
   const { document, uploadUrl } = await api<{ document: { id: string }; uploadUrl: string }>(

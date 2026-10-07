@@ -1,7 +1,7 @@
 # Coordinates
 
 Getting coordinates wrong makes signatures land in the wrong place, which is the most common
-e-signature bug. Every conversion goes through `packages/core/src/coordinates.ts`, which is
+e-signature bug. Every conversion goes through `packages/core/src/geometry/coordinates.ts`, which is
 unit-tested for all four rotations.
 
 ## Two coordinate systems
@@ -84,7 +84,7 @@ on rotated pages. pdf-lib rotates counter-clockwise around `(x, y)`.
    the round trip `fromPdfRect(toPdfRect(r)) ≈ r` holds.
 5. Test documents live in `fixtures/` (see its README): rotated 90° and 270°, non-zero crop box
    origins (one also rotated), mixed page sizes (A4, Letter, landscape, 180°), and a scanned
-   image-only PDF. They're generated deterministically by `packages/pdf/src/fixtures.ts` (`bun run
+   image-only PDF. They're generated deterministically by `packages/pdf/src/fixtures/fixtures.ts` (`bun run
    fixtures`). `fixtures.test.ts` checks every page by stamping and asserting on the content-stream
    `cm` matrix with an independent display transform. A change to `coordinates.ts` that moves a
    field fails it.

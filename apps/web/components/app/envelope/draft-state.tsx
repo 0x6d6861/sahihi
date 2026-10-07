@@ -37,7 +37,7 @@ export function DraftStateProvider({ children }: { children: React.ReactNode }) 
       const unsaved = editor.unsavedMessage?.()
       if (unsaved) problems.push(unsaved)
       if (editor.flush && !(await editor.flush())) {
-        problems.push("Some field changes couldn't be saved. Retry from the Document tab.")
+        problems.push("Some field changes couldn't be saved. Retry from the Add fields step.")
       }
     }
     return problems

@@ -1,10 +1,9 @@
 "use client"
 
-import { DownloadIcon } from "lucide-react"
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Spinner } from "@/components/ui/spinner"
-import { toastManager } from "@/components/ui/toast"
+import { DownloadIcon } from "@/components/app/icons"
+import { toastManager } from "@/components/app/toast"
+import { Button } from "@/components/arc/button/button"
 import { ApiError, api } from "@/lib/api"
 
 type Kind = "signed" | "certificate"
@@ -47,11 +46,12 @@ export function DownloadButtons({ endpoint }: { endpoint: string }) {
       {(["signed", "certificate"] as const).map((kind) => (
         <Button
           key={kind}
-          variant={kind === "signed" ? "default" : "outline"}
-          disabled={busy !== null}
+          variant={kind === "signed" ? "primary" : "secondary"}
+          loading={busy === kind}
+          disabled={busy !== null && busy !== kind}
           onClick={() => download(kind)}
         >
-          {busy === kind ? <Spinner aria-hidden /> : <DownloadIcon aria-hidden />}
+          <DownloadIcon aria-hidden />
           {LABEL[kind]}
         </Button>
       ))}

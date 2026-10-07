@@ -216,6 +216,25 @@ describe("use a template", () => {
     ).toBe(9)
   })
 
+  test("send: true (Send now) creates and sends it in one call", async () => {
+    const id = await saveTemplate(alice)
+    const { template } = await detail(alice, id)
+    const tenant = template.roles.find((r) => r.label === "Tenant")
+    const res = await request(alice, `/api/templates/${id}/envelopes`, {
+      method: "POST",
+      json: {
+        title: "Lease – Unit 9",
+        send: true,
+        recipients: [{ roleId: tenant?.id, name: "Amina Hassan", email: "amina@example.test" }],
+      },
+    })
+    expect(res.status).toBe(201)
+    const body = await json<{ envelope: { id: string }; sent: boolean }>(res)
+    expect(body.sent).toBe(true)
+    const created = await prisma.envelope.findUniqueOrThrow({ where: { id: body.envelope.id } })
+    expect(created.status).toBe("SENT")
+  })
+
   test("missing or invalid people come back per role", async () => {
     const id = await saveTemplate(alice)
     const res = await request(alice, `/api/templates/${id}/envelopes`, {

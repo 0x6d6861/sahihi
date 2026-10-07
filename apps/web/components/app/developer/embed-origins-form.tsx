@@ -3,12 +3,8 @@
 import { EmbedSettingsSchema } from "@sahihi/core"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field"
-import { Form } from "@/components/ui/form"
-import { Spinner } from "@/components/ui/spinner"
-import { Textarea } from "@/components/ui/textarea"
-import { toastManager } from "@/components/ui/toast"
+import { Button } from "@/components/arc/button/button"
+import { Textarea } from "@/components/arc/textarea/textarea"
 import { ApiError, api } from "@/lib/api"
 
 /** Origins allowed to show embedded signing in an iframe (docs/embedded-signing.md). */
@@ -17,6 +13,7 @@ export function EmbedOriginsForm({ initial }: { initial: string[] }) {
   const [text, setText] = useState(initial.join("\n"))
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [saved, setSaved] = useState(false)
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -38,7 +35,7 @@ export function EmbedOriginsForm({ initial }: { initial: string[] }) {
         json: parsed.data,
       })
       setText(res.origins.join("\n"))
-      toastManager.add({ title: "Embedding origins saved", type: "success" })
+      setSaved(true)
       router.refresh()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not save")
@@ -48,37 +45,28 @@ export function EmbedOriginsForm({ initial }: { initial: string[] }) {
   }
 
   return (
-    <Form
-      onSubmit={onSubmit}
-      errors={error ? { origins: error } : {}}
-      className="flex flex-col gap-4"
-    >
-      <Field name="origins">
-        <FieldLabel>Allowed origins</FieldLabel>
-        <Textarea
-          value={text}
-          rows={3}
-          onChange={(e) => {
-            setText(e.target.value)
-            // Base UI keeps a field with an external error invalid (and blocks submit) until cleared.
-            setError(null)
-          }}
-          placeholder={"https://portal.example.co.ke"}
-          className="font-mono"
-        />
-        <FieldDescription>
-          One per line. Only these sites may show signing in an iframe, and only for recipients
-          created with <span className="font-mono">delivery: "EMBEDDED"</span>. https, no path;
-          http://localhost is allowed for development.
-        </FieldDescription>
-        <FieldError />
-      </Field>
+    <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
+      <Textarea
+        label="Allowed origins"
+        name="origins"
+        value={text}
+        rows={3}
+        error={error ?? undefined}
+        onChange={(e) => {
+          setText(e.target.value)
+          setError(null)
+          setSaved(false)
+        }}
+        placeholder="https://portal.example.co.ke"
+        style={{ fontFamily: "var(--font-mono)" }}
+        description='One per line. Only these sites may show signing in an iframe, and only for recipients created with delivery: "EMBEDDED". https, no path; http://localhost is allowed for development.'
+      />
       <div>
-        <Button type="submit" disabled={busy}>
-          {busy && <Spinner aria-hidden />}
-          Save origins
+        {/* Confirms in place: the label morphs to "Saved" until the next edit. */}
+        <Button type="submit" variant="secondary" loading={busy}>
+          {saved ? "Saved" : "Save origins"}
         </Button>
       </div>
-    </Form>
+    </form>
   )
 }

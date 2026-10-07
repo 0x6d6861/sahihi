@@ -6,8 +6,8 @@
    (audit `envelope.created`). The document must be `READY`.
    Web: `/envelopes/new?documentId=…` (from the document page's "Create envelope" or the envelopes
    list). The form validates with the same `CreateEnvelopeSchema` (`lib/envelope-form.ts`) and maps
-   both client and API `issues[]` onto coss `Form errors`. The title defaults to the file name. "Sign
-   in order" is a `Switch` for `SEQUENTIAL`. Expiry is a date (coss `Popover` + `Calendar`, past days
+   both client and API `issues[]` onto each Arc field's `error`. The title defaults to the file name. "Sign
+   in order" is a `Switch` for `SEQUENTIAL`. Expiry is a date (Arc `DatePicker`, past days
    disabled) sent as the **end of that day in the sender's time zone**.
 2. `PUT /api/envelopes/:id/recipients` replaces the full list. Emails are unique per envelope, and
    `SMS_OTP` needs a phone number. Both are enforced in `ReplaceRecipientsSchema`, so the API
@@ -95,14 +95,21 @@ which issues links (raw token returned, hash stored), sets recipient `SENT`, and
 
 Link lifetime is `min(now + SIGNING_LINK_TTL_DAYS, envelope.expiresAt)`.
 
-Web (`app/(app)/envelopes/[id]/`): the header shows the status `Badge`; drafts also get **Send**.
-Send first settles the draft editors (`components/app/envelope/draft-state.tsx`): the field
-autosave is flushed, and unsaved recipient edits block with a message. It then calls `preflight`
-and lists the issues inline in an `Alert`, each with a **Fix** link to the tab that fixes it. Only a
-clean preflight opens the `AlertDialog` confirmation. Tabs are Document / Recipients / Activity
-(`?tab=`). While drafting, the panels stay mounted when hidden, so switching tabs can't drop a
-pending save. Activity lists the audit trail with readable labels (`lib/audit-labels.ts`) and the
-hash-chain check from `GET …/audit`.
+Web: an editable draft opens in the **draft editor**, full bleed inside the app shell
+(`app/(app)/envelopes/[id]/edit/`, ADR 0021); `/envelopes/:id` redirects it there and shows everything else read-only. The editor's
+left rail has four steps in `?step=` (Prepare document, optional, ADR 0024 → Recipients → Add fields →
+Preview) and quick actions; the top bar has **Send**. Send first settles the draft editors
+(`components/app/envelope/draft-state.tsx`): the field autosave is flushed, and unsaved recipient
+edits block with a message. It then calls `preflight` and lists the issues inline in an `Alert`,
+each with a **Fix** link to the step that fixes it. Only a clean preflight opens **Review & send**
+(`components/app/envelope/review-send-dialog.tsx`): title, message,
+signing order and expiry, prefilled from the draft. Send saves them with
+`PUT /api/envelopes/:id/details` and then sends; "Save changes" only saves them. Turning "sign in
+order" on numbers the recipients by their list position; turning it off puts everyone on step 1.
+After sending, the sender lands on the read-only envelope page. The
+steps stay mounted when hidden, so switching can't drop a pending save. The read-only page has
+Tabs Document / Recipients / Activity (`?tab=`). Activity (also a `Sheet` in the editor) lists the
+audit trail with readable labels (`lib/audit-labels.ts`) and the hash-chain check from `GET …/audit`.
 
 ## Signing (public: `/sign/[token]`)
 
@@ -133,9 +140,9 @@ When `verification` is `EMAIL_OTP` or `SMS_OTP`:
    (30 minutes, `path=/api/sign`).
 3. Fields, page metadata and the file URL are only returned once verified.
 
-UI: coss `OTPField length={6}` (numeric, `autocomplete="one-time-code"`) inside a `Card`. It
-verifies automatically when the sixth digit is entered. On a wrong code the slots clear and focus
-returns to the first one. "Resend code in 0:27" counts down from the server's `resendAfterSec`
+UI: Arc `OtpInput length={6}` (numeric, `autocomplete="one-time-code"`) inside a `Panel`. It
+verifies automatically when the sixth digit is entered. On a wrong code the slots clear and the
+error shows on the field. "Resend code in 0:27" counts down from the server's `resendAfterSec`
 (or `retryAfterSec` after a reload), and there are specific messages for the 15-minute rate limit
 and for too many attempts.
 
@@ -176,7 +183,7 @@ Implementation (`components/app/signing/`, state in `lib/signing.ts`, pure and t
   ticked. Missing required fields, whether found by the client or reported by the API
   (`missing_required_fields`), are outlined in red, and the page scrolls to the first one. A 409
   reloads the state.
-- Decline opens an `AlertDialog` that needs a reason.
+- Decline opens a `ConfirmDialog` that needs a reason.
 
 ## Sender actions
 
@@ -201,8 +208,8 @@ Web (`components/app/envelope/sender-actions.tsx`, on sent envelopes):
 - The header has **Copy status**, which puts a plain-text summary on the clipboard
   (`statusSummary()` in `lib/envelope-status.ts`: title, state, n of m signed, expiry, one line per
   recipient). Signing links can't be copied, because raw tokens are never stored.
-- While the envelope is `SENT` or `IN_PROGRESS`, the header also has **Void**, which opens an
-  `AlertDialog` that requires a reason.
+- While the envelope is `SENT` or `IN_PROGRESS`, the header also has **Void**, which opens a
+  `ConfirmDialog` that requires a reason.
 
 ## Completion
 

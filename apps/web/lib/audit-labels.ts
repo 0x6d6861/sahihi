@@ -3,6 +3,7 @@ import type { AuditEventType } from "@sahihi/core"
 /** Human-readable text for the Activity tab. `who` is the recipient's name when there is one. */
 const LABELS: Record<AuditEventType, (who: string) => string> = {
   "envelope.created": () => "Envelope created",
+  "envelope.document_replaced": () => "Document replaced with a prepared version",
   "envelope.sent": () => "Envelope sent",
   "envelope.voided": () => "Envelope voided",
   "envelope.expired": () => "Envelope expired",

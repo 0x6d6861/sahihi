@@ -1,33 +1,15 @@
 "use client"
 
 import { UpdateTemplateSchema } from "@sahihi/core"
-import { EllipsisIcon, PencilIcon, Trash2Icon } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import {
-  AlertDialog,
-  AlertDialogClose,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogPopup,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogFooter,
-  DialogHeader,
-  DialogPanel,
-  DialogPopup,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Field, FieldError, FieldLabel } from "@/components/ui/field"
-import { Form } from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
-import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@/components/ui/menu"
-import { Spinner } from "@/components/ui/spinner"
-import { toastManager } from "@/components/ui/toast"
+import { ConfirmDialog, DialogActions } from "@/components/app/confirm-dialog"
+import { LayoutTemplateIcon, PencilIcon, SendIcon, Trash2Icon } from "@/components/app/icons"
+import { toastManager } from "@/components/app/toast"
+import { Button as ArcButton } from "@/components/arc/button/button"
+import { Dialog, DialogContent } from "@/components/arc/dialog/dialog"
+import { type DropdownItem, DropdownMenu } from "@/components/arc/dropdown-menu/dropdown-menu"
+import { Input } from "@/components/arc/input/input"
 import { api } from "@/lib/api"
 import { type FormErrors, issuesToFormErrors } from "@/lib/envelope-form"
 
@@ -37,8 +19,14 @@ export interface TemplateRow {
   description: string | null
 }
 
-/** Rename / delete, shown only when the API says `permissions.manage`. */
-export function TemplateRowActions({ template }: { template: TemplateRow }) {
+/** Bulk send for anyone; Rename and Delete when the API says `permissions.manage`. */
+export function TemplateRowActions({
+  template,
+  canManage,
+}: {
+  template: TemplateRow
+  canManage: boolean
+}) {
   const router = useRouter()
   const [renaming, setRenaming] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -69,10 +57,8 @@ export function TemplateRowActions({ template }: { template: TemplateRow }) {
   }
 
   async function remove() {
-    setBusy(true)
     try {
       await api(`/templates/${template.id}`, { method: "DELETE" })
-      setDeleting(false)
       toastManager.add({ title: `“${template.name}” deleted`, type: "success" })
       router.refresh()
     } catch (err) {
@@ -81,103 +67,93 @@ export function TemplateRowActions({ template }: { template: TemplateRow }) {
         description: err instanceof Error ? err.message : undefined,
         type: "error",
       })
-    } finally {
-      setBusy(false)
+      throw err
     }
   }
 
   return (
     <>
-      <Menu>
-        <MenuTrigger
-          render={
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={`More actions for ${template.name}`}
-            />
-          }
-        >
-          <EllipsisIcon aria-hidden />
-        </MenuTrigger>
-        <MenuPopup align="end">
-          <MenuItem
-            onClick={() => {
-              setName(template.name)
-              setDescription(template.description ?? "")
-              setErrors({})
-              setRenaming(true)
-            }}
-          >
-            <PencilIcon aria-hidden />
-            Rename
-          </MenuItem>
-          <MenuItem variant="destructive" onClick={() => setDeleting(true)}>
-            <Trash2Icon aria-hidden />
-            Delete
-          </MenuItem>
-        </MenuPopup>
-      </Menu>
+      <DropdownMenu
+        label="Actions"
+        items={[
+          {
+            label: "Use template",
+            icon: <LayoutTemplateIcon />,
+            onSelect: () => router.push(`/templates/${template.id}/use`),
+          },
+          {
+            label: "Bulk send",
+            icon: <SendIcon />,
+            onSelect: () => router.push(`/templates/${template.id}/bulk`),
+          },
+          ...(canManage
+            ? ([
+                {
+                  label: "Rename",
+                  icon: <PencilIcon />,
+                  separatorBefore: true,
+                  onSelect: () => {
+                    setName(template.name)
+                    setDescription(template.description ?? "")
+                    setErrors({})
+                    setRenaming(true)
+                  },
+                },
+                {
+                  label: "Delete",
+                  icon: <Trash2Icon />,
+                  destructive: true,
+                  onSelect: () => setDeleting(true),
+                },
+              ] satisfies DropdownItem[])
+            : []),
+        ]}
+      />
 
       <Dialog open={renaming} onOpenChange={(o) => !busy && setRenaming(o)}>
-        <DialogPopup>
-          <DialogHeader>
-            <DialogTitle>Rename template</DialogTitle>
-          </DialogHeader>
-          <Form errors={errors} onSubmit={rename} className="contents">
-            <DialogPanel className="flex flex-col gap-4">
-              <Field name="name">
-                <FieldLabel>Name</FieldLabel>
-                <Input value={name} maxLength={120} onChange={(e) => setName(e.target.value)} />
-                <FieldError />
-              </Field>
-              <Field name="description">
-                <FieldLabel>Description (optional)</FieldLabel>
-                <Input
-                  value={description}
-                  maxLength={500}
-                  onChange={(e) => setDescription(e.target.value)}
-                />
-                <FieldError />
-              </Field>
-            </DialogPanel>
-            <DialogFooter>
-              <Button
+        <DialogContent title="Rename template">
+          <form onSubmit={rename} noValidate className="flex flex-col gap-4">
+            <Input
+              label="Name"
+              name="name"
+              value={name}
+              maxLength={120}
+              error={errors.name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <Input
+              label="Description (optional)"
+              name="description"
+              value={description}
+              maxLength={500}
+              error={errors.description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+            <DialogActions>
+              <ArcButton
                 variant="ghost"
                 type="button"
                 disabled={busy}
                 onClick={() => setRenaming(false)}
               >
                 Cancel
-              </Button>
-              <Button type="submit" disabled={busy}>
-                {busy && <Spinner aria-hidden />}
+              </ArcButton>
+              <ArcButton type="submit" loading={busy}>
                 Save
-              </Button>
-            </DialogFooter>
-          </Form>
-        </DialogPopup>
+              </ArcButton>
+            </DialogActions>
+          </form>
+        </DialogContent>
       </Dialog>
 
-      <AlertDialog open={deleting} onOpenChange={(o) => !busy && setDeleting(o)}>
-        <AlertDialogPopup>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete “{template.name}”?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Envelopes already created from it aren't affected. Its document stays in Documents.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogClose render={<Button variant="ghost" disabled={busy} />}>
-              Cancel
-            </AlertDialogClose>
-            <Button variant="destructive" onClick={remove} disabled={busy}>
-              {busy && <Spinner aria-hidden />}
-              Delete template
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogPopup>
-      </AlertDialog>
+      <ConfirmDialog
+        open={deleting}
+        onOpenChange={setDeleting}
+        title={`Delete “${template.name}”?`}
+        description="Envelopes already created from it aren't affected. Its document stays in Documents."
+        confirmLabel="Delete template"
+        onConfirm={remove}
+      />
     </>
   )
 }

@@ -146,7 +146,7 @@ export function FieldLayer({ pageNumber }: { pageNumber: number }) {
       ref={layerRef}
       data-field-layer
       className={cn(
-        "absolute inset-0 touch-none select-none",
+        "on-paper absolute inset-0 touch-none select-none",
         placing ? "pointer-events-auto cursor-crosshair" : "pointer-events-none",
       )}
       onPointerDownCapture={onPointerDown}

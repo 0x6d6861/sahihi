@@ -1,22 +1,11 @@
-import { LayoutTemplateIcon } from "lucide-react"
-import Link from "next/link"
-import {
-  type TemplateRow,
-  TemplateRowActions,
-} from "@/components/app/templates/template-row-actions"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardPanel } from "@/components/ui/card"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { ButtonLink } from "@/components/app/button-link"
+import { LayoutTemplateIcon } from "@/components/app/icons"
+import { Panel } from "@/components/app/panel"
+import type { TemplateRow } from "@/components/app/templates/template-row-actions"
+import { BulkSendsTable, TemplatesTable } from "@/components/app/templates/templates-table"
+import { EmptyState } from "@/components/arc/empty-state/empty-state"
 import { apiServer } from "@/lib/api-server"
+import { formatDate, pluralize } from "@/lib/format"
 
 interface TemplateListItem extends TemplateRow {
   document: { id: string; name: string; pageCount: number }
@@ -24,6 +13,7 @@ interface TemplateListItem extends TemplateRow {
   roles: { label: string; role: string }[]
   _count: { fields: number }
   permissions: { manage: boolean }
+  createdAt: string
 }
 
 export const metadata = { title: "Templates" }
@@ -40,12 +30,6 @@ interface BulkSendListItem {
   template: { name: string } | null
 }
 
-const when = new Intl.DateTimeFormat("en-GB", {
-  dateStyle: "medium",
-  timeStyle: "short",
-  timeZone: "Africa/Nairobi",
-})
-
 export default async function TemplatesPage() {
   const [{ data }, { data: bulk }] = await Promise.all([
     apiServer<{ items: TemplateListItem[] }>("/templates"),
@@ -54,124 +38,61 @@ export default async function TemplatesPage() {
   const items = data?.items ?? []
   const batches = (bulk?.items ?? []).slice(0, 10)
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="font-semibold text-xl">Templates</h1>
-        <p className="text-muted-foreground text-sm">
-          A document with its roles and fields, ready to send again. Save one from any envelope's
-          page with “Save as template”.
+    <div className="flex flex-col gap-8">
+      <header className="flex flex-col gap-2">
+        <h1 className="font-medium text-2xl tracking-tight">Templates</h1>
+        <p className="max-w-2xl text-muted-foreground text-sm">
+          {items.length > 0 ? `${pluralize(items.length, "template")}. ` : ""}A document with its
+          roles and fields, ready to send again. Save one from any envelope with “Save as template”.
         </p>
-      </div>
-      <Card>
-        <CardPanel>
-          {items.length === 0 ? (
-            <Empty className="md:py-10">
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <LayoutTemplateIcon aria-hidden />
-                </EmptyMedia>
-                <EmptyTitle>No templates yet</EmptyTitle>
-                <EmptyDescription>
-                  Open an envelope you send often and choose “Save as template”.
-                </EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Template</TableHead>
-                  <TableHead>Roles</TableHead>
-                  <TableHead>Document</TableHead>
-                  <TableHead>Saved by</TableHead>
-                  <TableHead className="w-60">
-                    <span className="sr-only">Actions</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((t) => (
-                  <TableRow key={t.id}>
-                    <TableCell>
-                      <div className="font-medium">{t.name}</div>
-                      {t.description && (
-                        <div className="max-w-80 truncate text-muted-foreground text-xs">
-                          {t.description}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {t.roles.map((r) => (
-                          <Badge key={r.label} variant="outline">
-                            {r.label}
-                          </Badge>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {t.document.name} · {t._count.fields}{" "}
-                      {t._count.fields === 1 ? "field" : "fields"}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{t.createdBy.name}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-end gap-1">
-                        <Button size="sm" render={<Link href={`/templates/${t.id}/use`} />}>
-                          Use
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          render={<Link href={`/templates/${t.id}/bulk`} />}
-                        >
-                          Bulk send
-                        </Button>
-                        {t.permissions.manage && <TemplateRowActions template={t} />}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardPanel>
-      </Card>
+      </header>
+
+      {items.length === 0 ? (
+        <Panel>
+          <EmptyState
+            className="md:py-10"
+            icon={<LayoutTemplateIcon aria-hidden />}
+            title="No templates yet"
+            description="Open an envelope you send often and choose “Save as template”."
+            action={<ButtonLink href="/envelopes">Go to envelopes</ButtonLink>}
+          />
+        </Panel>
+      ) : (
+        <TemplatesTable
+          rows={items.map((t) => ({
+            id: t.id,
+            name: t.name,
+            description: t.description,
+            roles: t.roles.map((r) => r.label),
+            fields: t._count.fields,
+            document: t.document.name,
+            savedBy: t.createdBy.name,
+            savedAt: t.createdAt,
+            savedLabel: formatDate(new Date(t.createdAt)),
+            canManage: t.permissions.manage,
+          }))}
+        />
+      )}
+
       {batches.length > 0 && (
-        <Card>
-          <CardPanel>
-            <p className="pb-3 font-medium text-sm">Recent bulk sends</p>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Batch</TableHead>
-                  <TableHead>Progress</TableHead>
-                  <TableHead>Started</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {batches.map((b) => (
-                  <TableRow key={b.id}>
-                    <TableCell>
-                      <Link href={`/bulk-sends/${b.id}`} className="font-medium hover:underline">
-                        {b.title}
-                      </Link>
-                      <div className="text-muted-foreground text-xs">
-                        {b.template?.name ?? "Deleted template"}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {b.sent}/{b.total} sent{b.failed > 0 ? `, ${b.failed} failed` : ""}
-                      {b.status !== "DONE" ? " · in progress" : ""}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {when.format(new Date(b.createdAt))}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardPanel>
-        </Card>
+        <section aria-labelledby="bulk-heading" className="flex flex-col gap-3">
+          <h2 id="bulk-heading" className="font-medium text-sm">
+            Recent bulk sends
+          </h2>
+          <BulkSendsTable
+            rows={batches.map((b) => ({
+              id: b.id,
+              template: b.template?.name ?? "Deleted template",
+              title: b.title,
+              sent: b.sent,
+              total: b.total,
+              failed: b.failed,
+              done: b.status === "DONE",
+              startedAt: b.createdAt,
+              startedLabel: formatDate(new Date(b.createdAt)),
+            }))}
+          />
+        </section>
       )}
     </div>
   )

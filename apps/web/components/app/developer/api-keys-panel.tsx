@@ -6,40 +6,18 @@ import {
   type ApiKeyScope,
   CreateApiKeySchema,
 } from "@sahihi/core"
-import { KeyRoundIcon, PlusIcon } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { ConfirmDialog, DialogActions } from "@/components/app/confirm-dialog"
+import { KeyRoundIcon, PlusIcon } from "@/components/app/icons"
+import { toastManager } from "@/components/app/toast"
 import { SecretReveal } from "@/components/app/webhooks/secret-reveal"
-import {
-  AlertDialog,
-  AlertDialogClose,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogPopup,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { CheckboxGroup } from "@/components/ui/checkbox-group"
-import {
-  Dialog,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogPanel,
-  DialogPopup,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Field, FieldError, FieldLabel } from "@/components/ui/field"
-import { Form } from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Spinner } from "@/components/ui/spinner"
+import { Badge } from "@/components/arc/badge/badge"
+import { Button } from "@/components/arc/button/button"
+import { Checkbox } from "@/components/arc/checkbox/checkbox"
+import { Dialog, DialogContent, DialogTrigger } from "@/components/arc/dialog/dialog"
+import { Input } from "@/components/arc/input/input"
+import { RadioGroup } from "@/components/arc/radio-group/radio-group"
 import {
   Table,
   TableBody,
@@ -48,9 +26,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { toastManager } from "@/components/ui/toast"
 import { api } from "@/lib/api"
 import { type FormErrors, issuesToFormErrors } from "@/lib/envelope-form"
+import { formatDate } from "@/lib/format"
 
 export interface ApiKeyRow {
   id: string
@@ -64,7 +42,6 @@ export interface ApiKeyRow {
   createdBy: { name: string }
 }
 
-const day = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: "Africa/Nairobi" })
 const EXPIRY = [
   { value: "never", label: "Never" },
   { value: "30", label: "In 30 days" },
@@ -73,10 +50,10 @@ const EXPIRY = [
 ]
 
 function keyStatus(k: ApiKeyRow) {
-  if (k.revokedAt) return { label: "Revoked", variant: "secondary" as const }
+  if (k.revokedAt) return { label: "Revoked", tone: "neutral" as const }
   if (k.expiresAt && new Date(k.expiresAt) <= new Date())
-    return { label: "Expired", variant: "secondary" as const }
-  return { label: "Active", variant: "success" as const }
+    return { label: "Expired", tone: "neutral" as const }
+  return { label: "Active", tone: "success" as const }
 }
 
 /** Public API keys (docs/public-api.md): create (shown once), list, revoke. */
@@ -108,24 +85,26 @@ export function ApiKeysPanel({ keys }: { keys: ApiKeyRow[] }) {
                     <div className="font-medium">{k.name}</div>
                     <div className="font-mono text-muted-foreground text-xs">{k.hint}</div>
                     <div className="text-muted-foreground text-xs">
-                      by {k.createdBy.name}, {day.format(new Date(k.createdAt))}
-                      {k.expiresAt ? ` · expires ${day.format(new Date(k.expiresAt))}` : ""}
+                      by {k.createdBy.name}, {formatDate(new Date(k.createdAt))}
+                      {k.expiresAt ? ` · expires ${formatDate(new Date(k.expiresAt))}` : ""}
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex max-w-72 flex-wrap gap-1">
                       {k.scopes.map((s) => (
-                        <Badge key={s} variant="outline" className="font-mono">
-                          {s}
+                        <Badge key={s} size="sm">
+                          <span className="font-mono">{s}</span>
                         </Badge>
                       ))}
                     </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs">
-                    {k.lastUsedAt ? day.format(new Date(k.lastUsedAt)) : "Never"}
+                    {k.lastUsedAt ? formatDate(new Date(k.lastUsedAt)) : "Never"}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={status.variant}>{status.label}</Badge>
+                    <Badge tone={status.tone} size="sm">
+                      {status.label}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     {status.label === "Active" && <RevokeKey id={k.id} name={k.name} />}
@@ -189,93 +168,80 @@ function CreateKeyDialog() {
 
   return (
     <Dialog open={open} onOpenChange={change}>
-      <DialogTrigger render={<Button />}>
-        <PlusIcon aria-hidden />
-        Create API key
+      <DialogTrigger asChild>
+        <Button>
+          <PlusIcon aria-hidden />
+          Create API key
+        </Button>
       </DialogTrigger>
-      <DialogPopup className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Create an API key</DialogTitle>
-          <DialogDescription>
-            For your own systems to call the Sahihi API. Give each system its own key with only the
-            permissions it needs.
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent
+        title={key ? "Copy your API key" : "Create an API key"}
+        description="For your own systems to call the Sahihi API. Give each system its own key with only the permissions it needs."
+      >
         {key ? (
-          <>
-            <DialogPanel>
-              <SecretReveal
-                secret={key}
-                label="API key"
-                hint="Store it in your system's secret manager; never in browser code."
-              />
-            </DialogPanel>
-            <DialogFooter>
+          <div className="flex flex-col gap-4">
+            <SecretReveal
+              secret={key}
+              label="API key"
+              hint="Store it in your system's secret manager; never in browser code."
+            />
+            <DialogActions>
               <Button onClick={() => setOpen(false)}>Done</Button>
-            </DialogFooter>
-          </>
+            </DialogActions>
+          </div>
         ) : (
-          <Form errors={errors} onSubmit={onSubmit} className="contents">
-            <DialogPanel className="flex flex-col gap-5">
-              <Field name="name">
-                <FieldLabel>Name</FieldLabel>
-                <Input
-                  value={name}
-                  maxLength={80}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Customer portal"
+          <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
+            <Input
+              label="Name"
+              name="name"
+              value={name}
+              maxLength={80}
+              error={errors.name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="For example, customer portal"
+            />
+            <fieldset className="flex flex-col gap-3">
+              <legend className="pb-3 font-medium text-sm">Permissions</legend>
+              {API_KEY_SCOPES.map((s: ApiKeyScope) => (
+                <Checkbox
+                  key={s}
+                  name="scopes"
+                  value={s}
+                  label={s}
+                  description={API_KEY_SCOPE_DESCRIPTIONS[s]}
+                  checked={scopes.includes(s)}
+                  onCheckedChange={(checked) =>
+                    setScopes((all) =>
+                      checked === true ? [...all, s] : all.filter((x) => x !== s),
+                    )
+                  }
                 />
-                <FieldError />
-              </Field>
-              <Field name="scopes">
-                <FieldLabel>Permissions</FieldLabel>
-                <CheckboxGroup value={scopes} onValueChange={(v) => setScopes(v as string[])}>
-                  {API_KEY_SCOPES.map((s: ApiKeyScope) => (
-                    <Label key={s} className="flex items-start gap-2 font-normal">
-                      <Checkbox name="scopes" value={s} />
-                      <span className="flex flex-col">
-                        <span className="font-mono text-xs">{s}</span>
-                        <span className="text-muted-foreground text-xs">
-                          {API_KEY_SCOPE_DESCRIPTIONS[s]}
-                        </span>
-                      </span>
-                    </Label>
-                  ))}
-                </CheckboxGroup>
-                <FieldError />
-              </Field>
-              <Field name="expiresInDays">
-                <FieldLabel>Expires</FieldLabel>
-                <Select
-                  items={EXPIRY}
-                  value={expiry}
-                  onValueChange={(v) => v && setExpiry(String(v))}
-                >
-                  <SelectTrigger className="w-full sm:w-56">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectPopup>
-                    {EXPIRY.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>
-                        {o.label}
-                      </SelectItem>
-                    ))}
-                  </SelectPopup>
-                </Select>
-              </Field>
-            </DialogPanel>
-            <DialogFooter>
+              ))}
+              {errors.scopes && (
+                <p role="alert" className="text-destructive-foreground text-sm">
+                  {errors.scopes}
+                </p>
+              )}
+            </fieldset>
+            <RadioGroup
+              label="Expires"
+              name="expiresInDays"
+              options={EXPIRY}
+              value={expiry}
+              onValueChange={setExpiry}
+            />
+            <DialogActions>
               <Button variant="ghost" type="button" disabled={busy} onClick={() => change(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={busy}>
-                {busy ? <Spinner aria-hidden /> : <KeyRoundIcon aria-hidden />}
+              <Button type="submit" loading={busy}>
+                <KeyRoundIcon aria-hidden />
                 Create key
               </Button>
-            </DialogFooter>
-          </Form>
+            </DialogActions>
+          </form>
         )}
-      </DialogPopup>
+      </DialogContent>
     </Dialog>
   )
 }
@@ -283,12 +249,9 @@ function CreateKeyDialog() {
 function RevokeKey({ id, name }: { id: string; name: string }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [busy, setBusy] = useState(false)
   async function revoke() {
-    setBusy(true)
     try {
       await api(`/api-keys/${id}`, { method: "DELETE" })
-      setOpen(false)
       toastManager.add({ title: `“${name}” revoked`, type: "success" })
       router.refresh()
     } catch (err) {
@@ -297,30 +260,22 @@ function RevokeKey({ id, name }: { id: string; name: string }) {
         description: err instanceof Error ? err.message : undefined,
         type: "error",
       })
-    } finally {
-      setBusy(false)
+      throw err
     }
   }
   return (
-    <AlertDialog open={open} onOpenChange={(o) => !busy && setOpen(o)}>
-      <AlertDialogTrigger render={<Button variant="ghost" size="sm" />}>Revoke</AlertDialogTrigger>
-      <AlertDialogPopup>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Revoke “{name}”?</AlertDialogTitle>
-          <AlertDialogDescription>
-            Requests with this key fail immediately. Systems using it need a new key.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="ghost" disabled={busy} />}>
-            Cancel
-          </AlertDialogClose>
-          <Button variant="destructive" onClick={revoke} disabled={busy}>
-            {busy && <Spinner aria-hidden />}
-            Revoke key
-          </Button>
-        </AlertDialogFooter>
-      </AlertDialogPopup>
-    </AlertDialog>
+    <>
+      <Button variant="ghost" size="sm" onClick={() => setOpen(true)}>
+        Revoke
+      </Button>
+      <ConfirmDialog
+        open={open}
+        onOpenChange={setOpen}
+        title={`Revoke “${name}”?`}
+        description="Requests with this key fail immediately. Systems using it need a new key."
+        confirmLabel="Revoke key"
+        onConfirm={revoke}
+      />
+    </>
   )
 }

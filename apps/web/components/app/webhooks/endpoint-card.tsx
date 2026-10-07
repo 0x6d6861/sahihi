@@ -1,32 +1,22 @@
 "use client"
 
 import type { WebhookDeliveryStatus } from "@sahihi/core"
+import { useRouter } from "next/navigation"
+import { useState } from "react"
+import { ConfirmDialog, DialogActions } from "@/components/app/confirm-dialog"
 import {
-  EllipsisIcon,
   KeyRoundIcon,
   PencilIcon,
   RotateCwIcon,
   SendIcon,
   Trash2Icon,
-} from "lucide-react"
-import { useRouter } from "next/navigation"
-import { useState } from "react"
-import {
-  AlertDialog,
-  AlertDialogClose,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogPopup,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardDescription, CardHeader, CardPanel, CardTitle } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
-import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@/components/ui/menu"
-import { Spinner } from "@/components/ui/spinner"
-import { Switch } from "@/components/ui/switch"
+} from "@/components/app/icons"
+import { toastManager } from "@/components/app/toast"
+import { Badge } from "@/components/arc/badge/badge"
+import { Button as ArcButton } from "@/components/arc/button/button"
+import { Dialog, DialogContent } from "@/components/arc/dialog/dialog"
+import { DropdownMenu } from "@/components/arc/dropdown-menu/dropdown-menu"
+import { Switch } from "@/components/arc/switch/switch"
 import {
   Table,
   TableBody,
@@ -35,8 +25,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { toastManager } from "@/components/ui/toast"
 import { api } from "@/lib/api"
+import { formatDateTime } from "@/lib/format"
 import { DELIVERY_BADGE, deliveryOutcome, maskedSecret } from "@/lib/webhooks"
 import { SecretReveal } from "./secret-reveal"
 import { WebhookFormDialog } from "./webhook-form-dialog"
@@ -61,12 +51,6 @@ export interface WebhookEndpointRow {
   secretHint: string
   deliveries: WebhookDeliveryRow[]
 }
-
-const when = new Intl.DateTimeFormat("en-GB", {
-  dateStyle: "medium",
-  timeStyle: "short",
-  timeZone: "Africa/Nairobi",
-})
 
 const fail = (title: string, err: unknown) =>
   toastManager.add({
@@ -118,7 +102,6 @@ export function EndpointCard({ endpoint }: { endpoint: WebhookEndpointRow }) {
     )
 
   async function rotate() {
-    setBusy(true)
     try {
       const res = await api<{ secret: string }>(`/webhooks/${endpoint.id}/rotate-secret`, {
         method: "POST",
@@ -127,76 +110,66 @@ export function EndpointCard({ endpoint }: { endpoint: WebhookEndpointRow }) {
       router.refresh()
     } catch (err) {
       fail("Secret not rotated", err)
-      setConfirm(null)
-    } finally {
-      setBusy(false)
+      throw err
     }
   }
 
   async function remove() {
-    if (
-      await run(
-        () => api(`/webhooks/${endpoint.id}`, { method: "DELETE" }),
-        "Webhook deleted",
-        "Not deleted",
-      )
+    const ok = await run(
+      () => api(`/webhooks/${endpoint.id}`, { method: "DELETE" }),
+      "Webhook deleted",
+      "Not deleted",
     )
-      setConfirm(null)
+    if (!ok) throw new Error("Not deleted")
   }
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
+    <section className="flex flex-col gap-5 rounded-2xl border bg-card p-6">
+      <header className="flex flex-row flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
-          <CardTitle className="truncate font-mono text-sm">{endpoint.url}</CardTitle>
-          <CardDescription>
+          <h3 className="truncate font-medium font-mono text-sm">{endpoint.url}</h3>
+          <p className="text-muted-foreground text-sm">
             {endpoint.description ? `${endpoint.description} · ` : ""}Secret{" "}
             <span className="font-mono">{maskedSecret(endpoint.secretHint)}</span>
-          </CardDescription>
+          </p>
           <div className="flex flex-wrap gap-1 pt-1">
             {endpoint.events.map((e) => (
-              <Badge key={e} variant="outline" className="font-mono">
-                {e}
+              <Badge key={e} size="sm">
+                <span className="font-mono">{e}</span>
               </Badge>
             ))}
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Label className="flex items-center gap-2 font-normal">
-            <Switch checked={endpoint.enabled} disabled={busy} onCheckedChange={toggle} />
-            {endpoint.enabled ? "Active" : "Paused"}
-          </Label>
-          <Menu>
-            <MenuTrigger
-              render={
-                <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${endpoint.url}`} />
-              }
-            >
-              {busy ? <Spinner aria-hidden /> : <EllipsisIcon aria-hidden />}
-            </MenuTrigger>
-            <MenuPopup align="end">
-              <MenuItem onClick={test}>
-                <SendIcon aria-hidden />
-                Send test event
-              </MenuItem>
-              <MenuItem onClick={() => setEditing(true)}>
-                <PencilIcon aria-hidden />
-                Edit
-              </MenuItem>
-              <MenuItem onClick={() => setConfirm("rotate")}>
-                <KeyRoundIcon aria-hidden />
-                Rotate secret
-              </MenuItem>
-              <MenuSeparator />
-              <MenuItem variant="destructive" onClick={() => setConfirm("delete")}>
-                <Trash2Icon aria-hidden />
-                Delete
-              </MenuItem>
-            </MenuPopup>
-          </Menu>
+          {/* Applies immediately, so a switch (Arc), not a checkbox. */}
+          <Switch
+            label={endpoint.enabled ? "Active" : "Paused"}
+            checked={endpoint.enabled}
+            disabled={busy}
+            onCheckedChange={toggle}
+          />
+          <DropdownMenu
+            label="Actions"
+            items={[
+              { label: "Send test event", icon: <SendIcon />, disabled: busy, onSelect: test },
+              { label: "Edit", icon: <PencilIcon />, onSelect: () => setEditing(true) },
+              {
+                label: "Rotate secret",
+                icon: <KeyRoundIcon />,
+                onSelect: () => setConfirm("rotate"),
+              },
+              {
+                label: "Delete",
+                icon: <Trash2Icon />,
+                destructive: true,
+                separatorBefore: true,
+                onSelect: () => setConfirm("delete"),
+              },
+            ]}
+          />
         </div>
-      </CardHeader>
-      <CardPanel>
+      </header>
+      <div>
         {endpoint.deliveries.length === 0 ? (
           <p className="text-muted-foreground text-sm">
             No deliveries yet. Send a test event to check the endpoint.
@@ -221,25 +194,27 @@ export function EndpointCard({ endpoint }: { endpoint: WebhookEndpointRow }) {
                   <TableRow key={d.id}>
                     <TableCell className="font-mono text-xs">{d.type}</TableCell>
                     <TableCell>
-                      <Badge variant={badge.variant}>{badge.label}</Badge>
+                      <Badge tone={badge.tone} size="sm">
+                        {badge.label}
+                      </Badge>
                     </TableCell>
                     <TableCell className="max-w-72 truncate text-muted-foreground text-xs">
                       {deliveryOutcome(d)}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-xs">
-                      {when.format(new Date(d.createdAt))}
+                      {formatDateTime(new Date(d.createdAt))}
                     </TableCell>
                     <TableCell>
                       {d.status === "FAILED" && (
-                        <Button
+                        <ArcButton
                           variant="ghost"
-                          size="icon-sm"
-                          aria-label={`Retry ${d.type}`}
+                          size="sm"
                           disabled={busy}
                           onClick={() => retry(d.id)}
                         >
                           <RotateCwIcon aria-hidden />
-                        </Button>
+                          Retry
+                        </ArcButton>
                       )}
                     </TableCell>
                   </TableRow>
@@ -248,62 +223,50 @@ export function EndpointCard({ endpoint }: { endpoint: WebhookEndpointRow }) {
             </TableBody>
           </Table>
         )}
-      </CardPanel>
+      </div>
 
       <WebhookFormDialog open={editing} onOpenChange={setEditing} initial={endpoint} />
 
-      <AlertDialog
-        open={confirm !== null}
+      <ConfirmDialog
+        open={confirm === "delete"}
+        onOpenChange={(o) => !o && setConfirm(null)}
+        title="Delete this webhook?"
+        description="Sahihi stops sending events to this URL and its delivery history is removed."
+        confirmLabel="Delete webhook"
+        onConfirm={remove}
+      />
+      <ConfirmDialog
+        open={confirm === "rotate" && newSecret === null}
+        onOpenChange={(o) => !o && setConfirm(null)}
+        title="Rotate the signing secret?"
+        description="The current secret stops working immediately. Update your receiver with the new one right away."
+        confirmLabel="Rotate secret"
+        tone="primary"
+        onConfirm={rotate}
+      />
+      <Dialog
+        open={newSecret !== null}
         onOpenChange={(o) => {
-          if (busy) return
           if (!o) {
             setConfirm(null)
             setNewSecret(null)
           }
         }}
       >
-        <AlertDialogPopup>
-          {newSecret ? (
-            <>
-              <AlertDialogHeader>
-                <AlertDialogTitle>New signing secret</AlertDialogTitle>
-              </AlertDialogHeader>
-              <div className="px-6">
-                <SecretReveal secret={newSecret} />
-              </div>
-              <AlertDialogFooter>
-                <AlertDialogClose render={<Button />}>Done</AlertDialogClose>
-              </AlertDialogFooter>
-            </>
-          ) : (
-            <>
-              <AlertDialogHeader>
-                <AlertDialogTitle>
-                  {confirm === "delete" ? "Delete this webhook?" : "Rotate the signing secret?"}
-                </AlertDialogTitle>
-                <AlertDialogDescription>
-                  {confirm === "delete"
-                    ? "Sahihi stops sending events to this URL and its delivery history is removed."
-                    : "The current secret stops working immediately. Update your receiver with the new one right away."}
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogClose render={<Button variant="ghost" disabled={busy} />}>
-                  Cancel
-                </AlertDialogClose>
-                <Button
-                  variant={confirm === "delete" ? "destructive" : "default"}
-                  disabled={busy}
-                  onClick={confirm === "delete" ? remove : rotate}
-                >
-                  {busy && <Spinner aria-hidden />}
-                  {confirm === "delete" ? "Delete webhook" : "Rotate secret"}
-                </Button>
-              </AlertDialogFooter>
-            </>
-          )}
-        </AlertDialogPopup>
-      </AlertDialog>
-    </Card>
+        <DialogContent title="New signing secret">
+          {newSecret && <SecretReveal secret={newSecret} />}
+          <DialogActions>
+            <ArcButton
+              onClick={() => {
+                setConfirm(null)
+                setNewSecret(null)
+              }}
+            >
+              Done
+            </ArcButton>
+          </DialogActions>
+        </DialogContent>
+      </Dialog>
+    </section>
   )
 }

@@ -1,11 +1,11 @@
 "use client"
 
-import { DownloadIcon, PackageIcon } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Spinner } from "@/components/ui/spinner"
+import { DownloadIcon, PackageIcon } from "@/components/app/icons"
+import { toastManager } from "@/components/app/toast"
+import { Badge } from "@/components/arc/badge/badge"
+import { Button } from "@/components/arc/button/button"
 import {
   Table,
   TableBody,
@@ -14,9 +14,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { toastManager } from "@/components/ui/toast"
 import { api } from "@/lib/api"
 import { exportStatus, formatBytes } from "@/lib/data"
+import { formatDateTime } from "@/lib/format"
 
 export interface ExportRow {
   id: string
@@ -29,12 +29,6 @@ export interface ExportRow {
   downloadable: boolean
   requestedBy: { name: string }
 }
-
-const when = new Intl.DateTimeFormat("en-GB", {
-  dateStyle: "medium",
-  timeStyle: "short",
-  timeZone: "Africa/Nairobi",
-})
 
 /** Request and download workspace exports (docs/data-retention.md → Export). */
 export function ExportsPanel({ exports }: { exports: ExportRow[] }) {
@@ -79,9 +73,9 @@ export function ExportsPanel({ exports }: { exports: ExportRow[] }) {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <Button onClick={request} disabled={busy || pending}>
-          {busy || pending ? <Spinner aria-hidden /> : <PackageIcon aria-hidden />}
-          {pending ? "Preparing export…" : "Export all envelopes"}
+        <Button variant="secondary" onClick={request} loading={busy} disabled={pending}>
+          <PackageIcon aria-hidden />
+          {pending ? "Preparing export" : "Export all envelopes"}
         </Button>
       </div>
       {exports.length > 0 && (
@@ -102,11 +96,13 @@ export function ExportsPanel({ exports }: { exports: ExportRow[] }) {
               return (
                 <TableRow key={x.id}>
                   <TableCell>
-                    <div>{when.format(new Date(x.createdAt))}</div>
+                    <div>{formatDateTime(new Date(x.createdAt))}</div>
                     <div className="text-muted-foreground text-xs">by {x.requestedBy.name}</div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={status.variant}>{status.label}</Badge>
+                    <Badge tone={status.tone} size="sm">
+                      {status.label}
+                    </Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs">
                     {x.status === "READY"
@@ -115,13 +111,9 @@ export function ExportsPanel({ exports }: { exports: ExportRow[] }) {
                   </TableCell>
                   <TableCell>
                     {x.downloadable && (
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label="Download export"
-                        onClick={() => download(x.id)}
-                      >
+                      <Button variant="ghost" size="sm" onClick={() => download(x.id)}>
                         <DownloadIcon aria-hidden />
+                        Download
                       </Button>
                     )}
                   </TableCell>
