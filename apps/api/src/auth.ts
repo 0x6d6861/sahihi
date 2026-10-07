@@ -72,7 +72,8 @@ export const auth = betterAuth({
         // The picture is uploaded through PUT /api/me/avatar, which sets `image` to our own URL.
         // Refusing it here keeps `update-user` from pointing it anywhere else.
         before: async (user, ctx) => {
-          if (ctx && "image" in user) {
+          // better-auth passes `image: undefined` on updates that don't touch it (a name change).
+          if (ctx && "image" in user && user.image !== undefined) {
             throw new APIError("BAD_REQUEST", { message: "Upload a picture in Settings → Profile" })
           }
         },
