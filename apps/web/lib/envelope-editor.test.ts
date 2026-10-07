@@ -7,14 +7,13 @@ import {
   nextStep,
   resolveStep,
   stepEnabled,
+  stepHint,
   stepNumber,
-  stepProgress,
 } from "./envelope-editor"
 
 describe("editor steps", () => {
   test("numbers and progress follow the step order", () => {
     expect(EDITOR_STEPS.map(stepNumber)).toEqual([1, 2, 3, 4])
-    expect(EDITOR_STEPS.map(stepProgress)).toEqual([25, 50, 75, 100])
   })
   test("next step, none after the last", () => {
     expect(nextStep("document")).toBe("recipients")
@@ -62,5 +61,13 @@ describe("fieldSummary", () => {
       "Signature ×2 · Date signed",
     )
     expect(fieldSummary([])).toBe("")
+  })
+})
+
+describe("stepHint", () => {
+  test("what the step is for, or why it's closed", () => {
+    expect(stepHint("recipients", false)).toBe("Who signs, approves or gets a copy")
+    expect(stepHint("fields", false)).toBe("Add a signer or approver first")
+    expect(stepHint("fields", true)).toBe("Place fields on the pages for each recipient")
   })
 })

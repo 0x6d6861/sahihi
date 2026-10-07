@@ -201,12 +201,6 @@ export function SendButton() {
   )
 }
 
-/** Run the send check from elsewhere (the rail's quick action). */
-export function useSendCheck() {
-  const { check, busy } = useSend()
-  return { check, busy }
-}
-
 /** Preflight problems, each with a Fix that opens the step that fixes it. */
 export function SendProblems() {
   const { problems, onFix } = useSend()

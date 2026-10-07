@@ -95,10 +95,11 @@ which issues links (raw token returned, hash stored), sets recipient `SENT`, and
 
 Link lifetime is `min(now + SIGNING_LINK_TTL_DAYS, envelope.expiresAt)`.
 
-Web: an editable draft opens in the **draft editor**, full bleed inside the app shell
-(`app/(app)/envelopes/[id]/edit/`, ADR 0021); `/envelopes/:id` redirects it there and shows everything else read-only. The editor's
-left rail has four steps in `?step=` (Prepare document, optional, ADR 0024 → Recipients → Add fields →
-Preview) and quick actions; the top bar has **Send**. Send first settles the draft editors
+Web: an editable draft opens in the **draft editor**, a full page without the app's bar
+(`app/(app)/envelopes/[id]/edit/`, ADR 0021, ADR 0031); `/envelopes/:id` redirects it there and
+shows everything else read-only. The editor's own top bar has the four steps as a pill, in
+`?step=` (Document, optional, ADR 0024 → Recipients → Fields → Preview), an **Actions** menu (save
+as template, download original, open document, activity) and **Send**. Send first settles the draft editors
 (`components/app/envelope/draft-state.tsx`): the field autosave is flushed, and unsaved recipient
 edits block with a message. It then calls `preflight` and lists the issues inline in an `Alert`,
 each with a **Fix** link to the step that fixes it. Only a clean preflight opens **Review & send**

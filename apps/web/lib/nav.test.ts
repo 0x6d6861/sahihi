@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { initials, isFullBleed, isNavActive } from "./nav"
+import { initials, isFullPage, isNavActive } from "./nav"
 
 describe("isNavActive", () => {
   test("matches the section and pages below it", () => {
@@ -12,16 +12,16 @@ describe("isNavActive", () => {
   })
 })
 
-describe("isFullBleed", () => {
+describe("isFullPage", () => {
   test("the draft envelope editor", () => {
-    expect(isFullBleed("/envelopes/abc/edit")).toBe(true)
-    expect(isFullBleed("/envelopes/abc/edit/")).toBe(true)
+    expect(isFullPage("/envelopes/abc/edit")).toBe(true)
+    expect(isFullPage("/envelopes/abc/edit/")).toBe(true)
   })
   test("not the other app pages", () => {
-    expect(isFullBleed("/envelopes")).toBe(false)
-    expect(isFullBleed("/envelopes/abc")).toBe(false)
-    expect(isFullBleed("/envelopes/new")).toBe(false)
-    expect(isFullBleed("/templates/abc/edit")).toBe(false)
+    expect(isFullPage("/envelopes")).toBe(false)
+    expect(isFullPage("/envelopes/abc")).toBe(false)
+    expect(isFullPage("/envelopes/new")).toBe(false)
+    expect(isFullPage("/templates/abc/edit")).toBe(false)
   })
 })
 
