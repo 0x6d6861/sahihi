@@ -159,6 +159,7 @@ org/{orgId}/envelopes/{envelopeId}/certificate.pdf
 org/{orgId}/exports/{exportId}.zip
 org/{orgId}/branding/logo-{version}.png      (public via /api/branding, docs/auth.md → Logos)
 user/{userId}/{signature|initials}-{version}.png   (saved signature, not workspace data)
+user/{userId}/avatar-{version}.png               (profile picture, via /api/avatars)
 ```
 
 Objects are write-once. `original.pdf` is never overwritten, because its SHA-256 is on the certificate.

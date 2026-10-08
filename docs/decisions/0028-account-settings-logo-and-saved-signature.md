@@ -34,6 +34,9 @@ Constraints:
    The signing page asks `GET /api/me/signatures` and pre-fills the capture dialog only when the
    signed-in user's email equals the recipient's. The signing routes don't change: the PNG is
    submitted as if just drawn, and is stamped and audited the same way.
+5. **Profile pictures are not public.** Same upload pattern as the logo (browser re-encodes,
+   API validates, versioned URL in `User.image`), but `/api/avatars/:userId` needs a session and
+   answers only the user and their workspace mates: a face is personal data, a logo isn't.
 
 ## Consequences
 
@@ -45,4 +48,5 @@ Constraints:
   signing event (IP, user agent, consent) exactly as before.
 - A user who changes email no longer sees their signature offered on envelopes addressed to the old
   address. That's intended.
-- Deleting a user (not offered yet) must also delete `user/{userId}/` in storage.
+- Deleting a user (not offered yet) must also delete `user/{userId}/` in storage (signature,
+  initials, picture).

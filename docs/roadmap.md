@@ -79,7 +79,7 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
 - [x] Playwright E2E: sign-up → upload → place → send → sign (Mailpit) → certificate
 - [x] Observability: structured logs, BullMQ dashboard, error tracking
 - [x] Arc design system: Arc primitives and tokens over coss/Extend, light + dark with a theme switch (ADR 0023, `docs/ui.md`)
-- [x] Account settings: profile (name, email change, saved signature), security (password, TOTP 2FA +
+- [x] Account settings: profile (picture, name, email change, saved signature), security (password, TOTP 2FA +
       backup codes, sessions), workspace (name, logo in emails and signing page, leave) (`docs/auth.md`
       → Account settings, ADR 0028)
 - [ ] Passkeys, delete account, forgot-password pages (`docs/auth.md` → What better-auth offers next)

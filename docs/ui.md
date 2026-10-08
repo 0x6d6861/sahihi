@@ -141,7 +141,7 @@ Arc unless marked coss or Extend.
 | Public signing | Extend `PDFViewer` (lighter; **not** `PDFEditor`) with fields inside `.on-paper` (coss `Checkbox` for checkbox fields, Arc `Popover` + `Input` for text fields), signature dialog (`Dialog`, `Tabs`, `SignaturePad` for Draw, ADR 0008), `OtpInput`, `Checkbox` (consent), `Progress`, `Alert`, `ConfirmDialog` (decline) |
 | Verify | `Panel`, `Badge`, `Alert`, `Input` (code), Extend `FileUpload` (hash locally), coss `Spinner` |
 | Settings shell | `Tabs` (navigates between settings pages) |
-| Settings / profile | `Panel`, `Input` (name), `Badge` + `Dialog` (change email), `SignatureCaptureDialog` (save signature, `on-paper` previews), `ConfirmDialog` (remove) |
+| Settings / profile | `Panel`, `Avatar` (xl) + hidden file input (picture), `Input` (name), `Badge` + `Dialog` (change email), `SignatureCaptureDialog` (save signature, `on-paper` previews), `ConfirmDialog` (remove) |
 | Settings / security | `PasswordField` + `Checkbox` (password), `Badge` + `Dialog` steps with `PasswordField`, QR (`qrcode` data URL on `on-paper`), `OtpInput`, `CopyButton` (2FA, backup codes), coss `Table` + `Badge` (sessions), `ConfirmDialog` |
 | Settings / workspace | `Input` (name), logo preview on `on-paper` + hidden file input, `ConfirmDialog` (remove logo, leave) |
 | Sign in / two-factor | `Panel`, `OtpInput` or `Input` (backup code), `Checkbox` (trust device) |
