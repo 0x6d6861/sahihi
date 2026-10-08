@@ -1,5 +1,6 @@
 import { PrismaPg } from "@prisma/adapter-pg"
 import { PrismaClient } from "./generated/prisma/client"
+import { createSerializedPool } from "./pg-pool"
 
 export { type AppendAuditInput, appendAuditEvent, toChainedEvent } from "./audit"
 export { countEnvelopesSent, countSeats, getOrgPlan, lockOrgQuota } from "./billing"
@@ -13,7 +14,8 @@ const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient }
 
 export function createPrismaClient(connectionString = process.env.DATABASE_URL) {
   if (!connectionString) throw new Error("DATABASE_URL is not set")
-  return new PrismaClient({ adapter: new PrismaPg({ connectionString }) })
+  // Our own pool, so each connection runs one query at a time (see pg-pool.ts).
+  return new PrismaClient({ adapter: new PrismaPg(createSerializedPool(connectionString)) })
 }
 
 /** Process-wide singleton (survives hot reloads in dev). */
