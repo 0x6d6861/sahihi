@@ -1,6 +1,5 @@
 import type { NextConfig } from "next"
-
-const API_URL = process.env.API_URL ?? "http://localhost:4000"
+import { API_URL } from "./lib/api-url"
 
 // proxy.ts allows presigned uploads/downloads only to this origin (CSP connect-src). Without it,
 // uploads and the PDF viewers would be blocked, so refuse to build or start production without it.

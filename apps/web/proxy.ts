@@ -1,5 +1,6 @@
 import { getSessionCookie } from "better-auth/cookies"
 import { type NextRequest, NextResponse } from "next/server"
+import { API_URL } from "@/lib/api-url"
 import { buildCsp, createNonce, isProtectedPath, toOrigin } from "@/lib/csp"
 
 const DEV = process.env.NODE_ENV === "development"
@@ -15,7 +16,6 @@ const ERROR_REPORTING_ORIGIN = toOrigin(process.env.NEXT_PUBLIC_SENTRY_DSN)
  * 2. For app routes, a cheap optimistic session-cookie check. The API re-validates everything.
  *    Public routes: /sign, /verify, auth pages.
  */
-const API_URL = process.env.API_URL ?? "http://localhost:4000"
 const EMBED_PATH = /^\/sign\/([A-Za-z0-9_-]{43})$/
 
 /**

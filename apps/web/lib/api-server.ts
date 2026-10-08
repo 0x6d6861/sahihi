@@ -1,7 +1,6 @@
 import "server-only"
 import { cookies } from "next/headers"
-
-const API_URL = process.env.API_URL ?? "http://localhost:4000"
+import { API_URL } from "./api-url"
 
 /** Server Component / Route Handler fetch to the API with the user's cookies. */
 export async function apiServer<T>(
