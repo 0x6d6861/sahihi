@@ -214,6 +214,9 @@ Implementation (`components/app/signing/`, state in `lib/signing.ts`, pure and t
     closed envelope gets 409 with the reason (`already_done`, `not_their_turn`, `envelope_closed`).
     Another org gets 404.
   - `reminderAvailability()` in `@sahihi/core` decides this for both the API and the UI.
+  - Known risk: the link is rotated in the transaction and the email queued after it. If Redis is
+    down at that moment the request fails, the old link is already dead and no email goes out; the
+    sender can remind again once the cooldown allows. The OTP route has the same shape.
 - **Void**: `POST /:id/void { reason }` is allowed from `SENT` or `IN_PROGRESS`. It clears every
   recipient's `tokenHash`, so old links return `invalid_link`, audits `envelope.voided` and notifies
   recipients.

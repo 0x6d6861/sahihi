@@ -5,6 +5,7 @@ import { stagger } from "@/components/app/motion"
 import { Panel } from "@/components/app/panel"
 import { Alert } from "@/components/arc/alert/alert"
 import { Badge } from "@/components/arc/badge/badge"
+import { API_URL } from "@/lib/api-url"
 import { formatDateTime } from "@/lib/format"
 
 export const metadata: Metadata = { title: "Verify certificate" }
@@ -50,10 +51,7 @@ export default async function VerifyPage({
   const { match } = await searchParams
   const code = normalizeCertificateCode(raw)
   const data: VerifyResponse = code
-    ? ((await fetch(
-        `${process.env.API_URL ?? "http://localhost:4000"}/api/verify/${encodeURIComponent(code)}`,
-        { cache: "no-store" },
-      )
+    ? ((await fetch(`${API_URL}/api/verify/${encodeURIComponent(code)}`, { cache: "no-store" })
         .then((r) => r.json())
         .catch(() => ({ valid: false }))) as VerifyResponse)
     : { valid: false }

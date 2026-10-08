@@ -42,6 +42,7 @@ apps/
   worker/     BullMQ consumers: notifications, envelope finalize, webhooks, maintenance (expire/remind/sweeps/retention/exports)
   web/        Next.js. (auth)/ sign-in/up/onboarding, (app)/ documents+envelopes+templates+bulk-sends+settings,
               sign/[token], verify/[code]
+  e2e/        Playwright journey on its own stack (api :4100, web :3100, worker, DB sahihi_e2e; docs/testing.md)
 packages/
   config/     Env schema (zod) + queue names. The ONLY place process.env is parsed.
   core/       Pure domain logic, no I/O, one folder per domain under src/: envelope/ (state machine, routing),
@@ -127,6 +128,8 @@ the relevant doc in `docs/` is updated if behaviour changed, and the matching ch
 8. **Secrets:** raw signing tokens and OTP codes are never stored or logged. Store only hashes
    (`hashSigningToken`, `hashOtp`). A raw token exists only in a notification job payload and the email.
    Log with `createLogger` (`@sahihi/infra`), not `console`: it redacts fields and masks tokens.
+   One exception: with no SMS provider configured and `NODE_ENV=development`, `sendSms` prints the
+   message (it holds the OTP) to the worker console, as Mailpit shows emails. Never elsewhere.
 9. **The server owns final PDFs:** the browser submits field values only. Stamping, flattening and
    hashing happen in the worker (`@sahihi/pdf`). Original PDFs are immutable once `READY`.
 10. **Coordinates:** `Field.x/y/width/height` are **normalized 0–1, top-left origin, relative to the
@@ -142,9 +145,11 @@ the relevant doc in `docs/` is updated if behaviour changed, and the matching ch
 13. Validate every request body with a zod schema from `@sahihi/core` (`src/shared/schemas.ts`) via `parseJson()`.
     Shared schemas live in core so web forms and the API agree.
 14. Env vars: add them to `packages/config/src/index.ts` **and** `.env.example`. Never read
-    `process.env` elsewhere, with two exceptions: `apps/web` for `API_URL`, `STORAGE_ORIGIN`,
-    `NODE_ENV` and the Sentry DSNs (`SENTRY_*`, `NEXT_PUBLIC_SENTRY_*`, docs/observability.md), and
-    `packages/db/prisma.config.ts` for `MIGRATE_DATABASE_URL` / `DATABASE_URL`.
+    `process.env` elsewhere, with three exceptions: `apps/web` for `API_URL` (`lib/api-url.ts`),
+    `STORAGE_ORIGIN`, `NODE_ENV`, `NEXT_RUNTIME` and the Sentry DSNs (`SENTRY_*`,
+    `NEXT_PUBLIC_SENTRY_*`, docs/observability.md); `packages/db/prisma.config.ts` for
+    `MIGRATE_DATABASE_URL` / `DATABASE_URL`; and `packages/db/src/index.ts` for `DATABASE_URL` and
+    `NODE_ENV`, so the shared client works in scripts and test preloads without the full server env.
 15. Prisma enums must mirror the unions in `packages/core/src/shared/enums.ts`. `packages/db/src/enums.test.ts`
     enforces this, so update both.
 16. When you change better-auth plugins, run `bun run auth:schema` and reconcile section 1 of
