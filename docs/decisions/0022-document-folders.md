@@ -1,6 +1,6 @@
 # 0022: Document folders on the Documents page
 
-- **Status:** accepted
+- **Status:** accepted (extended by 0038: folders also hold envelopes and templates)
 - **Date:** 2026-10-07
 
 ## Context
