@@ -1,5 +1,5 @@
 import { getEnv } from "@sahihi/config"
-import { abandonedUploadCutoff } from "@sahihi/core"
+import { abandonedUploadCutoff, canTransition } from "@sahihi/core"
 import {
   appendAuditEvent,
   issueSigningLink,
@@ -24,8 +24,12 @@ export async function expireEnvelopes() {
   })
   for (const { id } of overdue) {
     const webhooks = await prisma.$transaction(async (tx) => {
+      // The state machine decides (rule 6); the guarded update loses cleanly to a concurrent
+      // sign, decline or void.
+      const current = await tx.envelope.findUnique({ where: { id }, select: { status: true } })
+      if (!current || !canTransition(current.status, "EXPIRED")) return []
       const res = await tx.envelope.updateMany({
-        where: { id, status: { in: ["SENT", "IN_PROGRESS"] } },
+        where: { id, status: current.status },
         data: { status: "EXPIRED" },
       })
       if (res.count === 0) return []

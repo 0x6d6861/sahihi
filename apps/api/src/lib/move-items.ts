@@ -4,6 +4,7 @@ import {
   canManageTemplate,
   canMoveDocument,
   checkFoldersMove,
+  isInsideMovingFolder,
   MAX_FOLDER_DEPTH,
   type MovableKind,
 } from "@sahihi/core"
@@ -15,7 +16,8 @@ import { badRequest, forbidden, notFound } from "./http"
 import { actor } from "./permissions"
 
 /**
- * Moving several documents, envelopes, templates and folders at once (ADR 0039): `POST
+ * Moving several documents, envelopes, templates and folders at once (ADR 0039). Items inside a
+ * folder that is also moving stay in it and travel along. `POST
  * /files/move` and `POST /files/group` share the lookups, the checks and the writes. Every item
  * is loaded through the tenant scope; one that's missing is a 404, one the caller may not move a
  * 403, and nothing moves.
@@ -62,7 +64,18 @@ export async function loadMovableItems(c: Context<AppEnv>, items: readonly ItemR
   for (const t of templates) if (!canManageTemplate(me, t)) refuse(t.name)
   for (const f of folders) if (!canManageFolder(me, f)) refuse(f.name)
 
-  return { tree, documents, envelopes, templates, folders, folderIds }
+  // Picked along with a folder they're in (select-all, a search): they travel with it.
+  const moving = new Set(folderIds)
+  const free = (folderId: string | null) => !isInsideMovingFolder(folderId, moving, tree.parentOf)
+  const topFolders = folders.filter((f) => free(f.parentId))
+  return {
+    tree,
+    documents: documents.filter((d) => free(d.folderId)),
+    envelopes: envelopes.filter((e) => free(e.folderId)),
+    templates: templates.filter((t) => free(t.folderId)),
+    folders: topFolders,
+    folderIds: topFolders.map((f) => f.id),
+  }
 }
 
 export type MovableItems = Awaited<ReturnType<typeof loadMovableItems>>
@@ -105,6 +118,10 @@ export async function moveItems(
     data: { parentId: target },
   })
 }
+
+/** How many items actually moved (those inside a moving folder don't count). */
+export const movedCount = (items: MovableItems) =>
+  items.documents.length + items.envelopes.length + items.templates.length + items.folders.length
 
 /** Where each item was, so the client can undo. */
 export function movedFrom(items: MovableItems) {

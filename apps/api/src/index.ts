@@ -6,7 +6,8 @@ import { log } from "./middleware/request-log"
 const env = getEnv()
 const tracking = initErrorTracking("api")
 const app = createApp()
-const port = Number(process.env.PORT ?? new URL(env.API_URL).port ?? 4000)
+// An URL without an explicit port has `port === ""`, so `||` (not `??`) falls through to 4000.
+const port = env.PORT ?? (Number(new URL(env.API_URL).port) || 4000)
 
 log.info(`api listening on :${port}`, { errorTracking: tracking ? "sentry" : "off" })
 

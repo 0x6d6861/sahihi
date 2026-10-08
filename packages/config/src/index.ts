@@ -11,6 +11,8 @@ const EnvSchema = z.object({
 
   WEB_URL: z.string().url(),
   API_URL: z.string().url(),
+  /** Port the API listens on. Set by the host (Railway); locally it comes from API_URL. */
+  PORT: z.coerce.number().int().positive().optional(),
 
   BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_URL: z.string().url(),

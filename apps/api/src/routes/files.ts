@@ -28,7 +28,13 @@ import {
   templateListInclude,
   templateListItem,
 } from "../lib/list-items"
-import { assertFoldersCanMove, loadMovableItems, movedFrom, moveItems } from "../lib/move-items"
+import {
+  assertFoldersCanMove,
+  loadMovableItems,
+  movedCount,
+  movedFrom,
+  moveItems,
+} from "../lib/move-items"
 import { actor } from "../lib/permissions"
 import { requireOrg } from "../middleware/session"
 
@@ -181,7 +187,7 @@ export const files = new Hono<AppEnv>()
     if (target && !items.tree.byId.has(target)) notFound("Folder")
     assertFoldersCanMove(items.tree, items.folderIds, target)
     await prisma.$transaction((tx) => moveItems(tx, orgId, items, target))
-    return c.json({ moved: input.items.length, from: movedFrom(items) })
+    return c.json({ moved: movedCount(items), from: movedFrom(items) })
   })
 
   /**
@@ -221,5 +227,5 @@ export const files = new Hono<AppEnv>()
       await moveItems(tx, orgId, items, created.id)
       return created
     })
-    return c.json({ folder, moved: input.items.length, from: movedFrom(items) }, 201)
+    return c.json({ folder, moved: movedCount(items), from: movedFrom(items) }, 201)
   })

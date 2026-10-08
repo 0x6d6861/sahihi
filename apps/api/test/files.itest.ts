@@ -211,6 +211,30 @@ describe("POST /api/files/move", () => {
     expect(await where()).toEqual({ document: null })
   })
 
+  test("things picked along with a folder they're in travel with it, not out of it", async () => {
+    const outer = await createFolder(alice, "Outer")
+    const inner = await createFolder(alice, "Inner", outer)
+    const target = await createFolder(alice, "Target")
+    await request(alice, `/api/documents/${documentId}`, {
+      method: "PATCH",
+      json: { folderId: inner },
+    })
+    const res = await move(
+      alice,
+      [
+        { kind: "folder", id: outer },
+        { kind: "folder", id: inner },
+        { kind: "document", id: documentId },
+      ],
+      target,
+    )
+    expect(res.status).toBe(200)
+    expect(((await res.json()) as { moved: number }).moved).toBe(1)
+    expect((await prisma.folder.findUniqueOrThrow({ where: { id: outer } })).parentId).toBe(target)
+    expect((await prisma.folder.findUniqueOrThrow({ where: { id: inner } })).parentId).toBe(outer)
+    expect(await where()).toEqual({ document: inner })
+  })
+
   test("refuses a folder into its own subtree, and moves nothing", async () => {
     const a = await createFolder(alice, "A")
     const b = await createFolder(alice, "B", a)
