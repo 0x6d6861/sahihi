@@ -24,15 +24,15 @@ Integration tests are named `*.itest.ts`, so neither it nor a bare `bun test` pi
 - **`check`** (fast, no services): `bun install --frozen-lockfile` → `db:generate` → `bun run test`
   (the scoped script, not bare `bun test`) → `typecheck` → `lint`. Unit tests must stay
   infra-free.
-- **`integration-e2e`** (after `check`):
-  - Services: Postgres 17, Redis 7 and Mailpit (pinned to v1.31.2) as service containers. MinIO is
-    started with `docker run`, because service containers can't take its `server /data` command,
-    and the bucket is created with aws-cli, like `minio-init`.
-  - Then `bun run test:integration` and `bun run test:e2e`. Chromium is cached per Playwright
-    version.
-  - On failure, the Playwright report and traces are uploaded as an artifact for 7 days.
-  - It was replayed locally with `CI=true` against freshly created databases, and both suites
-    passed.
+- **`integration`** and **`e2e`** (both after `check`, in parallel), so a failure says which suite
+  broke and each reruns on its own:
+  - `integration`: Postgres 17 and Redis 7 as service containers, and MinIO, then
+    `bun run test:integration`.
+  - `e2e`: the same plus Mailpit (pinned to v1.31.2), then `bun run test:e2e`. Chromium is cached
+    per Playwright version. On failure, the Playwright report and traces are uploaded as an
+    artifact for 7 days.
+  - MinIO is started with `docker run` in both, because service containers can't take its
+    `server /data` command, and the bucket is created with aws-cli, like `minio-init`.
 
 ## What must be tested
 
@@ -110,5 +110,5 @@ up another run's email.
 - On failure, the screenshot, video and trace are in `apps/e2e/test-results/`
   (`bunx playwright show-trace …`). Both output folders are gitignored.
 
-In CI it runs in the `integration-e2e` job (below). With `CI` set, Playwright retries once and
+In CI it runs in the `e2e` job (below). With `CI` set, Playwright retries once and
 allows longer timeouts for cold `next dev` compiles.
