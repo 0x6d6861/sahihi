@@ -116,11 +116,9 @@ export async function processBulkSend(bulkSendId: string) {
   const bulk = await prisma.bulkSend.findUnique({ where: { id: bulkSendId } })
   if (!bulk || bulk.status === "DONE") return { skipped: true }
   if (!bulk.templateId) {
-    await prisma.bulkSend.update({
-      where: { id: bulk.id },
-      data: { status: "DONE", completedAt: new Date() },
-    })
-    return { skipped: true, reason: "template deleted" }
+    // Nothing can be sent: every waiting row fails, and the sender is told like any other batch.
+    const done = await finishBulkSend(bulk.id, "The template was deleted before the batch ran")
+    return { skipped: true, reason: "template deleted", sent: done.sent, failed: done.failed }
   }
   await prisma.bulkSend.update({ where: { id: bulk.id }, data: { status: "RUNNING" } })
   const template = await loadTemplate(bulk.templateId, bulk.organizationId)
@@ -174,10 +172,27 @@ export async function processBulkSend(bulkSendId: string) {
       ])
     }
   }
-  const done = await prisma.$transaction(async (tx) => {
+  const done = await finishBulkSend(bulk.id)
+  return { sent: done.sent, failed: done.failed }
+}
+
+/**
+ * Marks the batch DONE and tells its creator (bulk_send.finished), in one transaction. With
+ * `failRemaining`, rows still waiting fail with that message first.
+ */
+async function finishBulkSend(bulkSendId: string, failRemaining?: string) {
+  return prisma.$transaction(async (tx) => {
+    let failed = 0
+    if (failRemaining) {
+      const res = await tx.bulkSendItem.updateMany({
+        where: { bulkSendId, status: "PENDING" },
+        data: { status: "FAILED", error: failRemaining, recipients: Prisma.DbNull },
+      })
+      failed = res.count
+    }
     const done = await tx.bulkSend.update({
-      where: { id: bulk.id },
-      data: { status: "DONE", completedAt: new Date() },
+      where: { id: bulkSendId },
+      data: { status: "DONE", completedAt: new Date(), failed: { increment: failed } },
     })
     await notifyUsers(tx, {
       organizationId: done.organizationId,
@@ -192,5 +207,4 @@ export async function processBulkSend(bulkSendId: string) {
     })
     return done
   })
-  return { sent: done.sent, failed: done.failed }
 }

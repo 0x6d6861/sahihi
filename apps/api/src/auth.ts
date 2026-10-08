@@ -1,7 +1,7 @@
 import { getEnv } from "@sahihi/config"
 import { canAddSeat, orgAc, orgRoles, seatLimitMessage } from "@sahihi/core"
 import { countSeats, getOrgPlan, notifyWorkspaceAdmins, prisma } from "@sahihi/db"
-import { getQueues } from "@sahihi/infra"
+import { createLogger, getQueues } from "@sahihi/infra"
 import { betterAuth } from "better-auth"
 import { prismaAdapter } from "better-auth/adapters/prisma"
 import { APIError } from "better-auth/api"
@@ -15,6 +15,7 @@ import { organization, twoFactor } from "better-auth/plugins"
  * Docs: docs/auth.md
  */
 const env = getEnv()
+const log = createLogger("auth")
 
 const LOGO_MESSAGE = "Upload the logo in Settings → Workspace"
 
@@ -130,14 +131,20 @@ export const auth = betterAuth({
             throw new APIError("FORBIDDEN", { message: seatLimitMessage(plan) })
           }
         },
-        // Bell notification for the workspace's owners and admins (docs/notifications.md).
+        // Bell notification for the workspace's owners and admins (docs/notifications.md). The
+        // membership is already committed by better-auth, so this is best effort: a failure here
+        // must not turn a successful acceptance into an error for the new member.
         afterAcceptInvitation: async ({ member, user, organization }) => {
-          await notifyWorkspaceAdmins(prisma, {
-            organizationId: organization.id,
-            type: "member.joined",
-            exceptUserId: member.userId,
-            data: { memberName: user.name || user.email },
-          })
+          try {
+            await notifyWorkspaceAdmins(prisma, {
+              organizationId: organization.id,
+              type: "member.joined",
+              exceptUserId: member.userId,
+              data: { memberName: user.name || user.email },
+            })
+          } catch (err) {
+            log.warn("member.joined notification not written", { err })
+          }
         },
         // The DB rows cascade; stored files (PDFs, signatures, exports) are removed by the worker
         // (docs/data-retention.md → Deleting a workspace).

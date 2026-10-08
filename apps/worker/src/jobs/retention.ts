@@ -17,6 +17,7 @@ import {
 } from "@sahihi/core"
 import { appendAuditEvent, notifyUsers, prisma, toChainedEvent } from "@sahihi/db"
 import {
+  createLogger,
   deleteObject,
   deletePrefix,
   getObjectBytes,
@@ -25,6 +26,8 @@ import {
   putObjectStream,
 } from "@sahihi/infra"
 import { Zip, ZipPassThrough } from "fflate"
+
+const log = createLogger("retention")
 
 /**
  * Retention, export and deletion (docs/data-retention.md, ADR 0015).
@@ -174,6 +177,7 @@ export async function buildExport(exportId: string) {
   if (job?.status !== "PENDING") return { skipped: true }
   const dir = await mkdtemp(join(tmpdir(), "sahihi-export-"))
   const path = join(dir, "export.zip")
+  let result: { envelopes: number; sizeBytes: number }
   try {
     const envelopes = await prisma.envelope.findMany({
       where: { organizationId: job.organizationId, purgedAt: null, status: { not: "DRAFT" } },
@@ -282,44 +286,54 @@ export async function buildExport(exportId: string) {
     const { size } = await stat(path)
     await putObjectStream(key, createReadStream(path), size, "application/zip")
     const now = new Date()
-    await prisma.$transaction(async (tx) => {
-      await tx.dataExport.update({
-        where: { id: job.id },
-        data: {
-          status: "READY",
-          s3Key: key,
-          sizeBytes: size,
-          envelopeCount: envelopes.length,
-          completedAt: now,
-          expiresAt: new Date(now.getTime() + EXPORT_TTL_DAYS * 24 * 3600 * 1000),
-        },
-      })
-      await notifyUsers(tx, {
-        organizationId: job.organizationId,
-        userIds: [job.requestedById],
-        type: "export.ready",
-        data: { envelopeCount: envelopes.length },
-      })
+    await prisma.dataExport.update({
+      where: { id: job.id },
+      data: {
+        status: "READY",
+        s3Key: key,
+        sizeBytes: size,
+        envelopeCount: envelopes.length,
+        completedAt: now,
+        expiresAt: new Date(now.getTime() + EXPORT_TTL_DAYS * 24 * 3600 * 1000),
+      },
     })
-    return { envelopes: envelopes.length, sizeBytes: size }
+    result = { envelopes: envelopes.length, sizeBytes: size }
   } catch (err) {
-    await prisma.$transaction(async (tx) => {
-      await tx.dataExport.update({
-        where: { id: job.id },
-        data: {
-          status: "FAILED",
-          error: err instanceof Error ? err.message.slice(0, 500) : "Export failed",
-        },
-      })
-      await notifyUsers(tx, {
-        organizationId: job.organizationId,
-        userIds: [job.requestedById],
-        type: "export.failed",
-      })
+    await prisma.dataExport.update({
+      where: { id: job.id },
+      data: {
+        status: "FAILED",
+        error: err instanceof Error ? err.message.slice(0, 500) : "Export failed",
+      },
     })
+    await notifyExport(job, "export.failed")
     throw err
   } finally {
     await rm(dir, { recursive: true, force: true })
+  }
+  await notifyExport(job, "export.ready", { envelopeCount: result.envelopes })
+  return result
+}
+
+/**
+ * Tells the requester how their export went. After the status is saved, not in its transaction: the
+ * archive is already in storage, and a failed notification must not turn a READY export into a
+ * FAILED one. The Data settings page shows the status either way (docs/notifications.md).
+ */
+async function notifyExport(
+  job: { organizationId: string; requestedById: string },
+  type: "export.ready" | "export.failed",
+  data?: { envelopeCount: number },
+) {
+  try {
+    await notifyUsers(prisma, {
+      organizationId: job.organizationId,
+      userIds: [job.requestedById],
+      type,
+      data,
+    })
+  } catch (err) {
+    log.warn("export notification not written", { type, err })
   }
 }
 

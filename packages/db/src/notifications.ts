@@ -28,22 +28,7 @@ export async function notifyUsers(
     data?: NotificationData
   },
 ): Promise<number> {
-  const candidates = [...new Set(input.userIds)]
-  if (candidates.length === 0) return 0
-  const [members, prefs] = await Promise.all([
-    db.member.findMany({
-      where: { organizationId: input.organizationId, userId: { in: candidates } },
-      select: { userId: true },
-    }),
-    db.notificationPreference.findMany({
-      where: { organizationId: input.organizationId, userId: { in: candidates } },
-      select: { userId: true, settings: true },
-    }),
-  ])
-  const settingsOf = new Map(prefs.map((p) => [p.userId, parseNotificationSettings(p.settings)]))
-  const userIds = members
-    .map((m) => m.userId)
-    .filter((id) => isNotificationEnabled(input.type, settingsOf.get(id) ?? {}))
+  const userIds = await wantsNotification(db, input.organizationId, input.userIds, input.type)
   if (userIds.length === 0) return 0
   const data = (input.data ?? {}) as Prisma.InputJsonValue
   const res = await db.notification.createMany({
@@ -58,17 +43,47 @@ export async function notifyUsers(
   return res.count
 }
 
+/** The users among `userIds` who are members of the workspace and have the type turned on. */
+async function wantsNotification(
+  db: Db,
+  organizationId: string,
+  userIds: readonly string[],
+  type: NotificationType,
+): Promise<string[]> {
+  const candidates = [...new Set(userIds)]
+  if (candidates.length === 0) return []
+  const [members, prefs] = await Promise.all([
+    db.member.findMany({
+      where: { organizationId, userId: { in: candidates } },
+      select: { userId: true },
+    }),
+    db.notificationPreference.findMany({
+      where: { organizationId, userId: { in: candidates } },
+      select: { userId: true, settings: true },
+    }),
+  ])
+  const settingsOf = new Map(prefs.map((p) => [p.userId, parseNotificationSettings(p.settings)]))
+  return members
+    .map((m) => m.userId)
+    .filter((id) => isNotificationEnabled(type, settingsOf.get(id) ?? {}))
+}
+
 /**
- * Notifies the person who created the envelope. Adds the envelope title (and the recipient's name
- * when `recipientId` is given) to `data`. `exceptUserId` skips them when they caused the change.
+ * Notifies the person who created the envelope, adding the envelope title (and the recipient's
+ * name) to `data`. Skipped when they caused the change: `exceptUserId` is them, or `recipient` is
+ * them (a sender who signs their own envelope). Membership and preferences are checked before any
+ * name is looked up, so a type that's off (the default for "Opened") costs one envelope read.
+ * `actorUserId` adds the actor's name as `actorName`, read only when a notification is written.
  */
 export async function notifyEnvelopeOwner(
   db: Db,
   input: {
     envelopeId: string
     type: NotificationType
-    recipientId?: string
+    /** The recipient who acted (callers already hold the row) */
+    recipient?: { name: string; email: string }
     exceptUserId?: string
+    actorUserId?: string
     data?: NotificationData
   },
 ): Promise<number> {
@@ -77,26 +92,49 @@ export async function notifyEnvelopeOwner(
   }
   const envelope = await db.envelope.findUniqueOrThrow({
     where: { id: input.envelopeId },
-    select: { organizationId: true, createdById: true, title: true },
+    select: {
+      organizationId: true,
+      createdById: true,
+      title: true,
+      createdBy: { select: { email: true } },
+    },
   })
   if (envelope.createdById === input.exceptUserId) return 0
-  const recipient = input.recipientId
-    ? await db.recipient.findUnique({
-        where: { id: input.recipientId },
+  if (
+    input.recipient &&
+    input.recipient.email.toLowerCase() === envelope.createdBy.email.toLowerCase()
+  ) {
+    return 0
+  }
+  const [userId] = await wantsNotification(
+    db,
+    envelope.organizationId,
+    [envelope.createdById],
+    input.type,
+  )
+  if (!userId) return 0
+  const actor = input.actorUserId
+    ? await db.user.findUnique({
+        where: { id: input.actorUserId },
         select: { name: true, email: true },
       })
     : null
-  return notifyUsers(db, {
-    organizationId: envelope.organizationId,
-    userIds: [envelope.createdById],
-    type: input.type,
-    envelopeId: input.envelopeId,
+  const data = {
+    envelopeTitle: envelope.title,
+    ...(input.recipient ? { recipientName: input.recipient.name || input.recipient.email } : {}),
+    ...(actor ? { actorName: actor.name || actor.email } : {}),
+    ...input.data,
+  } as Prisma.InputJsonValue
+  await db.notification.create({
     data: {
-      envelopeTitle: envelope.title,
-      ...(recipient ? { recipientName: recipient.name || recipient.email } : {}),
-      ...input.data,
+      organizationId: envelope.organizationId,
+      userId,
+      type: input.type,
+      envelopeId: input.envelopeId,
+      data,
     },
   })
+  return 1
 }
 
 /** Notifies every owner and admin of the workspace (`admins` audience types). */

@@ -1,4 +1,6 @@
 import {
+  decodeNotificationCursor,
+  encodeNotificationCursor,
   isNotificationEnabled,
   ListNotificationsQuerySchema,
   MarkNotificationsReadSchema,
@@ -39,7 +41,10 @@ function preferencesView(role: string, settings: NotificationSettings) {
 export const notifications = new Hono<AppEnv>()
   .use(requireOrg)
 
-  /** Newest first, keyset-paginated by `cursor` (the last id of the previous page). */
+  /**
+   * Newest first, keyset-paginated by `cursor` (the previous page's `nextCursor`: a position, so it
+   * holds even if that item was dismissed meanwhile).
+   */
   .get("/", async (c) => {
     const query = parseQuery(c, ListNotificationsQuerySchema)
     const mine = forOrganization(c.get("organizationId")).notification({
@@ -47,11 +52,8 @@ export const notifications = new Hono<AppEnv>()
     })
     let after: Prisma.NotificationWhereInput = {}
     if (query.cursor) {
-      const cursor = await prisma.notification.findFirst({
-        where: { ...mine, id: query.cursor },
-        select: { id: true, createdAt: true },
-      })
-      if (!cursor) badRequest("Unknown cursor")
+      const cursor = decodeNotificationCursor(query.cursor)
+      if (!cursor) badRequest("Invalid cursor")
       const { id, createdAt } = cursor as NonNullable<typeof cursor>
       after = { OR: [{ createdAt: { lt: createdAt } }, { createdAt, id: { lt: id } }] }
     }
@@ -65,7 +67,8 @@ export const notifications = new Hono<AppEnv>()
       prisma.notification.count({ where: { ...mine, readAt: null } }),
     ])
     const items = rows.slice(0, query.limit)
-    const nextCursor = rows.length > query.limit ? (items.at(-1)?.id ?? null) : null
+    const last = items.at(-1)
+    const nextCursor = rows.length > query.limit && last ? encodeNotificationCursor(last) : null
     return c.json({ items, nextCursor, unreadCount })
   })
 

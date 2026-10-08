@@ -171,6 +171,24 @@ describe("bulk send", () => {
     expect(failed.recipients).toBeNull()
   })
 
+  test("template deleted before the batch runs: every row fails and the sender is told", async () => {
+    const res = await start(alice, { title: "Offer", rows: rows(3) })
+    const { bulkSend } = (await res.json()) as { bulkSend: { id: string } }
+    await prisma.template.delete({ where: { id: templateId } })
+    expect(await processBulkSend(bulkSend.id)).toMatchObject({ sent: 0, failed: 3 })
+    const items = await prisma.bulkSendItem.findMany({ where: { bulkSendId: bulkSend.id } })
+    expect(items.map((i) => [i.status, i.recipients])).toEqual([
+      ["FAILED", null],
+      ["FAILED", null],
+      ["FAILED", null],
+    ])
+    const [note] = await prisma.notification.findMany({ where: { userId: alice.userId } })
+    expect(note).toMatchObject({
+      type: "bulk_send.finished",
+      data: { bulkSendId: bulkSend.id, sent: 0, failed: 3 },
+    })
+  })
+
   test("a retry after a crash sends the existing draft instead of creating a duplicate", async () => {
     const res = await start(alice, { title: "Offer", rows: rows(1) })
     const { bulkSend } = (await res.json()) as { bulkSend: { id: string } }
