@@ -1,13 +1,18 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { createContext, useCallback, useContext, useMemo, useState } from "react"
-import { DocumentViewer } from "@/components/app/document-viewer"
 import { DocumentSwitcher } from "@/components/app/envelope/document-switcher"
 import type { EditorRecipient } from "@/components/app/field-editor/context"
 import { RecipientDot } from "@/components/app/field-editor/field-controls"
-import type { EditorDocument } from "@/components/app/field-editor/field-editor-surface"
-import type { PDFViewerPageOverlayProps } from "@/components/extend/pdf-viewer"
+import {
+  type EditorDocument,
+  VIEW_ONLY_FEATURES,
+} from "@/components/app/field-editor/field-editor-surface"
+import { toastManager } from "@/components/app/toast"
+import type { PDFEditorPageOverlayProps } from "@/components/extend/pdf-editor"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Skeleton } from "@/components/ui/skeleton"
 import { FIELD_LABELS, RECIPIENT_COLORS } from "@/lib/constants"
 import { fieldSummary } from "@/lib/envelope-editor"
 import type { EditorField } from "@/lib/field-editor"
@@ -18,6 +23,13 @@ import {
   uprightContentStyle,
 } from "@/lib/field-geometry"
 import { cn } from "@/lib/utils"
+
+// Same view-only PDFEditor as the field editor, so the document switcher sits in its second
+// toolbar row on both steps (ribbonContent, ADR 0019).
+const PDFEditor = dynamic(() => import("@/components/extend/pdf-editor").then((m) => m.PDFEditor), {
+  ssr: false,
+  loading: () => <Skeleton className="size-full" />,
+})
 
 interface PreviewState {
   /** Fields of the document on screen. */
@@ -62,12 +74,13 @@ function PreviewLayer({ page }: { page: number }) {
   )
 }
 
-// Stable reference: the viewer memoizes page rendering on renderPageOverlay.
-const renderPageOverlay = (p: PDFViewerPageOverlayProps) => <PreviewLayer page={p.pageNumber} />
+// Stable reference: the editor memoizes page rendering on renderPageOverlay.
+const renderPageOverlay = (p: PDFEditorPageOverlayProps) => <PreviewLayer page={p.pageNumber} />
 
 /**
  * Step 4 of the draft editor: each original PDF with its placed fields drawn over it, as the
- * recipients will find them (one document at a time, ADR 0037), and a per-recipient count
+ * recipients will find them (one document at a time, ADR 0037; the switcher sits in the viewer's
+ * second toolbar row, like on the fields step), and a per-recipient count
  * across all documents beside it. Fields are the live editor
  * state, so unsaved edits show too.
  */
@@ -89,6 +102,7 @@ export function PreviewStep({
     [allFields, active?.id],
   )
   const recipientMap = useMemo(() => new Map(recipients.map((r) => [r.id, r])), [recipients])
+  const fieldCount = (id: string) => allFields.filter((f) => f.envelopeDocumentId === id).length
   const rotationsKey = pageRotations.join(",")
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyed by value, not array identity
   const rotationOf = useCallback(
@@ -106,29 +120,42 @@ export function PreviewStep({
   return (
     <PreviewContext.Provider value={ctx}>
       <div className="flex size-full min-h-0 overflow-hidden">
-        <div className="flex min-w-0 flex-1 flex-col">
-          {documents.length > 1 && (
-            <div className="shrink-0 border-b px-4 py-2">
-              <DocumentSwitcher
-                documents={documents}
-                value={active?.id ?? ""}
-                onValueChange={setActiveId}
-              />
-            </div>
+        <div className="min-w-0 flex-1">
+          {active?.src ? (
+            <PDFEditor
+              // One viewer per document: switching loads the other PDF fresh.
+              key={active.id}
+              src={active.src}
+              fileName={active.name}
+              defaultMode="view"
+              defaultZoom="fit-width"
+              showUpload={false}
+              persistSignatures={false}
+              features={VIEW_ONLY_FEATURES}
+              renderPageOverlay={renderPageOverlay}
+              ribbonContent={
+                <div className="flex min-w-0 flex-1 items-center gap-2 text-muted-foreground text-xs">
+                  <DocumentSwitcher
+                    documents={documents}
+                    value={active.id}
+                    onValueChange={setActiveId}
+                    accessory={(id) => (
+                      <span className="text-muted-foreground tabular-nums">
+                        {fieldCount(id) || ""}
+                      </span>
+                    )}
+                  />
+                  <span className="max-lg:hidden">
+                    Fields as recipients will see them. Go back to Fields to change them.
+                  </span>
+                </div>
+              }
+              onToast={(t) => toastManager.add({ title: t.message, type: t.tone })}
+              className="size-full"
+            />
+          ) : (
+            <p className="p-6 text-muted-foreground text-sm">The document could not be loaded.</p>
           )}
-          <div className="min-h-0 flex-1">
-            {active?.src ? (
-              <DocumentViewer
-                key={active.id}
-                src={active.src}
-                fileName={active.name}
-                renderPageOverlay={renderPageOverlay}
-                className="h-full min-h-0 rounded-none border-0"
-              />
-            ) : (
-              <p className="p-6 text-muted-foreground text-sm">The document could not be loaded.</p>
-            )}
-          </div>
         </div>
         <aside
           aria-label="Fields per recipient"
