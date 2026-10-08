@@ -25,6 +25,9 @@ tenants must never see each other's data.**
 - Folder moves check the target with `assertFolderInOrg` (`apps/api/src/lib/folder-tree.ts`): a
   folder id from another workspace is a 404, for documents, envelopes, templates and list filters
   alike. `GET /api/files` (ADR 0038) builds each type's query with the same scope.
+  `POST /api/files/move` (ADR 0039) loads every item and the target through the scope: one
+  foreign or unknown id is a 404 and nothing moves. `POST /api/files/group` loads the same way
+  before it creates its folder.
 - Planned: Postgres row-level security as defence in depth.
 
 ## Signing tokens

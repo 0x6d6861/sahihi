@@ -11,24 +11,13 @@ import {
 import { forOrganization, prisma } from "@sahihi/db"
 import { Hono } from "hono"
 import type { AppEnv } from "../lib/env"
-import { type FolderTree, loadFolderTree as loadTree } from "../lib/folder-tree"
-import { badRequest, conflict, forbidden, notFound, parseJson, parseQuery } from "../lib/http"
+import { assertNameFree, type FolderTree, loadFolderTree as loadTree } from "../lib/folder-tree"
+import { badRequest, forbidden, notFound, parseJson, parseQuery } from "../lib/http"
 import { resolveTags, TAG_SELECT } from "../lib/labels"
 import { actor, assertCanManageFolder } from "../lib/permissions"
 import { requireOrg } from "../middleware/session"
 
 type Tree = FolderTree
-
-/** Sibling names are unique (case-insensitive) so breadcrumbs and "Move to…" stay unambiguous. */
-function assertNameFree(tree: Tree, parentId: string | null, name: string, exceptId?: string) {
-  const taken = tree.rows.some(
-    (f) =>
-      f.parentId === parentId &&
-      f.id !== exceptId &&
-      f.name.localeCompare(name, undefined, { sensitivity: "accent" }) === 0,
-  )
-  if (taken) conflict(`A folder named “${name}” already exists here`)
-}
 
 function assertMovable(tree: Tree, folderId: string, parentId: string | null) {
   const problem = checkFolderMove(folderId, parentId, tree.parentOf)
@@ -191,7 +180,7 @@ export const folders = new Hono<AppEnv>()
     const parentId = input.parentId === undefined ? folder.parentId : input.parentId
     if (parentId && !tree.byId.has(parentId)) notFound("Parent folder")
     if (parentId !== folder.parentId) assertMovable(tree, folder.id, parentId)
-    assertNameFree(tree, parentId, input.name ?? folder.name, folder.id)
+    assertNameFree(tree, parentId, input.name ?? folder.name, [folder.id])
     const tags = input.tags && (await resolveTags(orgId, input.tags))
     const updated = await prisma.folder.update({
       where: { id: folder.id },

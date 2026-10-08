@@ -93,6 +93,10 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
 - [x] Shared folders and labels for documents, envelopes and templates (ADR 0038)
 - [x] All files: one home page for documents, envelopes and templates, with one search and
       Type / Status / People / Added / Tags / Color filters (ADR 0038, `docs/ui.md`)
+- [x] Drag and drop on All files: drag items onto folders and crumbs, multi-select and Move…,
+      drop PDFs from the desktop to upload, drop onto a file to make a folder, Undo
+      (`POST /files/move`, `POST /files/group`, ADR 0039)
+- [ ] Drag and drop on the Documents, Envelopes and Templates pages (ADR 0039 → Consequences)
 - [ ] Passkeys, delete account, forgot-password pages (`docs/auth.md` → What better-auth offers next)
 
 ## Later

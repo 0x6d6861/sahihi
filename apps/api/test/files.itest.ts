@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, test } from "bun:test"
 import { prisma } from "@sahihi/db"
-import { createSender, request, resetDb, type Sender, uploadDocument } from "./helpers"
+import {
+  createSender,
+  joinOrganization,
+  request,
+  resetDb,
+  type Sender,
+  uploadDocument,
+} from "./helpers"
 
 // ADR 0038: All files (documents, envelopes and templates in one list)
 let alice: Sender
@@ -152,5 +159,196 @@ describe("GET /api/files", () => {
 
     expect((await files(alice)).items.map((i) => i.id)).toEqual([documentId])
     expect((await request(alice, `/api/files?folderId=${bobs}`)).status).toBe(404)
+  })
+})
+
+// ADR 0039: drag and drop and multi-select move many items at once
+describe("POST /api/files/move", () => {
+  async function createFolder(sender: Sender, name: string, parentId?: string) {
+    const res = await request(sender, "/api/folders", { method: "POST", json: { name, parentId } })
+    expect(res.status).toBe(201)
+    return (await json<{ folder: { id: string } }>(res)).folder.id
+  }
+  const move = (sender: Sender, items: { kind: string; id: string }[], folderId: string | null) =>
+    request(sender, "/api/files/move", { method: "POST", json: { items, folderId } })
+  const where = async () => ({
+    document: (await prisma.document.findUniqueOrThrow({ where: { id: documentId } })).folderId,
+  })
+
+  test("moves every kind into a folder and back to the root, reporting where each was", async () => {
+    const envelope = await createEnvelope(alice, "Lease draft")
+    const template = await createTemplate(alice, "Lease template")
+    const from = await createFolder(alice, "From")
+    const sub = await createFolder(alice, "Sub", from)
+    const to = await createFolder(alice, "To")
+    await request(alice, `/api/documents/${documentId}`, {
+      method: "PATCH",
+      json: { folderId: from },
+    })
+    const items = [
+      { kind: "document", id: documentId },
+      { kind: "envelope", id: envelope },
+      { kind: "template", id: template },
+      { kind: "folder", id: sub },
+    ]
+
+    const res = await move(alice, items, to)
+    expect(res.status).toBe(200)
+    const body = await json<{
+      moved: number
+      from: { kind: string; id: string; folderId: string | null }[]
+    }>(res)
+    expect(body.moved).toBe(4)
+    expect(body.from).toContainEqual({ kind: "document", id: documentId, folderId: from })
+    expect(body.from).toContainEqual({ kind: "folder", id: sub, folderId: from })
+    expect(body.from).toContainEqual({ kind: "envelope", id: envelope, folderId: null })
+    expect(await where()).toEqual({ document: to })
+    expect((await prisma.envelope.findUniqueOrThrow({ where: { id: envelope } })).folderId).toBe(to)
+    expect((await prisma.template.findUniqueOrThrow({ where: { id: template } })).folderId).toBe(to)
+    expect((await prisma.folder.findUniqueOrThrow({ where: { id: sub } })).parentId).toBe(to)
+
+    expect((await move(alice, items, null)).status).toBe(200)
+    expect(await where()).toEqual({ document: null })
+  })
+
+  test("refuses a folder into its own subtree, and moves nothing", async () => {
+    const a = await createFolder(alice, "A")
+    const b = await createFolder(alice, "B", a)
+    const res = await move(
+      alice,
+      [
+        { kind: "document", id: documentId },
+        { kind: "folder", id: a },
+      ],
+      b,
+    )
+    expect(res.status).toBe(400)
+    expect(await where()).toEqual({ document: null })
+  })
+
+  test("refuses a folder name already taken in the target, and two moved folders sharing a name", async () => {
+    const target = await createFolder(alice, "Target")
+    await createFolder(alice, "Leases", target)
+    const leases = await createFolder(alice, "leases")
+    expect((await move(alice, [{ kind: "folder", id: leases }], target)).status).toBe(409)
+
+    const x = await createFolder(alice, "X")
+    const y = await createFolder(alice, "Y")
+    await createFolder(alice, "Same", x)
+    await createFolder(alice, "Same", y)
+    const sames = await prisma.folder.findMany({ where: { name: "Same" }, select: { id: true } })
+    const items = sames.map((f) => ({ kind: "folder", id: f.id }))
+    expect((await move(alice, items, null)).status).toBe(409)
+  })
+
+  test("a member moves only their own items: one refusal moves nothing", async () => {
+    const member = await joinOrganization(alice, "member", "member")
+    const theirs = (await uploadDocument(member, undefined, "mine.pdf")).document.id
+    const folder = await createFolder(member, "Member folder")
+    const res = await move(
+      member,
+      [
+        { kind: "document", id: theirs },
+        { kind: "document", id: documentId },
+      ],
+      folder,
+    )
+    expect(res.status).toBe(403)
+    expect((await prisma.document.findUniqueOrThrow({ where: { id: theirs } })).folderId).toBeNull()
+    expect((await move(member, [{ kind: "document", id: theirs }], folder)).status).toBe(200)
+  })
+
+  test("never touches another workspace's items or folders", async () => {
+    const bob = await createSender("bob")
+    const bobsDoc = (await uploadDocument(bob)).document.id
+    const bobsFolder = await createFolder(bob, "Bob")
+    const mine = await createFolder(alice, "Mine")
+
+    expect((await move(alice, [{ kind: "document", id: documentId }], bobsFolder)).status).toBe(404)
+    expect((await move(alice, [{ kind: "document", id: bobsDoc }], mine)).status).toBe(404)
+    expect((await move(alice, [{ kind: "folder", id: bobsFolder }], mine)).status).toBe(404)
+    expect(
+      (await prisma.document.findUniqueOrThrow({ where: { id: bobsDoc } })).folderId,
+    ).toBeNull()
+  })
+})
+
+// ADR 0039: drop one item onto a file to put both in a new folder
+describe("POST /api/files/group", () => {
+  async function createFolder(sender: Sender, name: string, parentId?: string) {
+    const res = await request(sender, "/api/folders", { method: "POST", json: { name, parentId } })
+    expect(res.status).toBe(201)
+    return (await json<{ folder: { id: string } }>(res)).folder.id
+  }
+  const group = (sender: Sender, items: { kind: string; id: string }[], parentId: string | null) =>
+    request(sender, "/api/files/group", { method: "POST", json: { items, parentId } })
+  type Grouped = { folder: { id: string; name: string; parentId: string | null } }
+
+  test("makes “New folder”, then “New folder 2”, in the parent, holding every item", async () => {
+    const parent = await createFolder(alice, "Clients")
+    const envelope = await createEnvelope(alice, "Lease draft", parent)
+    await request(alice, `/api/documents/${documentId}`, {
+      method: "PATCH",
+      json: { folderId: parent },
+    })
+    const items = [
+      { kind: "document", id: documentId },
+      { kind: "envelope", id: envelope },
+    ]
+
+    const res = await group(alice, items, parent)
+    expect(res.status).toBe(201)
+    const { folder } = await json<Grouped>(res)
+    expect(folder).toMatchObject({ name: "New folder", parentId: parent })
+    expect((await prisma.document.findUniqueOrThrow({ where: { id: documentId } })).folderId).toBe(
+      folder.id,
+    )
+    expect((await prisma.envelope.findUniqueOrThrow({ where: { id: envelope } })).folderId).toBe(
+      folder.id,
+    )
+
+    const again = await json<Grouped>(await group(alice, items, parent))
+    expect(again.folder.name).toBe("New folder 2")
+  })
+
+  test("refuses a folder grouped into its own subtree, and creates nothing", async () => {
+    const outer = await createFolder(alice, "Outer")
+    await request(alice, `/api/documents/${documentId}`, {
+      method: "PATCH",
+      json: { folderId: outer },
+    })
+    const res = await group(
+      alice,
+      [
+        { kind: "document", id: documentId },
+        { kind: "folder", id: outer },
+      ],
+      outer,
+    )
+    expect(res.status).toBe(400)
+    expect(await prisma.folder.count({ where: { name: "New folder" } })).toBe(0)
+  })
+
+  test("a member can't group someone else's item; another workspace's items are unknown", async () => {
+    const member = await joinOrganization(alice, "member", "member")
+    const theirs = (await uploadDocument(member, undefined, "mine.pdf")).document.id
+    const items = [
+      { kind: "document", id: theirs },
+      { kind: "document", id: documentId },
+    ]
+    expect((await group(member, items, null)).status).toBe(403)
+
+    const bob = await createSender("bob")
+    const bobs = (await uploadDocument(bob)).document.id
+    const mixed = [
+      { kind: "document", id: documentId },
+      { kind: "document", id: bobs },
+    ]
+    expect((await group(alice, mixed, null)).status).toBe(404)
+    expect(await prisma.folder.count()).toBe(0)
+  })
+
+  test("needs two items", async () => {
+    expect((await group(alice, [{ kind: "document", id: documentId }], null)).status).toBe(400)
   })
 })

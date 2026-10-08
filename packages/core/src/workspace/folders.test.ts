@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import {
   checkFolderMove,
+  checkFoldersMove,
   folderPath,
   MAX_FOLDER_DEPTH,
   periodStart,
@@ -58,6 +59,18 @@ describe("checkFolderMove", () => {
     chain.set("g", null)
     chain.set("h", "g")
     expect(checkFolderMove("g", `f${MAX_FOLDER_DEPTH - 2}`, chain)).toBe("too-deep")
+  })
+})
+
+describe("checkFoldersMove", () => {
+  test("checks every folder against the one target", () => {
+    expect(checkFoldersMove(["c", "d"], "a", tree)).toBeNull()
+    expect(checkFoldersMove(["d", "a"], "c", tree)).toBe("cycle")
+    expect(checkFoldersMove([], "c", tree)).toBeNull()
+  })
+
+  test("a folder may move together with one of its subfolders", () => {
+    expect(checkFoldersMove(["b", "c"], "d", tree)).toBeNull()
   })
 })
 

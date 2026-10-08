@@ -28,6 +28,7 @@ export function MoveToFolderDialog({
   open,
   onOpenChange,
   itemName,
+  title = `Move “${itemName}”`,
   currentFolderId,
   excludeSubtreeOf,
   onMove,
@@ -35,11 +36,19 @@ export function MoveToFolderDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
   itemName: string
-  /** Where the item is now (null = top level); preselected and not a valid target. */
-  currentFolderId: string | null
-  excludeSubtreeOf?: string
-  onMove: (folderId: string | null) => Promise<void>
+  /** Defaults to Move “name”; several items (ADR 0039) say "Move 3 items". */
+  title?: string
+  /**
+   * Where the item is now (null = top level); preselected and not a valid target. `undefined`
+   * for items from several folders: the top level is preselected and any folder may be picked.
+   */
+  currentFolderId: string | null | undefined
+  /** Folders that can't take the item: these and everything under them. */
+  excludeSubtreeOf?: string | readonly string[]
+  /** `folderName` is the destination's own name (the top level's is "the top level"). */
+  onMove: (folderId: string | null, folderName: string) => Promise<void>
 }) {
+  const here = currentFolderId === undefined ? null : (currentFolderId ?? ROOT)
   const [folders, setFolders] = useState<FolderOption[] | null>(null)
   const [target, setTarget] = useState<string>(currentFolderId ?? ROOT)
   const [busy, setBusy] = useState(false)
@@ -57,8 +66,10 @@ export function MoveToFolderDialog({
   }, [open, currentFolderId])
 
   const items = useMemo(() => {
+    const excluded =
+      typeof excludeSubtreeOf === "string" ? [excludeSubtreeOf] : (excludeSubtreeOf ?? [])
     const options = (folders ?? [])
-      .filter((f) => !excludeSubtreeOf || !f.path.some((p) => p.id === excludeSubtreeOf))
+      .filter((f) => !f.path.some((p) => excluded.includes(p.id)))
       .map((f) => ({ value: f.id, label: folderPathLabel(f.path) }))
       .sort((a, b) => a.label.localeCompare(b.label))
     return [{ value: ROOT, label: "Top level (no folder)" }, ...options]
@@ -67,7 +78,8 @@ export function MoveToFolderDialog({
   async function move() {
     setBusy(true)
     try {
-      await onMove(target === ROOT ? null : target)
+      const folder = folders?.find((f) => f.id === target)
+      await onMove(folder ? folder.id : null, folder?.name ?? "the top level")
       onOpenChange(false)
     } catch (err) {
       toastManager.add({
@@ -83,7 +95,7 @@ export function MoveToFolderDialog({
   return (
     <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
       <DialogContent
-        title={`Move “${itemName}”`}
+        title={title}
         description="Folders only organise your work; signing and certificates aren't affected."
         // Room for the Combobox's list (it would be cut off at the dialog's edge).
         className={DIALOG_WITH_POPOVERS}
@@ -108,11 +120,7 @@ export function MoveToFolderDialog({
               >
                 Cancel
               </Button>
-              <Button
-                onClick={move}
-                loading={busy}
-                disabled={folders === null || target === (currentFolderId ?? ROOT)}
-              >
+              <Button onClick={move} loading={busy} disabled={folders === null || target === here}>
                 Move
               </Button>
             </DialogActions>

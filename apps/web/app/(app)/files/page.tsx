@@ -9,6 +9,14 @@ import { DocumentRowActions } from "@/components/app/documents/document-row-acti
 import { DocumentTypeIcon } from "@/components/app/documents/document-type-icon"
 import { EnvelopeCard, type EnvelopeItem } from "@/components/app/envelope/envelope-card"
 import { EnvelopeRowActions } from "@/components/app/envelope/envelope-row-actions"
+import {
+  BreadcrumbDrops,
+  DragCard,
+  DragRow,
+  SelectCell,
+  SelectHead,
+} from "@/components/app/files/drag-items"
+import { FilesDnd } from "@/components/app/files/files-dnd"
 import { FilesToolbar } from "@/components/app/files/files-toolbar"
 import { CreateFolderButton } from "@/components/app/folders/create-folder-button"
 import {
@@ -39,6 +47,7 @@ import {
 } from "@/components/ui/table"
 import { apiServer } from "@/lib/api-server"
 import { recipientSummary, signingProgress } from "@/lib/envelope-list"
+import type { DropTarget, MovableItem } from "@/lib/file-moves"
 import { filesApiQuery, filesHref, hasFileFilters, parseFilesView } from "@/lib/files-list"
 import { foldersApiQuery, searchesEverywhere } from "@/lib/folder-scope"
 import { formatDate, formatDateTime, pluralize } from "@/lib/format"
@@ -69,6 +78,15 @@ interface FilesPageData {
 }
 
 const ROOT = "All files"
+
+/** A file as something to drag and select (ADR 0039), with whether the user may move it. */
+function fileDrag(item: FileItem): { item: MovableItem; canMove: boolean } {
+  const name = item.kind === "envelope" ? item.title : item.name
+  return {
+    item: { kind: item.kind, id: item.id, name, folderId: item.folderId },
+    canMove: item.kind === "document" ? item.permissions.move : item.permissions.manage,
+  }
+}
 
 /**
  * Home of the app (ADR 0038): documents, envelopes and templates together, newest first, in the
@@ -120,6 +138,36 @@ export default async function FilesPage({
   ]
     .filter(Boolean)
     .join(", ")
+  // Drag and drop (ADR 0039): the page's items in order, the open folder and the crumbs above it.
+  const shownFolderItems = layout === "grid" ? shownFolders : folderRows
+  const movable: MovableItem[] = [
+    ...shownFolderItems.map((f) => ({
+      item: {
+        kind: "folder" as const,
+        id: f.id,
+        name: f.name,
+        folderId: searching ? (f.path?.at(-1)?.id ?? null) : (current?.id ?? null),
+      },
+      canMove: f.permissions.manage,
+    })),
+    ...items.map(fileDrag),
+  ]
+    .filter((d) => d.canMove)
+    .map((d) => d.item)
+  const here: DropTarget = {
+    folderId: current?.id ?? null,
+    name: current?.name ?? ROOT,
+    path: path.map((p) => p.id),
+  }
+  const crumbs: DropTarget[] = [
+    { folderId: null, name: ROOT, path: [] },
+    ...path.slice(0, -1).map((p, i) => ({
+      folderId: p.id,
+      name: p.name,
+      path: path.slice(0, i + 1).map((x) => x.id),
+    })),
+  ]
+
   const pagination =
     pageCount > 1 ? (
       <ListPagination
@@ -135,147 +183,162 @@ export default async function FilesPage({
     ) : null
 
   return (
-    <div className="flex flex-col gap-8">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="flex min-w-0 flex-col gap-2">
-          {path.length > 0 && (
-            <FolderBreadcrumb rootLabel={ROOT} path={path} hrefFor={folderHref} />
-          )}
-          <FolderHeading rootLabel={ROOT} current={current} searching={searching} />
-          {!blank && <p className="text-muted-foreground text-sm tabular-nums">{countLine}</p>}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <CreateFolderButton parentId={current?.id} allTags={allTags} />
-          <ButtonLink
-            variant="secondary"
-            href={
-              current ? `/envelopes/new?folder=${encodeURIComponent(current.id)}` : "/envelopes/new"
-            }
-          >
-            <PlusIcon aria-hidden />
-            New envelope
-          </ButtonLink>
-          <UploadDocument folderId={current?.id} />
-        </div>
-      </header>
-
-      {!blank && (
-        <FilesToolbar
-          view={view}
-          layout={layout}
-          people={data?.people ?? []}
-          tags={allTags}
-          colors={data?.colors ?? []}
-        />
-      )}
-
-      {layout === "grid" && !blank && (
-        <FolderCards
-          folders={shownFolders}
-          current={current}
-          searching={searching || filtered}
-          canCreate={Boolean(folders.data?.permissions?.create) && !filtered}
-          allTags={allTags}
-          hrefFor={folderHref}
-          rootLabel={ROOT}
-        />
-      )}
-
-      <section aria-labelledby="files-heading" className="flex flex-col gap-3">
-        <h2 id="files-heading" className="sr-only">
-          Files in this folder
-        </h2>
-        {blank ? (
-          <Panel>
-            {/* The drop zone is the one next step, so it is the empty state. */}
-            <div className="flex flex-col items-center gap-4 px-2 py-8 text-center sm:py-12">
-              <div className="flex flex-col gap-1">
-                <p className="font-medium">
-                  {current ? "This folder is empty" : "Nothing here yet"}
-                </p>
-                <p className="text-muted-foreground text-sm">
-                  {current
-                    ? "Upload a PDF here, or move documents, envelopes and templates into it."
-                    : "Upload your first PDF to send it for signature."}
-                </p>
-              </div>
-              <div className="w-full max-w-md">
-                <UploadDropzone folderId={current?.id} />
-              </div>
-            </div>
-          </Panel>
-        ) : total === 0 && folderRows.length === 0 ? (
-          <Panel>
-            <EmptyState
-              className="md:py-10"
-              icon={<FileSearchIcon aria-hidden />}
-              title={filtered ? "Nothing matches" : "No files here"}
-              description={
-                filtered
-                  ? "Try another search or clear the filters."
-                  : "Open a folder above, or add something to this one."
-              }
-              action={
-                filtered ? (
-                  <ButtonLink href={filesHref({ folder: view.folder })}>Clear filters</ButtonLink>
-                ) : undefined
-              }
-            />
-          </Panel>
-        ) : layout === "grid" ? (
-          <div className="flex flex-col gap-4">
-            <ListGrid>
-              {items.map((item) => (
-                <li key={`${item.kind}-${item.id}`} className="grid">
-                  {item.kind === "document" ? (
-                    <DocumentCard document={item} searching={searching} allTags={allTags} />
-                  ) : item.kind === "envelope" ? (
-                    <EnvelopeCard envelope={item} allTags={allTags} />
-                  ) : (
-                    <TemplateCard template={item} allTags={allTags} />
-                  )}
-                </li>
-              ))}
-            </ListGrid>
-            {pagination}
+    <FilesDnd
+      items={movable}
+      current={here}
+      resetKey={filesHref(view)}
+      fileDrop={!blank}
+      hideMoved={!searching}
+    >
+      <div className="flex flex-col gap-8">
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex min-w-0 flex-col gap-2">
+            {path.length > 0 && (
+              <BreadcrumbDrops targets={crumbs}>
+                <FolderBreadcrumb rootLabel={ROOT} path={path} hrefFor={folderHref} />
+              </BreadcrumbDrops>
+            )}
+            <FolderHeading rootLabel={ROOT} current={current} searching={searching} />
+            {!blank && <p className="text-muted-foreground text-sm tabular-nums">{countLine}</p>}
           </div>
-        ) : (
-          <Panel className="gap-0 p-2 sm:p-3">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="ps-3">Name</TableHead>
-                  <TableHead className="max-md:hidden">Owner</TableHead>
-                  <TableHead className="max-md:hidden">Added</TableHead>
-                  <TableHead className="w-0">
-                    <span className="sr-only">Actions</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <FolderRows
-                  folders={folderRows}
-                  current={current}
-                  searching={searching}
-                  allTags={allTags}
-                  hrefFor={folderHref}
-                  rootLabel={ROOT}
-                />
+          <div className="flex flex-wrap items-center gap-2">
+            <CreateFolderButton parentId={current?.id} allTags={allTags} />
+            <ButtonLink
+              variant="secondary"
+              href={
+                current
+                  ? `/envelopes/new?folder=${encodeURIComponent(current.id)}`
+                  : "/envelopes/new"
+              }
+            >
+              <PlusIcon aria-hidden />
+              New envelope
+            </ButtonLink>
+            <UploadDocument folderId={current?.id} />
+          </div>
+        </header>
+
+        {!blank && (
+          <FilesToolbar
+            view={view}
+            layout={layout}
+            people={data?.people ?? []}
+            tags={allTags}
+            colors={data?.colors ?? []}
+          />
+        )}
+
+        {layout === "grid" && !blank && (
+          <FolderCards
+            folders={shownFolders}
+            current={current}
+            path={path}
+            searching={searching || filtered}
+            canCreate={Boolean(folders.data?.permissions?.create) && !filtered}
+            allTags={allTags}
+            hrefFor={folderHref}
+            rootLabel={ROOT}
+          />
+        )}
+
+        <section aria-labelledby="files-heading" className="flex flex-col gap-3">
+          <h2 id="files-heading" className="sr-only">
+            Files in this folder
+          </h2>
+          {blank ? (
+            <Panel>
+              {/* The drop zone is the one next step, so it is the empty state. */}
+              <div className="flex flex-col items-center gap-4 px-2 py-8 text-center sm:py-12">
+                <div className="flex flex-col gap-1">
+                  <p className="font-medium">
+                    {current ? "This folder is empty" : "Nothing here yet"}
+                  </p>
+                  <p className="text-muted-foreground text-sm">
+                    {current
+                      ? "Upload a PDF here, or move documents, envelopes and templates into it."
+                      : "Upload your first PDF to send it for signature."}
+                  </p>
+                </div>
+                <div className="w-full max-w-md">
+                  <UploadDropzone folderId={current?.id} />
+                </div>
+              </div>
+            </Panel>
+          ) : total === 0 && folderRows.length === 0 ? (
+            <Panel>
+              <EmptyState
+                className="md:py-10"
+                icon={<FileSearchIcon aria-hidden />}
+                title={filtered ? "Nothing matches" : "No files here"}
+                description={
+                  filtered
+                    ? "Try another search or clear the filters."
+                    : "Open a folder above, or add something to this one."
+                }
+                action={
+                  filtered ? (
+                    <ButtonLink href={filesHref({ folder: view.folder })}>Clear filters</ButtonLink>
+                  ) : undefined
+                }
+              />
+            </Panel>
+          ) : layout === "grid" ? (
+            <div className="flex flex-col gap-4">
+              <ListGrid>
                 {items.map((item) => (
-                  <FileRow
-                    key={`${item.kind}-${item.id}`}
-                    item={item}
+                  <DragCard key={`${item.kind}-${item.id}`} className="grid" {...fileDrag(item)}>
+                    {item.kind === "document" ? (
+                      <DocumentCard document={item} searching={searching} allTags={allTags} />
+                    ) : item.kind === "envelope" ? (
+                      <EnvelopeCard envelope={item} allTags={allTags} />
+                    ) : (
+                      <TemplateCard template={item} allTags={allTags} />
+                    )}
+                  </DragCard>
+                ))}
+              </ListGrid>
+              {pagination}
+            </div>
+          ) : (
+            <Panel className="gap-0 p-2 sm:p-3">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <SelectHead />
+                    <TableHead className="ps-3">Name</TableHead>
+                    <TableHead className="max-md:hidden">Owner</TableHead>
+                    <TableHead className="max-md:hidden">Added</TableHead>
+                    <TableHead className="w-0">
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <FolderRows
+                    folders={folderRows}
+                    current={current}
+                    path={path}
                     searching={searching}
                     allTags={allTags}
+                    hrefFor={folderHref}
+                    rootLabel={ROOT}
                   />
-                ))}
-              </TableBody>
-            </Table>
-            {pagination && <div className="border-t px-3 pt-3">{pagination}</div>}
-          </Panel>
-        )}
-      </section>
-    </div>
+                  {items.map((item) => (
+                    <FileRow
+                      key={`${item.kind}-${item.id}`}
+                      item={item}
+                      searching={searching}
+                      allTags={allTags}
+                    />
+                  ))}
+                </TableBody>
+              </Table>
+              {pagination && <div className="border-t px-3 pt-3">{pagination}</div>}
+            </Panel>
+          )}
+        </section>
+      </div>
+    </FilesDnd>
   )
 }
 
@@ -336,8 +399,10 @@ function FileRow({
   allTags: TagRef[]
 }) {
   const f = rowFacts(item, searching)
+  const drag = fileDrag(item)
   return (
-    <TableRow>
+    <DragRow {...drag}>
+      <SelectCell {...drag} />
       {/* w-full + max-w-0: the name takes the spare width and truncates instead of pushing the
           other columns out of the card. */}
       <TableCell className="w-full max-w-0 ps-3">
@@ -392,6 +457,6 @@ function FileRow({
           />
         )}
       </TableCell>
-    </TableRow>
+    </DragRow>
   )
 }

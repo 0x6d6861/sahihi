@@ -263,6 +263,31 @@ opening popover is scrolled into view on short windows). Put such fields high in
 the popovers open downwards. Radix-portaled Arc items (`Select`, `Popover`, `DropdownMenu`,
 `Tooltip`) don't need this.
 
+## Drag and drop (ADR 0039)
+
+All files wraps its content in `FilesDnd` (`components/app/files/files-dnd.tsx`). Rows and cards
+use `DragRow` / `DragCard`, the checkbox column `SelectCell` / `SelectHead`, crumbs
+`BreadcrumbDrops` (`components/app/files/drag-items.tsx`). Outside `FilesDnd` they render as plain
+rows and cards, so shared folder components work on every page.
+
+- Mouse drags start after 6 px, touch drags after a 250 ms press; a drag on a selected item takes
+  the selection. The overlay chip is `bg-popover` with `shadow-lg`; a dragged item fades to 50 %.
+- Dropping onto a file (not a folder) puts both in a new "New folder" next to it (`POST
+  /files/group`); the file highlights like a folder does.
+- A valid drop target shows `ring-2 ring-ring` (plus `bg-accent` on rows). Invalid targets (a
+  folder into itself, everything already there) don't highlight and do nothing.
+- The keyboard path is the checkbox and the floating selection bar (`SelectionBar`: count, Select
+  all, Move…, Clear). Esc clears.
+- Desktop files: a dashed `border-primary` frame round the window and a `bg-primary` pill naming
+  the target folder. Desktop drops are ignored while a dialog is open.
+- Moves end in a success toast with **Undo**; refusals in an error toast with the API's message.
+- Motion (Arc tokens): the chip lifts in from 95 % (`--duration-instant`, `--ease-enter`; a second
+  card behind it for several items). On a valid drop it fades in place (120 ms) and the moved items
+  hide at once (not while searching), coming back if the API refuses; any other drop glides back
+  to the item (200 ms), so "nothing moved" is visible. Drag fades and drop highlights ease over
+  `--duration-instant`. The selection bar slides up 8 px on `--ease-enter` and leaves faster. With
+  reduced motion: no drop animation, opacity only.
+
 ## Label colours
 
 Folder and document label colours (ADR 0025) are user-picked hex values (Arc `ColorPicker`, the nine

@@ -82,3 +82,19 @@ export function checkFolderMove(
   if (parentPath.length + height > MAX_FOLDER_DEPTH) return "too-deep"
   return null
 }
+
+/**
+ * Can every one of `folderIds` move under `newParentId` together? The first problem found, or
+ * null. Moving a folder along with one of its subfolders is fine: the subfolder leaves it.
+ */
+export function checkFoldersMove(
+  folderIds: readonly string[],
+  newParentId: string | null,
+  parentOf: ReadonlyMap<string, string | null>,
+): FolderMoveProblem | null {
+  for (const id of folderIds) {
+    const problem = checkFolderMove(id, newParentId, parentOf)
+    if (problem) return problem
+  }
+  return null
+}

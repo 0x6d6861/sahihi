@@ -232,6 +232,33 @@ const TENANT: Record<string, Case> = {
     path: `/api/folders/${ids.folder}`,
     init: { method: "DELETE" },
   }),
+  // Every item and the target must be the caller's (ADR 0039).
+  "POST /api/files/move": () => ({
+    path: "/api/files/move",
+    init: {
+      method: "POST",
+      json: {
+        items: [
+          { kind: "document", id: ids.document },
+          { kind: "folder", id: ids.folder },
+        ],
+        folderId: null,
+      },
+    },
+  }),
+  "POST /api/files/group": () => ({
+    path: "/api/files/group",
+    init: {
+      method: "POST",
+      json: {
+        items: [
+          { kind: "document", id: ids.document },
+          { kind: "envelope", id: ids.envelope },
+        ],
+        parentId: null,
+      },
+    },
+  }),
   "POST /api/templates/:id/envelopes": () => ({
     path: `/api/templates/${ids.template}/envelopes`,
     init: {

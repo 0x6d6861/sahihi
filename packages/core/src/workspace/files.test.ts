@@ -2,9 +2,13 @@ import { describe, expect, test } from "bun:test"
 import {
   FILE_STATUSES,
   fileKindsFor,
+  GroupItemsSchema,
   ListFilesQuerySchema,
+  MAX_MOVE_ITEMS,
+  MoveItemsSchema,
   mergeNewestFirst,
   parseFileStatus,
+  uniqueFolderName,
 } from "./files"
 
 describe("All files status (ADR 0038)", () => {
@@ -56,5 +60,49 @@ describe("mergeNewestFirst", () => {
       "b",
       "a",
     ])
+  })
+})
+
+describe("MoveItemsSchema (ADR 0039)", () => {
+  test("takes any mix of kinds and a folder or the root", () => {
+    const items = [
+      { kind: "document", id: "d1" },
+      { kind: "folder", id: "f1" },
+    ]
+    expect(MoveItemsSchema.safeParse({ items, folderId: "f2" }).success).toBe(true)
+    expect(MoveItemsSchema.safeParse({ items, folderId: null }).success).toBe(true)
+  })
+
+  test("refuses empty, oversized and duplicate lists", () => {
+    const one = { kind: "envelope", id: "e1" }
+    expect(MoveItemsSchema.safeParse({ items: [], folderId: null }).success).toBe(false)
+    expect(MoveItemsSchema.safeParse({ items: [one, one], folderId: null }).success).toBe(false)
+    const many = Array.from({ length: MAX_MOVE_ITEMS + 1 }, (_, i) => ({
+      kind: "document",
+      id: `d${i}`,
+    }))
+    expect(MoveItemsSchema.safeParse({ items: many, folderId: null }).success).toBe(false)
+  })
+
+  test("the same id may appear under two kinds", () => {
+    const items = [
+      { kind: "document", id: "x" },
+      { kind: "template", id: "x" },
+    ]
+    expect(MoveItemsSchema.safeParse({ items, folderId: null }).success).toBe(true)
+  })
+})
+
+describe("grouping into a new folder (ADR 0039)", () => {
+  test("needs the file dropped on and at least one more item", () => {
+    const one = [{ kind: "document", id: "d1" }]
+    const two = [...one, { kind: "envelope", id: "e1" }]
+    expect(GroupItemsSchema.safeParse({ items: one, parentId: null }).success).toBe(false)
+    expect(GroupItemsSchema.safeParse({ items: two, parentId: "f1" }).success).toBe(true)
+  })
+
+  test("uniqueFolderName counts up past names in use, ignoring case", () => {
+    expect(uniqueFolderName("New folder", ["Leases"])).toBe("New folder")
+    expect(uniqueFolderName("New folder", ["new folder", "New folder 2"])).toBe("New folder 3")
   })
 })
