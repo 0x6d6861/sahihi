@@ -150,3 +150,73 @@ describe("POST /sign/:token/submit", () => {
     expect(finalizeJobs).toHaveLength(1)
   })
 })
+
+describe("two last signers at once", () => {
+  test("both signatures count: the envelope completes once, with one finalize job", async () => {
+    const { document } = await uploadDocument(alice)
+    const created = await request(alice, "/api/envelopes", {
+      method: "POST",
+      json: { documentId: document.id, title: "Race" },
+    })
+    const id = ((await created.json()) as { envelope: { id: string } }).envelope.id
+    const put = await request(alice, `/api/envelopes/${id}/recipients`, {
+      method: "PUT",
+      json: {
+        recipients: [
+          { name: "Amina", email: "amina@example.test" },
+          { name: "Baraka", email: "baraka@example.test" },
+        ],
+      },
+    })
+    const recipients = ((await put.json()) as { recipients: { id: string }[] }).recipients
+    const rect = { page: 1, width: 0.2, height: 0.05, x: 0.1 }
+    const fields = await request(alice, `/api/envelopes/${id}/fields`, {
+      method: "PUT",
+      json: {
+        fields: recipients.map((r, i) => ({
+          ...rect,
+          recipientId: r.id,
+          type: "SIGNATURE",
+          y: 0.1 + i * 0.1,
+        })),
+      },
+    })
+    const saved = ((await fields.json()) as { fields: { id: string; recipientId: string }[] })
+      .fields
+    expect((await request(alice, `/api/envelopes/${id}/send`, { method: "POST" })).status).toBe(200)
+    const jobs = await getQueues().notifications.raw.getJobs(["waiting", "delayed"])
+    const tokenFor = (recipientId: string) =>
+      jobs.find((j) => j.name === "envelope.invite" && j.data.recipientId === recipientId)?.data
+        .token as string
+
+    const results = await Promise.all(
+      recipients.map((r) =>
+        request(null, `/api/sign/${tokenFor(r.id)}/submit`, {
+          method: "POST",
+          json: {
+            consent: true,
+            consentVersion: CONSENT_VERSION,
+            values: [
+              {
+                kind: "image",
+                fieldId: saved.find((f) => f.recipientId === r.id)?.id,
+                dataUrl: PNG,
+              },
+            ],
+          },
+        }),
+      ),
+    )
+    expect(results.map((r) => r.status)).toEqual([200, 200])
+    const env = await prisma.envelope.findUniqueOrThrow({ where: { id } })
+    expect(env.status).toBe("COMPLETED")
+    const completed = await prisma.auditEvent.count({
+      where: { envelopeId: id, type: "envelope.completed" },
+    })
+    expect(completed).toBe(1)
+    const finalizeJobs = (await getQueues().finalize.raw.getJobs(["waiting", "delayed"])).filter(
+      (j) => j.data.envelopeId === id,
+    )
+    expect(finalizeJobs).toHaveLength(1)
+  })
+})

@@ -3,6 +3,7 @@ import {
   checkFolderMove,
   checkFoldersMove,
   folderPath,
+  isInsideMovingFolder,
   MAX_FOLDER_DEPTH,
   periodStart,
   subtreeHeight,
@@ -71,6 +72,16 @@ describe("checkFoldersMove", () => {
 
   test("a folder may move together with one of its subfolders", () => {
     expect(checkFoldersMove(["b", "c"], "d", tree)).toBeNull()
+  })
+})
+
+describe("isInsideMovingFolder", () => {
+  test("true at any depth below a moving folder, false elsewhere", () => {
+    const moving = new Set(["a"])
+    expect(isInsideMovingFolder("a", moving, tree)).toBe(true)
+    expect(isInsideMovingFolder("c", moving, tree)).toBe(true)
+    expect(isInsideMovingFolder("d", moving, tree)).toBe(false)
+    expect(isInsideMovingFolder(null, moving, tree)).toBe(false)
   })
 })
 

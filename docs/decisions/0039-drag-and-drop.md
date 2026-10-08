@@ -25,6 +25,8 @@ expect to drag files onto folders, pick several at once, and drop files from the
 - **One bulk endpoint, all or nothing.** `POST /api/files/move { items: {kind, id}[], folderId }`
   (≤ 100 items). Any item missing (404, also for another workspace's ids), not the caller's to move
   (403), a folder into its own subtree or too deep (400) or a folder name clash (409) moves nothing.
+  Items picked along with a folder they're in (select-all, a search) stay in it and travel
+  with it, so a move never flattens the tree (`isInsideMovingFolder`).
   One `updateMany` per type in one transaction. Organisation only, so no audit event (ADR 0038).
   The response lists where each item was, so the success toast offers **Undo**.
 - **Drop onto a file makes a folder.** Dropping items on a document, envelope or template (not a

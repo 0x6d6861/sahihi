@@ -98,3 +98,16 @@ export function checkFoldersMove(
   }
   return null
 }
+
+/**
+ * Is something in `folderId` (null = root) already inside one of `moving`, at any depth? Such an
+ * item travels with its folder: moving it separately would pull it out and flatten the tree, so
+ * a move of "a folder and things in it" leaves those things where they are (ADR 0039).
+ */
+export function isInsideMovingFolder(
+  folderId: string | null,
+  moving: ReadonlySet<string>,
+  parentOf: ReadonlyMap<string, string | null>,
+): boolean {
+  return folderId ? folderPath(folderId, parentOf).some((id) => moving.has(id)) : false
+}

@@ -20,7 +20,13 @@ import {
   truncateReason,
   VerifyOtpSchema,
 } from "@sahihi/core"
-import { appendAuditEvent, notifyEnvelopeOwner, prisma, queueEnvelopeWebhook } from "@sahihi/db"
+import {
+  appendAuditEvent,
+  notifyEnvelopeOwner,
+  type Prisma,
+  prisma,
+  queueEnvelopeWebhook,
+} from "@sahihi/db"
 import { activateNextRecipients } from "@sahihi/envelopes"
 import {
   enqueueWebhookDeliveries,
@@ -136,6 +142,18 @@ const requireReady = createMiddleware<SigningEnv>(async (c, next) => {
   if (!(await isVerified(c, s))) return c.json({ error: "verification_required" }, 401)
   await next()
 })
+
+/**
+ * SENT → IN_PROGRESS on the first view or signature. Checked by the state machine (rule 6) and
+ * guarded on SENT, so a concurrent completion or decline isn't overwritten.
+ */
+async function markInProgress(tx: Prisma.TransactionClient, envelopeId: string) {
+  assertTransition("SENT", "IN_PROGRESS")
+  await tx.envelope.updateMany({
+    where: { id: envelopeId, status: "SENT" },
+    data: { status: "IN_PROGRESS" },
+  })
+}
 
 export const signing = new Hono<SigningEnv>()
   .use("/:token/*", rateLimit({ bucket: "sign", limit: 120, windowSec: 60 }))
@@ -355,9 +373,7 @@ export const signing = new Hono<SigningEnv>()
           data: { status: "VIEWED", viewedAt: new Date() },
         })
         if (claimed.count === 0) return
-        if (s.envelope.status === "SENT") {
-          await tx.envelope.update({ where: { id: s.envelopeId }, data: { status: "IN_PROGRESS" } })
-        }
+        if (s.envelope.status === "SENT") await markInProgress(tx, s.envelopeId)
         await appendAuditEvent(tx, {
           envelopeId: s.envelopeId,
           type: "recipient.viewed",
@@ -520,6 +536,9 @@ export const signing = new Hono<SigningEnv>()
         ...meta,
       })
 
+      // Two last signers at once both see each other's signature here: `appendAuditEvent` above
+      // holds a per-envelope lock until commit, so the second transaction reads after the first
+      // commits. Keep an audit write (or another lock) before this read.
       const recipients = await tx.recipient.findMany({
         where: { envelopeId: s.envelopeId },
         select: { id: true, role: true, order: true, status: true },
@@ -533,7 +552,7 @@ export const signing = new Hono<SigningEnv>()
         })
         await appendAuditEvent(tx, { envelopeId: s.envelopeId, type: "envelope.completed" })
       } else if (s.envelope.status === "SENT") {
-        await tx.envelope.update({ where: { id: s.envelopeId }, data: { status: "IN_PROGRESS" } })
+        await markInProgress(tx, s.envelopeId)
       }
       // The last signature is reported as envelope.completed by finalize, with the signed PDF.
       if (outcome !== "COMPLETED") {
