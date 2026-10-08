@@ -38,16 +38,18 @@ model User {
   invitations      Invitation[]
   twoFactors       TwoFactor[]
 
-  documents      Document[]
-  envelopes      Envelope[]
-  templates      Template[]
-  folders        Folder[]
-  webhooks       WebhookEndpoint[]
-  exports        DataExport[]
-  apiKeys        ApiKey[]
-  bulkSends      BulkSend[]
-  savedSignature SavedSignature?
-  avatar         UserAvatar?
+  documents               Document[]
+  envelopes               Envelope[]
+  templates               Template[]
+  folders                 Folder[]
+  webhooks                WebhookEndpoint[]
+  exports                 DataExport[]
+  apiKeys                 ApiKey[]
+  bulkSends               BulkSend[]
+  savedSignature          SavedSignature?
+  avatar                  UserAvatar?
+  notifications           Notification[]
+  notificationPreferences NotificationPreference[]
 
   @@map("user")
 }
@@ -126,17 +128,19 @@ model Organization {
   members     Member[]
   invitations Invitation[]
 
-  documents    Document[]
-  envelopes    Envelope[]
-  templates    Template[]
-  folders      Folder[]
-  tags         Tag[]
-  webhooks     WebhookEndpoint[]
-  subscription Subscription?
-  settings     WorkspaceSettings?
-  exports      DataExport[]
-  apiKeys      ApiKey[]
-  bulkSends    BulkSend[]
+  documents               Document[]
+  envelopes               Envelope[]
+  templates               Template[]
+  folders                 Folder[]
+  tags                    Tag[]
+  webhooks                WebhookEndpoint[]
+  subscription            Subscription?
+  settings                WorkspaceSettings?
+  exports                 DataExport[]
+  apiKeys                 ApiKey[]
+  bulkSends               BulkSend[]
+  notifications           Notification[]
+  notificationPreferences NotificationPreference[]
 
   @@map("organization")
 }
@@ -332,10 +336,11 @@ model Envelope {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  recipients  Recipient[]
-  fields      Field[]
-  auditEvents AuditEvent[]
-  certificate Certificate?
+  recipients    Recipient[]
+  fields        Field[]
+  auditEvents   AuditEvent[]
+  certificate   Certificate?
+  notifications Notification[]
 
   @@index([organizationId, status])
   @@index([organizationId, createdAt])
@@ -731,4 +736,41 @@ model BulkSendItem {
 enum RecipientDelivery {
   EMAIL
   EMBEDDED
+}
+
+/// In-app notification for one user in one workspace (docs/notifications.md). Written in the same
+/// transaction as the change it reports. Deleted after NOTIFICATION_TTL_DAYS and when its envelope
+/// is purged (it holds names).
+model Notification {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// NotificationType from @sahihi/core
+  type           String
+  envelopeId     String?
+  envelope       Envelope?    @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+  /// NotificationData from @sahihi/core: a snapshot of names and counts for display
+  data           Json         @default("{}")
+  readAt         DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([userId, organizationId, createdAt])
+  @@index([userId, organizationId, readAt])
+  @@index([envelopeId])
+  @@index([createdAt])
+}
+
+/// A user's notification choices in one workspace. No row = defaults (NOTIFICATION_CATALOG).
+model NotificationPreference {
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// NotificationSettings from @sahihi/core: only the types the user changed
+  settings       Json         @default("{}")
+  updatedAt      DateTime     @updatedAt
+
+  @@id([userId, organizationId])
 }

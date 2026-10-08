@@ -2,7 +2,7 @@ import { assertTransition, sendPreflight } from "@sahihi/core"
 import { appendAuditEvent, prisma, queueEnvelopeWebhook } from "@sahihi/db"
 import { enqueueWebhookDeliveries, getQueues } from "@sahihi/infra"
 import { EnvelopeError, notFound } from "./errors"
-import { assertEnvelopeQuota } from "./quota"
+import { assertEnvelopeQuota, notifyQuotaUsage } from "./quota"
 import { activateNextRecipients } from "./routing"
 
 /** Who did it, for the audit trail (an API key acts on behalf of the admin who created it). */
@@ -42,7 +42,7 @@ export async function sendEnvelope(input: {
 
   const { links, webhooks } = await prisma.$transaction(async (tx) => {
     // Plan limit (docs/billing.md): serialised per workspace, refused with 402.
-    await assertEnvelopeQuota(tx, e.organizationId)
+    const quota = await assertEnvelopeQuota(tx, e.organizationId)
     await tx.envelope.update({ where: { id: e.id }, data: { status: "SENT", sentAt: new Date() } })
     await appendAuditEvent(tx, {
       envelopeId: e.id,
@@ -56,6 +56,7 @@ export async function sendEnvelope(input: {
       ipAddress: input.actor.ipAddress ?? null,
       userAgent: input.actor.userAgent ?? null,
     })
+    await notifyQuotaUsage(tx, e.organizationId, quota)
     const links = await activateNextRecipients(tx, e.id)
     const webhooks = await queueEnvelopeWebhook(tx, { envelopeId: e.id, type: "envelope.sent" })
     return { links, webhooks }

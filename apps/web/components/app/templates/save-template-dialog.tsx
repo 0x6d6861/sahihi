@@ -1,7 +1,7 @@
 "use client"
 
 import { defaultRoleLabels, type RecipientRole, SaveTemplateSchema } from "@sahihi/core"
-import { cloneElement, useState } from "react"
+import { useEffect, useState } from "react"
 import { ButtonLink } from "@/components/app/button-link"
 import { DialogActions } from "@/components/app/confirm-dialog"
 import { useDraftState } from "@/components/app/envelope/draft-state"
@@ -29,17 +29,27 @@ export function SaveTemplateDialog({
   envelopeId,
   envelopeTitle,
   recipients,
-  trigger,
+  open: openProp,
+  onOpenChange: onOpenChangeProp,
+  onAddRecipients,
 }: {
   envelopeId: string
   envelopeTitle: string
   recipients: TemplateSourceRecipient[]
-  /** Element the trigger renders as (e.g. a sidebar menu button); a secondary Button by default. */
-  trigger?: React.ReactElement
+  /**
+   * Controlled, without a trigger (e.g. opened from a menu item). Uncontrolled, it renders a
+   * secondary "Save as template" button.
+   */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  /** Without recipients there's nothing to save yet: this offers the way to add them. */
+  onAddRecipients?: () => void
 }) {
   const draft = useDraftState()
   const initialLabels = defaultRoleLabels(recipients)
-  const [open, setOpen] = useState(false)
+  const [openState, setOpenState] = useState(false)
+  const controlled = openProp !== undefined
+  const open = openProp ?? openState
   const [name, setName] = useState(envelopeTitle)
   const [description, setDescription] = useState("")
   const [labels, setLabels] = useState(initialLabels)
@@ -49,19 +59,28 @@ export function SaveTemplateDialog({
   const [pending, setPending] = useState(false)
   const [savedId, setSavedId] = useState<string | null>(null)
 
+  function setOpen(next: boolean) {
+    if (!controlled) setOpenState(next)
+    onOpenChangeProp?.(next)
+  }
+
   function onOpenChange(next: boolean) {
     if (pending) return
     setOpen(next)
-    if (next) {
-      setName(envelopeTitle)
-      setDescription("")
-      setLabels(initialLabels)
-      setKeep(recipients.map(() => false))
-      setErrors({})
-      setProblems([])
-      setSavedId(null)
-    }
   }
+
+  // Start each opening from a clean form, however it was opened.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset only when it opens
+  useEffect(() => {
+    if (!open) return
+    setName(envelopeTitle)
+    setDescription("")
+    setLabels(defaultRoleLabels(recipients))
+    setKeep(recipients.map(() => false))
+    setErrors({})
+    setProblems([])
+    setSavedId(null)
+  }, [open])
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -103,22 +122,16 @@ export function SaveTemplateDialog({
     }
   }
 
-  const label = (
-    <>
-      <LayoutTemplateIcon aria-hidden />
-      <span>Save as template</span>
-    </>
-  )
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger asChild>
-        {trigger ? (
-          cloneElement(trigger, undefined, label)
-        ) : (
-          <Button variant="secondary">{label}</Button>
-        )}
-      </DialogTrigger>
+      {!controlled && (
+        <DialogTrigger asChild>
+          <Button variant="secondary">
+            <LayoutTemplateIcon aria-hidden />
+            <span>Save as template</span>
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent
         title={savedId ? "Template saved" : "Save as template"}
         description="Reuse this document, its recipients' roles and every field. This envelope isn't changed."
@@ -136,6 +149,23 @@ export function SaveTemplateDialog({
               <ButtonLink variant="primary" href={`/templates/${savedId}/use`}>
                 Use it now
               </ButtonLink>
+            </DialogActions>
+          </div>
+        ) : recipients.length === 0 ? (
+          <div className="flex flex-col gap-4">
+            <Alert tone="info" title="Add a recipient first">
+              A template keeps each recipient's role and fields, so this draft needs at least one
+              recipient before it can be saved as a template.
+            </Alert>
+            <DialogActions>
+              <Button variant="ghost" onClick={() => setOpen(false)}>
+                Close
+              </Button>
+              {onAddRecipients && (
+                <Button variant="primary" onClick={onAddRecipients}>
+                  Add recipients
+                </Button>
+              )}
             </DialogActions>
           </div>
         ) : (

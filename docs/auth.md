@@ -44,9 +44,9 @@ Likely next plugins: see **What better-auth offers next** below.
 
 ## Account settings
 
-Settings has three account tabs before the workspace ones (`SETTINGS_NAV` in `lib/nav.ts`):
-**Profile**, **Security**, **Workspace**, then Members, Plan & usage, Data and API. The user menu
-opens Profile.
+Settings has its account tabs before the workspace ones (`SETTINGS_NAV` in `lib/nav.ts`):
+**Profile**, **Security**, **Notifications** (`docs/notifications.md`), **Workspace**, then Members,
+Plan & usage, Data and API. The user menu opens Profile.
 
 ### Profile (`/settings/profile`, any signed-in user)
 

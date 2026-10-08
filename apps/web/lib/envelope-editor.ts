@@ -8,28 +8,36 @@ import { FIELD_LABELS } from "./constants"
 export const EDITOR_STEPS = ["document", "recipients", "fields", "preview"] as const
 export type EditorStep = (typeof EDITOR_STEPS)[number]
 
-export const EDITOR_STEP_INFO: Record<EditorStep, { title: string; description: string }> = {
+/** `label` names the step in the editor's pill; `description` is its hover hint. */
+export const EDITOR_STEP_INFO: Record<EditorStep, { label: string; description: string }> = {
   document: {
-    title: "Prepare document",
+    label: "Document",
     description: "Optional: redact, rotate, reorder or remove pages",
   },
-  recipients: { title: "Recipients", description: "Who signs, approves or gets a copy" },
-  fields: { title: "Add fields", description: "Place fields on the pages for each recipient" },
-  preview: { title: "Preview", description: "Review the document before sending" },
+  recipients: {
+    label: "Recipients",
+    description: "Who signs, approves or gets a copy",
+  },
+  fields: {
+    label: "Fields",
+    description: "Place fields on the pages for each recipient",
+  },
+  preview: { label: "Preview", description: "Review the document before sending" },
+}
+
+/** The step pill's hover hint: what the step is for, or why it isn't open yet. */
+export function stepHint(step: EditorStep, hasFieldOwners: boolean): string {
+  if (!stepEnabled(step, hasFieldOwners)) return "Add a signer or approver first"
+  return EDITOR_STEP_INFO[step].description
 }
 
 export function isEditorStep(v: string | null | undefined): v is EditorStep {
   return EDITOR_STEPS.includes(v as EditorStep)
 }
 
-/** 1-based position, for "Step 2/4". */
+/** 1-based position. */
 export function stepNumber(step: EditorStep): number {
   return EDITOR_STEPS.indexOf(step) + 1
-}
-
-/** Share of the steps reached, 0–100, for the progress bar. */
-export function stepProgress(step: EditorStep): number {
-  return Math.round((stepNumber(step) / EDITOR_STEPS.length) * 100)
 }
 
 /** Fields and preview need someone who can own a field (a signer or approver). */

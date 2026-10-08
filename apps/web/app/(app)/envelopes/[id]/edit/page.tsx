@@ -5,9 +5,8 @@ import { apiServer } from "@/lib/api-server"
 import { type EnvelopeResponse, isEditableDraft } from "@/lib/envelope-detail"
 
 /**
- * Draft envelope editor (ADR 0021): full bleed inside the app shell, three steps (document &
- * recipients, fields, preview) in a left rail, Send in the top bar. Anything but an editable draft goes back to the
- * read-only envelope page.
+ * Draft envelope editor (ADR 0021, ADR 0031): a full page with its own top bar (the steps as a
+ * pill, More and Send). Anything but an editable draft goes back to the read-only envelope page.
  */
 export default async function EditEnvelopePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

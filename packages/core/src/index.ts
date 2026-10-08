@@ -18,6 +18,8 @@ export * from "./integrations/embed"
 export * from "./integrations/public-api"
 export * from "./integrations/webhooks"
 
+export * from "./notifications/notifications"
+
 export * from "./security/audit"
 export * from "./security/client-ip"
 export * from "./security/crypto"

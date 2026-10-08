@@ -24,3 +24,5 @@ step rail, so the editor showed two rails side by side.
 ## Consequences
 - No ⌘B / collapsible rail and no `sidebar_state` cookie in the app shell any more.
 - A fourth or fifth section still fits the pill; beyond that, revisit (a "More" menu or a rail).
+- ADR 0031: the pill is shared (`PillNav`) with the draft editor, which is now a full page with
+  its own bar and no rail.

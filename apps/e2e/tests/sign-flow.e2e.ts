@@ -62,14 +62,15 @@ test("sender signs up, sends an envelope; the signer signs; a certificate is iss
   // A new draft opens in the draft editor, on its first step (Prepare document, optional).
   await page.waitForURL(/\/envelopes\/[a-z0-9]{20,}\/edit/)
   await settle(page)
-  await page.getByRole("button", { name: /^Recipients/ }).click()
+  const steps = page.getByRole("navigation", { name: "Steps" })
+  await steps.getByRole("button", { name: "Recipients" }).click()
   await page.getByLabel("Name").first().fill(signer.name)
   await page.getByLabel("Email").first().fill(signer.email)
   await page.getByRole("button", { name: "Save recipients" }).click()
   await expect(page.getByText("All changes saved").first()).toBeVisible()
 
   // ── Place a signature field on page 1 ──
-  await page.getByRole("button", { name: /^Add fields/ }).click()
+  await steps.getByRole("button", { name: "Fields" }).click()
   await page
     .getByRole("complementary", { name: "Field tools" })
     .getByRole("button", { name: "Signature", exact: true })

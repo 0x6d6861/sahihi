@@ -125,7 +125,7 @@ Typed contracts: `packages/infra/src/queues.ts`. Consumers: `apps/worker/src/ind
 |---|---|---|
 | `notifications` | `auth.*`, `envelope.invite/reminder/completed/declined/voided`, `recipient.otp` | concurrency 10, 5 attempts exp. backoff |
 | `envelope-finalize` | `envelope.finalize` | `jobId: finalize-<envelopeId>` dedupes (BullMQ ids may not contain `:`); concurrency 2 |
-| `maintenance` | `envelopes.expire` (hourly :05), `envelopes.remind` (09:00 Africa/Nairobi), `documents.sweep-uploads` (every 15 min), `bulk.send` (on demand, `jobId: bulk-<id>`) | job schedulers upserted at worker boot |
+| `maintenance` | `envelopes.expire` (hourly :05), `envelopes.remind` (09:00 Africa/Nairobi), `documents.sweep-uploads` (every 15 min), `notifications.cleanup` (02:50 Africa/Nairobi, docs/notifications.md), `bulk.send` (on demand, `jobId: bulk-<id>`) | job schedulers upserted at worker boot |
 
 ### Emails
 

@@ -1,6 +1,6 @@
 # 0021: Full-screen draft envelope editor with steps
 
-- **Status:** accepted (amended 2026-10-07: the editor now sits inside the app shell, see below)
+- **Status:** accepted (amended 2026-10-07: the editor now sits inside the app shell, see below; layout superseded by ADR 0031)
 - **Date:** 2026-10-07
 
 ## Context

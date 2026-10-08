@@ -82,6 +82,8 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
 - [x] Account settings: profile (picture, name, email change, saved signature), security (password, TOTP 2FA +
       backup codes, sessions), workspace (name, logo in emails and signing page, leave) (`docs/auth.md`
       → Account settings, ADR 0028)
+- [x] In-app notifications: bell in the top bar (envelope and workspace events), per-type preferences
+      in Settings → Notifications (`docs/notifications.md`, ADR 0029)
 - [ ] Passkeys, delete account, forgot-password pages (`docs/auth.md` → What better-auth offers next)
 
 ## Later

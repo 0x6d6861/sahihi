@@ -11,12 +11,13 @@ export const APP_NAV: readonly { href: AppNavHref; label: string }[] = [
 export type AppNavHref = "/documents" | "/envelopes" | "/templates"
 
 /**
- * Settings pages: the tab bar on every settings page. Your account first (profile, security), then
- * the active workspace. The user menu links to the first one.
+ * Settings pages: the tab bar on every settings page. Your account first (profile, security,
+ * notifications), then the active workspace. The user menu links to the first one.
  */
 export const SETTINGS_NAV = [
   { href: "/settings/profile", label: "Profile" },
   { href: "/settings/security", label: "Security" },
+  { href: "/settings/notifications", label: "Notifications" },
   { href: "/settings/workspace", label: "Workspace" },
   { href: "/settings/members", label: "Members" },
   { href: "/settings/billing", label: "Plan & usage" },
@@ -30,10 +31,11 @@ export function isNavActive(pathname: string, href: string): boolean {
 }
 
 /**
- * Pages that fill the shell edge to edge instead of the centred, padded column: the draft envelope
- * editor (`/envelopes/:id/edit`, ADR 0021) brings its own rail, top bar and scroll areas.
+ * Full-page tools: the app shell hides its top bar and column, and the page fills the window with
+ * its own bar and scroll areas. Today only the draft envelope editor (`/envelopes/:id/edit`,
+ * ADR 0021, ADR 0031).
  */
-export function isFullBleed(pathname: string): boolean {
+export function isFullPage(pathname: string): boolean {
   return /^\/envelopes\/[^/]+\/edit\/?$/.test(pathname)
 }
 

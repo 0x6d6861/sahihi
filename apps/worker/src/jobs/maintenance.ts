@@ -1,6 +1,12 @@
 import { getEnv } from "@sahihi/config"
 import { abandonedUploadCutoff } from "@sahihi/core"
-import { appendAuditEvent, issueSigningLink, prisma, queueEnvelopeWebhook } from "@sahihi/db"
+import {
+  appendAuditEvent,
+  issueSigningLink,
+  notifyEnvelopeOwner,
+  prisma,
+  queueEnvelopeWebhook,
+} from "@sahihi/db"
 import { createLogger, deleteObject, enqueueWebhookDeliveries, getQueues } from "@sahihi/infra"
 
 const log = createLogger("worker")
@@ -25,6 +31,7 @@ export async function expireEnvelopes() {
       if (res.count === 0) return []
       await tx.recipient.updateMany({ where: { envelopeId: id }, data: { tokenHash: null } })
       await appendAuditEvent(tx, { envelopeId: id, type: "envelope.expired" })
+      await notifyEnvelopeOwner(tx, { envelopeId: id, type: "envelope.expired" })
       return queueEnvelopeWebhook(tx, { envelopeId: id, type: "envelope.expired" })
     })
     await enqueueWebhookDeliveries(webhooks)

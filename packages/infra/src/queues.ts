@@ -44,6 +44,8 @@ export interface MaintenanceJobs {
   "export.build": { exportId: string }
   /** Daily: delete expired export archives. */
   "exports.cleanup": Record<string, never>
+  /** Daily: delete in-app notifications past NOTIFICATION_TTL_DAYS (docs/notifications.md). */
+  "notifications.cleanup": Record<string, never>
   /** After a workspace is deleted: remove everything under org/<id>/ in storage. */
   "organization.purge-storage": { organizationId: string }
   /** Create and send one envelope per row (docs/bulk-send.md). */

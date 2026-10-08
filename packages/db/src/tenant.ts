@@ -40,6 +40,10 @@ export function forOrganization(organizationId: string) {
       ...where,
       organizationId,
     }),
+    notification: (where: Prisma.NotificationWhereInput = {}): Prisma.NotificationWhereInput => ({
+      ...where,
+      organizationId,
+    }),
     webhookDelivery: (
       where: Prisma.WebhookDeliveryWhereInput = {},
     ): Prisma.WebhookDeliveryWhereInput => ({ ...where, organizationId }),

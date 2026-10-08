@@ -215,6 +215,7 @@ const LISTS = [
   "GET /api/webhooks",
   "GET /api/data/exports",
   "GET /api/bulk-sends",
+  "GET /api/notifications",
 ]
 
 /**
@@ -256,6 +257,14 @@ const NOT_TENANT = [
   "DELETE /api/me/signatures/:kind",
   "PUT /api/me/avatar",
   "DELETE /api/me/avatar",
+  // The caller's own notifications in their workspace, keyed by user and org; ids from the body
+  // only ever match the caller's rows (notifications.itest.ts).
+  "GET /api/notifications/unread-count",
+  "POST /api/notifications/read",
+  "POST /api/notifications/unread",
+  "POST /api/notifications/dismiss",
+  "GET /api/notifications/preferences",
+  "PUT /api/notifications/preferences",
   // A user's picture, for themselves and people sharing a workspace (account.itest.ts).
   "GET /api/avatars/:userId",
   // The caller's own workspace logo; no ids.

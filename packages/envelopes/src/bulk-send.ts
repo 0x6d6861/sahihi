@@ -6,7 +6,7 @@ import {
   type TemplateForUse,
   validateBulkRows,
 } from "@sahihi/core"
-import { countEnvelopesSent, getOrgPlan, Prisma, prisma } from "@sahihi/db"
+import { countEnvelopesSent, getOrgPlan, notifyUsers, Prisma, prisma } from "@sahihi/db"
 import { getQueues } from "@sahihi/infra"
 import { EnvelopeError, notFound } from "./errors"
 import { createEnvelopeFromTemplate } from "./from-template"
@@ -174,10 +174,23 @@ export async function processBulkSend(bulkSendId: string) {
       ])
     }
   }
-  await prisma.bulkSend.update({
-    where: { id: bulk.id },
-    data: { status: "DONE", completedAt: new Date() },
+  const done = await prisma.$transaction(async (tx) => {
+    const done = await tx.bulkSend.update({
+      where: { id: bulk.id },
+      data: { status: "DONE", completedAt: new Date() },
+    })
+    await notifyUsers(tx, {
+      organizationId: done.organizationId,
+      userIds: [done.createdById],
+      type: "bulk_send.finished",
+      data: {
+        bulkSendId: done.id,
+        bulkSendTitle: done.title,
+        sent: done.sent,
+        failed: done.failed,
+      },
+    })
+    return done
   })
-  const done = await prisma.bulkSend.findUniqueOrThrow({ where: { id: bulk.id } })
   return { sent: done.sent, failed: done.failed }
 }

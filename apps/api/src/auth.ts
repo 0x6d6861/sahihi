@@ -1,6 +1,6 @@
 import { getEnv } from "@sahihi/config"
 import { canAddSeat, orgAc, orgRoles, seatLimitMessage } from "@sahihi/core"
-import { countSeats, getOrgPlan, prisma } from "@sahihi/db"
+import { countSeats, getOrgPlan, notifyWorkspaceAdmins, prisma } from "@sahihi/db"
 import { getQueues } from "@sahihi/infra"
 import { betterAuth } from "better-auth"
 import { prismaAdapter } from "better-auth/adapters/prisma"
@@ -71,9 +71,9 @@ export const auth = betterAuth({
       update: {
         // The picture is uploaded through PUT /api/me/avatar, which sets `image` to our own URL.
         // Refusing it here keeps `update-user` from pointing it anywhere else.
-        // update-user always passes an `image` key (undefined when only the name changes).
-        before: async (user) => {
-          if (user.image !== undefined) {
+        before: async (user, ctx) => {
+          // better-auth passes `image: undefined` on updates that don't touch it (a name change).
+          if (ctx && "image" in user && user.image !== undefined) {
             throw new APIError("BAD_REQUEST", { message: "Upload a picture in Settings → Profile" })
           }
         },
@@ -129,6 +129,15 @@ export const auth = betterAuth({
           if (!canAddSeat(plan, members, pendingInvitations)) {
             throw new APIError("FORBIDDEN", { message: seatLimitMessage(plan) })
           }
+        },
+        // Bell notification for the workspace's owners and admins (docs/notifications.md).
+        afterAcceptInvitation: async ({ member, user, organization }) => {
+          await notifyWorkspaceAdmins(prisma, {
+            organizationId: organization.id,
+            type: "member.joined",
+            exceptUserId: member.userId,
+            data: { memberName: user.name || user.email },
+          })
         },
         // The DB rows cascade; stored files (PDFs, signatures, exports) are removed by the worker
         // (docs/data-retention.md → Deleting a workspace).

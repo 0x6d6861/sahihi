@@ -7,11 +7,9 @@ const LOCALE = "en-GB"
 const TIME_ZONE = "Africa/Nairobi"
 
 const date = new Intl.DateTimeFormat(LOCALE, { dateStyle: "medium", timeZone: TIME_ZONE })
-const dateTime = new Intl.DateTimeFormat(LOCALE, {
-  dateStyle: "medium",
-  timeStyle: "short",
-  timeZone: TIME_ZONE,
-})
+// Time on its own: ICU versions disagree on how `dateStyle` + `timeStyle` join ("3 Oct 2026 at
+// 14:05" vs "3 Oct 2026, 14:05"), so formatDateTime joins the parts itself.
+const time = new Intl.DateTimeFormat(LOCALE, { timeStyle: "short", timeZone: TIME_ZONE })
 const dayMonth = new Intl.DateTimeFormat(LOCALE, {
   day: "numeric",
   month: "long",
@@ -31,7 +29,8 @@ export function formatDate(value: DateInput): string {
 
 /** "3 Oct 2026 at 14:05" */
 export function formatDateTime(value: DateInput): string {
-  return dateTime.format(toDate(value))
+  const d = toDate(value)
+  return `${date.format(d)} at ${time.format(d)}`
 }
 
 /** "1 November", for resets and renewals within the year. */

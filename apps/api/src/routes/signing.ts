@@ -16,9 +16,10 @@ import {
   otpResendWaitSec,
   SubmitSigningSchema,
   timingSafeEqual,
+  truncateReason,
   VerifyOtpSchema,
 } from "@sahihi/core"
-import { appendAuditEvent, prisma, queueEnvelopeWebhook } from "@sahihi/db"
+import { appendAuditEvent, notifyEnvelopeOwner, prisma, queueEnvelopeWebhook } from "@sahihi/db"
 import { activateNextRecipients } from "@sahihi/envelopes"
 import {
   enqueueWebhookDeliveries,
@@ -340,6 +341,11 @@ export const signing = new Hono<SigningEnv>()
           recipientId: s.id,
           ...clientMeta(c),
         })
+        await notifyEnvelopeOwner(tx, {
+          envelopeId: s.envelopeId,
+          type: "recipient.viewed",
+          recipientId: s.id,
+        })
       })
     }
     return c.json({
@@ -475,6 +481,14 @@ export const signing = new Hono<SigningEnv>()
       } else if (s.envelope.status === "SENT") {
         await tx.envelope.update({ where: { id: s.envelopeId }, data: { status: "IN_PROGRESS" } })
       }
+      // The last signature is reported as envelope.completed by finalize, with the signed PDF.
+      if (outcome !== "COMPLETED") {
+        await notifyEnvelopeOwner(tx, {
+          envelopeId: s.envelopeId,
+          type: "recipient.signed",
+          recipientId: s.id,
+        })
+      }
       // envelope.completed is emitted by finalize, once the signed PDF and certificate exist.
       const webhooks = await queueEnvelopeWebhook(tx, {
         envelopeId: s.envelopeId,
@@ -522,6 +536,12 @@ export const signing = new Hono<SigningEnv>()
         ...clientMeta(c),
       })
       await appendAuditEvent(tx, { envelopeId: s.envelopeId, type: "envelope.declined" })
+      await notifyEnvelopeOwner(tx, {
+        envelopeId: s.envelopeId,
+        type: "envelope.declined",
+        recipientId: s.id,
+        data: { reason: truncateReason(reason) },
+      })
       return queueEnvelopeWebhook(tx, {
         envelopeId: s.envelopeId,
         type: "envelope.declined",
