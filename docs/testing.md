@@ -36,8 +36,11 @@ Integration tests are named `*.itest.ts`, so neither it nor a bare `bun test` pi
 
 `.github/workflows/claude-review.yml` (`anthropics/claude-code-action@v1`) has two jobs:
 - **`review`:** Claude reviews every non-draft PR from this repository when it opens, gets new
-  commits or becomes ready. It checks the diff against the golden rules in AGENTS.md, posts
-  findings inline as `blocking:` or `nit:`, and finishes with a summary comment.
+  commits or becomes ready. It checks the diff against the golden rules in AGENTS.md and the
+  Karpathy guidelines (`.claude/skills/karpathy-guidelines/SKILL.md`: think before coding,
+  simplicity first, surgical changes, goal-driven execution), posts findings inline as
+  `blocking:` or `nit:`, and finishes with a summary comment. Edit the skill to change what it
+  checks.
 - **`mention`:** answers `@claude …` in PR and issue comments from owners, members and
   collaborators.
 

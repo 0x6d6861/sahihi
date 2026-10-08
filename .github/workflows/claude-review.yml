@@ -41,8 +41,9 @@ jobs:
         REPO: ${{ github.repository }}
         PR NUMBER: ${{ github.event.pull_request.number }}
 
-        Review this pull request. Read AGENTS.md first, then the docs/*.md files for the
-        areas the diff touches (its "Doc map" says which).
+        Review this pull request. Read AGENTS.md first, then
+        .claude/skills/karpathy-guidelines/SKILL.md (the review checklist and how to report),
+        then the docs/*.md files for the areas the diff touches (AGENTS.md's "Doc map" says which).
 
         Check the diff against the golden rules in AGENTS.md, in particular:
         - tenant isolation: tenant-owned queries go through forOrganization(orgId);
@@ -53,13 +54,14 @@ jobs:
         - request bodies validated with zod schemas from @sahihi/core;
         - UI built from registry components with theme tokens, working in light and dark;
         - the dependency direction between packages.
-        Also look for correctness bugs, security issues, missing tests and docs that no
-        longer match the code.
+        Then apply the four Karpathy guidelines (think before coding, simplicity first,
+        surgical changes, goal-driven execution) and look for correctness bugs and
+        security issues.
 
-        Post each finding on its line with the inline comment tool, starting with
-        "blocking:" or "nit:". Skip formatting and import order: Biome checks those.
-        Finish with one top-level summary comment (gh pr comment) listing the blocking
-        findings, or saying there are none. Don't push commits or change files.
+        Report as the skill says: one finding per inline comment on its line, starting with
+        "blocking:" or "nit:" and naming the guideline when it's the reason. Finish with one
+        top-level summary comment (gh pr comment) listing the blocking findings, or saying
+        there are none. Don't push commits or change files.
       REVIEW_ARGS: >-
         --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Grep,Glob"
     steps:
