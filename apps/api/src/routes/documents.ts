@@ -9,14 +9,13 @@ import {
   MAX_UPLOAD_BYTES,
   mergeSuggestions,
   type PageBox,
-  periodStart,
   sha256Hex,
   suggestFieldsFromAnchors,
   suggestFieldsFromForm,
   suggestFieldsFromText,
   UpdateDocumentSchema,
 } from "@sahihi/core"
-import { forOrganization, type Prisma, prisma } from "@sahihi/db"
+import { forOrganization, prisma } from "@sahihi/db"
 import {
   deleteObject,
   getObjectBytes,
@@ -31,7 +30,8 @@ import { Hono } from "hono"
 import type { AppEnv } from "../lib/env"
 import { loadFolderTree } from "../lib/folder-tree"
 import { badRequest, conflict, notFound, parseJson, parseQuery } from "../lib/http"
-import { colorsInUse, hasTag, resolveTags, TAG_SELECT, tagMatches, tagsInUse } from "../lib/labels"
+import { colorsInUse, resolveTags, TAG_SELECT, tagsInUse } from "../lib/labels"
+import { documentWhere } from "../lib/list-filters"
 import { actor, assertCanDeleteDocument, assertCanMoveDocument } from "../lib/permissions"
 import { queueThumbnail } from "../lib/thumbnails"
 import { requireOrg } from "../middleware/session"
@@ -136,18 +136,7 @@ export const documents = new Hono<AppEnv>()
       })
       if (!folder) notFound("Folder")
     }
-    const everywhere = Boolean(query.q || query.tag || query.color)
-    const filters: Prisma.DocumentWhereInput = {
-      status: query.status ?? { not: "UPLOADING" },
-      ...(!everywhere && { folderId: query.folderId ?? null }),
-      ...(query.q && {
-        OR: [{ name: { contains: query.q, mode: "insensitive" } }, { tags: tagMatches(query.q) }],
-      }),
-      ...(query.tag && { tags: hasTag(query.tag) }),
-      ...(query.color && { color: query.color }),
-      ...(query.senderId && { uploadedById: query.senderId }),
-      ...(query.period && { createdAt: { gte: periodStart(query.period, new Date()) } }),
-    }
+    const filters = documentWhere({ ...query, ownerId: query.senderId })
     const where = scope.document(filters)
     const [items, total, senders, tags] = await prisma.$transaction([
       prisma.document.findMany({

@@ -211,6 +211,10 @@ const TENANT: Record<string, Case> = {
     path: `/api/webhooks/${ids.webhook}/deliveries/${ids.delivery}/retry`,
     init: { method: "POST" },
   }),
+  "PATCH /api/envelopes/:id/labels": () => ({
+    path: `/api/envelopes/${ids.envelope}/labels`,
+    init: { method: "PATCH", json: { folderId: null } },
+  }),
   "PATCH /api/documents/:id": () => ({
     path: `/api/documents/${ids.document}`,
     init: { method: "PATCH", json: { folderId: null } },
