@@ -8,13 +8,15 @@ import { z } from "zod"
 /** Same minimum as `emailAndPassword.minPasswordLength` in apps/api/src/auth.ts. */
 export const MIN_PASSWORD_LENGTH = 10
 
+const newPassword = z
+  .string()
+  .min(MIN_PASSWORD_LENGTH, `Use at least ${MIN_PASSWORD_LENGTH} characters`)
+  .max(128)
+
 export const ChangePasswordSchema = z
   .object({
     currentPassword: z.string().min(1, "Enter your current password"),
-    newPassword: z
-      .string()
-      .min(MIN_PASSWORD_LENGTH, `Use at least ${MIN_PASSWORD_LENGTH} characters`)
-      .max(128),
+    newPassword,
     confirmPassword: z.string(),
     revokeOtherSessions: z.boolean(),
   })
@@ -27,6 +29,21 @@ export const ChangePasswordSchema = z
     message: "Choose a password you haven't used here",
   })
 export type ChangePasswordInput = z.infer<typeof ChangePasswordSchema>
+
+/** `/forgot-password`: where to send the reset link. */
+export const ForgotPasswordSchema = z.object({
+  email: z.string().trim().email("Enter your email address"),
+})
+export type ForgotPasswordInput = z.infer<typeof ForgotPasswordSchema>
+
+/** `/reset-password?token=…`: the new password, typed twice. */
+export const ResetPasswordSchema = z
+  .object({ newPassword, confirmPassword: z.string() })
+  .refine((v) => v.newPassword === v.confirmPassword, {
+    path: ["confirmPassword"],
+    message: "The passwords don't match",
+  })
+export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>
 
 /** A 6-digit code from an authenticator app. */
 export const TotpCodeSchema = z.string().regex(/^\d{6}$/, "Enter the 6-digit code")

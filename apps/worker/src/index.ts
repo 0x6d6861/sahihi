@@ -24,6 +24,7 @@ import {
   cleanupNotifications,
   purgeEnvelope,
   purgeOrganizationStorage,
+  purgeUserStorage,
   retentionSweep,
 } from "./jobs/retention"
 import { renderDocumentThumbnail, sweepThumbnails } from "./jobs/thumbnails"
@@ -65,6 +66,9 @@ const workers = [
       }
       if (job.name === "bulk.send") {
         return processBulkSend((job.data as MaintenanceJobs["bulk.send"]).bulkSendId)
+      }
+      if (job.name === "user.purge-storage") {
+        return purgeUserStorage((job.data as MaintenanceJobs["user.purge-storage"]).userId)
       }
       if (job.name === "organization.purge-storage") {
         const data = job.data as MaintenanceJobs["organization.purge-storage"]

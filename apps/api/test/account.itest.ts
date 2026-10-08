@@ -1,7 +1,16 @@
 import { beforeEach, describe, expect, test } from "bun:test"
 import { prisma } from "@sahihi/db"
+import { getQueues, headObject } from "@sahihi/infra"
+import { purgeUserStorage } from "../../worker/src/jobs/retention"
 import { auth } from "../src/auth"
-import { createSender, joinOrganization, request, resetDb } from "./helpers"
+import {
+  createSender,
+  joinOrganization,
+  request,
+  resetDb,
+  type Sender,
+  uploadDocument,
+} from "./helpers"
 
 /** Settings → Profile and Workspace (docs/auth.md → Account settings). */
 
@@ -12,6 +21,14 @@ const PNG =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
 
 beforeEach(resetDb)
+
+/** The link in the newest queued auth email of `name` to `email`. */
+async function emailedLink(name: string, email: string): Promise<URL> {
+  const jobs = await getQueues().notifications.raw.getJobs(["waiting", "delayed"])
+  const job = jobs.find((j) => j.name === name && j.data.email === email)
+  if (!job) throw new Error(`no ${name} email queued for ${email}`)
+  return new URL((job.data as { url: string }).url)
+}
 
 describe("saved signatures (/api/me/signatures)", () => {
   test("need a session but no active workspace", async () => {
@@ -186,5 +203,102 @@ describe("profile picture", () => {
     await auth.api.updateUser({ body: { name: "Amina O." }, headers })
     const user = await prisma.user.findUniqueOrThrow({ where: { id: amina.userId } })
     expect(user).toMatchObject({ name: "Amina O.", image: null })
+  })
+})
+
+describe("deleting an account (ADR 0040)", () => {
+  /** The raw token from the queued email's link (only the hash is stored). */
+  const emailedToken = async (email: string) =>
+    (await emailedLink("auth.delete-account", email)).searchParams.get("token") ?? ""
+  const ask = (s: Sender, password: string) =>
+    request(s, "/api/me/deletion", { method: "POST", json: { password } })
+  const confirm = (token: string) =>
+    request(null, "/api/account/delete", { method: "POST", json: { token } })
+
+  test("password, then the emailed link: the person is erased, their work stays", async () => {
+    const owner = await createSender("owner")
+    const amina = await joinOrganization(owner, "amina", "member")
+    const { document } = await uploadDocument(amina)
+    await request(amina, "/api/me/signatures", {
+      method: "PUT",
+      json: { kind: "signature", dataUrl: PNG },
+    })
+
+    expect((await ask(amina, "wrong password")).status).toBe(400)
+    const signatureKey = (
+      await prisma.savedSignature.findUniqueOrThrow({ where: { userId: amina.userId } })
+    ).signatureKey as string
+    const res = await ask(amina, amina.password)
+    expect(res.status).toBe(202)
+    const token = await emailedToken(amina.email)
+    // Only the hash is stored.
+    expect(await prisma.verification.count({ where: { identifier: { contains: token } } })).toBe(0)
+
+    expect((await confirm(token)).status).toBe(200)
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: amina.userId } })
+    expect(user).toMatchObject({
+      name: "Deleted user",
+      email: `deleted-${amina.userId}@redacted.invalid`,
+      image: null,
+    })
+    expect(await prisma.session.count({ where: { userId: amina.userId } })).toBe(0)
+    expect(await prisma.account.count({ where: { userId: amina.userId } })).toBe(0)
+    expect(await prisma.member.count({ where: { userId: amina.userId } })).toBe(0)
+    expect(await prisma.savedSignature.count({ where: { userId: amina.userId } })).toBe(0)
+    // The document belongs to the workspace and stays, credited to "Deleted user".
+    expect(
+      (await prisma.document.findUniqueOrThrow({ where: { id: document.id } })).uploadedById,
+    ).toBe(amina.userId)
+    expect(await getQueues().maintenance.raw.getJob(`purge-user-${amina.userId}`)).toBeTruthy()
+    expect((await purgeUserStorage(amina.userId)).deleted).toBeGreaterThanOrEqual(1)
+    expect(await headObject(signatureKey)).toBeNull()
+
+    // The old session is gone, the link works once, and the old password signs nobody in.
+    expect((await request(amina, "/api/me/signatures")).status).toBe(401)
+    expect((await confirm(token)).status).toBe(404)
+    const signIn = await auth.api
+      .signInEmail({ body: { email: amina.email, password: amina.password } })
+      .catch(() => null)
+    expect(signIn).toBeNull()
+  })
+
+  test("the last owner of a workspace can't delete until someone else owns it", async () => {
+    const owner = await createSender("owner")
+    expect((await request(owner, "/api/me/deletion")).status).toBe(200)
+    const res = await ask(owner, owner.password)
+    expect(res.status).toBe(409)
+    expect(((await res.json()) as { error: string }).error).toContain("owner Ltd")
+
+    await joinOrganization(owner, "second", "owner")
+    expect((await ask(owner, owner.password)).status).toBe(202)
+  })
+
+  test("an unknown or expired link deletes nothing", async () => {
+    const owner = await createSender("owner")
+    const amina = await joinOrganization(owner, "amina", "member")
+    await ask(amina, amina.password)
+    const token = await emailedToken(amina.email)
+    await prisma.verification.updateMany({
+      where: { value: amina.userId },
+      data: { expiresAt: new Date(Date.now() - 1000) },
+    })
+    expect((await confirm(token)).status).toBe(404)
+    expect((await confirm("x".repeat(43))).status).toBe(404)
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: amina.userId } })).name).toBe(
+      "amina",
+    )
+  })
+})
+
+describe("password reset", () => {
+  test("signs out every device", async () => {
+    const amina = await createSender("amina")
+    await auth.api.requestPasswordReset({
+      body: { email: amina.email, redirectTo: "/reset-password" },
+    })
+    const link = await emailedLink("auth.reset-password", amina.email)
+    const token = link.pathname.split("/").pop() ?? ""
+    await auth.api.resetPassword({ body: { token, newPassword: "a brand new password" } })
+    expect(await prisma.session.count({ where: { userId: amina.userId } })).toBe(0)
   })
 })

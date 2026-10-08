@@ -10,6 +10,7 @@
     "typecheck": "tsc -p ."
   },
   "dependencies": {
+    "@better-auth/passkey": "1.7.6",
     "@bull-board/api": "9.10.1",
     "@bull-board/hono": "9.10.1",
     "@sahihi/config": "workspace:*",

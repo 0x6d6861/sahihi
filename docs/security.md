@@ -62,6 +62,8 @@ tenants must never see each other's data.**
 | `/api/sign/:token/otp` | 5 / 15 min / token |
 | `/api/verify/*` | 30 / min / IP |
 | `/api/branding/:orgId/logo.png` (public workspace logo, ADR 0028) | 300 / min / IP |
+| `/api/account/*` (confirm account deletion, ADR 0040) | 10 / min / IP |
+| `POST /api/me/deletion` (password check before deleting an account) | 5 / 10 min / user |
 
 `/api/avatars/:userId` is not public: it needs a session and only serves people who share a
 workspace with that user.
@@ -171,6 +173,9 @@ them for malware yet; that needs an external scanner.
 - Retention, export and deletion: `docs/data-retention.md` (ADR 0015). Purging keeps the evidence
   (hashes, certificate code, audit trail under the lawful-basis exception) and deletes files and
   personal data. Deleting a workspace also wipes its storage prefix.
+- Deleting an account (ADR 0040) erases the person (name, email, sign-in methods, picture,
+  signatures, notifications, memberships) and keeps their work under "Deleted user". The emailed
+  link's token is stored only as a hash, like signing tokens.
 - Planned: a DPA template for tenants, and data residency options.
 - Don't put PII in logs. Log ids, not emails.
 

@@ -97,7 +97,8 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
       drop PDFs from the desktop to upload, drop onto a file to make a folder, Undo
       (`POST /files/move`, `POST /files/group`, ADR 0039)
 - [ ] Drag and drop on the Documents, Envelopes and Templates pages (ADR 0039 → Consequences)
-- [ ] Passkeys, delete account, forgot-password pages (`docs/auth.md` → What better-auth offers next)
+- [x] Passkeys, delete account (erase the person, keep the work; ADR 0040), forgot/reset password
+      pages (`docs/auth.md`)
 
 ## Later
 

@@ -3,6 +3,8 @@ import {
   BackupCodeSchema,
   ChangePasswordSchema,
   describeUserAgent,
+  ForgotPasswordSchema,
+  ResetPasswordSchema,
   TotpCodeSchema,
 } from "./security"
 
@@ -69,5 +71,23 @@ describe("two-factor codes", () => {
     expect(BackupCodeSchema.safeParse("aB3dE-fG7hJ").success).toBe(true)
     expect(BackupCodeSchema.safeParse("aB3dEfG7hJ").success).toBe(true)
     expect(BackupCodeSchema.safeParse("abc").success).toBe(false)
+  })
+})
+
+describe("forgot and reset password", () => {
+  test("ForgotPasswordSchema wants an email address", () => {
+    expect(ForgotPasswordSchema.safeParse({ email: " ada@example.com " }).data).toEqual({
+      email: "ada@example.com",
+    })
+    expect(ForgotPasswordSchema.safeParse({ email: "ada" }).success).toBe(false)
+  })
+
+  test("ResetPasswordSchema checks length and the repeat", () => {
+    const ok = { newPassword: "correct horse", confirmPassword: "correct horse" }
+    expect(ResetPasswordSchema.safeParse(ok).success).toBe(true)
+    expect(ResetPasswordSchema.safeParse({ ...ok, confirmPassword: "other" }).success).toBe(false)
+    expect(
+      ResetPasswordSchema.safeParse({ newPassword: "short", confirmPassword: "short" }).success,
+    ).toBe(false)
   })
 })

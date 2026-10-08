@@ -20,13 +20,18 @@ tokens unlock anything outside their own envelope.
 - Verification, reset and invitation emails are **enqueued** (`notifications` queue), never sent inline
 - `organization()` plugin with `allowUserToCreateOrganization: true`
 - `twoFactor()` plugin (TOTP + backup codes, issuer "Sahihi")
+- `passkey()` from `@better-auth/passkey`: relying party = the web origin's host (`WEB_URL`), since
+  the browser calls `/api/auth/*` there. Table `passkey`
+- `revokeSessionsOnPasswordReset: true`: a reset signs out every device
 - `user.changeEmail` with `sendChangeEmailConfirmation` (job `auth.change-email` to the current address)
 - `basePath: "/api/auth"`, `cookiePrefix: "sahihi"`, `trustedOrigins: [WEB_URL]`
 - Prisma adapter. Tables are in section 1 of `schema.prisma`
 
-Client: `apps/web/lib/auth-client.ts` (`createAuthClient` + `organizationClient()` + `twoFactorClient()`),
+Client: `apps/web/lib/auth-client.ts` (`createAuthClient` + `organizationClient()` + `twoFactorClient()` +
+`passkeyClient()`),
 exporting `signIn`, `signUp`, `signOut`, `useSession`, `organization`, `useActiveOrganization`,
-`twoFactor`, `updateUser`, `changeEmail`, `changePassword`, `revokeSession` and `revokeOtherSessions`.
+`twoFactor`, `updateUser`, `changeEmail`, `changePassword`, `revokeSession`, `revokeOtherSessions`
+and `passkey`.
 
 ### Changing plugins
 
@@ -69,12 +74,38 @@ drawn one. Signed-out signers and embedded iframes (no cookie) get a 401 and see
 |---|---|
 | Change password | better-auth `change-password` (`ChangePasswordSchema`), "Sign out of other devices" on by default |
 | Two-factor authentication | `twoFactor` plugin. Turn on: password → `enable` (returns the `otpauth://` URI, shown as a QR code with `qrcode`, plus 10 backup codes) → `verify-totp` with a code from the app → backup codes shown once (copy / download). Also: new backup codes, turn off (both need the password) |
+| Passkeys | `@better-auth/passkey`. Add (the browser's prompt; named after the device with `describeUserAgent`), rename, remove. The list shows the name, else the authenticator's (`getAuthenticatorName(aaguid)`, e.g. "iCloud Keychain"), and Synced / This device (`backedUp`) |
 | Sessions | better-auth `list-sessions`, `revoke-session`, `revoke-other-sessions`. Device names come from `describeUserAgent` |
+| Delete account | See **Delete account** below (ADR 0040) |
 
 Sign-in with 2FA: `signIn.email` answers `{ twoFactorRedirect: true }` and sets a 10-minute
 two-factor cookie instead of a session. The sign-in form sends the user to
 `/sign-in/two-factor?next=…`, which calls `verify-totp` or `verify-backup-code` (optionally
 "trust this device" for 30 days). better-auth locks the account for 15 minutes after 10 failed codes.
+
+Sign-in with a passkey: the "Sign in with a passkey" button (`signIn.passkey()`), or the browser's
+autofill on the email field (`autoComplete="email webauthn"`, conditional UI). A passkey is a full
+sign-in: no password and no second step (it already proves possession and user presence).
+
+### Delete account (ADR 0040)
+
+Erase the person, keep the work. Documents, envelopes, templates and folders point at their
+creator and belong to the workspace, so the `User` row stays as **"Deleted user"**
+(`deleted-<id>@redacted.invalid`).
+
+1. Settings → Security → Delete account: the password (`POST /api/me/deletion`, 5 tries / 10 min
+   per user). Refused (409) while the user is the last owner of a workspace (`deletionBlockers`);
+   the panel lists those workspaces up front (`GET /api/me/deletion`).
+2. An email (`auth.delete-account`) with a link to `/delete-account?token=…`, valid 1 hour. Only
+   the token's hash is stored (`verification`, `delete-account:<hash>` → user id).
+3. The page asks once more; `POST /api/account/delete` (public, rate-limited, works on any
+   device) re-checks ownership and runs `eraseUser` in one transaction: sessions, password,
+   2FA, passkeys, memberships, picture and saved-signature rows, notifications and preferences go;
+   their API keys are revoked; name and email become placeholders. `user.purge-storage` then
+   deletes `user/<id>/` in storage.
+
+Certificates already issued keep the name they were made with. Envelopes still in flight finalize
+with "Deleted user" as the sender. The audit trail stores `actorUserId` only, so it is unchanged.
 
 ### Workspace (`/settings/workspace`)
 
@@ -106,10 +137,7 @@ Available in better-auth 1.7 and not enabled yet, roughly in order of value:
 
 | Feature | What it takes |
 |---|---|
-| Passkeys | `@better-auth/passkey` package (new dependency) + a `passkey` table; sign-in button and a Security panel |
-| Delete account | `user.deleteUser` with `sendDeleteAccountVerification` and a `beforeDelete` that refuses while the user is the last owner of a workspace (and handles their envelopes' `createdById`) |
 | Email OTP as a second factor | `twoFactor({ otpOptions: { sendOTP } })` + a notifications job; fallback for users without an authenticator app |
-| Forgot password page | `sendResetPassword` is already wired; needs `/forgot-password` and `/reset-password` pages |
 | Social sign-in (Google, Microsoft) | `socialProviders` + env vars; Security would list linked accounts (`list-accounts`, `unlink-account`) |
 | Breached-password check | `haveIBeenPwned()` plugin (calls an external API on sign-up and password change) |
 | Last login method, multi-session | `lastLoginMethod()`, `multiSession()` plugins |
@@ -228,6 +256,10 @@ continues. After removal, only admins and owners can change those envelopes (the
 ## Web flows
 
 - `/sign-up` → verification email → `/onboarding` (create org, set active) → `/documents`
+- `/forgot-password` → `request-password-reset` (same answer whether or not the email has an
+  account) → email (`auth.reset-password`) → better-auth checks the token → `/reset-password?token=…`
+  → `reset-password` → every session is revoked → `/sign-in`. A bad or used link lands on
+  `/reset-password?error=INVALID_TOKEN`, which offers a new one.
 - `/sign-in?next=…` → back to `next`. New sessions start with the user's **first workspace active**
   (`databaseHooks.session.create.before` in `auth.ts`, by earliest `Member.createdAt`). Without it,
   every sign-in of an existing member landed on `/onboarding` and could create a duplicate

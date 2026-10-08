@@ -1,3 +1,4 @@
+import { passkey } from "@better-auth/passkey"
 import { getEnv } from "@sahihi/config"
 import { canAddSeat, orgAc, orgRoles, seatLimitMessage } from "@sahihi/core"
 import { countSeats, getOrgPlan, notifyWorkspaceAdmins, prisma } from "@sahihi/db"
@@ -31,6 +32,9 @@ export const auth = betterAuth({
     enabled: true,
     requireEmailVerification: true,
     minPasswordLength: 10,
+    // /forgot-password → email → /reset-password. A reset signs out every device: whoever knew the
+    // old password may still hold a session.
+    revokeSessionsOnPasswordReset: true,
     sendResetPassword: async ({ user, url }) => {
       await getQueues().notifications.add("auth.reset-password", {
         email: user.email,
@@ -103,6 +107,13 @@ export const auth = betterAuth({
     // Settings → Security: TOTP authenticator apps plus one-time backup codes. Sign-in answers
     // `twoFactorRedirect` and the web finishes it on /sign-in/two-factor.
     twoFactor({ issuer: "Sahihi" }),
+    // Settings → Security and the sign-in page. The relying party is the web origin: the browser
+    // calls /api/auth/* there (docs/auth.md → Cookies), so passkeys are bound to that host.
+    passkey({
+      rpID: new URL(env.WEB_URL).hostname,
+      rpName: "Sahihi",
+      origin: env.WEB_URL,
+    }),
     organization({
       // Every user can create their own workspace on sign-up
       allowUserToCreateOrganization: true,

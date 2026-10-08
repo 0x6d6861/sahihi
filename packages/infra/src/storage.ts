@@ -61,6 +61,7 @@ export const keys = {
   /** A user's profile picture (Settings → Profile), served by /api/avatars. */
   avatar: (userId: string, version: string) => `user/${userId}/avatar-${version}.png`,
   /** Everything a workspace stores (deleted with the workspace). */
+  userPrefix: (userId: string) => `user/${userId}/`,
   orgPrefix: (orgId: string) => `org/${orgId}/`,
   /** Everything stored for one envelope (signed PDF, certificate, signature images). */
   envelopePrefix: (orgId: string, envelopeId: string) => `org/${orgId}/envelopes/${envelopeId}/`,
@@ -200,10 +201,10 @@ export async function deleteObject(key: string) {
 
 /**
  * Deletes every object under `prefix` (1000 per request). Returns how many were deleted.
- * Refuses prefixes that aren't a workspace folder, so a bug can't empty the bucket.
+ * Refuses prefixes that aren't a workspace or user folder, so a bug can't empty the bucket.
  */
 export async function deletePrefix(prefix: string): Promise<number> {
-  if (!/^org\/[^/]+\/(.+\/)?$/.test(prefix))
+  if (!/^(org|user)\/[^/]+\/(.+\/)?$/.test(prefix))
     throw new Error(`Refusing to delete prefix "${prefix}"`)
   let deleted = 0
   let token: string | undefined

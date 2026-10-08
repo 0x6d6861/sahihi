@@ -1,17 +1,32 @@
+import { getEnv } from "@sahihi/config"
 import {
   AvatarSchema,
   avatarProblem,
   avatarUrl,
+  DELETE_ACCOUNT_TTL_SECONDS,
+  generateSigningToken,
+  hashDeletionToken,
+  RequestAccountDeletionSchema,
   SAVED_SIGNATURE_KINDS,
   type SavedSignatureKind,
   SaveSignatureSchema,
 } from "@sahihi/core"
 import { prisma } from "@sahihi/db"
-import { createLogger, deleteObject, getObjectBytes, keys, putObject } from "@sahihi/infra"
+import {
+  createLogger,
+  deleteObject,
+  getObjectBytes,
+  getQueues,
+  keys,
+  putObject,
+} from "@sahihi/infra"
 import { pngFromDataUrl } from "@sahihi/pdf"
 import { Hono } from "hono"
+import { auth } from "../auth"
+import { deletionBlockersFor, deletionIdentifier } from "../lib/account-deletion"
 import type { AppEnv } from "../lib/env"
-import { badRequest, notFound, parseJson } from "../lib/http"
+import { badRequest, conflict, notFound, parseJson } from "../lib/http"
+import { rateLimit } from "../middleware/rate-limit"
 import { requireUser } from "../middleware/session"
 
 /**
@@ -126,3 +141,60 @@ export const me = new Hono<AppEnv>()
     if (previous) await deleteObject(previous).catch((err) => log.warn("avatar kept", { err }))
     return c.body(null, 204)
   })
+
+  /** Settings → Security: what stands in the way of deleting the account (ADR 0040). */
+  .get("/deletion", async (c) => {
+    return c.json({ blockers: await deletionBlockersFor(c.get("user").id) })
+  })
+
+  /**
+   * Step 1 of deleting the account: the password, then a link by email (step 2 is
+   * `POST /api/account/delete`). Only the token's hash is stored; the raw token travels in the
+   * notification job and the email, like signing links. A new request replaces an older link.
+   */
+  .post(
+    "/deletion",
+    // auth.api calls skip better-auth's own rate limits: a few password tries per user, then wait.
+    rateLimit({
+      bucket: "account-deletion",
+      limit: 5,
+      windowSec: 600,
+      key: (c) => (c.get("user" as never) as { id: string }).id,
+    }),
+    async (c) => {
+      const { password } = await parseJson(c, RequestAccountDeletionSchema)
+      const user = c.get("user")
+      try {
+        await auth.api.verifyPassword({ body: { password }, headers: c.req.raw.headers })
+      } catch {
+        badRequest("That password isn't right")
+      }
+      const blockers = await deletionBlockersFor(user.id)
+      if (blockers.length > 0) {
+        conflict(
+          `You're the only owner of ${blockers.map((b) => b.name).join(", ")}. Make someone else an owner, or delete the workspace, first.`,
+        )
+      }
+
+      const token = generateSigningToken()
+      await prisma.$transaction([
+        prisma.verification.deleteMany({
+          where: { value: user.id, identifier: { startsWith: "delete-account:" } },
+        }),
+        prisma.verification.create({
+          data: {
+            id: crypto.randomUUID(),
+            identifier: deletionIdentifier(await hashDeletionToken(token)),
+            value: user.id,
+            expiresAt: new Date(Date.now() + DELETE_ACCOUNT_TTL_SECONDS * 1000),
+          },
+        }),
+      ])
+      await getQueues().notifications.add("auth.delete-account", {
+        email: user.email,
+        name: user.name,
+        url: `${getEnv().WEB_URL}/delete-account?token=${encodeURIComponent(token)}`,
+      })
+      return c.json({ sentTo: user.email }, 202)
+    },
+  )

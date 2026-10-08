@@ -63,6 +63,13 @@ better-auth's `organization.delete`:
   folder).
 - Certificates stop verifying. The dialog says so and suggests exporting first.
 
+## Deleting an account
+
+A person can delete their own account (Settings → Security; docs/auth.md → Delete account, ADR
+0040). Their personal data is erased and their files under `user/<id>/` are deleted
+(`user.purge-storage`; `deletePrefix` accepts `org/<id>/` and `user/<id>/` only). Their work stays
+with each workspace, credited to "Deleted user", and follows that workspace's retention.
+
 ## Tests
 
 `apps/api/test/retention.itest.ts` covers what's deleted and what's kept (including a valid audit
