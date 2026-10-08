@@ -42,8 +42,9 @@ Integration tests are named `*.itest.ts`, so neither it nor a bare `bun test` pi
   collaborators.
 
 It needs the `CLAUDE_CODE_OAUTH_TOKEN` repository secret (`claude setup-token`) and the Claude
-GitHub App installed on the repository. If the OAuth run fails (missing or expired token, plan
-limits, or any other error), the same run is retried with the `ANTHROPIC_API_KEY` secret. The action refuses to run a workflow file that differs
+GitHub App installed on the repository. Before each run, a one-line Claude call checks the OAuth
+token. When it's missing, expired or over its plan limits, the run uses the `ANTHROPIC_API_KEY`
+secret instead. A run that fails for another reason isn't repeated. The action refuses to run a workflow file that differs
 from the default branch's copy, so a PR that changes the workflow isn't reviewed by it.
 
 ## What must be tested

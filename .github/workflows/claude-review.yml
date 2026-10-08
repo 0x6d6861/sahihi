@@ -3,8 +3,8 @@ name: Claude review
 # Claude reviews every pull request (opened, new commits, ready for review) and answers
 # "@claude …" in PR and issue comments. Needs the Claude GitHub App
 # (https://github.com/apps/claude) and the CLAUDE_CODE_OAUTH_TOKEN repository secret
-# (`claude setup-token`). When the OAuth run fails (missing or expired token, plan limits), the
-# same run is retried with the ANTHROPIC_API_KEY secret, if it is set.
+# (`claude setup-token`). Each job first checks the OAuth token with a one-line Claude call; when
+# it's missing, expired or over its plan limits, the job uses the ANTHROPIC_API_KEY secret.
 # The action only runs a workflow file that matches the default branch's copy, so a PR that
 # changes this file isn't reviewed by it.
 
@@ -67,17 +67,34 @@ jobs:
         with:
           fetch-depth: 1
 
-      # OAuth first; on failure, the same review with the API key.
-      - id: oauth
+      # Pick the credential before the real run, so only a token problem switches to the API key
+      # (a review that fails for another reason is not repeated): one tiny call proves the OAuth
+      # token is set, valid and within its plan limits.
+      - id: auth
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          HAS_API_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+        run: |
+          if [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ] &&
+            timeout 120 npx -y @anthropic-ai/claude-code@2.1.294 -p "Reply with OK" --max-turns 1 < /dev/null > /dev/null 2>&1; then
+            echo "mode=oauth" >> "$GITHUB_OUTPUT"
+          elif [ "$HAS_API_KEY" = "true" ]; then
+            echo "::warning::The Claude OAuth token is missing or not working; using ANTHROPIC_API_KEY."
+            echo "mode=api" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Neither CLAUDE_CODE_OAUTH_TOKEN nor ANTHROPIC_API_KEY is usable."
+            exit 1
+          fi
+
+      - if: steps.auth.outputs.mode == 'oauth'
         uses: anthropics/claude-code-action@v1
-        continue-on-error: true
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           track_progress: true
           prompt: ${{ env.REVIEW_PROMPT }}
           claude_args: ${{ env.REVIEW_ARGS }}
 
-      - if: steps.oauth.outcome == 'failure'
+      - if: steps.auth.outputs.mode == 'api'
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -107,14 +124,31 @@ jobs:
         with:
           fetch-depth: 1
 
-      # OAuth first; on failure, the same run with the API key.
-      - id: oauth
+      # Pick the credential before the real run, so only a token problem switches to the API key
+      # (a review that fails for another reason is not repeated): one tiny call proves the OAuth
+      # token is set, valid and within its plan limits.
+      - id: auth
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          HAS_API_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+        run: |
+          if [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ] &&
+            timeout 120 npx -y @anthropic-ai/claude-code@2.1.294 -p "Reply with OK" --max-turns 1 < /dev/null > /dev/null 2>&1; then
+            echo "mode=oauth" >> "$GITHUB_OUTPUT"
+          elif [ "$HAS_API_KEY" = "true" ]; then
+            echo "::warning::The Claude OAuth token is missing or not working; using ANTHROPIC_API_KEY."
+            echo "mode=api" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Neither CLAUDE_CODE_OAUTH_TOKEN nor ANTHROPIC_API_KEY is usable."
+            exit 1
+          fi
+
+      - if: steps.auth.outputs.mode == 'oauth'
         uses: anthropics/claude-code-action@v1
-        continue-on-error: true
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
-      - if: steps.oauth.outcome == 'failure'
+      - if: steps.auth.outputs.mode == 'api'
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
