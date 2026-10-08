@@ -34,6 +34,17 @@ Integration tests are named `*.itest.ts`, so neither it nor a bare `bun test` pi
   - MinIO is started with `docker run` in both, because service containers can't take its
     `server /data` command, and the bucket is created with aws-cli, like `minio-init`.
 
+`.github/workflows/claude-review.yml` (`anthropics/claude-code-action@v1`) has two jobs:
+- **`review`:** Claude reviews every non-draft PR from this repository when it opens, gets new
+  commits or becomes ready. It checks the diff against the golden rules in AGENTS.md, posts
+  findings inline as `blocking:` or `nit:`, and finishes with a summary comment.
+- **`mention`:** answers `@claude …` in PR and issue comments from owners, members and
+  collaborators.
+
+It needs the `CLAUDE_CODE_OAUTH_TOKEN` repository secret (`claude setup-token`) and the Claude
+GitHub App installed on the repository. The action refuses to run a workflow file that differs
+from the default branch's copy, so a PR that changes the workflow isn't reviewed by it.
+
 ## What must be tested
 
 - **Coordinates:** every rotation (0/90/180/270), non-zero crop box origin, and round trips.
