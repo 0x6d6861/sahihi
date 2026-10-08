@@ -28,6 +28,8 @@ export interface Sender {
   userId: string
   organizationId: string
   cookie: string
+  email: string
+  password: string
 }
 
 let seq = 0
@@ -72,7 +74,7 @@ export async function createSender(
       headers: new Headers({ cookie }),
     })
   }
-  return { userId: user.id, organizationId, cookie }
+  return { userId: user.id, organizationId, cookie, email, password }
 }
 
 /** A new signed-in user who joins `org`'s organization with `role` and makes it active. */

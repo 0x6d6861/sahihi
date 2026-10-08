@@ -37,6 +37,7 @@ model User {
   members          Member[]
   invitations      Invitation[]
   twoFactors       TwoFactor[]
+  passkeys         Passkey[]
 
   documents               Document[]
   envelopes               Envelope[]
@@ -117,6 +118,26 @@ model TwoFactor {
   @@index([secret])
   @@index([userId])
   @@map("twoFactor")
+}
+
+// @better-auth/passkey (Settings → Security, sign-in with a passkey; docs/auth.md)
+model Passkey {
+  id           String    @id
+  name         String?
+  publicKey    String
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialID String
+  counter      Int
+  deviceType   String
+  backedUp     Boolean
+  transports   String?
+  createdAt    DateTime?
+  aaguid       String?
+
+  @@index([userId])
+  @@index([credentialID])
+  @@map("passkey")
 }
 
 model Organization {

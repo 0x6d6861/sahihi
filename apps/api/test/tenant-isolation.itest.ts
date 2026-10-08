@@ -323,6 +323,10 @@ const NOT_TENANT = [
   "DELETE /api/me/signatures/:kind",
   "PUT /api/me/avatar",
   "DELETE /api/me/avatar",
+  // Account deletion (ADR 0040): the caller's own account; confirming is public (emailed token).
+  "GET /api/me/deletion",
+  "POST /api/me/deletion",
+  "POST /api/account/delete",
   // The caller's own notifications in their workspace, keyed by user and org; ids from the body
   // only ever match the caller's rows (notifications.itest.ts).
   "GET /api/notifications/unread-count",

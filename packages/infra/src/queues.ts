@@ -11,6 +11,8 @@ import { Redis } from "ioredis"
 export interface NotificationJobs {
   "auth.verify-email": { email: string; name: string; url: string }
   "auth.reset-password": { email: string; name: string; url: string }
+  /** Confirm deleting an account (docs/auth.md → Delete account). */
+  "auth.delete-account": { email: string; name: string; url: string }
   /** Sent to the CURRENT address; the link then verifies the new one. */
   "auth.change-email": { email: string; name: string; newEmail: string; url: string }
   "auth.org-invitation": {
@@ -50,6 +52,8 @@ export interface MaintenanceJobs {
   "notifications.cleanup": Record<string, never>
   /** After a workspace is deleted: remove everything under org/<id>/ in storage. */
   "organization.purge-storage": { organizationId: string }
+  /** After an account is deleted: remove its picture and saved signatures under user/<id>/. */
+  "user.purge-storage": { userId: string }
   /** Create and send one envelope per row (docs/bulk-send.md). */
   "bulk.send": { bulkSendId: string }
 }

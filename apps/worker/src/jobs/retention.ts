@@ -395,6 +395,11 @@ export async function purgeOrganizationStorage(organizationId: string) {
   return { deleted: await deletePrefix(keys.orgPrefix(organizationId)) }
 }
 
+/** After an account is deleted (ADR 0040): remove its picture and saved signatures. */
+export async function purgeUserStorage(userId: string) {
+  return { deleted: await deletePrefix(keys.userPrefix(userId)) }
+}
+
 // ── Notifications ────────────────────────────────────────────────────────────
 
 /** Daily: delete in-app notifications older than NOTIFICATION_TTL_DAYS, read or not. */

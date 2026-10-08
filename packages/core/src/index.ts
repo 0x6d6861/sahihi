@@ -1,3 +1,4 @@
+export * from "./account/deletion"
 export * from "./account/profile"
 export * from "./account/security"
 

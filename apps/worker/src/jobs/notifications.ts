@@ -45,6 +45,20 @@ export async function handleNotification(job: AnyNotification) {
         })),
       })
     }
+    case "auth.delete-account": {
+      const d = job.data
+      return sendEmail({
+        to: d.email,
+        tag: "auth",
+        ...(await t.authLink({
+          name: d.name,
+          heading: "Delete your Sahihi account?",
+          body: "You asked to delete your account. Your name, email, sign-in methods, picture and saved signatures will be erased, and you'll leave every workspace. Documents and envelopes you created stay with their workspaces. The link expires in 1 hour. If this wasn't you, ignore this email and change your password.",
+          label: "Delete my account",
+          url: d.url,
+        })),
+      })
+    }
     case "auth.change-email": {
       const d = job.data
       return sendEmail({

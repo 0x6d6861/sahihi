@@ -9,6 +9,7 @@ import { secureHeaders } from "hono/secure-headers"
 import { ADMIN_QUEUES_PATH, adminDashboard } from "./admin"
 import { auth } from "./auth"
 import { reportRequestError, requestIdOf, requestLog } from "./middleware/request-log"
+import { account } from "./routes/account"
 import { apiKeys } from "./routes/api-keys"
 import { avatars } from "./routes/avatars"
 import { billing } from "./routes/billing"
@@ -74,6 +75,7 @@ export function createApp() {
     .route("/api/bulk-sends", bulkSends)
     .route("/api/billing", billing)
     .route("/api/me", me)
+    .route("/api/account", account)
     .route("/api/notifications", notifications)
     .route("/api/avatars", avatars)
     .route("/api/workspace", workspace)
