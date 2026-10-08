@@ -119,7 +119,8 @@ export const auth = betterAuth({
           if (organization.logo) throw new APIError("BAD_REQUEST", { message: LOGO_MESSAGE })
         },
         beforeUpdateOrganization: async ({ organization }) => {
-          if ("logo" in organization) throw new APIError("BAD_REQUEST", { message: LOGO_MESSAGE })
+          if (organization.logo !== undefined)
+            throw new APIError("BAD_REQUEST", { message: LOGO_MESSAGE })
         },
         // Pending invitations hold a seat, so an invite that could never be accepted is refused now.
         beforeCreateInvitation: async ({ organization }) => {

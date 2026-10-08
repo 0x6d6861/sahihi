@@ -55,3 +55,12 @@ export function fitWithin(
     height: Math.max(1, Math.round(height * scale)),
   }
 }
+
+/** Centre square of an image, for cropping a profile picture. */
+export function centerSquare(
+  width: number,
+  height: number,
+): { x: number; y: number; size: number } {
+  const size = Math.min(width, height)
+  return { x: Math.round((width - size) / 2), y: Math.round((height - size) / 2), size }
+}

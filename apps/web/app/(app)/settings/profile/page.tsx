@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { ChangeEmail } from "@/components/app/account/change-email"
 import { ProfileForm } from "@/components/app/account/profile-form"
+import { ProfilePicture } from "@/components/app/account/profile-picture"
 import {
   type SavedSignatures,
   SavedSignaturesEditor,
@@ -10,7 +11,7 @@ import { apiServer, getServerSession } from "@/lib/api-server"
 
 export const metadata = { title: "Profile" }
 
-/** Your name, email and saved signature (docs/auth.md → Account settings). Any signed-in user. */
+/** Your picture, name, email and saved signature (docs/auth.md → Account settings). Any signed-in user. */
 export default async function ProfilePage() {
   const [session, signatures] = await Promise.all([
     getServerSession(),
@@ -22,6 +23,7 @@ export default async function ProfilePage() {
   return (
     <div className="flex flex-col gap-6">
       <Panel title="Profile">
+        <ProfilePicture name={user.name} email={user.email} image={user.image ?? null} />
         <ProfileForm name={user.name} />
       </Panel>
 
