@@ -27,7 +27,7 @@ const PDFEditor = dynamic(() => import("@/components/extend/pdf-editor").then((m
 })
 
 // Field-placement shell: view-only, every editing feature off (docs/ui.md → PDFEditor configurations).
-const VIEW_ONLY_FEATURES = {
+export const VIEW_ONLY_FEATURES = {
   annotate: false,
   redact: false,
   forms: false,
