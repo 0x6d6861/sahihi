@@ -60,8 +60,9 @@ export const keys = {
     `user/${userId}/${kind}-${version}.png`,
   /** A user's profile picture (Settings → Profile), served by /api/avatars. */
   avatar: (userId: string, version: string) => `user/${userId}/avatar-${version}.png`,
-  /** Everything a workspace stores (deleted with the workspace). */
+  /** Everything stored for one user (deleted with their account, ADR 0040). */
   userPrefix: (userId: string) => `user/${userId}/`,
+  /** Everything a workspace stores (deleted with the workspace). */
   orgPrefix: (orgId: string) => `org/${orgId}/`,
   /** Everything stored for one envelope (signed PDF, certificate, signature images). */
   envelopePrefix: (orgId: string, envelopeId: string) => `org/${orgId}/envelopes/${envelopeId}/`,

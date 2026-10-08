@@ -99,8 +99,9 @@ creator and belong to the workspace, so the `User` row stays as **"Deleted user"
 2. An email (`auth.delete-account`) with a link to `/delete-account?token=…`, valid 1 hour. Only
    the token's hash is stored (`verification`, `delete-account:<hash>` → user id).
 3. The page asks once more; `POST /api/account/delete` (public, rate-limited, works on any
-   device) re-checks ownership and runs `eraseUser` in one transaction: sessions, password,
-   2FA, passkeys, memberships, picture and saved-signature rows, notifications and preferences go;
+   device) runs `eraseUser` in one transaction, which re-checks ownership under a lock on the
+   workspaces' member rows: sessions, password, 2FA, passkeys, memberships, pending links,
+   invitations to the old address, picture and saved-signature rows, notifications and preferences go;
    their API keys are revoked; name and email become placeholders. `user.purge-storage` then
    deletes `user/<id>/` in storage.
 

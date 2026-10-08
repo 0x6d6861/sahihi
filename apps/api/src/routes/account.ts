@@ -2,9 +2,9 @@ import { ConfirmAccountDeletionSchema, hashDeletionToken } from "@sahihi/core"
 import { prisma } from "@sahihi/db"
 import { createLogger, getQueues } from "@sahihi/infra"
 import { Hono } from "hono"
-import { deletionBlockersFor, deletionIdentifier, eraseUser } from "../lib/account-deletion"
+import { deletionIdentifier, eraseUser } from "../lib/account-deletion"
 import type { AppEnv } from "../lib/env"
-import { conflict, notFound, parseJson } from "../lib/http"
+import { notFound, parseJson } from "../lib/http"
 import { rateLimit } from "../middleware/rate-limit"
 
 const log = createLogger("account")
@@ -17,8 +17,8 @@ export const account = new Hono<AppEnv>()
   .use(rateLimit({ bucket: "account", limit: 10, windowSec: 60 }))
 
   /**
-   * Step 2 of deleting an account (ADR 0040): erase it. The link works once and for an hour. The
-   * last-owner check runs again, since memberships may have changed since the email.
+   * Step 2 of deleting an account (ADR 0040): erase it. The link works once and for an hour.
+   * `eraseUser` runs the last-owner check again, under a lock, since memberships may have changed.
    */
   .post("/delete", async (c) => {
     const { token } = await parseJson(c, ConfirmAccountDeletionSchema)
@@ -32,20 +32,17 @@ export const account = new Hono<AppEnv>()
     if (!pending) notFound("Deletion link")
     const userId = pending.value
 
-    const blockers = await deletionBlockersFor(userId)
-    if (blockers.length > 0) {
-      conflict(
-        `You're now the only owner of ${blockers.map((b) => b.name).join(", ")}. Make someone else an owner, or delete the workspace, first.`,
-      )
-    }
-
     if (await eraseUser(userId)) {
-      await getQueues().maintenance.add(
-        "user.purge-storage",
-        { userId },
-        { jobId: `purge-user-${userId}`, attempts: 5 },
-      )
       log.info("account deleted", { userId })
+      // The account is already erased and the link used: a queue failure must not turn that into
+      // an error. The files under user/<id>/ then stay until someone re-queues the purge.
+      await getQueues()
+        .maintenance.add(
+          "user.purge-storage",
+          { userId },
+          { jobId: `purge-user-${userId}`, attempts: 5 },
+        )
+        .catch((err) => log.error("user.purge-storage not queued", { userId, err }))
     }
     return c.json({ deleted: true })
   })

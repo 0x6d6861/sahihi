@@ -212,8 +212,15 @@ describe("deleting an account (ADR 0040)", () => {
     (await emailedLink("auth.delete-account", email)).searchParams.get("token") ?? ""
   const ask = (s: Sender, password: string) =>
     request(s, "/api/me/deletion", { method: "POST", json: { password } })
+  // Each call from its own client IP: the route allows 10 a minute per IP, across test runs.
   const confirm = (token: string) =>
-    request(null, "/api/account/delete", { method: "POST", json: { token } })
+    request(null, "/api/account/delete", {
+      method: "POST",
+      json: { token },
+      headers: {
+        "x-forwarded-for": `10.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}.1`,
+      },
+    })
 
   test("password, then the emailed link: the person is erased, their work stays", async () => {
     const owner = await createSender("owner")
@@ -228,6 +235,19 @@ describe("deleting an account (ADR 0040)", () => {
     const signatureKey = (
       await prisma.savedSignature.findUniqueOrThrow({ where: { userId: amina.userId } })
     ).signatureKey as string
+    // An invitation to her address (another workspace) and a reset link she never used.
+    const other = await createSender("other")
+    await prisma.invitation.create({
+      data: {
+        id: crypto.randomUUID(),
+        organizationId: other.organizationId,
+        email: amina.email.toUpperCase(),
+        role: "member",
+        expiresAt: new Date(Date.now() + 86_400_000),
+        inviterId: other.userId,
+      },
+    })
+    await auth.api.requestPasswordReset({ body: { email: amina.email } })
     const res = await ask(amina, amina.password)
     expect(res.status).toBe(202)
     const token = await emailedToken(amina.email)
@@ -245,6 +265,11 @@ describe("deleting an account (ADR 0040)", () => {
     expect(await prisma.account.count({ where: { userId: amina.userId } })).toBe(0)
     expect(await prisma.member.count({ where: { userId: amina.userId } })).toBe(0)
     expect(await prisma.savedSignature.count({ where: { userId: amina.userId } })).toBe(0)
+    // No row keeps her address, and no pending link (a reset would give the row a password).
+    const oldEmail = { equals: amina.email, mode: "insensitive" as const }
+    expect(await prisma.invitation.count({ where: { email: oldEmail } })).toBe(0)
+    expect(await prisma.user.count({ where: { email: oldEmail } })).toBe(0)
+    expect(await prisma.verification.count({ where: { value: amina.userId } })).toBe(0)
     // The document belongs to the workspace and stays, credited to "Deleted user".
     expect(
       (await prisma.document.findUniqueOrThrow({ where: { id: document.id } })).uploadedById,
@@ -271,6 +296,22 @@ describe("deleting an account (ADR 0040)", () => {
 
     await joinOrganization(owner, "second", "owner")
     expect((await ask(owner, owner.password)).status).toBe(202)
+  })
+
+  test("two co-owners deleting at once can't leave the workspace without an owner", async () => {
+    const owner = await createSender("owner")
+    const second = await joinOrganization(owner, "second", "owner")
+    expect((await ask(owner, owner.password)).status).toBe(202)
+    expect((await ask(second, second.password)).status).toBe(202)
+    const tokens = [await emailedToken(owner.email), await emailedToken(second.email)]
+
+    const statuses = (await Promise.all(tokens.map(confirm))).map((r) => r.status).sort()
+    expect(statuses).toEqual([200, 409])
+    expect(
+      await prisma.member.count({
+        where: { organizationId: owner.organizationId, role: { contains: "owner" } },
+      }),
+    ).toBe(1)
   })
 
   test("an unknown or expired link deletes nothing", async () => {
