@@ -7,6 +7,7 @@ import { Alert } from "@/components/arc/alert/alert"
 import { Button } from "@/components/arc/button/button"
 import { Input } from "@/components/arc/input/input"
 import { organization } from "@/lib/auth-client"
+import { HOME_HREF } from "@/lib/nav"
 
 const slugify = (s: string) =>
   s
@@ -34,7 +35,7 @@ export default function OnboardingPage() {
       return setError(error?.message ?? "Could not create workspace")
     }
     await organization.setActive({ organizationId: data.id })
-    router.push("/documents")
+    router.push(HOME_HREF)
     router.refresh()
   }
 

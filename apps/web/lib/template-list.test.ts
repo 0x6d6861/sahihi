@@ -36,3 +36,11 @@ describe("templates view (URL)", () => {
     expect(hasTemplateFilters({ layout: "grid" })).toBe(false)
   })
 })
+
+describe("templates view: folders and labels (ADR 0038)", () => {
+  test("reads folder, tag and colour and sends them to the API", () => {
+    const view = parseTemplatesView({ folder: "f1", color: "#1570D1" })
+    expect(templatesApiQuery(view)).toBe("page=1&folderId=f1&color=1570D1")
+    expect(templatesHref(view, { folder: undefined })).toBe("/templates")
+  })
+})

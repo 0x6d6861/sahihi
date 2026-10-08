@@ -71,3 +71,18 @@ describe("row summaries", () => {
     ).toEqual({ signed: 1, total: 2 })
   })
 })
+
+describe("envelopes view: folders and labels (ADR 0038)", () => {
+  test("reads folder, tag and colour and sends them to the API", () => {
+    const view = parseEnvelopesView({ folder: "f1", tag: " NDA ", color: "1570d1" })
+    expect(view).toMatchObject({ folder: "f1", tag: "NDA", color: "#1570D1" })
+    expect(envelopesApiQuery(view)).toBe("page=1&folderId=f1&tag=NDA&color=1570D1")
+    expect(hasEnvelopeFilters(view)).toBe(true)
+  })
+
+  test("opening another folder clears the search, tag and colour", () => {
+    const view = { folder: "f1", q: "lease", tag: "nda", stage: "drafts" as const }
+    expect(envelopesHref(view, { folder: "f2" })).toBe("/envelopes?folder=f2&stage=drafts")
+    expect(envelopesHref(view, { stage: undefined })).toBe("/envelopes?folder=f1&q=lease&tag=nda")
+  })
+})

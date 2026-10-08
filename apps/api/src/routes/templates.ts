@@ -1,19 +1,22 @@
 import {
   canManageTemplate,
   ListTemplatesQuerySchema,
-  periodStart,
   SaveTemplateSchema,
   TEMPLATES_PAGE_SIZE,
   templateRolesFromEnvelope,
   UpdateTemplateSchema,
   UseTemplateRequestSchema,
 } from "@sahihi/core"
-import { forOrganization, type Prisma, prisma } from "@sahihi/db"
+import { forOrganization, prisma } from "@sahihi/db"
 import { createEnvelopeFromTemplate } from "@sahihi/envelopes"
-import { copyObject, deleteObject, keys, presignCacheable } from "@sahihi/infra"
+import { copyObject, deleteObject, keys } from "@sahihi/infra"
 import { Hono } from "hono"
 import type { AppEnv } from "../lib/env"
+import { assertFolderInOrg } from "../lib/folder-tree"
 import { badRequest, clientMeta, notFound, parseJson, parseQuery } from "../lib/http"
+import { colorsInUse, resolveTags, TAG_SELECT, tagsInUse } from "../lib/labels"
+import { templateWhere } from "../lib/list-filters"
+import { templateListInclude, templateListItem } from "../lib/list-items"
 import { actor, assertCanManageTemplate } from "../lib/permissions"
 import { sendAfterCreate } from "../lib/send-after-create"
 import { requireOrg } from "../middleware/session"
@@ -75,6 +78,7 @@ export const templates = new Hono<AppEnv>()
       },
     })
     if (!envelope) notFound("Envelope")
+    if (input.folderId) await assertFolderInOrg(orgId, input.folderId)
     if (envelope.documents.some((d) => d.document.status !== "READY" || d.document.deletedAt)) {
       badRequest("A document of this envelope is no longer available")
     }
@@ -90,6 +94,7 @@ export const templates = new Hono<AppEnv>()
           description: input.description || null,
           message: envelope.message,
           signingOrder: envelope.signingOrder,
+          folderId: input.folderId ?? null,
         },
       })
       // The documents in order; fields are re-pointed at the template's own document rows.
@@ -148,26 +153,19 @@ export const templates = new Hono<AppEnv>()
   })
 
   /**
-   * The Templates list (ADR 0036), newest first, 25 a page. `q` matches the name, the description
-   * or the document's name; `createdById` (Saved by chip) and `period` narrow it. Each item carries
+   * The Templates list (ADR 0036), newest first, 25 a page: one folder (root when `folderId` is
+   * omitted, ADR 0038). `q` matches the name, the description, a tag or the document's name; `q`,
+   * `tag` and `color` search every folder. `createdById` (Saved by chip) and `period` narrow either
+   * view. Each item carries
    * its document's first-page thumbnail (ADR 0033).
    */
   .get("/", async (c) => {
-    const scope = forOrganization(c.get("organizationId"))
+    const orgId = c.get("organizationId")
+    const scope = forOrganization(orgId)
     const query = parseQuery(c, ListTemplatesQuerySchema)
     const pageSize = TEMPLATES_PAGE_SIZE
-    const q = query.q
-    const filters: Prisma.TemplateWhereInput = {
-      ...(query.createdById && { createdById: query.createdById }),
-      ...(query.period && { createdAt: { gte: periodStart(query.period, new Date()) } }),
-      ...(q && {
-        OR: [
-          { name: { contains: q, mode: "insensitive" } },
-          { description: { contains: q, mode: "insensitive" } },
-          { documents: { some: { document: { name: { contains: q, mode: "insensitive" } } } } },
-        ],
-      }),
-    }
+    if (query.folderId) await assertFolderInOrg(orgId, query.folderId)
+    const filters = templateWhere({ ...query, ownerId: query.createdById })
     const where = scope.template(filters)
     const [rows, total, savers] = await prisma.$transaction([
       prisma.template.findMany({
@@ -175,17 +173,7 @@ export const templates = new Hono<AppEnv>()
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         skip: (query.page - 1) * pageSize,
         take: pageSize,
-        include: {
-          documents: {
-            orderBy: { order: "asc" },
-            select: {
-              document: { select: { id: true, name: true, pageCount: true, thumbnailKey: true } },
-            },
-          },
-          createdBy: { select: { id: true, name: true, image: true } },
-          roles: { select: { label: true, role: true }, orderBy: { order: "asc" } },
-          _count: { select: { fields: true } },
-        },
+        include: templateListInclude,
       }),
       prisma.template.count({ where }),
       // "Saved by" chip options: everyone who saved a template in this workspace.
@@ -197,24 +185,14 @@ export const templates = new Hono<AppEnv>()
     ])
     const a = actor(c)
     return c.json({
-      items: await Promise.all(
-        rows.map(async ({ createdById, documents, ...t }) => {
-          const docs = documents.map(({ document: { thumbnailKey: _key, ...d } }) => d)
-          const thumbnailKey = documents[0]?.document.thumbnailKey
-          return {
-            ...t,
-            // The first document (rows show it and "+ N more"; ADR 0037), then all of them.
-            document: docs[0] ?? null,
-            documents: docs,
-            thumbnailUrl: thumbnailKey ? await presignCacheable(thumbnailKey) : null,
-            permissions: { manage: canManageTemplate(a, { createdById }) },
-          }
-        }),
-      ),
+      items: await Promise.all(rows.map((t) => templateListItem(t, a))),
       page: query.page,
       pageSize,
       total,
       savers,
+      // Tags and Color chip options and the tag picker's suggestions (ADR 0038).
+      tags: await tagsInUse(orgId),
+      colors: await colorsInUse(orgId),
     })
   })
 
@@ -261,18 +239,25 @@ export const templates = new Hono<AppEnv>()
 
   .patch("/:id", async (c) => {
     const input = await parseJson(c, UpdateTemplateSchema)
-    const scope = forOrganization(c.get("organizationId"))
+    const orgId = c.get("organizationId")
     const template = await prisma.template.findFirst({
-      where: scope.template({ id: c.req.param("id") }),
+      where: forOrganization(orgId).template({ id: c.req.param("id") }),
     })
     if (!template) notFound("Template")
     assertCanManageTemplate(c, template)
+    if (input.folderId) await assertFolderInOrg(orgId, input.folderId)
+    const tags = input.tags && (await resolveTags(orgId, input.tags))
     const updated = await prisma.template.update({
       where: { id: template.id },
       data: {
         ...(input.name !== undefined && { name: input.name }),
         ...(input.description !== undefined && { description: input.description || null }),
+        // Folder and labels (ADR 0038): organisation only.
+        ...(input.folderId !== undefined && { folderId: input.folderId }),
+        ...(input.color !== undefined && { color: input.color }),
+        ...(tags && { tags: { set: tags } }),
       },
+      include: { tags: TAG_SELECT },
     })
     return c.json({ template: updated })
   })

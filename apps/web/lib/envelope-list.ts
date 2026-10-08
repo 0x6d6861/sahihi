@@ -4,16 +4,21 @@ import {
   ENVELOPE_STAGES,
   type EnvelopeStage,
 } from "@sahihi/core"
+import {
+  clearSearchOnFolderChange,
+  type FolderScope,
+  parseFolderScope,
+  setFolderScope,
+} from "./folder-scope"
 import { type ListLayout, parseListLayout } from "./list-layout"
 
 /**
  * The Envelopes page's state lives in the URL
- * (`/envelopes?q=…&stage=…&sender=…&period=…&page=…&layout=grid`) so it stays a Server Component
- * and links/back work (ADR 0036). These helpers read it, build links and turn it into the API's
- * query.
+ * (`/envelopes?folder=…&q=…&tag=…&color=…&stage=…&sender=…&period=…&page=…&layout=grid`) so it
+ * stays a Server Component and links/back work (ADR 0036, 0038). These helpers read it, build
+ * links and turn it into the API's query.
  */
-export interface EnvelopesView {
-  q?: string
+export interface EnvelopesView extends FolderScope {
   stage?: EnvelopeStage
   sender?: string
   period?: DocumentPeriod
@@ -37,6 +42,7 @@ const oneOf = <T extends string>(v: string, allowed: readonly T[]) =>
 export function parseEnvelopesView(params: RawParams): EnvelopesView {
   const page = Number.parseInt(one(params.page), 10)
   return {
+    ...parseFolderScope(params),
     q: one(params.q).slice(0, 200) || undefined,
     stage: oneOf(one(params.stage), ENVELOPE_STAGES),
     sender: one(params.sender) || undefined,
@@ -47,14 +53,18 @@ export function parseEnvelopesView(params: RawParams): EnvelopesView {
 }
 
 export const hasEnvelopeFilters = (v: EnvelopesView) =>
-  Boolean(v.q || v.stage || v.sender || v.period)
+  Boolean(v.q || v.tag || v.color || v.stage || v.sender || v.period)
 
-/** `/envelopes` link for `view` with `patch` applied. Changing anything but the page resets it. */
+/**
+ * `/envelopes` link for `view` with `patch` applied. Changing anything but the page resets it;
+ * opening another folder also clears the search, tag and colour.
+ */
 export function envelopesHref(view: EnvelopesView, patch: Partial<EnvelopesView> = {}): string {
   const next: EnvelopesView = { ...view, ...patch }
   if (!("page" in patch)) next.page = undefined
+  clearSearchOnFolderChange(view, patch, next)
   const qs = new URLSearchParams()
-  if (next.q) qs.set("q", next.q)
+  setFolderScope(qs, next)
   if (next.stage) qs.set("stage", next.stage)
   if (next.sender) qs.set("sender", next.sender)
   if (next.period) qs.set("period", next.period)
@@ -67,7 +77,7 @@ export function envelopesHref(view: EnvelopesView, patch: Partial<EnvelopesView>
 /** Query string for `GET /api/envelopes`. */
 export function envelopesApiQuery(view: EnvelopesView): string {
   const qs = new URLSearchParams({ page: String(view.page ?? 1) })
-  if (view.q) qs.set("q", view.q)
+  setFolderScope(qs, view, "folderId")
   if (view.stage) qs.set("stage", view.stage)
   if (view.sender) qs.set("senderId", view.sender)
   if (view.period) qs.set("period", view.period)

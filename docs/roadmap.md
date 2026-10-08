@@ -90,6 +90,9 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
       → Account settings, ADR 0028)
 - [x] In-app notifications: bell in the top bar (envelope and workspace events), per-type preferences
       in Settings → Notifications (`docs/notifications.md`, ADR 0029)
+- [x] Shared folders and labels for documents, envelopes and templates (ADR 0038)
+- [x] All files: one home page for documents, envelopes and templates, with one search and
+      Type / Status / People / Added / Tags / Color filters (ADR 0038, `docs/ui.md`)
 - [ ] Passkeys, delete account, forgot-password pages (`docs/auth.md` → What better-auth offers next)
 
 ## Later

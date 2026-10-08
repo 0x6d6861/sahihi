@@ -3,7 +3,16 @@ import { cookies } from "next/headers"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import { ButtonLink } from "@/components/app/button-link"
+import { CreateFolderButton } from "@/components/app/folders/create-folder-button"
+import {
+  FolderBreadcrumb,
+  FolderCards,
+  FolderHeading,
+  FolderRows,
+  type FoldersPageData,
+} from "@/components/app/folders/folder-section"
 import { FileSearchIcon, LayoutTemplateIcon } from "@/components/app/icons"
+import { ColorDot, ColorName, TagBadges } from "@/components/app/labels/labels"
 import { ListGrid } from "@/components/app/list-card"
 import { ListPagination } from "@/components/app/list-pagination"
 import { Panel } from "@/components/app/panel"
@@ -24,7 +33,9 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { apiServer } from "@/lib/api-server"
+import { foldersApiQuery, searchesEverywhere } from "@/lib/folder-scope"
 import { formatDate, formatDateTime, pluralize } from "@/lib/format"
+import type { TagRef } from "@/lib/labels"
 import { LIST_LAYOUT_COOKIE, resolveListLayout } from "@/lib/list-layout"
 import { totalPages } from "@/lib/pagination"
 import {
@@ -49,7 +60,8 @@ interface BulkSendListItem {
 
 /**
  * Reusable envelopes of the active workspace (docs/templates.md), with Drive-style search and
- * chips (Saved by, Created) and a list or a grid of document thumbnails, 25 a page (ADR 0036).
+ * chips (Saved by, Created, Tags, Color), folders (ADR 0038; shared with Documents and Envelopes)
+ * and a list or a grid of document thumbnails, 25 a page (ADR 0036).
  */
 export default async function TemplatesPage({
   searchParams,
@@ -61,17 +73,24 @@ export default async function TemplatesPage({
     view.layout,
     (await cookies()).get(LIST_LAYOUT_COOKIE.templates)?.value,
   )
-  const [templates, { data: bulk }] = await Promise.all([
+  const folderQuery = foldersApiQuery(view)
+  const [templates, folders, { data: bulk }] = await Promise.all([
     apiServer<{
       items: TemplateItem[]
       page: number
       pageSize: number
       total: number
       savers: { id: string; name: string }[]
+      tags: TagRef[]
+      colors: string[]
     }>(`/templates?${templatesApiQuery(view)}`),
+    apiServer<FoldersPageData>(`/folders${folderQuery ? `?${folderQuery}` : ""}`),
     apiServer<{ items: BulkSendListItem[] }>("/bulk-sends"),
   ])
-  if (templates.status === 400) redirect("/templates")
+  // A deleted or foreign folder id, or a query the API refuses: start over at the top level.
+  if ([templates.status, folders.status].some((s) => s === 400 || s === 404)) {
+    redirect("/templates")
+  }
   const data = templates.data
   const items = data?.items ?? []
   const total = data?.total ?? 0
@@ -80,7 +99,15 @@ export default async function TemplatesPage({
   const pageCount = totalPages(total, pageSize)
   if (items.length === 0 && total > 0) redirect(templatesHref(view, { page: pageCount }))
   const filtered = hasTemplateFilters(view)
-  const blank = total === 0 && !filtered
+  const searching = searchesEverywhere(view)
+  const path = folders.data?.path ?? []
+  const current = folders.data?.folder ?? null
+  const subfolders = folders.data?.items ?? []
+  const allTags = data?.tags ?? []
+  const folderHref = (folder: string | undefined) => templatesHref(view, { folder })
+  // Nothing at all, anywhere: the first-run empty state. Inside a folder, the toolbar stays.
+  const blank = total === 0 && subfolders.length === 0 && !filtered && !current
+  const folderRows = layout === "list" && page === 1 ? subfolders : []
   const batches = (bulk?.items ?? []).slice(0, 10)
   const pagination =
     pageCount > 1 ? (
@@ -96,13 +123,19 @@ export default async function TemplatesPage({
 
   return (
     <div className="flex flex-col gap-8">
-      <header className="flex flex-col gap-2">
-        <h1 className="font-medium text-2xl tracking-tight">Templates</h1>
-        <p className="max-w-2xl text-muted-foreground text-sm">
-          {total > 0 ? `${pluralize(total, filtered ? "matching template" : "template")}. ` : ""}A
-          document with its roles and fields, ready to send again. Save one from any envelope with
-          “Save as template”.
-        </p>
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex min-w-0 flex-col gap-2">
+          {path.length > 0 && (
+            <FolderBreadcrumb rootLabel="Templates" path={path} hrefFor={folderHref} />
+          )}
+          <FolderHeading rootLabel="Templates" current={current} searching={searching} />
+          <p className="max-w-2xl text-muted-foreground text-sm">
+            {total > 0 ? `${pluralize(total, filtered ? "matching template" : "template")}. ` : ""}A
+            document with its roles and fields, ready to send again. Save one from any envelope with
+            “Save as template”.
+          </p>
+        </div>
+        {!blank && <CreateFolderButton parentId={current?.id} allTags={allTags} />}
       </header>
 
       {blank ? (
@@ -117,15 +150,42 @@ export default async function TemplatesPage({
         </Panel>
       ) : (
         <section aria-label="Templates" className="flex flex-col gap-6">
-          <TemplatesToolbar view={view} layout={layout} savers={data?.savers ?? []} />
-          {total === 0 ? (
+          <TemplatesToolbar
+            view={view}
+            layout={layout}
+            savers={data?.savers ?? []}
+            tags={allTags}
+            colors={data?.colors ?? []}
+          />
+          {layout === "grid" && (
+            <FolderCards
+              folders={subfolders}
+              current={current}
+              searching={searching}
+              canCreate={Boolean(folders.data?.permissions?.create)}
+              allTags={allTags}
+              hrefFor={folderHref}
+              rootLabel="Templates"
+            />
+          )}
+          {total === 0 && folderRows.length === 0 ? (
             <Panel>
               <EmptyState
                 className="md:py-10"
                 icon={<FileSearchIcon aria-hidden />}
-                title="No matching templates"
-                description="Try another search or clear the filters."
-                action={<ButtonLink href="/templates">Clear filters</ButtonLink>}
+                title={filtered ? "No matching templates" : "No templates here"}
+                description={
+                  filtered
+                    ? "Try another search or clear the filters."
+                    : "Move templates into this folder, or save one from an envelope."
+                }
+                action={
+                  filtered ? (
+                    <ButtonLink href={templatesHref({ folder: view.folder })}>
+                      Clear filters
+                    </ButtonLink>
+                  ) : undefined
+                }
               />
             </Panel>
           ) : layout === "grid" ? (
@@ -133,7 +193,7 @@ export default async function TemplatesPage({
               <ListGrid>
                 {items.map((t) => (
                   <li key={t.id} className="grid">
-                    <TemplateCard template={t} />
+                    <TemplateCard template={t} allTags={allTags} />
                   </li>
                 ))}
               </ListGrid>
@@ -155,23 +215,40 @@ export default async function TemplatesPage({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
+                  <FolderRows
+                    folders={folderRows}
+                    current={current}
+                    searching={searching}
+                    allTags={allTags}
+                    hrefFor={folderHref}
+                    rootLabel="Templates"
+                    columns={4}
+                  />
                   {items.map((t) => (
                     <TableRow key={t.id}>
                       <TableCell className="w-full max-w-0 ps-3">
                         <div className="flex min-w-0 items-center gap-3">
                           <TemplateTypeIcon />
                           <div className="flex min-w-0 flex-col gap-0.5">
-                            <Link
-                              href={`/templates/${t.id}/use`}
-                              title={t.name}
-                              className="truncate font-medium underline-offset-4 hover:underline"
-                            >
-                              {t.name}
-                            </Link>
+                            <div className="flex min-w-0 items-center gap-2">
+                              {t.color && <ColorDot color={t.color} className="size-2.5" />}
+                              <Link
+                                href={`/templates/${t.id}/use`}
+                                title={t.name}
+                                className="truncate font-medium underline-offset-4 hover:underline"
+                              >
+                                {t.name}
+                                <ColorName color={t.color} />
+                              </Link>
+                              <div className="hidden shrink-0 sm:flex">
+                                <TagBadges tags={t.tags} max={2} />
+                              </div>
+                            </div>
                             <span
                               className="truncate text-muted-foreground text-xs"
                               title={t.documents.map((d) => d.name).join(", ")}
                             >
+                              {searching && t.folder ? `In ${t.folder.name} · ` : ""}
                               {t.description
                                 ? `${t.description} · ${documentsSummary(t.documents.map((d) => d.name))}`
                                 : documentsSummary(t.documents.map((d) => d.name))}
@@ -208,8 +285,9 @@ export default async function TemplatesPage({
                             </ButtonLink>
                           </span>
                           <TemplateRowActions
-                            template={{ id: t.id, name: t.name, description: t.description }}
+                            template={t}
                             canManage={t.permissions.manage}
+                            allTags={allTags}
                           />
                         </span>
                       </TableCell>

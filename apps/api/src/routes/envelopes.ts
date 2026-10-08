@@ -3,7 +3,6 @@ import {
   CreateAttachmentUploadSchema,
   CreateEnvelopeSchema,
   canManageEnvelope,
-  ENVELOPE_STAGE_STATUSES,
   ENVELOPES_PAGE_SIZE,
   hasPermission,
   isClosed,
@@ -11,7 +10,6 @@ import {
   ListEnvelopesQuerySchema,
   MAX_ATTACHMENTS,
   MAX_UPLOAD_BYTES,
-  periodStart,
   ReorderEnvelopeDocumentsSchema,
   ReplaceEnvelopeDocumentSchema,
   ReplaceFieldsSchema,
@@ -20,10 +18,11 @@ import {
   sendPreflight,
   sha256Hex,
   UpdateEnvelopeDetailsSchema,
+  UpdateEnvelopeLabelsSchema,
   VoidEnvelopeSchema,
   verifyAuditChain,
 } from "@sahihi/core"
-import { appendAuditEvent, forOrganization, type Prisma, prisma, toChainedEvent } from "@sahihi/db"
+import { appendAuditEvent, forOrganization, prisma, toChainedEvent } from "@sahihi/db"
 import {
   attachDocuments,
   documentsAuditData,
@@ -40,7 +39,6 @@ import {
   getQueues,
   headObject,
   keys,
-  presignCacheable,
   presignDownload,
   presignUpload,
 } from "@sahihi/infra"
@@ -55,6 +53,7 @@ import {
   envelopeDocumentsSelect,
   totalPages,
 } from "../lib/envelope-documents"
+import { assertFolderInOrg } from "../lib/folder-tree"
 import {
   badRequest,
   clientMeta,
@@ -64,6 +63,9 @@ import {
   parseJson,
   parseQuery,
 } from "../lib/http"
+import { colorsInUse, resolveTags, TAG_SELECT, tagsInUse } from "../lib/labels"
+import { envelopeWhere } from "../lib/list-filters"
+import { envelopeListInclude, envelopeListItem } from "../lib/list-items"
 import { actor, assertCanManageEnvelope } from "../lib/permissions"
 import { requireOrg } from "../middleware/session"
 
@@ -145,6 +147,7 @@ export const envelopes = new Hono<AppEnv>()
     const input = await parseJson(c, CreateEnvelopeSchema)
     const orgId = c.get("organizationId")
     const documents = await loadReadyDocuments(orgId, input.documentIds)
+    if (input.folderId) await assertFolderInOrg(orgId, input.folderId)
 
     const envelope = await prisma.$transaction(async (tx) => {
       const created = await tx.envelope.create({
@@ -155,6 +158,7 @@ export const envelopes = new Hono<AppEnv>()
           message: input.message,
           signingOrder: input.signingOrder,
           expiresAt: input.expiresAt,
+          folderId: input.folderId ?? null,
         },
       })
       await attachDocuments(tx, created.id, documents)
@@ -171,9 +175,10 @@ export const envelopes = new Hono<AppEnv>()
   })
 
   /**
-   * The Envelopes list (ADR 0036), newest first, 25 a page. `q` matches the title, the document's
-   * name or a recipient's name or email; `stage` (Status chip), `senderId` (creator) and `period`
-   * narrow it. Each item carries its document's first-page thumbnail (ADR 0033) and whether the
+   * The Envelopes list (ADR 0036), newest first, 25 a page: one folder (root when `folderId` is
+   * omitted, ADR 0038). `q` matches the title, a tag, the document's name or a recipient's name or
+   * email; `q`, `tag` and `color` search every folder. `stage` (Status chip), `senderId` (creator)
+   * and `period` narrow either view. Each item carries its document's first-page thumbnail (ADR 0033) and whether the
    * caller may manage it.
    */
   .get("/", async (c) => {
@@ -181,28 +186,8 @@ export const envelopes = new Hono<AppEnv>()
     const scope = forOrganization(orgId)
     const query = parseQuery(c, ListEnvelopesQuerySchema)
     const pageSize = ENVELOPES_PAGE_SIZE
-    const q = query.q
-    const filters: Prisma.EnvelopeWhereInput = {
-      ...(query.stage && { status: { in: [...ENVELOPE_STAGE_STATUSES[query.stage]] } }),
-      ...(query.senderId && { createdById: query.senderId }),
-      ...(query.period && { createdAt: { gte: periodStart(query.period, new Date()) } }),
-      ...(q && {
-        OR: [
-          { title: { contains: q, mode: "insensitive" } },
-          { documents: { some: { document: { name: { contains: q, mode: "insensitive" } } } } },
-          {
-            recipients: {
-              some: {
-                OR: [
-                  { name: { contains: q, mode: "insensitive" } },
-                  { email: { contains: q, mode: "insensitive" } },
-                ],
-              },
-            },
-          },
-        ],
-      }),
-    }
+    if (query.folderId) await assertFolderInOrg(orgId, query.folderId)
+    const filters = envelopeWhere({ ...query, ownerId: query.senderId })
     const where = scope.envelope(filters)
     const [rows, total, senders] = await prisma.$transaction([
       prisma.envelope.findMany({
@@ -210,19 +195,7 @@ export const envelopes = new Hono<AppEnv>()
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         skip: (query.page - 1) * pageSize,
         take: pageSize,
-        include: {
-          documents: {
-            orderBy: { order: "asc" },
-            select: {
-              document: { select: { id: true, name: true, pageCount: true, thumbnailKey: true } },
-            },
-          },
-          recipients: {
-            select: { id: true, name: true, status: true, role: true },
-            orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-          },
-          createdBy: { select: { id: true, name: true, image: true } },
-        },
+        include: envelopeListInclude,
       }),
       prisma.envelope.count({ where }),
       // "Sent by" chip options: everyone who created an envelope in this workspace.
@@ -233,21 +206,17 @@ export const envelopes = new Hono<AppEnv>()
       }),
     ])
     const me = actor(c)
-    const items = await Promise.all(
-      rows.map(async ({ documents, ...e }) => {
-        const docs = documents.map(({ document: { thumbnailKey: _key, ...d } }) => d)
-        const thumbnailKey = documents[0]?.document.thumbnailKey
-        return {
-          ...e,
-          // The first document (list rows show it and "+ N more"; ADR 0037), then all of them.
-          document: docs[0] ?? null,
-          documents: docs,
-          thumbnailUrl: thumbnailKey ? await presignCacheable(thumbnailKey) : null,
-          permissions: { manage: canManageEnvelope(me, e) },
-        }
-      }),
-    )
-    return c.json({ items, page: query.page, pageSize, total, senders })
+    const items = await Promise.all(rows.map((e) => envelopeListItem(e, me)))
+    return c.json({
+      items,
+      page: query.page,
+      pageSize,
+      total,
+      senders,
+      // Tags and Color chip options and the tag picker's suggestions (ADR 0038).
+      tags: await tagsInUse(orgId),
+      colors: await colorsInUse(orgId),
+    })
   })
 
   .get("/:id", async (c) => {
@@ -279,6 +248,34 @@ export const envelopes = new Hono<AppEnv>()
           !envelope.purgedAt,
       },
     })
+  })
+
+  /**
+   * Move to a folder (`folderId: null` = root) and/or set the colour and tags (ADR 0038). Any
+   * status: folders and labels are organisation only, so this is not a state change and writes no
+   * audit event. Same rule as managing the envelope (sender, admin, owner).
+   */
+  .patch("/:id/labels", async (c) => {
+    const input = await parseJson(c, UpdateEnvelopeLabelsSchema)
+    const orgId = c.get("organizationId")
+    const envelope = await prisma.envelope.findFirst({
+      where: forOrganization(orgId).envelope({ id: c.req.param("id") }),
+      select: { id: true, createdById: true },
+    })
+    if (!envelope) notFound("Envelope")
+    assertCanManageEnvelope(c, envelope)
+    if (input.folderId) await assertFolderInOrg(orgId, input.folderId)
+    const tags = input.tags && (await resolveTags(orgId, input.tags))
+    const updated = await prisma.envelope.update({
+      where: { id: envelope.id },
+      data: {
+        ...(input.folderId !== undefined && { folderId: input.folderId }),
+        ...(input.color !== undefined && { color: input.color }),
+        ...(tags && { tags: { set: tags } }),
+      },
+      select: { id: true, folderId: true, color: true, tags: TAG_SELECT },
+    })
+    return c.json({ envelope: updated })
   })
 
   /**

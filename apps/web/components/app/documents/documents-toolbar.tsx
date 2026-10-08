@@ -1,9 +1,9 @@
 "use client"
 
-import { DOCUMENT_LIST_STATUSES, DOCUMENT_PERIODS, labelColorName } from "@sahihi/core"
-import { ColorDot } from "@/components/app/labels/labels"
+import { DOCUMENT_LIST_STATUSES, DOCUMENT_PERIODS } from "@sahihi/core"
 import {
   ListSearch,
+  labelChips,
   type SearchChip,
   uniqueLabels,
   useListNavigation,
@@ -63,39 +63,7 @@ export function DocumentsToolbar({
       current: view.period,
       options: DOCUMENT_PERIODS.map((p) => ({ value: p, label: PERIOD_LABEL[p] })),
     },
-    // A tag or colour from a link that's no longer on anything still shows, so it can be cleared.
-    ...(tags.length > 0 || view.tag
-      ? [
-          {
-            id: "tag",
-            label: "Tags",
-            any: "Any tag",
-            current: view.tag,
-            caseInsensitive: true,
-            options: uniqueLabels([
-              ...tags.map((t) => ({ value: t.name, label: t.name })),
-              ...(view.tag && !tags.some((t) => t.name.toLowerCase() === view.tag?.toLowerCase())
-                ? [{ value: view.tag, label: view.tag }]
-                : []),
-            ]),
-          } satisfies SearchChip,
-        ]
-      : []),
-    ...(colors.length > 0 || view.color
-      ? [
-          {
-            id: "color",
-            label: "Color",
-            any: "Any color",
-            current: view.color,
-            options: [...new Set([...colors, ...(view.color ? [view.color] : [])])].map((c) => ({
-              value: c,
-              label: labelColorName(c),
-              icon: <ColorDot color={c} />,
-            })),
-          } satisfies SearchChip,
-        ]
-      : []),
+    ...labelChips({ tags, colors, tag: view.tag, color: view.color }),
   ]
 
   return (

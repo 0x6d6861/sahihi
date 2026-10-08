@@ -26,8 +26,8 @@ export async function resolveTags(
 }
 
 /**
- * Tags on at least one listed document or folder: the "Tag" filter options and the tag picker's
- * suggestions. Unused tags stay in the table but aren't offered.
+ * Tags on at least one listed document, folder, envelope or template (ADR 0038): the "Tag" filter
+ * options and the tag picker's suggestions. Unused tags stay in the table but aren't offered.
  */
 export function tagsInUse(organizationId: string) {
   const scope = forOrganization(organizationId)
@@ -36,6 +36,8 @@ export function tagsInUse(organizationId: string) {
       OR: [
         { documents: { some: scope.document({ status: { not: "UPLOADING" } }) } },
         { folders: { some: {} } },
+        { envelopes: { some: {} } },
+        { templates: { some: {} } },
       ],
     }),
     select: { id: true, name: true },
@@ -50,12 +52,12 @@ export const tagMatches = (q: string) => ({ some: { key: { contains: tagKey(q) }
 export const hasTag = (name: string) => ({ some: { key: tagKey(name) } })
 
 /**
- * Colours on at least one listed document or folder, for the Color filter: presets first in
+ * Colours on at least one listed document, folder, envelope or template, for the Color filter: presets first in
  * picker order, then the rest by hex.
  */
 export async function colorsInUse(organizationId: string): Promise<string[]> {
   const scope = forOrganization(organizationId)
-  const [docs, folders] = await Promise.all([
+  const [docs, folders, envelopes, templates] = await Promise.all([
     prisma.document.findMany({
       where: scope.document({ status: { not: "UPLOADING" }, color: { not: null } }),
       distinct: ["color"],
@@ -66,8 +68,20 @@ export async function colorsInUse(organizationId: string): Promise<string[]> {
       distinct: ["color"],
       select: { color: true },
     }),
+    prisma.envelope.findMany({
+      where: scope.envelope({ color: { not: null } }),
+      distinct: ["color"],
+      select: { color: true },
+    }),
+    prisma.template.findMany({
+      where: scope.template({ color: { not: null } }),
+      distinct: ["color"],
+      select: { color: true },
+    }),
   ])
-  const used = new Set([...docs, ...folders].flatMap((r) => (r.color ? [r.color] : [])))
+  const used = new Set(
+    [...docs, ...folders, ...envelopes, ...templates].flatMap((r) => (r.color ? [r.color] : [])),
+  )
   const presets: string[] = LABEL_COLOR_PRESETS.map((p) => p.color).filter((c) => used.has(c))
   const others = [...used].filter((c) => !presets.includes(c)).sort()
   return [...presets, ...others]

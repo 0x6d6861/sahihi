@@ -44,7 +44,7 @@ export function PillNav({
   return (
     <nav aria-label={label} className={className}>
       <LayoutGroup id={id}>
-        <ul className="flex w-full items-center gap-1 rounded-full bg-muted p-1 md:w-auto">
+        <ul className="flex w-full items-center gap-1 overflow-x-auto rounded-full bg-muted p-1 [scrollbar-width:none] md:w-auto">
           {items.map((item) => (
             <PillNavEntry key={item.id} item={item} layoutId={`${id}-active`} current={current} />
           ))}
@@ -65,7 +65,7 @@ function PillNavEntry({
 }) {
   const reduced = useReducedMotion()
   const className = cn(
-    "relative isolate flex h-9 items-center justify-center gap-2 rounded-full px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-4",
+    "relative isolate flex h-9 items-center justify-center gap-2 rounded-full px-2 text-sm whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-4",
     item.active
       ? "font-medium text-foreground"
       : "text-muted-foreground transition-colors hover:text-foreground",

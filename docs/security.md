@@ -22,6 +22,9 @@ tenants must never see each other's data.**
   first org's rows, and a snapshot of its documents, envelopes, recipients, fields and audit events
   must be unchanged. The test also checks that every route in `app.routes` is classified (tenant,
   list, or not tenant-scoped with a reason), so a new route without a cross-tenant case fails CI.
+- Folder moves check the target with `assertFolderInOrg` (`apps/api/src/lib/folder-tree.ts`): a
+  folder id from another workspace is a 404, for documents, envelopes, templates and list filters
+  alike. `GET /api/files` (ADR 0038) builds each type's query with the same scope.
 - Planned: Postgres row-level security as defence in depth.
 
 ## Signing tokens

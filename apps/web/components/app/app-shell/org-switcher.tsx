@@ -7,6 +7,7 @@ import { useState } from "react"
 import { toastManager } from "@/components/app/toast"
 import { type DropdownItem, DropdownMenu } from "@/components/arc/dropdown-menu/dropdown-menu"
 import { organization } from "@/lib/auth-client"
+import { HOME_HREF } from "@/lib/nav"
 
 export interface ShellOrganization {
   id: string
@@ -41,7 +42,7 @@ export function OrgSwitcher({
       })
       return
     }
-    router.push("/documents")
+    router.push(HOME_HREF)
     router.refresh()
   }
 

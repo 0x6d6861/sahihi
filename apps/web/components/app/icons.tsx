@@ -48,6 +48,7 @@ import {
   Settings02Icon as HugeSettingsIcon,
   SecurityCheckIcon as HugeShieldCheckIcon,
   SignatureIcon as HugeSignatureIcon,
+  Tag01Icon as HugeTagIcon,
   Delete02Icon as HugeTrash2Icon,
   Alert02Icon as HugeTriangleAlertIcon,
   TextIcon as HugeTypeIcon,
@@ -118,6 +119,7 @@ export const SendIcon = icon(HugeSendIcon)
 export const SettingsIcon = icon(HugeSettingsIcon)
 export const ShieldCheckIcon = icon(HugeShieldCheckIcon)
 export const SignatureIcon = icon(HugeSignatureIcon)
+export const TagIcon = icon(HugeTagIcon)
 export const Trash2Icon = icon(HugeTrash2Icon)
 export const TriangleAlertIcon = icon(HugeTriangleAlertIcon)
 export const TypeIcon = icon(HugeTypeIcon)

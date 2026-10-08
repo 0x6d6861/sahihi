@@ -9,24 +9,23 @@ import { DocumentTypeIcon } from "@/components/app/documents/document-type-icon"
 import { DocumentsToolbar } from "@/components/app/documents/documents-toolbar"
 import { CreateFolderButton } from "@/components/app/folders/create-folder-button"
 import {
-  FolderCard,
-  type FolderCardData,
-  FolderRowActions,
-} from "@/components/app/folders/folder-card"
-import { FileSearchIcon, FolderIcon } from "@/components/app/icons"
+  FolderBreadcrumb,
+  FolderCards,
+  FolderHeading,
+  FolderRows,
+  type FoldersPageData,
+} from "@/components/app/folders/folder-section"
+import { FileSearchIcon } from "@/components/app/icons"
 import { ColorDot, ColorName, TagBadges } from "@/components/app/labels/labels"
 import { Panel } from "@/components/app/panel"
 import { Person } from "@/components/app/people"
 import { DocumentStatusIcon } from "@/components/app/status-icon"
-import { Breadcrumb } from "@/components/arc/breadcrumb/breadcrumb"
 import { EmptyState } from "@/components/arc/empty-state/empty-state"
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table"
 import { apiServer } from "@/lib/api-server"
 import {
-  type DocumentsView,
   documentsApiQuery,
   documentsHref,
-  folderMeta,
   foldersApiQuery,
   hasFilters,
   parseDocumentsView,
@@ -57,19 +56,6 @@ interface DocumentsPageData {
   tags: TagRef[]
   /** Label colours in use, for the Color filter. */
   colors: string[]
-}
-
-interface FoldersPageData {
-  folder: {
-    id: string
-    name: string
-    parentId: string | null
-    color: string | null
-    tags: TagRef[]
-  } | null
-  path: { id: string; name: string }[]
-  items: FolderCardData[]
-  permissions?: { create: boolean }
 }
 
 /**
@@ -132,7 +118,6 @@ export default async function DocumentsPage({
     />
   )
 
-  const heading = searching ? "Search results" : (current?.name ?? "Documents")
   const countLine = filtered
     ? `${pluralize(total, "matching document")}${searching && subfolders.length > 0 ? `, ${pluralize(subfolders.length, "folder")}` : ""}`
     : `${pluralize(total, "document")}${subfolders.length > 0 ? `, ${pluralize(subfolders.length, "folder")}` : ""}`
@@ -142,18 +127,14 @@ export default async function DocumentsPage({
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex min-w-0 flex-col gap-2">
           {/* Only inside a folder: at the top level the title already says where you are. */}
-          {path.length > 0 && <FolderBreadcrumb view={view} path={path} />}
-          <h1 className="truncate font-medium text-2xl tracking-tight">
-            {heading}
-            {!searching && <ColorName color={current?.color} />}
-          </h1>
-          {/* Inside a folder: its label colour as a dot, then its tags, like on its card. */}
-          {!searching && current && (current.color || current.tags.length > 0) && (
-            <div className="flex min-w-0 items-center gap-2">
-              {current.color && <ColorDot color={current.color} />}
-              <TagBadges tags={current.tags} max={6} />
-            </div>
+          {path.length > 0 && (
+            <FolderBreadcrumb
+              rootLabel="Documents"
+              path={path}
+              hrefFor={(folder) => documentsHref(view, { folder })}
+            />
           )}
+          <FolderHeading rootLabel="Documents" current={current} searching={searching} />
           {!blank && <p className="text-muted-foreground text-sm tabular-nums">{countLine}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -173,41 +154,17 @@ export default async function DocumentsPage({
         />
       )}
 
-      {/* Grid: folders as cards above the documents (the list puts them in the table instead).
-          No subfolders here yet: a ghost card where they would be, to create the first one. */}
-      {folderCards &&
-        !searching &&
-        subfolders.length === 0 &&
-        folders.data?.permissions?.create && (
-          <section aria-labelledby="folders-heading" className="flex flex-col gap-3">
-            <h2 id="folders-heading" className="font-medium text-sm">
-              Folders
-            </h2>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <CreateFolderButton parentId={view.folder} allTags={allTags} appearance="ghost" />
-            </div>
-          </section>
-        )}
-
-      {/* Searching: matching folders from anywhere, each saying where it lives. */}
-      {folderCards && subfolders.length > 0 && (
-        <section aria-labelledby="folders-heading" className="flex flex-col gap-3">
-          <h2 id="folders-heading" className="font-medium text-sm">
-            Folders
-          </h2>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {subfolders.map((f) => (
-              <FolderCard
-                key={f.id}
-                folder={f}
-                href={documentsHref(view, { folder: f.id })}
-                parentId={searching ? (f.path?.at(-1)?.id ?? null) : (current?.id ?? null)}
-                parentName={parentLabel(searching ? f.path?.at(-1) : current)}
-                allTags={allTags}
-              />
-            ))}
-          </div>
-        </section>
+      {/* Grid: folders as cards above the documents (the list puts them in the table instead). */}
+      {folderCards && (
+        <FolderCards
+          folders={subfolders}
+          current={current}
+          searching={searching}
+          canCreate={Boolean(folders.data?.permissions?.create)}
+          allTags={allTags}
+          hrefFor={(folder) => documentsHref(view, { folder })}
+          rootLabel="Documents"
+        />
       )}
 
       <section aria-labelledby="documents-heading" className="flex flex-col gap-3">
@@ -278,61 +235,14 @@ export default async function DocumentsPage({
                 </TableHeader> */}
                 <TableBody>
                   {/* Folders first, like Drive's list; only on the first page of documents. */}
-                  {folderRows.map((f) => {
-                    const parent = searching ? f.path?.at(-1) : current
-                    return (
-                      <TableRow key={`folder-${f.id}`}>
-                        <TableCell className="w-full max-w-0 ps-3">
-                          <div className="flex min-w-0 items-center gap-3">
-                            <FolderIcon
-                              aria-hidden
-                              className="size-5 shrink-0 text-muted-foreground"
-                            />
-                            <div className="flex min-w-0 flex-col gap-0.5">
-                              <div className="flex min-w-0 items-center gap-2">
-                                {f.color && <ColorDot color={f.color} className="size-2.5" />}
-                                <Link
-                                  href={documentsHref(view, { folder: f.id })}
-                                  title={f.name}
-                                  className="truncate font-medium underline-offset-4 hover:underline"
-                                >
-                                  {f.name}
-                                  <ColorName color={f.color} />
-                                </Link>
-                                <div className="hidden shrink-0 sm:flex">
-                                  <TagBadges tags={f.tags} max={2} />
-                                </div>
-                              </div>
-                              <span className="truncate text-muted-foreground text-xs tabular-nums">
-                                {folderMeta(f)}
-                              </span>
-                              <div className="sm:hidden">
-                                <TagBadges tags={f.tags} />
-                              </div>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-muted-foreground max-md:hidden">
-                          {f.createdBy && <Person person={f.createdBy} />}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums max-md:hidden">
-                          {f.createdAt && (
-                            <time dateTime={f.createdAt} title={formatDateTime(f.createdAt)}>
-                              {formatDate(f.createdAt)}
-                            </time>
-                          )}
-                        </TableCell>
-                        <TableCell className="pe-1">
-                          <FolderRowActions
-                            folder={f}
-                            parentId={parent?.id ?? null}
-                            parentName={parentLabel(parent)}
-                            allTags={allTags}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
+                  <FolderRows
+                    folders={folderRows}
+                    current={current}
+                    searching={searching}
+                    allTags={allTags}
+                    hrefFor={(folder) => documentsHref(view, { folder })}
+                    rootLabel="Documents"
+                  />
                   {items.map((d) => {
                     return (
                       <TableRow key={d.id}>
@@ -392,10 +302,6 @@ export default async function DocumentsPage({
   )
 }
 
-/** Where a deleted folder's contents go, for its confirmation: “Parent” or the top level. */
-const parentLabel = (parent: { name: string } | null | undefined) =>
-  parent ? `“${parent.name}”` : "the top level"
-
 /** The line under a document's name: where it came from, plus sender and date on phones. */
 function DocumentMeta({ document: d, searching }: { document: DocumentRow; searching: boolean }) {
   const parts = [
@@ -412,22 +318,4 @@ function DocumentMeta({ document: d, searching }: { document: DocumentRow; searc
       </span>
     </>
   )
-}
-
-function FolderBreadcrumb({
-  view,
-  path,
-}: {
-  view: DocumentsView
-  path: { id: string; name: string }[]
-}) {
-  // Shown inside folders only. The last item is the current folder (no link).
-  const items = [
-    { label: "Documents", href: documentsHref(view, { folder: undefined }) },
-    ...path.map((p, i) => ({
-      label: p.name,
-      href: i === path.length - 1 ? undefined : documentsHref(view, { folder: p.id }),
-    })),
-  ]
-  return <Breadcrumb items={items} ariaLabel="Folders" />
 }

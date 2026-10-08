@@ -39,7 +39,8 @@ test("an envelope with two documents and a supporting file is signed and finaliz
   await settle(page)
   await page.getByLabel("Workspace name").fill(`Multi Ltd ${run}`)
   await page.getByRole("button", { name: "Continue" }).click()
-  await page.waitForURL(/\/documents/)
+  // Onboarding lands on All files, the home page (ADR 0038).
+  await page.waitForURL(/\/files/)
 
   // ── First document, then a draft from it ──
   await settle(page)

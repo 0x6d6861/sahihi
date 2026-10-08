@@ -280,8 +280,8 @@ model Document {
   @@index([sourceDocumentId])
 }
 
-/// Nested folders for organising documents (ADR 0022). Deleting a folder moves its documents
-/// and subfolders up to its parent (done in the API; `NoAction` refuses orphaning yet lets an org delete cascade).
+/// Nested folders for organising documents, envelopes and templates (ADR 0022, 0038). Deleting a
+/// folder moves its contents and subfolders up to its parent (done in the API; `NoAction` refuses orphaning yet lets an org delete cascade).
 model Folder {
   id             String       @id @default(cuid())
   organizationId String
@@ -298,11 +298,13 @@ model Folder {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   documents      Document[]
+  envelopes      Envelope[]
+  templates      Template[]
 
   @@index([organizationId, parentId])
 }
 
-/// A workspace tag on folders and documents (ADR 0025). Created on first use; `key` is the
+/// A workspace tag on folders, documents, envelopes and templates (ADR 0025, 0038). Created on first use; `key` is the
 /// lowercased name, so "NDA" and "nda" are one tag. Unused tags are left in place (harmless).
 model Tag {
   id             String       @id @default(cuid())
@@ -313,6 +315,8 @@ model Tag {
   createdAt      DateTime     @default(now())
   documents      Document[]
   folders        Folder[]
+  envelopes      Envelope[]
+  templates      Template[]
 
   @@unique([organizationId, key])
 }
@@ -338,6 +342,12 @@ model Envelope {
   bundleS3Key    String?
   /// Files and personal data deleted (retention or on request); evidence kept (docs/data-retention.md)
   purgedAt       DateTime?
+  /// Folder and labels on the lists (ADR 0038). Organisation only: signing, evidence and webhooks
+  /// never read them, so moving or labelling an envelope is not a state change.
+  folderId       String?
+  folder         Folder?        @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  color          String?
+  tags           Tag[]
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
@@ -353,6 +363,7 @@ model Envelope {
 
   @@index([organizationId, status])
   @@index([organizationId, createdAt])
+  @@index([organizationId, folderId, createdAt])
 }
 
 /// One document to sign in an envelope (ADR 0037). The document link is NO ACTION (checked at the
@@ -535,6 +546,11 @@ model Template {
   /// Default envelope message
   message        String?
   signingOrder   SigningOrder @default(PARALLEL)
+  /// Folder and labels on the lists (ADR 0038). Organisation only.
+  folderId       String?
+  folder         Folder?      @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  color          String?
+  tags           Tag[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -547,6 +563,7 @@ model Template {
   fields      TemplateField[]
 
   @@index([organizationId, createdAt])
+  @@index([organizationId, folderId, createdAt])
 }
 
 /// One document of a template, in `order` (ADR 0037).

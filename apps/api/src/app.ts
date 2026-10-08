@@ -18,6 +18,7 @@ import { data } from "./routes/data"
 import { documents } from "./routes/documents"
 import { embedding } from "./routes/embedding"
 import { envelopes } from "./routes/envelopes"
+import { files } from "./routes/files"
 import { folders } from "./routes/folders"
 import { me } from "./routes/me"
 import { notifications } from "./routes/notifications"
@@ -66,6 +67,7 @@ export function createApp() {
 
     .route("/api/documents", documents)
     .route("/api/folders", folders)
+    .route("/api/files", files)
     .route("/api/envelopes", envelopes)
     .route("/api/templates", templates)
     .route("/api/templates/:id/bulk-sends", startBulkSendRoute)

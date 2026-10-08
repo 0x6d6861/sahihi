@@ -94,8 +94,8 @@ export const TagListSchema = z
   .transform((tags) => uniqueTags(tags))
   .pipe(z.array(z.string()).max(MAX_TAGS_PER_ITEM, `Use ${MAX_TAGS_PER_ITEM} tags or fewer.`))
 
-/** Colour (`null` clears it) and/or the full tag list, for a folder or a document. */
-const labelFields = {
+/** Colour (`null` clears it) and/or the full tag list, for a folder or any item in one. */
+export const labelFields = {
   color: LabelColorSchema.nullable().optional(),
   tags: TagListSchema.optional(),
 }
@@ -129,19 +129,27 @@ export const TEMPLATES_PAGE_SIZE = 25
  */
 export const ListEnvelopesQuerySchema = z.object({
   page: z.coerce.number().int().min(1).max(10_000).default(1),
+  /** Like Documents (ADR 0038): omitted = workspace root; `q`, `tag` and `color` search every folder. */
+  folderId: z.string().min(1).max(64).optional(),
   q: z.string().trim().max(200).optional(),
   stage: z.enum(ENVELOPE_STAGES).optional(),
   senderId: z.string().min(1).max(64).optional(),
   period: z.enum(DOCUMENT_PERIODS).optional(),
+  tag: TagNameSchema.optional(),
+  color: LabelColorSchema.optional(),
 })
 export type ListEnvelopesQuery = z.infer<typeof ListEnvelopesQuerySchema>
 
 /** The Templates list (ADR 0036): `q` matches the name, description or document name. */
 export const ListTemplatesQuerySchema = z.object({
   page: z.coerce.number().int().min(1).max(10_000).default(1),
+  /** Like Documents (ADR 0038): omitted = workspace root; `q`, `tag` and `color` search every folder. */
+  folderId: z.string().min(1).max(64).optional(),
   q: z.string().trim().max(200).optional(),
   createdById: z.string().min(1).max(64).optional(),
   period: z.enum(DOCUMENT_PERIODS).optional(),
+  tag: TagNameSchema.optional(),
+  color: LabelColorSchema.optional(),
 })
 export type ListTemplatesQuery = z.infer<typeof ListTemplatesQuerySchema>
 
@@ -235,6 +243,9 @@ const DocumentIdsSchema = z
   .max(MAX_ENVELOPE_DOCUMENTS)
   .refine((ids) => new Set(ids).size === ids.length, "Each document can be added once.")
 
+/** An envelope's title (on the signing page, the emails and the certificate). */
+export const EnvelopeTitleSchema = z.string().trim().min(1, "Enter a title.").max(200)
+
 /**
  * A new draft. `documentIds` lists the documents to sign in order; `documentId` (one document) is
  * still accepted from older callers and means `documentIds: [documentId]`.
@@ -243,10 +254,12 @@ export const CreateEnvelopeSchema = z
   .object({
     documentIds: DocumentIdsSchema.optional(),
     documentId: z.string().min(1).max(64).optional(),
-    title: z.string().trim().min(1).max(200),
+    title: EnvelopeTitleSchema,
     message: z.string().max(2000).optional(),
     signingOrder: z.enum(SIGNING_ORDERS).default("PARALLEL"),
     expiresAt: z.coerce.date().optional(),
+    /** Folder (same org) the draft lands in; omitted = workspace root (ADR 0038). */
+    folderId: z.string().min(1).max(64).optional(),
   })
   .transform(({ documentId, documentIds, ...rest }, ctx) => {
     const ids = documentIds ?? (documentId ? [documentId] : [])
@@ -279,6 +292,19 @@ export const CreateAttachmentUploadSchema = z.object({
   }),
 })
 export type CreateAttachmentUploadInput = z.infer<typeof CreateAttachmentUploadSchema>
+
+/**
+ * Move an envelope to a folder (`folderId: null` = workspace root) and/or set its colour and tags
+ * (`PATCH /envelopes/:id/labels`, ADR 0038). Allowed in any status: organisation only, never
+ * evidence.
+ */
+export const UpdateEnvelopeLabelsSchema = z
+  .object({
+    folderId: z.string().min(1).max(64).nullable().optional(),
+    ...labelFields,
+  })
+  .refine((v) => Object.values(v).some((x) => x !== undefined), "Nothing to change")
+export type UpdateEnvelopeLabelsInput = z.infer<typeof UpdateEnvelopeLabelsSchema>
 
 /** A draft's details, edited in the draft editor's "Review & send" (`PUT /envelopes/:id/details`). */
 export const UpdateEnvelopeDetailsSchema = z.object({

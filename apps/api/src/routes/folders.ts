@@ -37,8 +37,9 @@ function assertMovable(tree: Tree, folderId: string, parentId: string | null) {
 }
 
 /**
- * Folders on the Documents page (ADR 0022). Organisation only: moving a document never changes
- * its envelopes. Deleting a folder moves its documents and subfolders up to its parent.
+ * Folders (ADR 0022, 0038): they hold documents, envelopes and templates. Organisation only:
+ * moving an item never touches signing or evidence. Deleting a folder moves its contents and
+ * subfolders up to its parent.
  */
 export const folders = new Hono<AppEnv>()
   .use(requireOrg)
@@ -96,6 +97,22 @@ export const folders = new Hono<AppEnv>()
         })
       : []
     const docsIn = new Map(docCounts.map((r) => [r.folderId, r._count._all]))
+    const [envelopeCounts, templateCounts] = ids.length
+      ? await Promise.all([
+          prisma.envelope.groupBy({
+            by: ["folderId"],
+            where: forOrganization(orgId).envelope({ folderId: { in: ids } }),
+            _count: { _all: true },
+          }),
+          prisma.template.groupBy({
+            by: ["folderId"],
+            where: forOrganization(orgId).template({ folderId: { in: ids } }),
+            _count: { _all: true },
+          }),
+        ])
+      : [[], []]
+    const envelopesIn = new Map(envelopeCounts.map((r) => [r.folderId, r._count._all]))
+    const templatesIn = new Map(templateCounts.map((r) => [r.folderId, r._count._all]))
     // Who created each listed folder, for the Documents list's Sender column (avatar + name).
     const creators = new Map(
       (
@@ -124,6 +141,8 @@ export const folders = new Hono<AppEnv>()
         createdAt: f.createdAt,
         createdBy: creators.get(f.createdById) ?? null,
         documentCount: docsIn.get(f.id) ?? 0,
+        envelopeCount: envelopesIn.get(f.id) ?? 0,
+        templateCount: templatesIn.get(f.id) ?? 0,
         folderCount: tree.rows.filter((x) => x.parentId === f.id).length,
         color: f.color,
         tags: f.tags,
@@ -187,7 +206,7 @@ export const folders = new Hono<AppEnv>()
     return c.json({ folder: updated })
   })
 
-  /** Documents and subfolders move up to the parent; nothing else is deleted. */
+  /** Documents, envelopes, templates and subfolders move up to the parent; nothing else is deleted. */
   .delete("/:id", async (c) => {
     const scope = forOrganization(c.get("organizationId"))
     const folder = await prisma.folder.findFirst({ where: scope.folder({ id: c.req.param("id") }) })
@@ -198,6 +217,14 @@ export const folders = new Hono<AppEnv>()
       // Soft-deleted documents too, so the FK's SET NULL never silently sends them to the root.
       prisma.document.updateMany({
         where: { organizationId: folder.organizationId, folderId: folder.id },
+        data: { folderId: folder.parentId },
+      }),
+      prisma.envelope.updateMany({
+        where: scope.envelope({ folderId: folder.id }),
+        data: { folderId: folder.parentId },
+      }),
+      prisma.template.updateMany({
+        where: scope.template({ folderId: folder.id }),
         data: { folderId: folder.parentId },
       }),
       prisma.folder.updateMany({

@@ -45,6 +45,9 @@ e.g. for a data subject's erasure request. It's the "Delete data" button on the 
   - per sent, non-purged envelope (up to `EXPORT_MAX_ENVELOPES` = 2,000): `envelope.json`
     (details, recipients), `audit.json` (events + chain verification), `original.pdf`, and when
     completed `signed.pdf` and `certificate.pdf`
+- Folders and labels (ADR 0022, 0025, 0038) are not exported; they only organise the lists. Purging
+  an envelope keeps its folder and labels, and deleting a folder moves its documents, envelopes and
+  templates up a level.
 - `GET /api/data/exports` lists the last 10. `GET /api/data/exports/:id/download` returns a
   presigned `attachment` URL. Archives expire after **7 days** (`exports.cleanup`, daily), and
   the row is kept as history.

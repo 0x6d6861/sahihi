@@ -34,6 +34,23 @@ Integration tests are named `*.itest.ts`, so neither it nor a bare `bun test` pi
   - MinIO is started with `docker run` in both, because service containers can't take its
     `server /data` command, and the bucket is created with aws-cli, like `minio-init`.
 
+`.github/workflows/claude-review.yml` (`anthropics/claude-code-action@v1`) has two jobs:
+- **`review`:** Claude reviews every non-draft PR from this repository when it opens, gets new
+  commits or becomes ready. It checks the diff against the golden rules in AGENTS.md and the
+  Karpathy guidelines (`.claude/skills/karpathy-guidelines/SKILL.md`: think before coding,
+  simplicity first, surgical changes, goal-driven execution), posts findings inline as
+  `blocking:` or `nit:`, and finishes with a summary comment. Edit the skill to change what it
+  checks.
+- **`mention`:** answers `@claude …` in PR and issue comments from owners, members and
+  collaborators.
+
+It needs the `CLAUDE_CODE_OAUTH_TOKEN` repository secret (`claude setup-token`) and the Claude
+GitHub App installed on the repository. Before each run, a one-line Claude call checks the OAuth
+token. When it's missing, expired or over its plan limits, the run uses the `ANTHROPIC_API_KEY`
+secret instead. A run that fails for another reason isn't repeated. With neither secret set,
+the jobs skip with a warning; with a token that doesn't work and no API key, they fail. The action refuses to run a workflow file that differs
+from the default branch's copy, so a PR that changes the workflow isn't reviewed by it.
+
 ## What must be tested
 
 - **Coordinates:** every rotation (0/90/180/270), non-zero crop box origin, and round trips.

@@ -1,6 +1,6 @@
 import { z } from "zod"
 import type { FieldType, RecipientRole, SigningOrder, VerificationMethod } from "../shared/enums"
-import { RecipientInputSchema } from "../shared/schemas"
+import { labelFields, RecipientInputSchema } from "../shared/schemas"
 
 /**
  * Templates (docs/templates.md): a document + recipient roles + a field layout, saved from an
@@ -16,10 +16,14 @@ export const TemplateRoleInputSchema = z.object({
   keepContact: z.boolean().default(false),
 })
 
+export const TemplateNameSchema = z.string().trim().min(1, "Give the template a name").max(120)
+
 export const SaveTemplateSchema = z.object({
   envelopeId: z.string().min(1),
-  name: z.string().trim().min(1, "Give the template a name").max(120),
+  name: TemplateNameSchema,
   description: z.string().trim().max(500).optional(),
+  /** Folder (same org) the template lands in; omitted = workspace root (ADR 0038). */
+  folderId: z.string().min(1).max(64).optional(),
   roles: z
     .array(TemplateRoleInputSchema)
     .min(1)
@@ -44,12 +48,15 @@ export const SaveTemplateSchema = z.object({
 })
 export type SaveTemplateInput = z.infer<typeof SaveTemplateSchema>
 
+/** Rename, describe, move to a folder (`folderId: null` = root) and/or label (ADR 0038). */
 export const UpdateTemplateSchema = z
   .object({
-    name: z.string().trim().min(1, "Give the template a name").max(120).optional(),
+    name: TemplateNameSchema.optional(),
     description: z.string().trim().max(500).nullable().optional(),
+    folderId: z.string().min(1).max(64).nullable().optional(),
+    ...labelFields,
   })
-  .refine((v) => v.name !== undefined || v.description !== undefined, "Nothing to update")
+  .refine((v) => Object.values(v).some((x) => x !== undefined), "Nothing to update")
 
 // ── Use a template ───────────────────────────────────────────────────────────
 export const UseTemplateSchema = z.object({

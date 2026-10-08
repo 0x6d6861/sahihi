@@ -119,9 +119,12 @@ test("hasFilters and folderPathLabel", () => {
 
 describe("folder meta line", () => {
   test("counts only what isn't zero; empty when both are", () => {
-    expect(folderSummary(3, 1)).toBe("3 documents, 1 folder")
-    expect(folderSummary(0, 2)).toBe("2 folders")
-    expect(folderSummary(0, 0)).toBe("Empty")
+    expect(folderSummary({ documentCount: 3, folderCount: 1 })).toBe("3 documents, 1 folder")
+    expect(folderSummary({ documentCount: 0, folderCount: 2 })).toBe("2 folders")
+    expect(folderSummary({ documentCount: 0, folderCount: 0 })).toBe("Empty")
+    expect(
+      folderSummary({ documentCount: 1, envelopeCount: 2, templateCount: 1, folderCount: 0 }),
+    ).toBe("1 document, 2 envelopes, 1 template")
   })
 
   test("search results say where the folder lives instead", () => {

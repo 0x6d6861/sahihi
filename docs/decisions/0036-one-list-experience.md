@@ -1,6 +1,6 @@
 # 0036: One list experience for Documents, Envelopes and Templates
 
-- **Status:** accepted
+- **Status:** accepted (extended by 0038: folders and labels on every list, plus All files)
 - **Date:** 2026-10-08
 
 ## Context

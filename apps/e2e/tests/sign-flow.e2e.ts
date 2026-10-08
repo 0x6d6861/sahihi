@@ -45,7 +45,8 @@ test("sender signs up, sends an envelope; the signer signs; a certificate is iss
   await settle(page)
   await page.getByLabel("Workspace name").fill(`E2E Ltd ${run}`)
   await page.getByRole("button", { name: "Continue" }).click()
-  await page.waitForURL(/\/documents/)
+  // Onboarding lands on All files, the home page (ADR 0038).
+  await page.waitForURL(/\/files/)
 
   // ── Upload a PDF ──
   await settle(page)

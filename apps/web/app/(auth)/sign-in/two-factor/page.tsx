@@ -11,10 +11,11 @@ import { Checkbox } from "@/components/arc/checkbox/checkbox"
 import { Input } from "@/components/arc/input/input"
 import { OtpInput } from "@/components/arc/otp-input/otp-input"
 import { twoFactor } from "@/lib/auth-client"
+import { HOME_HREF } from "@/lib/nav"
 
 /** Only same-site paths, so `?next=` can't send anyone to another origin. */
 const safeNext = (next: string | null) =>
-  next?.startsWith("/") && !next.startsWith("//") ? next : "/documents"
+  next?.startsWith("/") && !next.startsWith("//") ? next : HOME_HREF
 
 /**
  * Second sign-in step for accounts with two-factor authentication (docs/auth.md → Account
