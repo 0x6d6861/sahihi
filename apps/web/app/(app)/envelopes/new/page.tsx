@@ -17,10 +17,12 @@ interface DocumentRow {
 export default async function NewEnvelopePage({
   searchParams,
 }: {
-  searchParams: Promise<{ documentId?: string | string[] }>
+  searchParams: Promise<{ documentId?: string | string[]; folder?: string | string[] }>
 }) {
-  const raw = (await searchParams).documentId
-  const documentId = typeof raw === "string" ? raw : undefined
+  const params = await searchParams
+  const documentId = typeof params.documentId === "string" ? params.documentId : undefined
+  // "New envelope" inside a folder (ADR 0038): the draft lands there.
+  const folderId = typeof params.folder === "string" && params.folder ? params.folder : undefined
 
   // The 25 newest documents. A preselected one further back is fetched on its own.
   const { data } = await apiServer<{ items: DocumentRow[] }>("/documents")
@@ -56,7 +58,11 @@ export default async function NewEnvelopePage({
             }
           />
         ) : (
-          <NewEnvelopeForm documents={documents} defaultDocumentId={documentId} />
+          <NewEnvelopeForm
+            documents={documents}
+            defaultDocumentId={documentId}
+            folderId={folderId}
+          />
         )}
       </Panel>
     </div>

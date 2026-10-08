@@ -3,11 +3,17 @@ import {
   DOCUMENT_PERIODS,
   type DocumentPeriod,
   type DocumentStatus,
-  MAX_TAG_LENGTH,
-  normalizeLabelColor,
 } from "@sahihi/core"
+import {
+  clearSearchOnFolderChange,
+  type FolderScope,
+  parseFolderScope,
+  setFolderScope,
+} from "./folder-scope"
 import { pluralize } from "./format"
 import { type ListLayout, parseListLayout } from "./list-layout"
+
+export { foldersApiQuery, searchesEverywhere } from "./folder-scope"
 
 /**
  * The Documents page's state lives in the URL
@@ -15,13 +21,7 @@ import { type ListLayout, parseListLayout } from "./list-layout"
  * Component and links/back work. These helpers read it, build links and turn it into the API's
  * query (ADR 0022, 0025).
  */
-export interface DocumentsView {
-  folder?: string
-  q?: string
-  /** Tag name (case-insensitive). */
-  tag?: string
-  /** Label colour, `#RRGGBB` (`#` dropped in the URL). */
-  color?: string
+export interface DocumentsView extends FolderScope {
   status?: (typeof DOCUMENT_LIST_STATUSES)[number]
   sender?: string
   period?: DocumentPeriod
@@ -55,10 +55,8 @@ const oneOf = <T extends string>(v: string, allowed: readonly T[]) =>
 export function parseDocumentsView(params: RawParams): DocumentsView {
   const page = Number.parseInt(one(params.page), 10)
   return {
-    folder: one(params.folder) || undefined,
+    ...parseFolderScope(params),
     q: one(params.q).slice(0, 200) || undefined,
-    tag: one(params.tag).slice(0, MAX_TAG_LENGTH) || undefined,
-    color: normalizeLabelColor(one(params.color)) ?? undefined,
     status: oneOf(one(params.status), DOCUMENT_LIST_STATUSES),
     sender: one(params.sender) || undefined,
     period: oneOf(one(params.period), DOCUMENT_PERIODS),
@@ -71,9 +69,6 @@ export function parseDocumentsView(params: RawParams): DocumentsView {
 export const hasFilters = (v: DocumentsView) =>
   Boolean(v.q || v.tag || v.color || v.status || v.sender || v.period)
 
-/** Search, tag and colour look in every folder rather than the open one (ADR 0025). */
-export const searchesEverywhere = (v: DocumentsView) => Boolean(v.q || v.tag || v.color)
-
 /**
  * `/documents` link for `view` with `patch` applied. Changing anything but the page goes back to
  * page 1; opening another folder also clears the search, tag and colour (which span every folder).
@@ -81,14 +76,9 @@ export const searchesEverywhere = (v: DocumentsView) => Boolean(v.q || v.tag || 
 export function documentsHref(view: DocumentsView, patch: Partial<DocumentsView> = {}): string {
   const next: DocumentsView = { ...view, ...patch }
   if (!("page" in patch)) next.page = undefined
-  if ("folder" in patch && patch.folder !== view.folder) {
-    for (const key of ["q", "tag", "color"] as const) if (!(key in patch)) next[key] = undefined
-  }
+  clearSearchOnFolderChange(view, patch, next)
   const qs = new URLSearchParams()
-  if (next.folder) qs.set("folder", next.folder)
-  if (next.q) qs.set("q", next.q)
-  if (next.tag) qs.set("tag", next.tag)
-  if (next.color) qs.set("color", next.color.replace("#", ""))
+  setFolderScope(qs, next)
   if (next.status) qs.set("status", next.status)
   if (next.sender) qs.set("sender", next.sender)
   if (next.period) qs.set("period", next.period)
@@ -101,48 +91,47 @@ export function documentsHref(view: DocumentsView, patch: Partial<DocumentsView>
 /** Query string for `GET /api/documents`. */
 export function documentsApiQuery(view: DocumentsView): string {
   const qs = new URLSearchParams({ page: String(view.page ?? 1) })
-  if (view.folder) qs.set("folderId", view.folder)
-  if (view.q) qs.set("q", view.q)
-  if (view.tag) qs.set("tag", view.tag)
-  if (view.color) qs.set("color", view.color.replace("#", ""))
+  setFolderScope(qs, view, "folderId")
   if (view.status) qs.set("status", view.status)
   if (view.sender) qs.set("senderId", view.sender)
   if (view.period) qs.set("period", view.period)
   return qs.toString()
 }
 
-/** Query string for `GET /api/folders`: one level, or matching folders anywhere when searching. */
-export function foldersApiQuery(view: DocumentsView): string {
-  const qs = new URLSearchParams()
-  if (searchesEverywhere(view)) {
-    if (view.q) qs.set("q", view.q)
-    if (view.tag) qs.set("tag", view.tag)
-    if (view.color) qs.set("color", view.color.replace("#", ""))
-  } else if (view.folder) {
-    qs.set("parentId", view.folder)
-  }
-  return qs.toString()
-}
-
 /** "Contracts / Leases" for a folder's path (root first). */
 export const folderPathLabel = (path: { name: string }[]) => path.map((p) => p.name).join(" / ")
 
-/** "3 documents, 1 folder", only the parts that aren't zero; "Empty" when both are. */
-export function folderSummary(documents: number, folders: number): string {
+/** What a folder holds (ADR 0038); envelope and template counts are absent from older callers. */
+export interface FolderCounts {
+  documentCount: number
+  envelopeCount?: number
+  templateCount?: number
+  folderCount: number
+}
+
+/**
+ * "3 documents, 2 envelopes, 1 template, 1 folder": only the parts that aren't zero; "Empty" when
+ * all are.
+ */
+export function folderSummary(c: FolderCounts): string {
   const parts = [
-    documents > 0 ? pluralize(documents, "document") : null,
-    folders > 0 ? pluralize(folders, "folder") : null,
+    c.documentCount > 0 ? pluralize(c.documentCount, "document") : null,
+    c.envelopeCount ? pluralize(c.envelopeCount, "envelope") : null,
+    c.templateCount ? pluralize(c.templateCount, "template") : null,
+    c.folderCount > 0 ? pluralize(c.folderCount, "folder") : null,
   ].filter(Boolean)
   return parts.length > 0 ? parts.join(", ") : "Empty"
 }
 
-/** The line under a folder's name: where it lives (search results, `path` set) or what's in it. */
-export function folderMeta(folder: {
-  documentCount: number
-  folderCount: number
-  path?: { name: string }[]
-}): string {
+/**
+ * The line under a folder's name: where it lives (search results, `path` set; `rootLabel` names
+ * the top level) or what's in it.
+ */
+export function folderMeta(
+  folder: FolderCounts & { path?: { name: string }[] },
+  rootLabel = "Documents",
+): string {
   return folder.path
-    ? `In ${folder.path.length > 0 ? folderPathLabel(folder.path) : "Documents"}`
-    : folderSummary(folder.documentCount, folder.folderCount)
+    ? `In ${folder.path.length > 0 ? folderPathLabel(folder.path) : rootLabel}`
+    : folderSummary(folder)
 }

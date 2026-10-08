@@ -1,6 +1,12 @@
 "use client"
 
-import { CreateFolderSchema, DocumentNameSchema, TagListSchema } from "@sahihi/core"
+import {
+  CreateFolderSchema,
+  DocumentNameSchema,
+  EnvelopeTitleSchema,
+  TagListSchema,
+  TemplateNameSchema,
+} from "@sahihi/core"
 import { useEffect, useId, useRef, useState } from "react"
 import { DialogActions } from "@/components/app/confirm-dialog"
 import { DIALOG_WITH_POPOVERS, RevealPopovers } from "@/components/app/dialog-popovers"
@@ -19,13 +25,25 @@ export interface EditItemChanges {
   tags: string[]
 }
 
+export type EditItemKind = "folder" | "document" | "envelope" | "template"
+
 const NAME_RULES = {
   folder: CreateFolderSchema.shape.name,
   document: DocumentNameSchema,
+  envelope: EnvelopeTitleSchema,
+  template: TemplateNameSchema,
+}
+
+const MAX_NAME: Record<EditItemKind, number> = {
+  folder: 120,
+  document: 200,
+  envelope: 200,
+  template: 120,
 }
 
 /**
- * Name, color and tags in one dialog (ADR 0025): "Edit" for a folder or a document, and
+ * Name, color and tags in one dialog (ADR 0025, 0038): "Edit" for a folder, document, envelope or
+ * template, and
  * `mode="create"` for a new folder (empty name, "Create"). `onSubmit`
  * throws to keep the dialog open; a 409 (name taken, or a document already sent) shows on the
  * name, anything else under the tags.
@@ -44,7 +62,7 @@ export function EditItemDialog({
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  kind: "folder" | "document"
+  kind: EditItemKind
   mode?: "create" | "edit"
   name: string
   /** Why the name can't change (shown under the disabled field); omitted = editable. */
@@ -103,7 +121,7 @@ export function EditItemDialog({
   return (
     <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
       <DialogContent
-        title={`${mode === "create" ? "Create" : "Edit"} ${kind === "folder" ? "folder" : "document"}`}
+        title={`${mode === "create" ? "Create" : "Edit"} ${kind}`}
         className={DIALOG_WITH_POPOVERS}
         // Escape inside the open colour picker closes the picker, not the dialog.
         onEscapeKeyDown={(e) => {
@@ -113,10 +131,10 @@ export function EditItemDialog({
         <RevealPopovers>
           <form onSubmit={submit} className="flex flex-col gap-5" noValidate>
             <Input
-              label="Name"
+              label={kind === "envelope" ? "Title" : "Name"}
               name="name"
               value={nextName}
-              maxLength={kind === "folder" ? 120 : 200}
+              maxLength={MAX_NAME[kind]}
               autoFocus={!renameLocked}
               disabled={Boolean(renameLocked) || busy}
               description={renameLocked}

@@ -6,11 +6,14 @@ import { useState } from "react"
 import { ConfirmDialog, DialogActions } from "@/components/app/confirm-dialog"
 import {
   EllipsisVerticalIcon,
+  FolderInputIcon,
   LayoutTemplateIcon,
   PencilIcon,
   SendIcon,
+  TagIcon,
   Trash2Icon,
 } from "@/components/app/icons"
+import { ItemLabelDialogs } from "@/components/app/labels/item-label-dialogs"
 import { toastManager } from "@/components/app/toast"
 import { Button as ArcButton } from "@/components/arc/button/button"
 import { Dialog, DialogContent } from "@/components/arc/dialog/dialog"
@@ -18,25 +21,34 @@ import { type DropdownItem, DropdownMenu } from "@/components/arc/dropdown-menu/
 import { Input } from "@/components/arc/input/input"
 import { api } from "@/lib/api"
 import { type FormErrors, issuesToFormErrors } from "@/lib/envelope-form"
+import type { TagRef } from "@/lib/labels"
 
 export interface TemplateRow {
   id: string
   name: string
   description: string | null
+  folderId: string | null
+  color: string | null
+  tags: TagRef[]
 }
 
 /**
- * The ⋮ menu on a template row or card (ADR 0034, 0036): Use and Bulk send for anyone; Rename and
- * Delete when the API says `permissions.manage`.
+ * The ⋮ menu on a template row or card (ADR 0034, 0036): Use and Bulk send for anyone; Rename,
+ * Edit labels, Move to (ADR 0038) and Delete when the API says `permissions.manage`.
  */
 export function TemplateRowActions({
   template,
   canManage,
+  allTags,
 }: {
   template: TemplateRow
   canManage: boolean
+  /** Every tag in use in the workspace, for the tag picker. */
+  allTags: TagRef[]
 }) {
   const router = useRouter()
+  const [editing, setEditing] = useState(false)
+  const [moving, setMoving] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [name, setName] = useState(template.name)
@@ -110,6 +122,8 @@ export function TemplateRowActions({
                     setRenaming(true)
                   },
                 },
+                { label: "Edit labels…", icon: <TagIcon />, onSelect: () => setEditing(true) },
+                { label: "Move to…", icon: <FolderInputIcon />, onSelect: () => setMoving(true) },
                 {
                   label: "Delete",
                   icon: <Trash2Icon />,
@@ -156,6 +170,18 @@ export function TemplateRowActions({
           </form>
         </DialogContent>
       </Dialog>
+
+      {canManage && (
+        <ItemLabelDialogs
+          kind="template"
+          item={template}
+          allTags={allTags}
+          editing={editing}
+          onEditingChange={setEditing}
+          moving={moving}
+          onMovingChange={setMoving}
+        />
+      )}
 
       <ConfirmDialog
         open={deleting}

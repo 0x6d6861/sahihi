@@ -1,12 +1,18 @@
 import { DOCUMENT_PERIODS, type DocumentPeriod } from "@sahihi/core"
+import {
+  clearSearchOnFolderChange,
+  type FolderScope,
+  parseFolderScope,
+  setFolderScope,
+} from "./folder-scope"
 import { type ListLayout, parseListLayout } from "./list-layout"
 
 /**
- * The Templates page's state lives in the URL (`/templates?q=…&by=…&period=…&page=…&layout=grid`)
- * so it stays a Server Component and links/back work (ADR 0036).
+ * The Templates page's state lives in the URL
+ * (`/templates?folder=…&q=…&tag=…&color=…&by=…&period=…&page=…&layout=grid`) so it stays a Server
+ * Component and links/back work (ADR 0036, 0038).
  */
-export interface TemplatesView {
-  q?: string
+export interface TemplatesView extends FolderScope {
   /** Saved by (user id). */
   by?: string
   period?: DocumentPeriod
@@ -22,6 +28,7 @@ export function parseTemplatesView(params: RawParams): TemplatesView {
   const page = Number.parseInt(one(params.page), 10)
   const period = one(params.period)
   return {
+    ...parseFolderScope(params),
     q: one(params.q).slice(0, 200) || undefined,
     by: one(params.by) || undefined,
     period: (DOCUMENT_PERIODS as readonly string[]).includes(period)
@@ -32,14 +39,19 @@ export function parseTemplatesView(params: RawParams): TemplatesView {
   }
 }
 
-export const hasTemplateFilters = (v: TemplatesView) => Boolean(v.q || v.by || v.period)
+export const hasTemplateFilters = (v: TemplatesView) =>
+  Boolean(v.q || v.tag || v.color || v.by || v.period)
 
-/** `/templates` link for `view` with `patch` applied. Changing anything but the page resets it. */
+/**
+ * `/templates` link for `view` with `patch` applied. Changing anything but the page resets it;
+ * opening another folder also clears the search, tag and colour.
+ */
 export function templatesHref(view: TemplatesView, patch: Partial<TemplatesView> = {}): string {
   const next: TemplatesView = { ...view, ...patch }
   if (!("page" in patch)) next.page = undefined
+  clearSearchOnFolderChange(view, patch, next)
   const qs = new URLSearchParams()
-  if (next.q) qs.set("q", next.q)
+  setFolderScope(qs, next)
   if (next.by) qs.set("by", next.by)
   if (next.period) qs.set("period", next.period)
   if (next.page && next.page > 1) qs.set("page", String(next.page))
@@ -51,7 +63,7 @@ export function templatesHref(view: TemplatesView, patch: Partial<TemplatesView>
 /** Query string for `GET /api/templates`. */
 export function templatesApiQuery(view: TemplatesView): string {
   const qs = new URLSearchParams({ page: String(view.page ?? 1) })
-  if (view.q) qs.set("q", view.q)
+  setFolderScope(qs, view, "folderId")
   if (view.by) qs.set("createdById", view.by)
   if (view.period) qs.set("period", view.period)
   return qs.toString()

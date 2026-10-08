@@ -6,7 +6,16 @@ import { ButtonLink } from "@/components/app/button-link"
 import { EnvelopeCard, type EnvelopeItem } from "@/components/app/envelope/envelope-card"
 import { EnvelopeRowActions } from "@/components/app/envelope/envelope-row-actions"
 import { EnvelopesToolbar } from "@/components/app/envelope/envelopes-toolbar"
+import { CreateFolderButton } from "@/components/app/folders/create-folder-button"
+import {
+  FolderBreadcrumb,
+  FolderCards,
+  FolderHeading,
+  FolderRows,
+  type FoldersPageData,
+} from "@/components/app/folders/folder-section"
 import { FileSearchIcon, PlusIcon, SendIcon } from "@/components/app/icons"
+import { ColorDot, ColorName, TagBadges } from "@/components/app/labels/labels"
 import { ListGrid } from "@/components/app/list-card"
 import { ListPagination } from "@/components/app/list-pagination"
 import { Panel } from "@/components/app/panel"
@@ -34,15 +43,18 @@ import {
   recipientSummary,
   signingProgress,
 } from "@/lib/envelope-list"
+import { foldersApiQuery, searchesEverywhere } from "@/lib/folder-scope"
 import { formatDate, formatDateTime, formatDayMonth, pluralize } from "@/lib/format"
+import type { TagRef } from "@/lib/labels"
 import { LIST_LAYOUT_COOKIE, resolveListLayout } from "@/lib/list-layout"
 import { totalPages } from "@/lib/pagination"
 
 export const metadata = { title: "Envelopes" }
 
 /**
- * Every envelope of the workspace, newest first (ADR 0036): Drive-style search and chips
- * (Status, Sent by, Created), then a list or a grid of document thumbnails, 25 a page.
+ * The workspace's envelopes, newest first (ADR 0036): Drive-style search and chips (Status, Sent
+ * by, Created, Tags, Color), folders (ADR 0038; shared with Documents and Templates), then a list
+ * or a grid of document thumbnails, 25 a page.
  */
 export default async function EnvelopesPage({
   searchParams,
@@ -54,20 +66,27 @@ export default async function EnvelopesPage({
     view.layout,
     (await cookies()).get(LIST_LAYOUT_COOKIE.envelopes)?.value,
   )
-  const [envelopes, { data: billing }] = await Promise.all([
+  const folderQuery = foldersApiQuery(view)
+  const [envelopes, folders, { data: billing }] = await Promise.all([
     apiServer<{
       items: EnvelopeItem[]
       page: number
       pageSize: number
       total: number
       senders: { id: string; name: string }[]
+      tags: TagRef[]
+      colors: string[]
     }>(`/envelopes?${envelopesApiQuery(view)}`),
+    apiServer<FoldersPageData>(`/folders${folderQuery ? `?${folderQuery}` : ""}`),
     apiServer<{
       period: { end: string }
       envelopes: { used: number; limit: number | null; level: UsageLevel }
     }>("/billing"),
   ])
-  if (envelopes.status === 400) redirect("/envelopes")
+  // A deleted or foreign folder id, or a query the API refuses: start over at the top level.
+  if ([envelopes.status, folders.status].some((s) => s === 400 || s === 404)) {
+    redirect("/envelopes")
+  }
   const data = envelopes.data
   const items = data?.items ?? []
   const total = data?.total ?? 0
@@ -77,7 +96,15 @@ export default async function EnvelopesPage({
   // Past the last page (e.g. after a filter change elsewhere): go to the last page that has rows.
   if (items.length === 0 && total > 0) redirect(envelopesHref(view, { page: pageCount }))
   const filtered = hasEnvelopeFilters(view)
-  const blank = total === 0 && !filtered
+  const searching = searchesEverywhere(view)
+  const path = folders.data?.path ?? []
+  const current = folders.data?.folder ?? null
+  const subfolders = folders.data?.items ?? []
+  const allTags = data?.tags ?? []
+  const folderHref = (folder: string | undefined) => envelopesHref(view, { folder })
+  // Nothing at all, anywhere: the first-run empty state. Inside a folder, the toolbar stays.
+  const blank = total === 0 && subfolders.length === 0 && !filtered && !current
+  const folderRows = layout === "list" && page === 1 ? subfolders : []
   const banner = billing
     ? quotaBanner(
         billing.envelopes.level,
@@ -102,17 +129,29 @@ export default async function EnvelopesPage({
     <div className="flex flex-col gap-8">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex min-w-0 flex-col gap-2">
-          <h1 className="font-medium text-2xl tracking-tight">Envelopes</h1>
+          {path.length > 0 && (
+            <FolderBreadcrumb rootLabel="Envelopes" path={path} hrefFor={folderHref} />
+          )}
+          <FolderHeading rootLabel="Envelopes" current={current} searching={searching} />
           {!blank && (
             <p className="text-muted-foreground text-sm tabular-nums">
               {pluralize(total, filtered ? "matching envelope" : "envelope")}
+              {subfolders.length > 0 ? `, ${pluralize(subfolders.length, "folder")}` : ""}
             </p>
           )}
         </div>
-        <ButtonLink variant="primary" href="/envelopes/new">
-          <PlusIcon aria-hidden />
-          New envelope
-        </ButtonLink>
+        <div className="flex flex-wrap items-center gap-2">
+          <CreateFolderButton parentId={current?.id} allTags={allTags} />
+          <ButtonLink
+            variant="primary"
+            href={
+              current ? `/envelopes/new?folder=${encodeURIComponent(current.id)}` : "/envelopes/new"
+            }
+          >
+            <PlusIcon aria-hidden />
+            New envelope
+          </ButtonLink>
+        </div>
       </header>
 
       {banner && (
@@ -140,15 +179,42 @@ export default async function EnvelopesPage({
         </Panel>
       ) : (
         <section aria-label="Envelopes" className="flex flex-col gap-6">
-          <EnvelopesToolbar view={view} layout={layout} senders={data?.senders ?? []} />
-          {total === 0 ? (
+          <EnvelopesToolbar
+            view={view}
+            layout={layout}
+            senders={data?.senders ?? []}
+            tags={allTags}
+            colors={data?.colors ?? []}
+          />
+          {layout === "grid" && (
+            <FolderCards
+              folders={subfolders}
+              current={current}
+              searching={searching}
+              canCreate={Boolean(folders.data?.permissions?.create)}
+              allTags={allTags}
+              hrefFor={folderHref}
+              rootLabel="Envelopes"
+            />
+          )}
+          {total === 0 && folderRows.length === 0 ? (
             <Panel>
               <EmptyState
                 className="md:py-10"
                 icon={<FileSearchIcon aria-hidden />}
-                title="No matching envelopes"
-                description="Try another search or clear the filters."
-                action={<ButtonLink href="/envelopes">Clear filters</ButtonLink>}
+                title={filtered ? "No matching envelopes" : "No envelopes here"}
+                description={
+                  filtered
+                    ? "Try another search or clear the filters."
+                    : "Create one here, or move envelopes into this folder."
+                }
+                action={
+                  filtered ? (
+                    <ButtonLink href={envelopesHref({ folder: view.folder })}>
+                      Clear filters
+                    </ButtonLink>
+                  ) : undefined
+                }
               />
             </Panel>
           ) : layout === "grid" ? (
@@ -156,7 +222,7 @@ export default async function EnvelopesPage({
               <ListGrid>
                 {items.map((e) => (
                   <li key={e.id} className="grid">
-                    <EnvelopeCard envelope={e} />
+                    <EnvelopeCard envelope={e} allTags={allTags} />
                   </li>
                 ))}
               </ListGrid>
@@ -179,6 +245,15 @@ export default async function EnvelopesPage({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
+                  <FolderRows
+                    folders={folderRows}
+                    current={current}
+                    searching={searching}
+                    allTags={allTags}
+                    hrefFor={folderHref}
+                    rootLabel="Envelopes"
+                    columns={5}
+                  />
                   {items.map((e) => {
                     const progress = signingProgress(e.recipients)
                     return (
@@ -187,14 +262,22 @@ export default async function EnvelopesPage({
                           <div className="flex min-w-0 items-center gap-3">
                             <EnvelopeTypeIcon />
                             <div className="flex min-w-0 flex-col gap-0.5">
-                              <Link
-                                href={`/envelopes/${e.id}`}
-                                title={e.title}
-                                className="truncate font-medium underline-offset-4 hover:underline"
-                              >
-                                {e.title}
-                              </Link>
+                              <div className="flex min-w-0 items-center gap-2">
+                                {e.color && <ColorDot color={e.color} className="size-2.5" />}
+                                <Link
+                                  href={`/envelopes/${e.id}`}
+                                  title={e.title}
+                                  className="truncate font-medium underline-offset-4 hover:underline"
+                                >
+                                  {e.title}
+                                  <ColorName color={e.color} />
+                                </Link>
+                                <div className="hidden shrink-0 sm:flex">
+                                  <TagBadges tags={e.tags} max={2} />
+                                </div>
+                              </div>
                               <span className="truncate text-muted-foreground text-xs">
+                                {searching && e.folder ? `In ${e.folder.name} · ` : ""}
                                 {documentsSummary(e.documents.map((d) => d.name))}
                               </span>
                               {/* Phones: recipients and progress move under the title. */}
@@ -242,7 +325,7 @@ export default async function EnvelopesPage({
                           </time>
                         </TableCell>
                         <TableCell className="pe-1">
-                          <EnvelopeRowActions envelope={e} />
+                          <EnvelopeRowActions envelope={e} allTags={allTags} />
                         </TableCell>
                       </TableRow>
                     )

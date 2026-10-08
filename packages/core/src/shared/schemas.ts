@@ -243,6 +243,9 @@ const DocumentIdsSchema = z
   .max(MAX_ENVELOPE_DOCUMENTS)
   .refine((ids) => new Set(ids).size === ids.length, "Each document can be added once.")
 
+/** An envelope's title (on the signing page, the emails and the certificate). */
+export const EnvelopeTitleSchema = z.string().trim().min(1, "Enter a title.").max(200)
+
 /**
  * A new draft. `documentIds` lists the documents to sign in order; `documentId` (one document) is
  * still accepted from older callers and means `documentIds: [documentId]`.
@@ -251,7 +254,7 @@ export const CreateEnvelopeSchema = z
   .object({
     documentIds: DocumentIdsSchema.optional(),
     documentId: z.string().min(1).max(64).optional(),
-    title: z.string().trim().min(1).max(200),
+    title: EnvelopeTitleSchema,
     message: z.string().max(2000).optional(),
     signingOrder: z.enum(SIGNING_ORDERS).default("PARALLEL"),
     expiresAt: z.coerce.date().optional(),

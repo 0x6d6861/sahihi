@@ -27,9 +27,12 @@ function startOfToday() {
 export function NewEnvelopeForm({
   documents,
   defaultDocumentId,
+  folderId,
 }: {
   documents: ReadyDocument[]
   defaultDocumentId?: string
+  /** Folder the draft lands in (ADR 0038); omitted = top level. */
+  folderId?: string
 }) {
   const router = useRouter()
   const initial = documents.find((d) => d.id === defaultDocumentId)
@@ -58,7 +61,7 @@ export function NewEnvelopeForm({
     try {
       const { envelope } = await api<{ envelope: { id: string } }>("/envelopes", {
         method: "POST",
-        json: built.input,
+        json: { ...built.input, folderId },
       })
       router.push(`/envelopes/${envelope.id}`)
     } catch (err) {

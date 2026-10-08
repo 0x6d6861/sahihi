@@ -16,8 +16,7 @@ import { ColorDot, ColorName, TagBadges } from "@/components/app/labels/labels"
 import { toastManager } from "@/components/app/toast"
 import { DropdownMenu } from "@/components/arc/dropdown-menu/dropdown-menu"
 import { api } from "@/lib/api"
-import { folderMeta } from "@/lib/documents-list"
-import { pluralize } from "@/lib/format"
+import { folderMeta, folderSummary } from "@/lib/documents-list"
 import type { TagRef } from "@/lib/labels"
 import { MoveToFolderDialog } from "./move-to-folder-dialog"
 
@@ -25,6 +24,9 @@ export interface FolderCardData {
   id: string
   name: string
   documentCount: number
+  /** What else it holds (ADR 0038). */
+  envelopeCount?: number
+  templateCount?: number
   folderCount: number
   /** `#RRGGBB` label colour. */
   color: string | null
@@ -37,7 +39,7 @@ export interface FolderCardData {
 }
 
 /**
- * A folder on the Documents page: opens it, with Edit (name, color, tags) / Move / Delete for whoever
+ * A folder on a list page (ADR 0022, 0038): opens it, with Edit (name, color, tags) / Move / Delete for whoever
  * may manage it. Deleting moves its contents up to `parentName` (ADR 0022). Under the summary, its
  * label colour as a dot and then its tags, on one line (ADR 0025).
  */
@@ -47,6 +49,7 @@ export function FolderCard({
   parentId,
   parentName,
   allTags,
+  rootLabel = "Documents",
 }: {
   folder: FolderCardData
   href: string
@@ -54,6 +57,8 @@ export function FolderCard({
   parentName: string
   /** Every tag in use in the workspace, for the tag picker. */
   allTags: TagRef[]
+  /** The page's top level, for "In …" on search results. */
+  rootLabel?: string
 }) {
   return (
     <div className="relative flex min-h-16 items-center gap-3 rounded-xl border bg-card py-2.5 ps-4 pe-2.5 press-subtle has-[a:hover]:bg-muted has-[a:focus-visible]:bg-muted">
@@ -69,7 +74,7 @@ export function FolderCard({
             <ColorName color={folder.color} />
           </Link>
           <p className="truncate text-muted-foreground text-xs tabular-nums">
-            {folderMeta(folder)}
+            {folderMeta(folder, rootLabel)}
           </p>
         </div>
         {/* Label line: the colour dot, then the tags. */}
@@ -131,7 +136,8 @@ export function FolderRowActions({
   }
 
   if (!folder.permissions.manage) return null
-  const empty = folder.documentCount === 0 && folder.folderCount === 0
+  const contents = folderSummary(folder)
+  const empty = contents === "Empty"
 
   return (
     <>
@@ -189,7 +195,7 @@ export function FolderRowActions({
         description={
           empty
             ? "The folder is empty."
-            : `Its ${pluralize(folder.documentCount, "document")} and ${pluralize(folder.folderCount, "subfolder")} move to ${parentName}. No documents are deleted.`
+            : `What's in it (${contents}) moves to ${parentName}. Nothing else is deleted.`
         }
         confirmLabel="Delete folder"
         onConfirm={remove}

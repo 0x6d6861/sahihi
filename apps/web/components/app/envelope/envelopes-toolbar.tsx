@@ -3,6 +3,7 @@
 import { DOCUMENT_PERIODS, ENVELOPE_STAGES } from "@sahihi/core"
 import {
   ListSearch,
+  labelChips,
   type SearchChip,
   uniqueLabels,
   useListNavigation,
@@ -10,6 +11,7 @@ import {
 import { ENVELOPE_STAGE_ICON } from "@/components/app/status-icon"
 import { PERIOD_LABEL } from "@/lib/documents-list"
 import { ENVELOPE_STAGE_LABEL, type EnvelopesView, envelopesHref } from "@/lib/envelope-list"
+import type { TagRef } from "@/lib/labels"
 import type { ListLayout } from "@/lib/list-layout"
 
 /**
@@ -21,9 +23,14 @@ export function EnvelopesToolbar({
   view,
   layout,
   senders,
+  tags,
+  colors,
 }: {
   view: EnvelopesView
   layout: ListLayout
+  /** Tags and label colours in use in the workspace (ADR 0038). */
+  tags: TagRef[]
+  colors: string[]
   senders: { id: string; name: string }[]
 }) {
   const nav = useListNavigation("envelopes", view.layout)
@@ -54,17 +61,26 @@ export function EnvelopesToolbar({
       current: view.period,
       options: DOCUMENT_PERIODS.map((p) => ({ value: p, label: PERIOD_LABEL[p] })),
     },
+    ...labelChips({ tags, colors, tag: view.tag, color: view.color }),
   ]
 
   return (
     <ListSearch
       label="Search envelopes"
-      placeholder="Search by title, document or recipient"
+      placeholder="Search by title, tag, document or recipient"
       query={view.q ?? ""}
       onQueryChange={(q) => go({ q })}
       chips={chips}
       onChipChange={(id, value) => go({ [id]: value } as Partial<EnvelopesView>)}
-      onClearChips={() => go({ stage: undefined, sender: undefined, period: undefined })}
+      onClearChips={() =>
+        go({
+          tag: undefined,
+          color: undefined,
+          stage: undefined,
+          sender: undefined,
+          period: undefined,
+        })
+      }
       layout={layout}
       onLayoutChange={(l) =>
         nav.setLayout(l, envelopesHref(view, { layout: undefined, page: view.page }))

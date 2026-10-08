@@ -20,7 +20,8 @@ interface FolderOption {
 const ROOT = "__root__"
 
 /**
- * Pick a destination folder (or the top level) for a document or a folder. Loads the workspace's
+ * Pick a destination folder (or the top level) for a document, envelope, template or folder
+ * (ADR 0038). Loads the workspace's
  * folders when opened. For a folder, its own subtree is left out (the API refuses it anyway).
  */
 export function MoveToFolderDialog({
@@ -60,7 +61,7 @@ export function MoveToFolderDialog({
       .filter((f) => !excludeSubtreeOf || !f.path.some((p) => p.id === excludeSubtreeOf))
       .map((f) => ({ value: f.id, label: folderPathLabel(f.path) }))
       .sort((a, b) => a.label.localeCompare(b.label))
-    return [{ value: ROOT, label: "Documents (top level)" }, ...options]
+    return [{ value: ROOT, label: "Top level (no folder)" }, ...options]
   }, [folders, excludeSubtreeOf])
 
   async function move() {
@@ -83,7 +84,7 @@ export function MoveToFolderDialog({
     <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
       <DialogContent
         title={`Move “${itemName}”`}
-        description="Folders only organise documents; envelopes aren't affected."
+        description="Folders only organise your work; signing and certificates aren't affected."
         // Room for the Combobox's list (it would be cut off at the dialog's edge).
         className={DIALOG_WITH_POPOVERS}
       >

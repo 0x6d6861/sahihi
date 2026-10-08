@@ -1,12 +1,15 @@
 "use client"
 
+import { labelColorName } from "@sahihi/core"
 import { useRouter } from "next/navigation"
 import { type ReactNode, useEffect, useRef, useState, useTransition } from "react"
 import { CheckIcon } from "@/components/app/icons"
+import { ColorDot } from "@/components/app/labels/labels"
 import { Button } from "@/components/arc/button/button"
 import { DropdownMenu } from "@/components/arc/dropdown-menu/dropdown-menu"
 import { SearchField } from "@/components/arc/search-field/search-field"
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control"
+import type { TagRef } from "@/lib/labels"
 import { type ListLayout, type ListPage, listLayoutCookie } from "@/lib/list-layout"
 
 const SEARCH_DELAY_MS = 300
@@ -62,6 +65,59 @@ export function uniqueLabels(options: ChipOption[]): ChipOption[] {
     seen.set(o.label, n)
     return n === 1 ? o : { ...o, label: `${o.label} (${n})` }
   })
+}
+
+/**
+ * The Tags and Color chips (ADR 0025, 0038), only when the workspace uses them. A tag or colour
+ * from a link that's no longer on anything still shows, so it can be cleared.
+ */
+export function labelChips({
+  tags,
+  colors,
+  tag,
+  color,
+}: {
+  /** Tags in use in the workspace. */
+  tags: TagRef[]
+  /** Label colours in use in the workspace (`#RRGGBB`). */
+  colors: string[]
+  tag?: string
+  color?: string
+}): SearchChip[] {
+  return [
+    ...(tags.length > 0 || tag
+      ? [
+          {
+            id: "tag",
+            label: "Tags",
+            any: "Any tag",
+            current: tag,
+            caseInsensitive: true,
+            options: uniqueLabels([
+              ...tags.map((t) => ({ value: t.name, label: t.name })),
+              ...(tag && !tags.some((t) => t.name.toLowerCase() === tag.toLowerCase())
+                ? [{ value: tag, label: tag }]
+                : []),
+            ]),
+          } satisfies SearchChip,
+        ]
+      : []),
+    ...(colors.length > 0 || color
+      ? [
+          {
+            id: "color",
+            label: "Color",
+            any: "Any color",
+            current: color,
+            options: [...new Set([...colors, ...(color ? [color] : [])])].map((c) => ({
+              value: c,
+              label: labelColorName(c),
+              icon: <ColorDot color={c} />,
+            })),
+          } satisfies SearchChip,
+        ]
+      : []),
+  ]
 }
 
 const selectedOption = (chip: SearchChip) =>
