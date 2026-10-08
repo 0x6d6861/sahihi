@@ -21,7 +21,7 @@ describe("buildCreateEnvelopeInput", () => {
   test("builds the API input", () => {
     expect(buildCreateEnvelopeInput(base, now)).toEqual({
       ok: true,
-      input: { documentId: "doc_1", title: "Lease", signingOrder: "PARALLEL" },
+      input: { documentIds: ["doc_1"], title: "Lease", signingOrder: "PARALLEL" },
     })
   })
   test("maps the switch, trims the message and sets expiry to the end of the day", () => {

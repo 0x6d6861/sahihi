@@ -10,6 +10,7 @@ import { Breadcrumb } from "@/components/arc/breadcrumb/breadcrumb"
 import { apiServer } from "@/lib/api-server"
 import { DOCUMENT_STATUS_BADGE } from "@/lib/constants"
 import { shortHash } from "@/lib/documents"
+import { documentsHref } from "@/lib/documents-list"
 import { formatDate } from "@/lib/format"
 
 interface DocumentDetail {
@@ -27,9 +28,10 @@ export const metadata = { title: "Document" }
 
 export default async function DocumentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const { status, data } = await apiServer<{ document: DocumentDetail }>(
-    `/documents/${encodeURIComponent(id)}`,
-  )
+  const { status, data } = await apiServer<{
+    document: DocumentDetail
+    folderPath: { id: string; name: string }[]
+  }>(`/documents/${encodeURIComponent(id)}`)
   if (status === 404 || !data) notFound()
   const doc = data.document
 
@@ -41,7 +43,15 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="flex flex-col gap-6">
-      <Breadcrumb items={[{ label: "Documents", href: "/documents" }, { label: doc.name }]} />
+      {/* Documents / the folders it lives in, root first / the document. */}
+      <Breadcrumb
+        ariaLabel="Location"
+        items={[
+          { label: "Documents", href: "/documents" },
+          ...data.folderPath.map((f) => ({ label: f.name, href: documentsHref({ folder: f.id }) })),
+          { label: doc.name },
+        ]}
+      />
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-2">

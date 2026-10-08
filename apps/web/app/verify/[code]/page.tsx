@@ -1,6 +1,7 @@
 import { normalizeCertificateCode } from "@sahihi/core"
 import type { Metadata } from "next"
 import Link from "next/link"
+import { stagger } from "@/components/app/motion"
 import { Panel } from "@/components/app/panel"
 import { Alert } from "@/components/arc/alert/alert"
 import { Badge } from "@/components/arc/badge/badge"
@@ -15,8 +16,15 @@ interface VerifyResponse {
     title: string
     organization: string
     completedAt: string
-    originalSha256: string
-    signedSha256: string
+    /** Every signed document with both hashes, in signing order (ADR 0037). */
+    documents: {
+      name: string
+      pageCount: number | null
+      originalSha256: string | null
+      signedSha256: string | null
+    }[]
+    /** Supporting files shared with the signers, not signed. */
+    attachments: { name: string; sha256: string | null }[]
     signers: { name: string; email: string; signedAt: string | null; verification: string }[]
   }
 }
@@ -74,8 +82,8 @@ export default async function VerifyPage({
             description={`${data.envelope.organization} · completed ${formatDateTime(new Date(data.envelope.completedAt))}`}
           >
             <ul className="flex flex-col gap-1 text-sm">
-              {data.envelope.signers.map((s) => (
-                <li key={s.email}>
+              {data.envelope.signers.map((s, i) => (
+                <li key={s.email} className="enter-fade" style={stagger(i)}>
                   <span className="font-medium">{s.name}</span>{" "}
                   <span className="text-muted-foreground">{s.email}</span>
                   {s.signedAt && (
@@ -87,10 +95,35 @@ export default async function VerifyPage({
                 </li>
               ))}
             </ul>
-            <div className="break-all font-mono text-muted-foreground text-xs">
-              <div>Original SHA-256: {data.envelope.originalSha256}</div>
-              <div>Signed SHA-256: {data.envelope.signedSha256}</div>
-            </div>
+            <ol className="flex flex-col gap-3">
+              {data.envelope.documents.map((d, i) => (
+                <li
+                  key={d.signedSha256 ?? d.originalSha256 ?? d.name}
+                  className="flex flex-col gap-1"
+                >
+                  <span className="font-medium text-sm">
+                    {data.envelope && data.envelope.documents.length > 1 ? `${i + 1}. ` : ""}
+                    {d.name}
+                  </span>
+                  <div className="break-all font-mono text-muted-foreground text-xs">
+                    <div>Original SHA-256: {d.originalSha256}</div>
+                    <div>Signed SHA-256: {d.signedSha256}</div>
+                  </div>
+                </li>
+              ))}
+            </ol>
+            {data.envelope.attachments.length > 0 && (
+              <div className="flex flex-col gap-1">
+                <span className="font-medium text-sm">Supporting files (shared, not signed)</span>
+                <ul className="flex flex-col gap-1 break-all font-mono text-muted-foreground text-xs">
+                  {data.envelope.attachments.map((a) => (
+                    <li key={a.sha256 ?? a.name}>
+                      <span className="font-sans">{a.name}</span>: {a.sha256}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </Panel>
         </>
       )}

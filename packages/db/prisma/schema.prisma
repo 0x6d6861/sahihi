@@ -41,6 +41,7 @@ model User {
   documents               Document[]
   envelopes               Envelope[]
   templates               Template[]
+  envelopeAttachments     EnvelopeAttachment[]
   folders                 Folder[]
   webhooks                WebhookEndpoint[]
   exports                 DataExport[]
@@ -236,37 +237,43 @@ enum SigningProviderKind {
 
 /// An uploaded source PDF. Immutable once READY — never overwrite `s3Key`.
 model Document {
-  id               String         @id @default(cuid())
-  organizationId   String
-  organization     Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  uploadedById     String
-  uploadedBy       User           @relation(fields: [uploadedById], references: [id])
-  name             String
-  s3Key            String         @unique
-  status           DocumentStatus @default(UPLOADING)
-  sizeBytes        Int?
-  sha256           String?
-  pageCount        Int?
+  id                String             @id @default(cuid())
+  organizationId    String
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  uploadedById      String
+  uploadedBy        User               @relation(fields: [uploadedById], references: [id])
+  name              String
+  s3Key             String             @unique
+  status            DocumentStatus     @default(UPLOADING)
+  sizeBytes         Int?
+  sha256            String?
+  pageCount         Int?
   /// PageBox[] from @sahihi/core — unrotated crop box + rotation per page
-  pages            Json?
-  failureReason    String?
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  deletedAt        DateTime?
-  envelopes        Envelope[]
-  templates        Template[]
+  pages             Json?
+  failureReason     String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  deletedAt         DateTime?
+  /// Envelopes and templates that use this document (ADR 0037: an envelope can hold several).
+  envelopeDocuments EnvelopeDocument[]
+  templateDocuments TemplateDocument[]
   /// Set when this document was produced by "Prepare document" from another one (same org).
   /// The source is never modified; this is lineage only.
-  sourceDocumentId String?
-  source           Document?      @relation("DocumentLineage", fields: [sourceDocumentId], references: [id], onDelete: SetNull)
-  derived          Document[]     @relation("DocumentLineage")
+  sourceDocumentId  String?
+  source            Document?          @relation("DocumentLineage", fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  derived           Document[]         @relation("DocumentLineage")
   /// Folder on the Documents page (null = workspace root). Organisation only, no effect on signing.
-  folderId         String?
-  folder           Folder?        @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  folderId          String?
+  folder            Folder?            @relation(fields: [folderId], references: [id], onDelete: SetNull)
   /// Label colour (`#RRGGBB`, `LabelColorSchema`) and tags on the Documents page (ADR 0025).
   /// Organisation only, like folders.
-  color            String?
-  tags             Tag[]
+  color             String?
+  tags              Tag[]
+  /// First-page preview PNG for the Documents grid, rendered by the worker once READY (ADR 0033).
+  /// Same tenancy and presigned-only access as the PDF. Null until rendered.
+  thumbnailKey      String?
+  /// Why rendering failed; set so the backfill sweep doesn't retry a broken file forever.
+  thumbnailError    String?
 
   @@index([organizationId, createdAt])
   @@index([organizationId, folderId, createdAt])
@@ -315,8 +322,6 @@ model Envelope {
   id             String         @id @default(cuid())
   organizationId String
   organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  documentId     String
-  document       Document       @relation(fields: [documentId], references: [id])
   createdById    String
   createdBy      User           @relation(fields: [createdById], references: [id])
   title          String
@@ -328,14 +333,18 @@ model Envelope {
   completedAt    DateTime?
   voidedAt       DateTime?
   voidReason     String?
-  /// Stamped + flattened output (without certificate)
-  signedS3Key    String?
-  signedSha256   String?
+  /// "Download all" zip of the signed PDFs, certificate and supporting files (a convenience, not
+  /// evidence; ADR 0037).
+  bundleS3Key    String?
   /// Files and personal data deleted (retention or on request); evidence kept (docs/data-retention.md)
   purgedAt       DateTime?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
+  /// The documents to sign, in `order` (ADR 0037).
+  documents     EnvelopeDocument[]
+  /// Supporting files: shared with recipients, never signed.
+  attachments   EnvelopeAttachment[]
   recipients    Recipient[]
   fields        Field[]
   auditEvents   AuditEvent[]
@@ -344,6 +353,52 @@ model Envelope {
 
   @@index([organizationId, status])
   @@index([organizationId, createdAt])
+}
+
+/// One document to sign in an envelope (ADR 0037). The document link is NO ACTION (checked at the
+/// end of the statement): a document can't be removed under an envelope, yet deleting a workspace
+/// cascades through both. Fields are placed on its pages; finalize stamps
+/// it into its own signed PDF. The original `Document` is never modified.
+model EnvelopeDocument {
+  id           String   @id @default(cuid())
+  envelopeId   String
+  envelope     Envelope @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+  documentId   String
+  document     Document @relation(fields: [documentId], references: [id], onDelete: NoAction)
+  /// 0-based position in the envelope.
+  order        Int      @default(0)
+  /// Stamped + flattened output (without certificate)
+  signedS3Key  String?
+  signedSha256 String?
+  createdAt    DateTime @default(now())
+  fields       Field[]
+
+  @@unique([envelopeId, documentId])
+  @@index([envelopeId, order])
+  @@index([documentId])
+  @@index([signedSha256])
+}
+
+/// A supporting file the sender shares with an envelope's recipients (ADR 0037): any allowed type,
+/// never signed, always downloaded (never shown inline). Its hash is listed on the certificate.
+/// Tenancy follows the envelope.
+model EnvelopeAttachment {
+  id           String         @id @default(cuid())
+  envelopeId   String
+  envelope     Envelope       @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+  name         String
+  contentType  String
+  sizeBytes    Int
+  sha256       String?
+  s3Key        String         @unique
+  status       DocumentStatus @default(UPLOADING)
+  order        Int            @default(0)
+  uploadedById String
+  uploadedBy   User           @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime       @default(now())
+
+  @@index([envelopeId, order])
+  @@index([status, createdAt])
 }
 
 model Recipient {
@@ -403,27 +458,30 @@ model RecipientOtp {
 /// A placement on the document. Coordinates are NORMALIZED (0–1) relative to the
 /// page as displayed (rotation applied), origin TOP-LEFT. See docs/coordinates.md.
 model Field {
-  id          String    @id @default(cuid())
-  envelopeId  String
-  envelope    Envelope  @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
-  recipientId String
-  recipient   Recipient @relation(fields: [recipientId], references: [id], onDelete: Cascade)
-  type        FieldType
+  id                 String           @id @default(cuid())
+  envelopeId         String
+  envelope           Envelope         @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+  recipientId        String
+  recipient          Recipient        @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  /// The document the field sits on (ADR 0037); `page` is 1-based within it.
+  envelopeDocumentId String
+  envelopeDocument   EnvelopeDocument @relation(fields: [envelopeDocumentId], references: [id], onDelete: Cascade)
+  type               FieldType
   /// 1-based page number
-  page        Int
-  x           Float
-  y           Float
-  width       Float
-  height      Float
-  required    Boolean   @default(true)
-  label       String?
+  page               Int
+  x                  Float
+  y                  Float
+  width              Float
+  height             Float
+  required           Boolean          @default(true)
+  label              String?
   // ── completion ──
-  value       String?
+  value              String?
   /// S3 key of the PNG for SIGNATURE / INITIALS fields
-  imageS3Key  String?
-  filledAt    DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  imageS3Key         String?
+  filledAt           DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 
   @@index([envelopeId])
   @@index([recipientId])
@@ -470,10 +528,6 @@ model Template {
   id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  /// Fields are normalized to this PDF's pages, so a template always carries its document.
-  /// Deleting the document is refused while templates use it.
-  documentId     String
-  document       Document     @relation(fields: [documentId], references: [id])
   createdById    String
   createdBy      User         @relation(fields: [createdById], references: [id])
   name           String
@@ -484,12 +538,46 @@ model Template {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  bulkSends BulkSend[]
-  roles     TemplateRole[]
-  fields    TemplateField[]
+  bulkSends   BulkSend[]
+  /// Fields are normalized to these PDFs' pages, so a template always carries its documents.
+  /// Deleting a document is refused while templates use it (ADR 0012, 0037).
+  documents   TemplateDocument[]
+  attachments TemplateAttachment[]
+  roles       TemplateRole[]
+  fields      TemplateField[]
 
   @@index([organizationId, createdAt])
+}
+
+/// One document of a template, in `order` (ADR 0037).
+model TemplateDocument {
+  id         String          @id @default(cuid())
+  templateId String
+  template   Template        @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  documentId String
+  document   Document        @relation(fields: [documentId], references: [id], onDelete: NoAction)
+  order      Int             @default(0)
+  fields     TemplateField[]
+
+  @@unique([templateId, documentId])
+  @@index([templateId, order])
   @@index([documentId])
+}
+
+/// A supporting file kept with a template (ADR 0037). Its own copy of the object, so the template
+/// outlives the envelope it was saved from; using the template copies it again.
+model TemplateAttachment {
+  id          String   @id @default(cuid())
+  templateId  String
+  template    Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  name        String
+  contentType String
+  sizeBytes   Int
+  sha256      String
+  s3Key       String   @unique
+  order       Int      @default(0)
+
+  @@index([templateId, order])
 }
 
 /// A recipient slot ("Tenant", "Landlord"). Filled with a person when the template is used,
@@ -513,19 +601,21 @@ model TemplateRole {
 }
 
 model TemplateField {
-  id         String       @id @default(cuid())
-  templateId String
-  template   Template     @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  roleId     String
-  role       TemplateRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  type       FieldType
-  page       Int
-  x          Float
-  y          Float
-  width      Float
-  height     Float
-  required   Boolean      @default(true)
-  label      String?
+  id                 String           @id @default(cuid())
+  templateId         String
+  template           Template         @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  roleId             String
+  role               TemplateRole     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  templateDocumentId String
+  templateDocument   TemplateDocument @relation(fields: [templateDocumentId], references: [id], onDelete: Cascade)
+  type               FieldType
+  page               Int
+  x                  Float
+  y                  Float
+  width              Float
+  height             Float
+  required           Boolean          @default(true)
+  label              String?
 
   @@index([templateId])
 }

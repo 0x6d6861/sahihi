@@ -4,7 +4,13 @@ import { UpdateTemplateSchema } from "@sahihi/core"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { ConfirmDialog, DialogActions } from "@/components/app/confirm-dialog"
-import { LayoutTemplateIcon, PencilIcon, SendIcon, Trash2Icon } from "@/components/app/icons"
+import {
+  EllipsisVerticalIcon,
+  LayoutTemplateIcon,
+  PencilIcon,
+  SendIcon,
+  Trash2Icon,
+} from "@/components/app/icons"
 import { toastManager } from "@/components/app/toast"
 import { Button as ArcButton } from "@/components/arc/button/button"
 import { Dialog, DialogContent } from "@/components/arc/dialog/dialog"
@@ -19,7 +25,10 @@ export interface TemplateRow {
   description: string | null
 }
 
-/** Bulk send for anyone; Rename and Delete when the API says `permissions.manage`. */
+/**
+ * The ⋮ menu on a template row or card (ADR 0034, 0036): Use and Bulk send for anyone; Rename and
+ * Delete when the API says `permissions.manage`.
+ */
 export function TemplateRowActions({
   template,
   canManage,
@@ -74,7 +83,9 @@ export function TemplateRowActions({
   return (
     <>
       <DropdownMenu
-        label="Actions"
+        label={`Actions for ${template.name}`}
+        iconOnly
+        icon={<EllipsisVerticalIcon />}
         items={[
           {
             label: "Use template",

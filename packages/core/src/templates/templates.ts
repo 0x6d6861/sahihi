@@ -204,11 +204,11 @@ export const hasFixedContact = (role: { name: string | null; email: string | nul
  * like any recipient list: same schema, unique emails, a phone for SMS verification. Issues use
  * the path `recipients.<roleId>.<field>` so the form can show them next to the right input.
  */
-export function draftFromTemplate(
-  template: TemplateForUse,
+export function draftFromTemplate<T extends TemplateForUse>(
+  template: T,
   input: UseTemplateInput["recipients"],
 ):
-  | { ok: true; recipients: DraftRecipient[]; fields: TemplateForUse["fields"] }
+  | { ok: true; recipients: DraftRecipient[]; fields: T["fields"] }
   | { ok: false; issues: TemplateIssue[] } {
   const issues: TemplateIssue[] = []
   const given = new Map(input.map((r) => [r.roleId, r]))

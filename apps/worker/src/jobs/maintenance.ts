@@ -83,7 +83,7 @@ const SWEEP_BATCH = 500
 
 /**
  * Every 15 min: uploads never completed within an hour become FAILED + soft-deleted, and their
- * storage object (if the PUT landed) is removed. Idempotent: the conditional update skips rows a
+ * storage object (if the PUT landed) is removed. Abandoned supporting-file uploads are deleted. Idempotent: the conditional update skips rows a
  * late `complete` already moved on, and deleting a missing object is a no-op in S3.
  */
 export async function sweepAbandonedUploads(now = new Date()) {
@@ -110,6 +110,23 @@ export async function sweepAbandonedUploads(now = new Date()) {
       )
     }
     if (stale.length < SWEEP_BATCH) break
+  }
+  // Supporting files (ADR 0037) left UPLOADING the same way: the row goes, and the object if the
+  // PUT landed. Nothing was audited for them (only `complete` audits).
+  const staleFiles = await prisma.envelopeAttachment.findMany({
+    where: { status: "UPLOADING", createdAt: { lt: cutoff } },
+    select: { id: true, s3Key: true },
+    take: SWEEP_BATCH,
+  })
+  for (const a of staleFiles) {
+    const res = await prisma.envelopeAttachment.deleteMany({
+      where: { id: a.id, status: "UPLOADING" },
+    })
+    if (res.count === 0) continue
+    swept += 1
+    await deleteObject(a.s3Key).catch((err: unknown) =>
+      log.error("could not delete abandoned file upload", { key: a.s3Key, err }),
+    )
   }
   return { swept }
 }

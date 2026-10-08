@@ -153,8 +153,13 @@ Private bucket. The browser only ever sees short-lived presigned URLs. Key layou
 
 ```
 org/{orgId}/documents/{documentId}/original.pdf
+org/{orgId}/documents/{documentId}/thumbnail.png   (first page for the grid, ADR 0033)
 org/{orgId}/envelopes/{envelopeId}/fields/{fieldId}.png
-org/{orgId}/envelopes/{envelopeId}/signed.pdf
+org/{orgId}/envelopes/{envelopeId}/signed.pdf            (single-document envelopes signed before ADR 0037)
+org/{orgId}/envelopes/{envelopeId}/signed/{envelopeDocumentId}.pdf
+org/{orgId}/envelopes/{envelopeId}/attachments/{attachmentId}   (supporting files, ADR 0037)
+org/{orgId}/envelopes/{envelopeId}/bundle.zip            ("Download all")
+org/{orgId}/templates/{templateId}/attachments/{attachmentId}
 org/{orgId}/envelopes/{envelopeId}/certificate.pdf
 org/{orgId}/exports/{exportId}.zip
 org/{orgId}/branding/logo-{version}.png      (public via /api/branding, docs/auth.md → Logos)

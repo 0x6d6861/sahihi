@@ -31,6 +31,19 @@ export interface CertificateEvent {
   ipAddress: string | null
 }
 
+export interface CertificateDocument {
+  name: string
+  pageCount: number
+  originalSha256: string
+  signedSha256: string
+}
+
+export interface CertificateAttachment {
+  name: string
+  sizeBytes: number
+  sha256: string
+}
+
 export interface CertificateInput {
   code: string
   verifyUrl: string
@@ -39,15 +52,15 @@ export interface CertificateInput {
     id: string
     title: string
     organizationName: string
-    documentName: string
-    pageCount: number
     sender: { name: string; email: string }
     createdAt: Date
     sentAt: Date | null
     completedAt: Date
-    originalSha256: string
-    signedSha256: string
   }
+  /** The signed documents in signing order (ADR 0037), each with its original and signed hash. */
+  documents: CertificateDocument[]
+  /** Supporting files shared with the recipients: never signed, listed with their hash. */
+  attachments: CertificateAttachment[]
   signers: CertificateSigner[]
   events: CertificateEvent[]
   /** hash of the last audit event — anchors the full chain */
@@ -186,16 +199,33 @@ export async function renderCertificate(input: CertificateInput): Promise<Uint8A
   w.heading("Envelope")
   w.row("Envelope ID", e.id)
   w.row("Organization", e.organizationName)
-  w.row("Document", `${e.documentName} (${e.pageCount} page${e.pageCount === 1 ? "" : "s"})`)
   w.row("Sender", `${e.sender.name} <${e.sender.email}>`)
   w.row("Created", formatUtc(e.createdAt))
   w.row("Sent", formatUtc(e.sentAt))
   w.row("Completed", formatUtc(e.completedAt))
 
-  w.heading("Document integrity (SHA-256)")
-  w.row("Original document", e.originalSha256)
-  w.row("Signed document", e.signedSha256)
+  // ── Documents: one signed PDF each (ADR 0037) ──
+  const docs = input.documents
+  w.heading(docs.length === 1 ? "Document (SHA-256)" : `Documents (${docs.length}, SHA-256)`)
+  docs.forEach((d, i) => {
+    w.ensure(56)
+    if (i > 0) w.gap(6)
+    const pages = `${d.pageCount} page${d.pageCount === 1 ? "" : "s"}`
+    w.text(`${docs.length > 1 ? `${i + 1}. ` : ""}${d.name} (${pages})`, { bold: true, size: 9.5 })
+    w.row("Original", d.originalSha256)
+    w.row("Signed", d.signedSha256)
+  })
+  w.gap(4)
   w.row("Audit chain head", input.auditChainHead)
+
+  // ── Supporting files: shared, not signed ──
+  if (input.attachments.length > 0) {
+    w.heading(`Supporting files (${input.attachments.length}, shared with signers, not signed)`)
+    for (const a of input.attachments) {
+      w.ensure(36)
+      w.row(`${a.name} (${formatSize(a.sizeBytes)})`, a.sha256, 210)
+    }
+  }
 
   // ── Signers ──
   w.heading(`Recipients (${input.signers.length})`)
@@ -235,4 +265,10 @@ export async function renderCertificate(input: CertificateInput): Promise<Uint8A
   }
 
   return doc.save()
+}
+
+/** "12 KB", "1.4 MB". */
+function formatSize(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }

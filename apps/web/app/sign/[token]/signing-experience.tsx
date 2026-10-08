@@ -32,9 +32,18 @@ interface SigningSession {
     maskedEmail: string
     maskedPhone: string | null
   }
-  document: { name: string; pageCount: number | null; pages: { rotation: number }[] | null }
+  /** In signing order (ADR 0037). */
+  documents: {
+    id: string
+    name: string
+    pageCount: number | null
+    pages: { rotation: number }[] | null
+  }[]
+  /** Supporting files, once the signer is verified (ADR 0037). */
+  attachments: { id: string; name: string; contentType: string; sizeBytes: number }[]
   fields: {
     id: string
+    envelopeDocumentId: string
     type: FieldType
     page: number
     x: number
@@ -129,9 +138,15 @@ export function SigningExperience({ token }: { token: string }) {
         headingLevel={1}
         title={m.title}
         description={m.body}
-        className="mx-auto w-full max-w-md"
+        className="enter-fade mx-auto w-full max-w-md"
       >
-        {session.downloadsAvailable && <DownloadButtons endpoint={`${base}/downloads`} />}
+        {session.downloadsAvailable && (
+          <DownloadButtons
+            endpoint={`${base}/downloads`}
+            documents={session.documents}
+            attachments={session.attachments}
+          />
+        )}
       </Panel>
     )
   }

@@ -1,10 +1,12 @@
 export * from "./account/profile"
 export * from "./account/security"
 
+export * from "./envelope/documents"
 export * from "./envelope/envelope-state"
 export * from "./envelope/reminders"
 export * from "./envelope/routing"
 export * from "./envelope/send-preflight"
+export * from "./envelope/stages"
 
 export * from "./field-detection/anchor-tags"
 export * from "./field-detection/field-suggestions"

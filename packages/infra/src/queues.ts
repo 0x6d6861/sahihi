@@ -36,6 +36,8 @@ export interface MaintenanceJobs {
   "envelopes.expire": Record<string, never>
   "envelopes.remind": Record<string, never>
   "documents.sweep-uploads": Record<string, never>
+  /** Hourly: queue thumbnails for READY documents that have none yet (backfill and lost jobs). */
+  "documents.sweep-thumbnails": Record<string, never>
   "webhooks.sweep": Record<string, never>
   /** Daily: purge closed envelopes past their workspace's retention (docs/data-retention.md). */
   "retention.sweep": Record<string, never>
@@ -50,6 +52,12 @@ export interface MaintenanceJobs {
   "organization.purge-storage": { organizationId: string }
   /** Create and send one envelope per row (docs/bulk-send.md). */
   "bulk.send": { bulkSendId: string }
+}
+
+/** Per-document work kept off the single-file maintenance queue (exports, bulk sends). */
+export interface DocumentJobs {
+  /** Render a READY document's first-page thumbnail (ADR 0033). Enqueue with enqueueDocumentThumbnail. */
+  "document.thumbnail": { documentId: string }
 }
 
 export interface WebhookJobs {
@@ -93,6 +101,7 @@ let queues:
       finalize: TypedQueue<FinalizeJobs>
       maintenance: TypedQueue<MaintenanceJobs>
       webhooks: TypedQueue<WebhookJobs>
+      documents: TypedQueue<DocumentJobs>
     }
   | undefined
 
@@ -102,6 +111,7 @@ export function getQueues() {
     finalize: new TypedQueue<FinalizeJobs>(QUEUES.finalize),
     maintenance: new TypedQueue<MaintenanceJobs>(QUEUES.maintenance),
     webhooks: new TypedQueue<WebhookJobs>(QUEUES.webhooks),
+    documents: new TypedQueue<DocumentJobs>(QUEUES.documents),
   }
   return queues
 }
@@ -128,5 +138,17 @@ export async function enqueueWebhookDeliveries(
         },
       ),
     ),
+  )
+}
+
+/**
+ * Queue a document's thumbnail AFTER the transaction that made it READY has committed. The job id
+ * is the document id, so the upload path and the sweep never render the same document twice at once.
+ */
+export async function enqueueDocumentThumbnail(documentId: string) {
+  await getQueues().documents.add(
+    "document.thumbnail",
+    { documentId },
+    { jobId: `thumb-${documentId}`, attempts: 3 },
   )
 }

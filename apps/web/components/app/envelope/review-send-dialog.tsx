@@ -91,8 +91,14 @@ export function ReviewSendDialog({
                   minDate={startOfToday()}
                   placeholder="No expiry"
                   locale="en-GB"
-                  description={errors.expiresAt ?? "Links stop working at the end of this day."}
+                  description="Links stop working at the end of this day."
                 />
+                {/* Arc's DatePicker has no error state: say it below, announced. */}
+                {errors.expiresAt && (
+                  <p role="alert" className="pt-1.5 text-destructive-foreground text-xs">
+                    {errors.expiresAt}
+                  </p>
+                )}
               </div>
               {details.expiresOn && (
                 <Button

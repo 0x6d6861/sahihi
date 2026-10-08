@@ -4,7 +4,6 @@ import {
   ApiCreateEnvelopeSchema,
   ApiListEnvelopesQuerySchema,
   ApiVoidSchema,
-  downloadFileName,
   envelopeEventData,
   MAX_UPLOAD_BYTES,
   sha256Hex,
@@ -19,10 +18,16 @@ import {
   startBulkSend,
   voidEnvelope,
 } from "@sahihi/envelopes"
-import { deleteObject, keys, presignDownload, putObject } from "@sahihi/infra"
+import { deleteObject, keys, putObject } from "@sahihi/infra"
 import { inspectPdf, PdfInspectionError } from "@sahihi/pdf"
 import { type Context, Hono } from "hono"
-import { clientMeta, conflict, notFound, parseJson, parseQuery } from "../lib/http"
+import {
+  downloadLinks,
+  envelopeAttachmentsSelect,
+  envelopeDocumentsSelect,
+} from "../lib/envelope-documents"
+import { clientMeta, notFound, parseJson, parseQuery } from "../lib/http"
+import { queueThumbnail } from "../lib/thumbnails"
 import { type ApiKeyEnv, requireApiKey, requireScope } from "../middleware/api-key"
 import { rateLimit } from "../middleware/rate-limit"
 import { bulkItemSelect, bulkSendSelect } from "./bulk-sends"
@@ -43,7 +48,17 @@ async function envelopeView(organizationId: string, id: string) {
   const e = await prisma.envelope.findFirst({
     where: forOrganization(organizationId).envelope({ id }),
     include: {
-      document: { select: { id: true, name: true, sha256: true } },
+      documents: {
+        select: {
+          order: true,
+          signedSha256: true,
+          document: { select: { id: true, name: true, sha256: true } },
+        },
+      },
+      attachments: {
+        select: { name: true, sha256: true, status: true },
+        orderBy: { order: "asc" },
+      },
       certificate: { select: { code: true } },
       recipients: { orderBy: [{ order: "asc" }, { createdAt: "asc" }] },
     },
@@ -129,6 +144,7 @@ export const v1 = new Hono<ApiKeyEnv>()
           pages: info.pages as unknown as object,
         },
       })
+      await queueThumbnail(doc.id)
       return c.json({ document: docView(doc) }, 201)
     } catch (err) {
       await deleteObject(s3Key).catch(() => {})
@@ -246,11 +262,18 @@ export const v1 = new Hono<ApiKeyEnv>()
     return c.json({ envelope: await envelopeView(organizationId, c.req.param("id")) })
   })
 
-  /** Short-lived download links for the signed PDF and certificate (once finalized). */
+  /**
+   * Short-lived download links once finalized (ADR 0037): each signed document, the certificate,
+   * the supporting files and the "download all" zip. `signed` is the first document's (deprecated).
+   */
   .get("/envelopes/:id/downloads", requireScope("envelopes:read"), async (c) => {
     const e = await prisma.envelope.findFirst({
       where: forOrganization(c.get("organizationId")).envelope({ id: c.req.param("id") }),
-      include: { certificate: true },
+      include: {
+        certificate: true,
+        documents: envelopeDocumentsSelect,
+        attachments: { ...envelopeAttachmentsSelect, where: { status: "READY" } },
+      },
     })
     if (!e) notFound("Envelope")
     const env = e as NonNullable<typeof e>
@@ -260,17 +283,7 @@ export const v1 = new Hono<ApiKeyEnv>()
         410,
       )
     }
-    if (!env.signedS3Key || !env.certificate) conflict("Envelope is not finalized yet")
-    return c.json({
-      signed: await presignDownload(env.signedS3Key as string, {
-        fileName: downloadFileName(env.title, "signed"),
-        disposition: "attachment",
-      }),
-      certificate: await presignDownload((env.certificate as { s3Key: string }).s3Key, {
-        fileName: downloadFileName(env.title, "certificate"),
-        disposition: "attachment",
-      }),
-    })
+    return c.json(await downloadLinks(env))
   })
 
   // ── Bulk send ──────────────────────────────────────────────────────────────

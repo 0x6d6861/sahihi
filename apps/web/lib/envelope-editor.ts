@@ -1,4 +1,4 @@
-import type { FieldType, PreflightCode } from "@sahihi/core"
+import type { FieldType, PreflightCode, PreflightIssue } from "@sahihi/core"
 import { FIELD_LABELS } from "./constants"
 
 /**
@@ -11,8 +11,8 @@ export type EditorStep = (typeof EDITOR_STEPS)[number]
 /** `label` names the step in the editor's pill; `description` is its hover hint. */
 export const EDITOR_STEP_INFO: Record<EditorStep, { label: string; description: string }> = {
   document: {
-    label: "Document",
-    description: "Optional: redact, rotate, reorder or remove pages",
+    label: "Documents",
+    description: "The documents to sign, in order, and any supporting files",
   },
   recipients: {
     label: "Recipients",
@@ -73,4 +73,25 @@ export function fieldSummary(types: FieldType[]): string {
   return [...counts]
     .map(([t, n]) => (n > 1 ? `${FIELD_LABELS[t]} ×${n}` : FIELD_LABELS[t]))
     .join(" · ")
+}
+
+/**
+ * Splits preflight issues by where they're fixed. The expiry is set in the "Review & send" dialog,
+ * so an expiry issue opens that dialog with the error on the date field instead of blocking it (it
+ * used to be listed above the editor with no way to reach the date).
+ */
+export function splitPreflight(issues: PreflightIssue[]): {
+  /** Fixed in the review dialog, by form field. */
+  inDialog: Record<string, string>
+  /** Fixed elsewhere in the editor; these keep the dialog closed. */
+  blocking: PreflightIssue[]
+} {
+  const inDialog: Record<string, string> = {}
+  const blocking: PreflightIssue[] = []
+  for (const i of issues) {
+    if (i.code === "expiry_in_past")
+      inDialog.expiresAt = "This day has passed. Pick a later day or clear the expiry."
+    else blocking.push(i)
+  }
+  return { inDialog, blocking }
 }

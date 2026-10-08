@@ -133,8 +133,22 @@ describe("schemas, retries, payloads", () => {
       completedAt: at,
       voidedAt: null,
       voidReason: null,
-      document: { id: "doc_1", name: "lease.pdf", sha256: "a".repeat(64) },
-      signedSha256: "b".repeat(64),
+      documents: [
+        {
+          order: 1,
+          signedSha256: "d".repeat(64),
+          document: { id: "doc_2", name: "annex.pdf", sha256: "c".repeat(64) },
+        },
+        {
+          order: 0,
+          signedSha256: "b".repeat(64),
+          document: { id: "doc_1", name: "lease.pdf", sha256: "a".repeat(64) },
+        },
+      ],
+      attachments: [
+        { name: "prices.xlsx", sha256: "e".repeat(64), status: "READY" },
+        { name: "half.png", sha256: null, status: "UPLOADING" },
+      ],
       certificate: { code: "K7QM-2XDP-9RTA" },
       recipients: [
         {
@@ -151,6 +165,11 @@ describe("schemas, retries, payloads", () => {
       ],
     })
     expect(data.envelope.certificateCode).toBe("K7QM-2XDP-9RTA")
+    // Documents in signing order; the legacy single-document fields are the first one's.
+    expect(data.envelope.documents.map((d) => d.name)).toEqual(["lease.pdf", "annex.pdf"])
+    expect(data.envelope.document?.name).toBe("lease.pdf")
+    expect(data.envelope.signedSha256).toBe("b".repeat(64))
+    expect(data.envelope.attachments).toEqual([{ name: "prices.xlsx", sha256: "e".repeat(64) }])
     expect(data.envelope.recipients[0]?.signedAt).toBe("2026-09-29T08:00:00.000Z")
     const json = JSON.stringify(data)
     for (const secretish of ["token", "Hash", "otp", "ipAddress", "signedIp"])

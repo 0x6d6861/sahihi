@@ -17,6 +17,7 @@ import { DEFAULT_FIELD_SIZE } from "./field-geometry"
 const place = (s: EditorState, from: { x: number; y: number }, to = from) =>
   editorReducer(s, {
     type: "place",
+    envelopeDocumentId: "d1",
     page: 1,
     recipientId: "r1",
     fieldType: "SIGNATURE",
@@ -54,6 +55,7 @@ describe("placement", () => {
   test("checkboxes start optional", () => {
     const s = editorReducer(initialState([]), {
       type: "place",
+      envelopeDocumentId: "d1",
       page: 2,
       recipientId: "r1",
       fieldType: "CHECKBOX",
@@ -93,6 +95,7 @@ describe("editing", () => {
     let s = place(initialState([]), { x: 0.2, y: 0.2 })
     s = editorReducer(s, {
       type: "place",
+      envelopeDocumentId: "d1",
       page: 1,
       recipientId: "r2",
       fieldType: "TEXT",
@@ -109,6 +112,7 @@ describe("editing", () => {
 describe("import", () => {
   const imported = (x: number, page = 1): Omit<EditorField, "key"> => ({
     recipientId: "r1",
+    envelopeDocumentId: "d1",
     type: "TEXT",
     page,
     required: true,
@@ -145,6 +149,7 @@ describe("payload", () => {
     const fields = fieldsFromSaved([
       {
         recipientId: "r1",
+        envelopeDocumentId: "d1",
         type: "SIGNATURE",
         page: 1,
         required: true,
@@ -161,6 +166,7 @@ describe("payload", () => {
     ])
     expect(body[0]).toEqual({
       recipientId: "r1",
+      envelopeDocumentId: "d1",
       type: "SIGNATURE",
       page: 1,
       required: true,

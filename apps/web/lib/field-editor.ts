@@ -16,6 +16,8 @@ export interface EditorField extends NormalizedRect {
   /** Client-only identity. The API recreates rows on every save, so ids aren't stable. */
   key: string
   recipientId: string
+  /** The envelope document it sits on; `page` is within it (ADR 0037). */
+  envelopeDocumentId: string
   type: FieldType
   page: number
   required: boolean
@@ -40,6 +42,7 @@ export const fieldKey = () => `f${++seq}`
 export type EditorAction =
   | {
       type: "place"
+      envelopeDocumentId: string
       page: number
       recipientId: string
       fieldType: FieldType
@@ -92,6 +95,7 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
       const field: EditorField = {
         key,
         recipientId: a.recipientId,
+        envelopeDocumentId: a.envelopeDocumentId,
         type: a.fieldType,
         page: a.page,
         required: a.fieldType !== "CHECKBOX",
@@ -119,7 +123,12 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
     case "select":
       return s.selected === a.key ? s : { ...s, selected: a.key }
     case "import": {
-      const added = withoutDuplicates(s.fields, a.fields).map((f) => ({ ...f, key: fieldKey() }))
+      // Duplicates are judged per document: the same rect on another document is a different field.
+      const docs = new Set(a.fields.map((f) => f.envelopeDocumentId))
+      const added = withoutDuplicates(
+        s.fields.filter((f) => docs.has(f.envelopeDocumentId)),
+        a.fields,
+      ).map((f) => ({ ...f, key: fieldKey() }))
       return added.length ? changed(s, [...s.fields, ...added], null) : s
     }
     case "syncRecipients": {
@@ -137,6 +146,7 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
 export function fieldsFromSaved(
   saved: (NormalizedRect & {
     recipientId: string
+    envelopeDocumentId: string
     type: FieldType
     page: number
     required: boolean
@@ -146,6 +156,7 @@ export function fieldsFromSaved(
   return saved.map((f) => ({
     key: fieldKey(),
     recipientId: f.recipientId,
+    envelopeDocumentId: f.envelopeDocumentId,
     type: f.type,
     page: f.page,
     required: f.required,
@@ -162,6 +173,7 @@ export function toFieldsPayload(fields: EditorField[]): { fields: FieldInput[] }
   return {
     fields: fields.map((f) => ({
       recipientId: f.recipientId,
+      envelopeDocumentId: f.envelopeDocumentId,
       type: f.type,
       page: f.page,
       required: f.required,

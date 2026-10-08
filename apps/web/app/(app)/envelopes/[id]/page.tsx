@@ -1,12 +1,12 @@
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
-import { DocumentViewer } from "@/components/app/document-viewer"
 import { DownloadButtons } from "@/components/app/downloads/download-buttons"
 import {
   ActivityList,
   type AuditEventRow,
   type ChainVerification,
 } from "@/components/app/envelope/activity-list"
+import { EnvelopeDocumentsPanel } from "@/components/app/envelope/envelope-documents-panel"
 import { EnvelopeTabs } from "@/components/app/envelope/envelope-tabs"
 import { PurgeEnvelope } from "@/components/app/envelope/purge-envelope"
 import {
@@ -30,6 +30,7 @@ import {
 import { apiServer } from "@/lib/api-server"
 import { ENVELOPE_STATUS_BADGE, RECIPIENT_STATUS_BADGE } from "@/lib/constants"
 import { type EnvelopeResponse, isEditableDraft } from "@/lib/envelope-detail"
+import { documentsLine } from "@/lib/envelope-documents"
 import { recipientSummary, signingProgress } from "@/lib/envelope-list"
 import { formatDate } from "@/lib/format"
 import { ROLE_LABELS, VERIFICATION_LABELS } from "@/lib/recipients"
@@ -57,26 +58,39 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
   const open = e.status === "DRAFT" || e.status === "SENT" || e.status === "IN_PROGRESS"
   const sequential = e.signingOrder === "SEQUENTIAL"
   const purged = Boolean(e.purgedAt)
-  // The original PDF (presigned, short-lived).
-  const file = purged
-    ? { status: 410, data: null }
-    : await apiServer<{ url: string }>(`/documents/${encodeURIComponent(e.document.id)}/file`)
+  // Each original PDF (presigned, short-lived), in signing order.
+  const urls = purged
+    ? []
+    : await Promise.all(
+        e.documents.map((d) =>
+          apiServer<{ url: string }>(`/documents/${encodeURIComponent(d.documentId)}/file`),
+        ),
+      )
   const recipientNames = Object.fromEntries(e.recipients.map((r) => [r.id, r.name]))
 
   const documentPanel = (
     <Panel
-      title={e.document.name}
-      description={`${e.document.pageCount} ${e.document.pageCount === 1 ? "page" : "pages"} · ${e.fields.length} fields · ${e.status === "DRAFT" ? "not sent yet" : "the original, as sent for signing"}`}
+      title={
+        e.documents.length > 1 ? documentsLine(e.documents) : (e.documents[0]?.name ?? "Document")
+      }
+      description={`${e.documents.length > 1 ? "" : `${documentsLine(e.documents)} · `}${e.fields.length} fields · ${e.status === "DRAFT" ? "not sent yet" : "the originals, as sent for signing"}`}
     >
       {purged ? (
         <p className="text-muted-foreground text-sm">
-          The document was deleted under the data retention policy. Its hash is kept on the
-          certificate and in the Activity log.
+          The documents and files were deleted under the data retention policy. Their hashes are
+          kept on the certificate and in the Activity log.
         </p>
-      ) : !file.data ? (
-        <p className="text-muted-foreground text-sm">The document could not be loaded.</p>
       ) : (
-        <DocumentViewer src={file.data.url} fileName={e.document.name} />
+        <EnvelopeDocumentsPanel
+          envelopeId={e.id}
+          documents={e.documents.map((d, i) => ({
+            id: d.id,
+            name: d.name,
+            pageCount: d.pageCount,
+            url: urls[i]?.data?.url ?? null,
+          }))}
+          attachments={e.attachments}
+        />
       )}
     </Panel>
   )
@@ -243,13 +257,17 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
           title="Signed and certified"
           description={
             e.certificate
-              ? `Everyone signed${e.completedAt ? ` on ${formatDate(new Date(e.completedAt))}` : ""}. The signed PDF and the Certificate of Completion are ready.`
+              ? `Everyone signed${e.completedAt ? ` on ${formatDate(new Date(e.completedAt))}` : ""}. ${e.documents.length > 1 ? `The ${e.documents.length} signed PDFs` : "The signed PDF"} and the Certificate of Completion are ready.`
               : "Everyone has signed. The signed PDF and certificate are being produced; refresh in a moment."
           }
         >
           {e.certificate && (
             <div className="flex flex-wrap items-center justify-between gap-4">
-              <DownloadButtons endpoint={`/envelopes/${e.id}/downloads`} />
+              <DownloadButtons
+                endpoint={`/envelopes/${e.id}/downloads`}
+                documents={e.documents}
+                attachments={e.attachments.filter((a) => a.status === "READY")}
+              />
               <p className="text-muted-foreground text-sm">
                 Certificate{" "}
                 <span className="font-medium font-mono text-foreground">{e.certificate.code}</span>

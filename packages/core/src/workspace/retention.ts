@@ -62,6 +62,8 @@ export const REDACTED = {
   envelopeTitle: "Deleted envelope",
   documentName: "Deleted document",
   recipientName: "Deleted recipient",
+  /** Supporting files' names can name people ("ID - Amina.jpg"); their hashes stay. */
+  attachmentName: "Deleted file",
   /** Keeps (envelopeId, email) unique without holding a real address. */
   recipientEmail: (recipientId: string) => `deleted-${recipientId}@redacted.invalid`,
 } as const

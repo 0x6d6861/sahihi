@@ -1,4 +1,5 @@
 import {
+  CopyObjectCommand,
   DeleteObjectCommand,
   DeleteObjectsCommand,
   GetObjectCommand,
@@ -15,8 +16,13 @@ import { contentDisposition } from "@sahihi/core"
  * Private object storage. The bucket is NEVER public; clients only receive
  * short-lived presigned URLs. Key layout (docs/architecture.md → Storage):
  *   org/{orgId}/documents/{documentId}/original.pdf
+ *   org/{orgId}/documents/{documentId}/thumbnail.png
  *   org/{orgId}/envelopes/{envelopeId}/fields/{fieldId}.png
- *   org/{orgId}/envelopes/{envelopeId}/signed.pdf
+ *   org/{orgId}/envelopes/{envelopeId}/signed.pdf            (single-document, before ADR 0037)
+ *   org/{orgId}/envelopes/{envelopeId}/signed/{envelopeDocumentId}.pdf
+ *   org/{orgId}/envelopes/{envelopeId}/attachments/{attachmentId}
+ *   org/{orgId}/envelopes/{envelopeId}/bundle.zip
+ *   org/{orgId}/templates/{templateId}/attachments/{attachmentId}
  *   org/{orgId}/envelopes/{envelopeId}/certificate.pdf
  *   org/{orgId}/exports/{exportId}.zip
  *   org/{orgId}/branding/logo-{version}.png
@@ -26,9 +32,24 @@ import { contentDisposition } from "@sahihi/core"
 export const keys = {
   original: (orgId: string, documentId: string) =>
     `org/${orgId}/documents/${documentId}/original.pdf`,
+  /** First-page preview for the Documents grid (ADR 0033). Same access rules as the original. */
+  thumbnail: (orgId: string, documentId: string) =>
+    `org/${orgId}/documents/${documentId}/thumbnail.png`,
   fieldImage: (orgId: string, envelopeId: string, fieldId: string) =>
     `org/${orgId}/envelopes/${envelopeId}/fields/${fieldId}.png`,
+  /** Single-document envelopes signed before ADR 0037 keep this key. */
   signed: (orgId: string, envelopeId: string) => `org/${orgId}/envelopes/${envelopeId}/signed.pdf`,
+  /** One signed PDF per envelope document (ADR 0037). */
+  signedDocument: (orgId: string, envelopeId: string, envelopeDocumentId: string) =>
+    `org/${orgId}/envelopes/${envelopeId}/signed/${envelopeDocumentId}.pdf`,
+  /** A supporting file shared with the recipients (ADR 0037); always served as a download. */
+  attachment: (orgId: string, envelopeId: string, attachmentId: string) =>
+    `org/${orgId}/envelopes/${envelopeId}/attachments/${attachmentId}`,
+  /** "Download all": signed PDFs, certificate and supporting files (ADR 0037). */
+  bundle: (orgId: string, envelopeId: string) => `org/${orgId}/envelopes/${envelopeId}/bundle.zip`,
+  /** A template's own copy of a supporting file (ADR 0037). */
+  templateAttachment: (orgId: string, templateId: string, attachmentId: string) =>
+    `org/${orgId}/templates/${templateId}/attachments/${attachmentId}`,
   certificate: (orgId: string, envelopeId: string) =>
     `org/${orgId}/envelopes/${envelopeId}/certificate.pdf`,
   export: (orgId: string, exportId: string) => `org/${orgId}/exports/${exportId}.zip`,
@@ -98,6 +119,31 @@ export async function presignDownload(
   )
 }
 
+/** Window for `presignCacheable`: URLs repeat within it, and live at most twice as long. */
+export const CACHEABLE_URL_WINDOW_SECONDS = 15 * 60
+
+/**
+ * GET URL the browser can cache: signed at the start of the current window, so every request in
+ * that window gets the same URL, and valid for two windows, so it outlives the `max-age` it asks
+ * the browser to cache it for. For small images listed on every page view (document thumbnails),
+ * not for originals or signed PDFs.
+ */
+export async function presignCacheable(key: string, now = Date.now()) {
+  const windowMs = CACHEABLE_URL_WINDOW_SECONDS * 1000
+  return getSignedUrl(
+    s3(),
+    new GetObjectCommand({
+      Bucket: bucket(),
+      Key: key,
+      ResponseCacheControl: `private, max-age=${CACHEABLE_URL_WINDOW_SECONDS}`,
+    }),
+    {
+      signingDate: new Date(Math.floor(now / windowMs) * windowMs),
+      expiresIn: 2 * CACHEABLE_URL_WINDOW_SECONDS,
+    },
+  )
+}
+
 export async function getObjectBytes(key: string): Promise<Uint8Array> {
   const res = await s3().send(new GetObjectCommand({ Bucket: bucket(), Key: key }))
   if (!res.Body) throw new Error(`Empty object: ${key}`)
@@ -124,6 +170,17 @@ export async function putObjectStream(
       Body: body as never,
       ContentLength: contentLength,
       ContentType: contentType,
+    }),
+  )
+}
+
+/** Server-side copy within the bucket (template ↔ envelope supporting files). */
+export async function copyObject(fromKey: string, toKey: string) {
+  await s3().send(
+    new CopyObjectCommand({
+      Bucket: bucket(),
+      Key: toKey,
+      CopySource: `${bucket()}/${fromKey.split("/").map(encodeURIComponent).join("/")}`,
     }),
   )
 }

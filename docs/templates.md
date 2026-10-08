@@ -5,6 +5,13 @@ start new envelopes without placing fields again (ADR 0012).
 
 ## Model (`schema.prisma`)
 
+Since ADR 0037 a template keeps several documents (`TemplateDocument`, in order). Its fields point
+at one of them (`TemplateField.templateDocumentId`). Its supporting files are its own copies
+(`TemplateAttachment`, under `org/{org}/templates/{id}/attachments/`). Saving copies them from the
+envelope; using the template copies them again into the new envelope. Deleting the template
+deletes its copies. A document can't be deleted while a template uses it.
+
+
 | Model | What |
 |---|---|
 | `Template` | org, `documentId`, name, description, default `message`, `signingOrder`, creator |

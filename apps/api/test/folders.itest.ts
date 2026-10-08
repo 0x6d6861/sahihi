@@ -165,6 +165,35 @@ describe("documents in folders", () => {
     expect((await docs(alice)).total).toBe(1)
   })
 
+  test("a document's detail carries its folder path, root first, for the breadcrumb", async () => {
+    const clients = await createFolder(alice, "Clients")
+    const acme = await createFolder(alice, "Acme", clients)
+    const { document } = await uploadDocument(alice)
+    const detail = async () =>
+      json<{ folderPath: { id: string; name: string }[] }>(
+        await request(alice, `/api/documents/${document.id}`),
+      )
+    expect((await detail()).folderPath).toEqual([])
+    await request(alice, `/api/documents/${document.id}`, {
+      method: "PATCH",
+      json: { folderId: acme },
+    })
+    expect((await detail()).folderPath).toEqual([
+      { id: clients, name: "Clients" },
+      { id: acme, name: "Acme" },
+    ])
+  })
+
+  test("listed folders say who created them", async () => {
+    await createFolder(alice, "Signed")
+    const [item] = (
+      await json<{ items: { createdBy: { id: string; name: string } | null }[] }>(
+        await request(alice, "/api/folders"),
+      )
+    ).items
+    expect(item?.createdBy?.id).toBe(alice.userId)
+  })
+
   test("members move only documents they uploaded", async () => {
     const { document } = await uploadDocument(alice)
     const bob = await joinOrganization(alice, "bob", "member")

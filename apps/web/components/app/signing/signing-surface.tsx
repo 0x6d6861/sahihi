@@ -1,10 +1,12 @@
 "use client"
 
-import { CONSENT_TEXT, CONSENT_VERSION, offersSavedSignature } from "@sahihi/core"
+import { CONSENT_TEXT, CONSENT_VERSION, documentsSummary, offersSavedSignature } from "@sahihi/core"
 import dynamic from "next/dynamic"
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import { ConfirmDialog } from "@/components/app/confirm-dialog"
-import { ArrowDownIcon } from "@/components/app/icons"
+import { AttachmentsList } from "@/components/app/envelope/attachments-list"
+import { DocumentSwitcher } from "@/components/app/envelope/document-switcher"
+import { ArrowDownIcon, CheckIcon } from "@/components/app/icons"
 import { Panel } from "@/components/app/panel"
 import { toastManager } from "@/components/app/toast"
 import { Alert } from "@/components/arc/alert/alert"
@@ -54,7 +56,9 @@ interface SurfaceContextValue {
   activeId: string | null
   missing: Set<string>
   recipient: { name: string; email: string | null }
-  /** Intrinsic /Rotate of a page (1-based), from Document.pages. */
+  /** The document on screen (ADR 0037); only its fields are drawn. */
+  activeDocumentId: string
+  /** Intrinsic /Rotate of a page (1-based) of the document on screen, from Document.pages. */
   rotationOf: (page: number) => PageRotation
   activate: (field: SignerField) => void
   setValue: (fieldId: string, value: SignerValue | undefined) => void
@@ -101,13 +105,22 @@ const renderPageOverlay = (p: PDFViewerPageOverlayProps) => <SignerFieldLayer pa
 
 /** This recipient's fields on one page. Only their own fields are ever sent by the API. */
 function SignerFieldLayer({ page }: { page: number }) {
-  const { fields, values, activeId, missing, recipient, rotationOf, activate, setValue } =
-    useSurface()
+  const {
+    fields,
+    values,
+    activeId,
+    missing,
+    recipient,
+    activeDocumentId,
+    rotationOf,
+    activate,
+    setValue,
+  } = useSurface()
   const rot = rotationOf(page)
   return (
     <div className="on-paper pointer-events-none absolute inset-0">
       {fields
-        .filter((f) => f.page === page)
+        .filter((f) => f.page === page && f.envelopeDocumentId === activeDocumentId)
         .map((f) => {
           const style = {
             ...rectStyle(displayedToLocalRect(f, rot)),
@@ -176,7 +189,7 @@ function SignerFieldLayer({ page }: { page: number }) {
                     data-field-id={f.id}
                     aria-label={`${label}${f.required ? " (required)" : ""}`}
                     style={style}
-                    className={cn(tone, "pointer-events-auto")}
+                    className={cn(tone, "press pointer-events-auto")}
                     {...stop}
                     onClick={() => activate(f)}
                   >
@@ -212,7 +225,7 @@ function SignerFieldLayer({ page }: { page: number }) {
               data-field-id={f.id}
               aria-label={`${img ? "Change" : "Add"} ${label.toLowerCase()}${f.required ? " (required)" : ""}`}
               style={style}
-              className={cn(tone, "pointer-events-auto")}
+              className={cn(tone, "press pointer-events-auto")}
               {...stop}
               onClick={() => activate(f)}
             >
@@ -248,7 +261,10 @@ export function SigningSurface({
       sender: { name: string }
     }
     recipient: { name: string; email?: string | null }
-    document: { name: string; pages: { rotation: number }[] | null }
+    /** In signing order (ADR 0037). */
+    documents: { id: string; name: string; pages: { rotation: number }[] | null }[]
+    /** Supporting files the signer can download (ADR 0037). */
+    attachments: { id: string; name: string; contentType: string; sizeBytes: number }[]
     fields: SignerField[]
   }
   onDone: () => void
@@ -259,8 +275,13 @@ export function SigningSurface({
     [session.recipient.name, session.recipient.email],
   )
   const viewerRef = useRef<PDFViewerHandle | null>(null)
-  const [fileUrl, setFileUrl] = useState<string | null>(null)
+  const documents = session.documents
+  const [activeDocumentId, setActiveDocumentId] = useState(documents[0]?.id ?? "")
+  const activeDocument = documents.find((d) => d.id === activeDocumentId) ?? documents[0]
+  // Each document's original, fetched the first time it's shown (presigned, short-lived).
+  const [fileUrls, setFileUrls] = useState<Record<string, string>>({})
   const [fileError, setFileError] = useState(false)
+  const fileUrl = activeDocument ? (fileUrls[activeDocument.id] ?? null) : null
   const [values, setValues] = useState<SignerValues>({})
   const [activeId, setActiveId] = useState<string | null>(null)
   const [missing, setMissing] = useState<Set<string>>(new Set())
@@ -293,13 +314,16 @@ export function SigningSurface({
     }
   }, [recipient.email])
 
-  // First call marks the recipient VIEWED (and audits it) on the server.
+  // The first call for any document marks the recipient VIEWED (and audits it) on the server.
   useEffect(() => {
-    api<{ url: string }>(`${base}/file`).then(
-      (r) => setFileUrl(r.url),
+    const id = activeDocument?.id
+    if (!id || fileUrls[id]) return
+    setFileError(false)
+    api<{ url: string }>(`${base}/file?document=${encodeURIComponent(id)}`).then(
+      (r) => setFileUrls((u) => ({ ...u, [id]: r.url })),
       () => setFileError(true),
     )
-  }, [base])
+  }, [base, activeDocument?.id, fileUrls])
 
   const setValue = useCallback((fieldId: string, value: SignerValue | undefined) => {
     setValues((v) => ({ ...v, [fieldId]: value }))
@@ -311,25 +335,48 @@ export function SigningSurface({
       setCapture({ fieldId: f.id, kind: f.type === "INITIALS" ? "initials" : "signature" })
   }, [])
 
-  const goTo = useCallback((f: SignerField) => {
-    viewerRef.current?.scrollToPageArea(
-      f.page,
-      { top: f.y * 100, left: f.x * 100, width: f.width * 100, height: f.height * 100 },
-      { behavior: "smooth" },
-    )
-    setActiveId(f.id)
-    // Focus the field once it's been scrolled into view.
-    setTimeout(() => {
-      document
-        .querySelector<HTMLElement>(`[data-field-id="${f.id}"]`)
-        ?.focus({ preventScroll: true })
-    }, 350)
-  }, [])
+  // A field on another document: switch to it, then keep trying to scroll until its viewer has
+  // loaded (up to ~3s), and focus the field once it's on screen.
+  const pendingRef = useRef<number | null>(null)
+  const goTo = useCallback(
+    (f: SignerField) => {
+      if (pendingRef.current) window.clearInterval(pendingRef.current)
+      const switching = f.envelopeDocumentId !== activeDocumentId
+      if (switching) setActiveDocumentId(f.envelopeDocumentId)
+      setActiveId(f.id)
+      const area = { top: f.y * 100, left: f.x * 100, width: f.width * 100, height: f.height * 100 }
+      let tries = 0
+      const attempt = () => {
+        tries += 1
+        viewerRef.current?.scrollToPageArea(f.page, area, {
+          behavior: switching ? "auto" : "smooth",
+        })
+        const el = document.querySelector<HTMLElement>(`[data-field-id="${f.id}"]`)
+        if (el || tries > 15) {
+          if (pendingRef.current) window.clearInterval(pendingRef.current)
+          pendingRef.current = null
+          // Focus once it's been scrolled into view.
+          setTimeout(() => el?.focus({ preventScroll: true }), switching ? 50 : 350)
+        }
+      }
+      if (switching) pendingRef.current = window.setInterval(attempt, 200)
+      else attempt()
+    },
+    [activeDocumentId],
+  )
+  useEffect(
+    () => () => {
+      if (pendingRef.current) window.clearInterval(pendingRef.current)
+    },
+    [],
+  )
+  const remainingOn = (id: string) =>
+    fields.filter((f) => f.envelopeDocumentId === id && f.required && !isFilled(f, values)).length
 
   const progress = completion(fields, values)
   const next = nextFieldToFill(fields, values, activeId)
   const complete = progress.done === progress.total
-  const pages = session.document.pages
+  const pages = activeDocument?.pages ?? null
   const rotationOf = useCallback(
     (page: number): PageRotation => {
       const r = pages?.[page - 1]?.rotation
@@ -338,8 +385,28 @@ export function SigningSurface({
     [pages],
   )
   const ctx = useMemo(
-    () => ({ fields, values, activeId, missing, recipient, rotationOf, activate, setValue }),
-    [fields, values, activeId, missing, recipient, rotationOf, activate, setValue],
+    () => ({
+      fields,
+      values,
+      activeId,
+      missing,
+      recipient,
+      activeDocumentId: activeDocument?.id ?? "",
+      rotationOf,
+      activate,
+      setValue,
+    }),
+    [
+      fields,
+      values,
+      activeId,
+      missing,
+      recipient,
+      activeDocument?.id,
+      rotationOf,
+      activate,
+      setValue,
+    ],
   )
 
   async function submit() {
@@ -415,7 +482,7 @@ export function SigningSurface({
         <Panel
           headingLevel={1}
           title={session.envelope.title}
-          description={`${session.envelope.sender.name} (${session.envelope.organization.name}) asked you to sign ${session.document.name}.`}
+          description={`${session.envelope.sender.name} (${session.envelope.organization.name}) asked you to sign ${documentsSummary(documents.map((d) => d.name))}.`}
           actions={
             logoPath && (
               // Logos are drawn for white backgrounds (emails), so they sit on paper in dark mode too.
@@ -432,6 +499,18 @@ export function SigningSurface({
         >
           {session.envelope.message && (
             <p className="whitespace-pre-line text-sm">{session.envelope.message}</p>
+          )}
+          {session.attachments.length > 0 && (
+            <div className="flex flex-col gap-2 pt-1">
+              <p className="font-medium text-sm">
+                Supporting files{" "}
+                <span className="font-normal text-muted-foreground">(to read, not to sign)</span>
+              </p>
+              <AttachmentsList
+                attachments={session.attachments}
+                source={{ kind: "signer", base }}
+              />
+            </div>
           )}
         </Panel>
 
@@ -455,6 +534,25 @@ export function SigningSurface({
           </span>
         </div>
 
+        {documents.length > 1 && (
+          <DocumentSwitcher
+            documents={documents}
+            value={activeDocument?.id ?? ""}
+            onValueChange={(id) => {
+              setActiveDocumentId(id)
+              setActiveId(null)
+            }}
+            accessory={(id) => {
+              const left = remainingOn(id)
+              return left > 0 ? (
+                <span className="text-muted-foreground tabular-nums">{left}</span>
+              ) : (
+                <CheckIcon aria-label="Done" className="size-3.5 text-success-foreground" />
+              )
+            }}
+          />
+        )}
+
         <div className="h-[70dvh] min-h-96 overflow-hidden rounded-2xl border">
           {fileError ? (
             <div className="p-4">
@@ -464,8 +562,9 @@ export function SigningSurface({
             </div>
           ) : fileUrl ? (
             <SigningViewer
+              key={activeDocument?.id}
               src={fileUrl}
-              fileName={session.document.name}
+              fileName={activeDocument?.name ?? "document.pdf"}
               handleRef={viewerRef}
               renderPageOverlay={renderPageOverlay}
             />

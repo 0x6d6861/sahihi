@@ -1,9 +1,11 @@
 "use client"
 
-import { createContext, useCallback, useContext, useMemo } from "react"
+import { createContext, useCallback, useContext, useMemo, useState } from "react"
 import { DocumentViewer } from "@/components/app/document-viewer"
+import { DocumentSwitcher } from "@/components/app/envelope/document-switcher"
 import type { EditorRecipient } from "@/components/app/field-editor/context"
 import { RecipientDot } from "@/components/app/field-editor/field-controls"
+import type { EditorDocument } from "@/components/app/field-editor/field-editor-surface"
 import type { PDFViewerPageOverlayProps } from "@/components/extend/pdf-viewer"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { FIELD_LABELS, RECIPIENT_COLORS } from "@/lib/constants"
@@ -18,6 +20,7 @@ import {
 import { cn } from "@/lib/utils"
 
 interface PreviewState {
+  /** Fields of the document on screen. */
   fields: EditorField[]
   recipients: Map<string, EditorRecipient>
   rotationOf: (page: number) => PageRotation
@@ -63,23 +66,28 @@ function PreviewLayer({ page }: { page: number }) {
 const renderPageOverlay = (p: PDFViewerPageOverlayProps) => <PreviewLayer page={p.pageNumber} />
 
 /**
- * Step 3 of the draft editor: the original PDF with every placed field drawn over it, as the
- * recipients will find them, and a per-recipient count beside it. Fields are the live editor
+ * Step 4 of the draft editor: each original PDF with its placed fields drawn over it, as the
+ * recipients will find them (one document at a time, ADR 0037), and a per-recipient count
+ * across all documents beside it. Fields are the live editor
  * state, so unsaved edits show too.
  */
 export function PreviewStep({
-  src,
-  fileName,
-  fields,
+  documents,
+  fields: allFields,
   recipients,
-  pageRotations,
 }: {
-  src: string
-  fileName: string
+  /** The envelope's documents in signing order; one is on screen at a time (ADR 0037). */
+  documents: EditorDocument[]
   fields: EditorField[]
   recipients: EditorRecipient[]
-  pageRotations: number[]
 }) {
+  const [activeId, setActiveId] = useState(documents[0]?.id ?? "")
+  const active = documents.find((d) => d.id === activeId) ?? documents[0]
+  const pageRotations = active?.pageRotations ?? []
+  const fields = useMemo(
+    () => allFields.filter((f) => f.envelopeDocumentId === active?.id),
+    [allFields, active?.id],
+  )
   const recipientMap = useMemo(() => new Map(recipients.map((r) => [r.id, r])), [recipients])
   const rotationsKey = pageRotations.join(",")
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyed by value, not array identity
@@ -98,13 +106,29 @@ export function PreviewStep({
   return (
     <PreviewContext.Provider value={ctx}>
       <div className="flex size-full min-h-0 overflow-hidden">
-        <div className="min-w-0 flex-1">
-          <DocumentViewer
-            src={src}
-            fileName={fileName}
-            renderPageOverlay={renderPageOverlay}
-            className="h-full min-h-0 rounded-none border-0"
-          />
+        <div className="flex min-w-0 flex-1 flex-col">
+          {documents.length > 1 && (
+            <div className="shrink-0 border-b px-4 py-2">
+              <DocumentSwitcher
+                documents={documents}
+                value={active?.id ?? ""}
+                onValueChange={setActiveId}
+              />
+            </div>
+          )}
+          <div className="min-h-0 flex-1">
+            {active?.src ? (
+              <DocumentViewer
+                key={active.id}
+                src={active.src}
+                fileName={active.name}
+                renderPageOverlay={renderPageOverlay}
+                className="h-full min-h-0 rounded-none border-0"
+              />
+            ) : (
+              <p className="p-6 text-muted-foreground text-sm">The document could not be loaded.</p>
+            )}
+          </div>
         </div>
         <aside
           aria-label="Fields per recipient"
@@ -115,7 +139,8 @@ export function PreviewStep({
               <h2 className="font-medium text-sm">Fields per recipient</h2>
               <ul className="flex flex-col gap-3">
                 {recipients.map((r) => {
-                  const own = fields.filter((f) => f.recipientId === r.id)
+                  // Across every document: what the recipient will be asked to do.
+                  const own = allFields.filter((f) => f.recipientId === r.id)
                   return (
                     <li key={r.id} className="flex flex-col gap-1">
                       <span className="flex items-center gap-2 font-medium text-sm">

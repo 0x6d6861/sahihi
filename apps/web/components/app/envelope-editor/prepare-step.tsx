@@ -8,24 +8,26 @@ import { Button } from "@/components/arc/button/button"
 import { api } from "@/lib/api"
 
 /**
- * Step 1 of the draft editor (ADR 0024): the full PDF editor over the envelope's document, to
- * redact, rotate, reorder or remove pages, or fill its form fields. Optional: "Skip" moves on.
- * Saving uploads a new document (the original stays in the library) and switches the draft to it
- * with `PUT /envelopes/:id/document`, which removes every placed field.
+ * "Prepare pages" of one of the draft's documents (ADR 0024, 0037): the full PDF editor over it, to
+ * redact, rotate, reorder or remove pages, or fill its form fields. Saving uploads a new document
+ * (the original stays in the library) and puts it in this document's place with
+ * `PUT /envelopes/:id/document`, which removes this document's placed fields only.
  */
 export function PrepareStep({
   envelopeId,
+  envelopeDocumentId,
   document,
   src,
   fieldCount,
-  onNext,
+  onDone,
 }: {
   envelopeId: string
+  envelopeDocumentId: string
   document: { id: string; name: string }
   src: string
-  /** Fields placed right now (live), for the warning. */
+  /** Fields placed right now (live) on this document, for the warning. */
   fieldCount: number
-  onNext: () => void
+  onDone: () => void
 }) {
   const router = useRouter()
   const draft = useDraftState()
@@ -35,10 +37,10 @@ export function PrepareStep({
     await draft?.settle()
     const { fieldsRemoved } = await api<{ fieldsRemoved: number }>(
       `/envelopes/${envelopeId}/document`,
-      { method: "PUT", json: { documentId: doc.id } },
+      { method: "PUT", json: { documentId: doc.id, envelopeDocumentId } },
     )
     toastManager.add({
-      title: "Envelope now uses the prepared document",
+      title: "The envelope now uses the prepared document",
       description:
         fieldsRemoved > 0
           ? `${doc.name}. ${fieldsRemoved} placed ${fieldsRemoved === 1 ? "field was" : "fields were"} removed; place them again.`
@@ -46,13 +48,13 @@ export function PrepareStep({
       type: "success",
     })
     router.refresh()
-    onNext()
+    onDone()
   }
 
   const note =
     fieldCount > 0
-      ? `This envelope then uses the new document, and its ${fieldCount} placed ${fieldCount === 1 ? "field is" : "fields are"} removed: pages may have moved, turned or gone.`
-      : "This envelope then uses the new document."
+      ? `The envelope then uses the new document, and the ${fieldCount} ${fieldCount === 1 ? "field" : "fields"} placed on this one ${fieldCount === 1 ? "is" : "are"} removed: pages may have moved, turned or gone.`
+      : "The envelope then uses the new document in this one's place."
 
   return (
     <PrepareDocument
@@ -64,8 +66,8 @@ export function PrepareStep({
       confirmNote={note}
       note={note}
       actions={
-        <Button variant="secondary" onClick={onNext}>
-          Skip this step
+        <Button variant="secondary" onClick={onDone}>
+          Cancel
         </Button>
       }
       className="h-full"

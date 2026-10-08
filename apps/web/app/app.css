@@ -111,3 +111,77 @@ body {
   --info-foreground: oklch(48% 0.17 255);
   --ring: oklch(33% 0 0 / 0.72);
 }
+
+/*
+ * Motion (docs/ui.md → Motion). Arc owns the curves and durations (foundation.css); these classes apply
+ * them to app-owned surfaces that Arc doesn't draw. Plain classes (not Tailwind utilities) so they
+ * carry their own reduced-motion rule. They set the full transition list, because an unlayered class
+ * beats Tailwind's `transition-colors` on the same element.
+ */
+
+/* Press feedback for clickable cards and custom buttons: a slight shrink while held. Large surfaces
+   use `press-subtle` so the edge doesn't visibly jump. `:has(a:active)` covers cards whose whole
+   area is a stretched link. */
+.press,
+.press-subtle {
+  transition-property: transform, color, background-color, border-color, box-shadow;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--ease-enter);
+}
+/* Gated here rather than undone under `reduce`: the `:not()` makes these more specific than any override.
+   Like Arc's Button, an anchor of a floating layer never scales (Radix measures it on pointerdown), and
+   neither does a card while a control inside it is pressed (`:active` also matches ancestors). */
+@media (prefers-reduced-motion: no-preference) {
+  .press:active:not(
+    :disabled,
+    [aria-disabled="true"],
+    [aria-haspopup]:not([aria-haspopup="false"])
+  ),
+  .press:has(a:active) {
+    transform: scale(0.97);
+  }
+  .press-subtle:active:not(
+    :disabled,
+    [aria-disabled="true"],
+    :has(:is(button, [role="button"]):active)
+  ),
+  .press-subtle:has(a:active) {
+    transform: scale(0.985);
+  }
+}
+
+/* First appearance of content (no JS, no layout animation). On list items set `--i` with `stagger(i)`
+   from components/app/motion.ts: each item starts 35ms after the previous, capped at 8 steps. Items
+   already on screen never replay, so filtering only fades in the rows that are new. */
+.enter-fade {
+  transition-property: opacity, transform;
+  transition-duration: var(--duration-standard);
+  transition-timing-function: var(--ease-enter);
+  transition-delay: calc(var(--i, 0) * 35ms);
+  @starting-style {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+/* An object placed by the user (a field dropped on a page): grows in from just under its size, never
+   from nothing. Only the entrance animates; dragging and resizing stay instant. */
+.enter-pop {
+  transition-property: opacity, transform;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--ease-enter);
+  @starting-style {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Keep the opacity cue, drop the movement. */
+  .enter-fade,
+  .enter-pop {
+    @starting-style {
+      transform: none;
+    }
+  }
+}

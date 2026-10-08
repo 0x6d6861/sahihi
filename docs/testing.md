@@ -85,6 +85,12 @@ recipient → place a signature field → send → the signer opens the emailed 
 browser context, types a signature, consents and finishes → the worker stamps the PDF and issues
 the certificate → the public `/verify/<code>` page. It takes about 25 s.
 
+A second journey, `multi-document.e2e.ts` (ADR 0037), adds a second document from the draft
+editor's "Add document" dialog and a supporting CSV, places a signature on each document (switching
+documents in the field editor), has the signer sign both (switching with "Next field" and reusing
+the adopted signature), then checks "Download all" and that `/verify` lists both documents and the
+file. About 30 s.
+
 **Its own stack.** It never uses your `.env` or dev database. `playwright.config.ts` and
 `global-setup.ts` start:
 - the api on **4100** and `next dev` on **3100**, via Playwright's `webServer`;

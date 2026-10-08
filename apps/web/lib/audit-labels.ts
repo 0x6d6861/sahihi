@@ -4,6 +4,11 @@ import type { AuditEventType } from "@sahihi/core"
 const LABELS: Record<AuditEventType, (who: string) => string> = {
   "envelope.created": () => "Envelope created",
   "envelope.document_replaced": () => "Document replaced with a prepared version",
+  "envelope.document_added": () => "Document added",
+  "envelope.document_removed": () => "Document removed",
+  "envelope.documents_reordered": () => "Documents reordered",
+  "envelope.attachment_added": () => "Supporting file added",
+  "envelope.attachment_removed": () => "Supporting file removed",
   "envelope.sent": () => "Envelope sent",
   "envelope.voided": () => "Envelope voided",
   "envelope.expired": () => "Envelope expired",
@@ -16,7 +21,8 @@ const LABELS: Record<AuditEventType, (who: string) => string> = {
   "recipient.otp_verified": (who) => `${who} verified their identity`,
   "recipient.otp_failed": (who) => `${who} entered a wrong verification code`,
   "recipient.consented": (who) => `${who} agreed to sign electronically`,
-  "recipient.viewed": (who) => `${who} viewed the document`,
+  "recipient.viewed": (who) => `${who} viewed the documents`,
+  "recipient.attachment_viewed": (who) => `${who} downloaded a supporting file`,
   "recipient.field_filled": (who) => `${who} filled a field`,
   "recipient.signed": (who) => `${who} signed`,
   "recipient.declined": (who) => `${who} declined to sign`,
@@ -36,9 +42,31 @@ export function auditEventLabel(
   const text = label(recipientName || "A recipient")
   // A few events carry a sender-supplied reason worth showing.
   const reason = typeof data?.reason === "string" ? data.reason.trim() : ""
-  return reason && (type === "envelope.voided" || type === "recipient.declined")
-    ? `${text}: “${reason}”`
-    : text
+  if (reason && (type === "envelope.voided" || type === "recipient.declined")) {
+    return `${text}: “${reason}”`
+  }
+  // File events name the file (ADR 0037).
+  const name =
+    typeof data?.name === "string"
+      ? data.name
+      : typeof data?.documentName === "string"
+        ? data.documentName
+        : ""
+  const named =
+    type === "envelope.document_removed" ||
+    type === "envelope.attachment_added" ||
+    type === "envelope.attachment_removed" ||
+    type === "recipient.attachment_viewed" ||
+    type === "document.finalized"
+  if (name && named) return `${text}: ${name}`
+  if (type === "envelope.document_added" && Array.isArray(data?.documents)) {
+    const names = (data.documents as { name?: unknown }[])
+      .map((d) => (typeof d.name === "string" ? d.name : null))
+      .filter(Boolean)
+    if (names.length > 0)
+      return `${names.length > 1 ? "Documents added" : text}: ${names.join(", ")}`
+  }
+  return text
 }
 
 /** Tone for the event's badge in the Activity list. */

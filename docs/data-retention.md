@@ -8,8 +8,8 @@ admins manage this under **Settings → Data** (`data:manage`).
 
 | Deleted | Kept (evidence) |
 |---|---|
-| Signed PDF, certificate PDF, signature/initials images (`org/<id>/envelopes/<envelopeId>/…`) | Status, all timestamps, signing order |
-| The original PDF, once no other live envelope and no template uses it (the `Document` row is renamed "Deleted document" and soft-deleted; its `sha256` stays) | Document hash, `signedSha256`, the `Certificate` row (code, hash) so `/verify/<code>` still answers |
+| Signed PDFs (one per document), certificate PDF, signature/initials images, supporting files and the "Download all" zip (`org/<id>/envelopes/<envelopeId>/…`); supporting files are renamed "Deleted file" (ADR 0037) | Status, all timestamps, signing order |
+| The original PDF and its thumbnail, once no other live envelope and no template uses it (the `Document` row is renamed "Deleted document" and soft-deleted; its `sha256` stays). Deleting a document from the Documents page removes its thumbnail at once (ADR 0033) | Each document's hash and `signedSha256`, supporting files' hashes, the `Certificate` row (code, hash) so `/verify/<code>` still answers |
 | Recipients' names, emails (→ `deleted-<id>@redacted.invalid`), phones, signing IPs and user agents, decline reasons, OTP rows, link tokens | Recipient roles, order, statuses and `signedAt`/`viewedAt`/`declinedAt` |
 | Field values and labels; envelope title and message; void reason | Field positions and types |
 | Webhook delivery payloads for that envelope (→ `{ redacted: true }`); in-app notifications about it (deleted, docs/notifications.md) | The hash-chained **audit trail**, append-only (ADR 0010), plus an `envelope.purged` event with the reason |

@@ -31,7 +31,7 @@ async function seedCompleted(completedAt = new Date()) {
   const envelope = await prisma.envelope.create({
     data: {
       organizationId: alice.organizationId,
-      documentId: document.id,
+      documents: { create: { documentId: document.id } },
       createdById: alice.userId,
       title: "Lease – Wanjiku Kamau",
       message: "Karibu",
@@ -52,18 +52,21 @@ async function seedCompleted(completedAt = new Date()) {
         ],
       },
     },
-    include: { recipients: true },
+    include: { recipients: true, documents: true },
   })
   const recipientId = envelope.recipients[0]?.id as string
+  const envelopeDocumentId = envelope.documents[0]?.id as string
   const org = alice.organizationId
+  const signedKey = keys.signedDocument(org, envelope.id, envelopeDocumentId)
   const imageKey = keys.fieldImage(org, envelope.id, "f1")
   await putObject(imageKey, new Uint8Array([137, 80, 78, 71]), "image/png")
-  await putObject(keys.signed(org, envelope.id), pdf, "application/pdf")
+  await putObject(signedKey, pdf, "application/pdf")
   await putObject(keys.certificate(org, envelope.id), pdf, "application/pdf")
   await prisma.field.createMany({
     data: [
       {
         envelopeId: envelope.id,
+        envelopeDocumentId,
         recipientId,
         type: "SIGNATURE",
         page: 1,
@@ -75,6 +78,7 @@ async function seedCompleted(completedAt = new Date()) {
       },
       {
         envelopeId: envelope.id,
+        envelopeDocumentId,
         recipientId,
         type: "TEXT",
         page: 1,
@@ -86,9 +90,9 @@ async function seedCompleted(completedAt = new Date()) {
       },
     ],
   })
-  await prisma.envelope.update({
-    where: { id: envelope.id },
-    data: { signedS3Key: keys.signed(org, envelope.id), signedSha256: "5".repeat(64) },
+  await prisma.envelopeDocument.update({
+    where: { id: envelopeDocumentId },
+    data: { signedS3Key: signedKey, signedSha256: "5".repeat(64) },
   })
   const cert = await prisma.certificate.create({
     data: {
@@ -107,6 +111,7 @@ async function seedCompleted(completedAt = new Date()) {
     documentId: document.id,
     recipientId,
     imageKey,
+    signedKey,
     code: cert.code,
   }
 }
@@ -149,12 +154,13 @@ describe("purge", () => {
         recipients: true,
         fields: true,
         certificate: true,
+        documents: true,
         auditEvents: { orderBy: { seq: "asc" } },
       },
     })
     // Files gone (signed, certificate, signature image, and the original: nothing else uses it).
     for (const key of [
-      keys.signed(alice.organizationId, s.envelopeId),
+      s.signedKey,
       keys.certificate(alice.organizationId, s.envelopeId),
       s.imageKey,
     ]) {
@@ -166,7 +172,8 @@ describe("purge", () => {
     expect(doc.sha256).toMatch(/^[0-9a-f]{64}$/) // hash kept
 
     // Personal data gone.
-    expect(e).toMatchObject({ title: "Deleted envelope", message: null, signedS3Key: null })
+    expect(e).toMatchObject({ title: "Deleted envelope", message: null, bundleS3Key: null })
+    expect(e.documents[0]?.signedS3Key).toBeNull()
     expect(e.recipients[0]).toMatchObject({
       name: "Deleted recipient",
       email: `deleted-${s.recipientId}@redacted.invalid`,
@@ -179,7 +186,7 @@ describe("purge", () => {
 
     // Evidence kept.
     expect(e.status).toBe("COMPLETED")
-    expect(e.signedSha256).toBe("5".repeat(64))
+    expect(e.documents[0]?.signedSha256).toBe("5".repeat(64))
     expect(e.certificate?.code).toBe(s.code)
     expect(e.recipients[0]?.signedAt).not.toBeNull()
     expect(e.auditEvents.map((a) => a.type)).toEqual([
@@ -202,7 +209,7 @@ describe("purge", () => {
     await prisma.template.create({
       data: {
         organizationId: alice.organizationId,
-        documentId: s.documentId,
+        documents: { create: { documentId: s.documentId } },
         createdById: alice.userId,
         name: "Lease",
       },
@@ -282,16 +289,26 @@ describe("export", () => {
       [
         "README.txt",
         "manifest.json",
-        ...["audit.json", "certificate.pdf", "envelope.json", "original.pdf", "signed.pdf"].map(
-          (f) => `${folder}/${f}`,
-        ),
+        ...[
+          "audit.json",
+          "certificate.pdf",
+          "envelope.json",
+          // One original and one signed copy per document, in signing order (ADR 0037).
+          "documents/01-contract.pdf",
+          "documents/01-contract (signed).pdf",
+        ].map((f) => `${folder}/${f}`),
       ].sort(),
     )
     const meta = JSON.parse(new TextDecoder().decode(files[`${folder}/envelope.json`]))
     expect(meta.recipients[0].email).toBe("wanjiku@example.test")
+    expect(meta.documents).toEqual([
+      { name: "contract.pdf", sha256: expect.any(String), signedSha256: "5".repeat(64) },
+    ])
     const audit = JSON.parse(new TextDecoder().decode(files[`${folder}/audit.json`]))
     expect(audit.verification.valid).toBe(true)
-    expect(new TextDecoder().decode(files[`${folder}/signed.pdf`])).toBe("%PDF-1.7 signed")
+    expect(new TextDecoder().decode(files[`${folder}/documents/01-contract (signed).pdf`])).toBe(
+      "%PDF-1.7 signed",
+    )
 
     const dl = await request(alice, `/api/data/exports/${x.id}/download`)
     expect(dl.status).toBe(200)

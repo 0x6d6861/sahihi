@@ -7,7 +7,7 @@ export const ENVELOPE_TABS = ["document", "recipients", "activity"] as const
 export type EnvelopeTab = (typeof ENVELOPE_TABS)[number]
 
 const LABELS: Record<EnvelopeTab, string> = {
-  document: "Document",
+  document: "Documents",
   recipients: "Recipients",
   activity: "Activity",
 }

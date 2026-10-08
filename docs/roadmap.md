@@ -30,6 +30,12 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
 - [x] Extend `FileThumbnail` in the list; `Pagination` (`GET /documents?page=N` → `{ items, page, pageSize, total }`)
 - [x] Integration test harness (`apps/api/test/`, see `docs/testing.md`) + documents tests incl. cross-tenant 404
 - [x] Worker job to clean up `UPLOADING` documents older than 1 hour (`documents.sweep-uploads`, every 15 min)
+- [x] Grid view with first-page thumbnails rendered by the worker (`document.thumbnail`, hourly backfill
+      sweep, cacheable presigned URLs, Drive-style cards, layout saved in a cookie) (ADR 0033, 0034)
+- [x] Same list experience on Envelopes and Templates: server-side search, chips and paging, list / grid with
+      document thumbnails, status icons, avatars, signing-progress rings, ⋮ menus (ADR 0036)
+- [x] Multi-document envelopes and supporting files: several documents per envelope (and template), one
+      signed PDF each, one certificate, "Download all" zip, files shared with signers (ADR 0037)
 - [x] Folders on the Documents page (nested; create, rename, move, delete → contents move up) +
       search and Status / Sender / Period filters (ADR 0022)
 - [x] Color and tags on folders and documents, searchable (`q` matches tags; Tag and Color filters

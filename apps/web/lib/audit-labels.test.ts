@@ -24,3 +24,23 @@ describe("auditEventLabel", () => {
     expect(auditEventTone("recipient.signed")).toBe("success")
   })
 })
+
+describe("multi-document events (ADR 0037)", () => {
+  test("file events name the file", () => {
+    expect(auditEventLabel("envelope.attachment_added", null, { name: "prices.xlsx" })).toBe(
+      "Supporting file added: prices.xlsx",
+    )
+    expect(auditEventLabel("recipient.attachment_viewed", "Amina", { name: "id.png" })).toBe(
+      "Amina downloaded a supporting file: id.png",
+    )
+    expect(auditEventLabel("document.finalized", null, { documentName: "annex.pdf" })).toBe(
+      "Signed PDF produced: annex.pdf",
+    )
+    expect(
+      auditEventLabel("envelope.document_added", null, {
+        documents: [{ name: "a.pdf" }, { name: "b.pdf" }],
+      }),
+    ).toBe("Documents added: a.pdf, b.pdf")
+    expect(auditEventLabel("envelope.documents_reordered", null, {})).toBe("Documents reordered")
+  })
+})

@@ -56,7 +56,13 @@ beforeEach(async () => {
 
 const envelope = (data: { status: "SENT" | "COMPLETED"; expiresAt?: Date; completedAt?: Date }) =>
   prisma.envelope.create({
-    data: { organizationId: orgId, documentId, createdById: userId, title: "Lease", ...data },
+    data: {
+      organizationId: orgId,
+      documents: { create: { documentId } },
+      createdById: userId,
+      title: "Lease",
+      ...data,
+    },
   })
 
 describe("worker notifications", () => {

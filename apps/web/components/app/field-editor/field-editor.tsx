@@ -12,32 +12,29 @@ import {
   toFieldsPayload,
 } from "@/lib/field-editor"
 import type { EditorRecipient } from "./context"
-import { FieldEditorSurface } from "./field-editor-surface"
+import { type EditorDocument, FieldEditorSurface } from "./field-editor-surface"
 import { useAutosave } from "./use-autosave"
 
 type SavedField = Parameters<typeof fieldsFromSaved>[0][number]
 
-/** Field placement on a DRAFT envelope, autosaved with `PUT /envelopes/:id/fields`. */
+/**
+ * Field placement on a DRAFT envelope, autosaved with `PUT /envelopes/:id/fields`. One state for
+ * every document of the envelope (the save replaces them all); the surface shows one at a time.
+ */
 export function FieldEditor({
   envelopeId,
-  documentId,
-  src,
-  fileName,
+  documents,
   recipients,
   initialFields,
-  pageRotations,
   frameClassName,
   onFieldsChange,
 }: {
   envelopeId: string
-  documentId: string
-  src: string
-  fileName: string
+  /** The envelope's documents in signing order (ADR 0037). */
+  documents: EditorDocument[]
   /** Recipients that may own fields (VIEWERs excluded), in list order. */
   recipients: EditorRecipient[]
   initialFields: SavedField[]
-  /** Intrinsic /Rotate per page (index = page - 1), from Document.pages. */
-  pageRotations: number[]
   frameClassName?: string
   /** Called with the fields after every change, e.g. for a live preview. */
   onFieldsChange?: (fields: EditorField[]) => void
@@ -71,10 +68,8 @@ export function FieldEditor({
       state={state}
       dispatch={dispatch}
       recipients={recipients}
-      src={src}
-      fileName={fileName}
-      documentId={documentId}
-      pageRotations={pageRotations}
+      documents={documents}
+      detect
       status={status}
       onRetry={() => void retry()}
       frameClassName={frameClassName}

@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, test } from "bun:test"
 import { prisma } from "@sahihi/db"
+import { putObject } from "@sahihi/infra"
 import { app, createSender, request, resetDb, type Sender, uploadDocument } from "./helpers"
 
 /**
@@ -26,6 +27,8 @@ const ids = {
   apiKey: "",
   bulkSend: "",
   folder: "",
+  envelopeDocument: "",
+  attachment: "",
 }
 
 type Case = () => { path: string; init?: RequestInit & { json?: unknown } }
@@ -113,6 +116,37 @@ const TENANT: Record<string, Case> = {
   }),
   "GET /api/envelopes/:id/audit": () => ({ path: `/api/envelopes/${ids.envelope}/audit` }),
   "GET /api/envelopes/:id/downloads": () => ({ path: `/api/envelopes/${ids.envelope}/downloads` }),
+  // Multi-document envelopes and supporting files (ADR 0037).
+  "POST /api/envelopes/:id/documents": () => ({
+    path: `/api/envelopes/${ids.envelope}/documents`,
+    init: { method: "POST", json: { documentIds: [ids.document] } },
+  }),
+  "DELETE /api/envelopes/:id/documents/:envelopeDocumentId": () => ({
+    path: `/api/envelopes/${ids.envelope}/documents/${ids.envelopeDocument}`,
+    init: { method: "DELETE" },
+  }),
+  "PUT /api/envelopes/:id/documents/order": () => ({
+    path: `/api/envelopes/${ids.envelope}/documents/order`,
+    init: { method: "PUT", json: { envelopeDocumentIds: [ids.envelopeDocument] } },
+  }),
+  "POST /api/envelopes/:id/attachments/uploads": () => ({
+    path: `/api/envelopes/${ids.envelope}/attachments/uploads`,
+    init: {
+      method: "POST",
+      json: { name: "prices.csv", sizeBytes: 10, contentType: "text/csv" },
+    },
+  }),
+  "POST /api/envelopes/:id/attachments/:attachmentId/complete": () => ({
+    path: `/api/envelopes/${ids.envelope}/attachments/${ids.attachment}/complete`,
+    init: { method: "POST" },
+  }),
+  "DELETE /api/envelopes/:id/attachments/:attachmentId": () => ({
+    path: `/api/envelopes/${ids.envelope}/attachments/${ids.attachment}`,
+    init: { method: "DELETE" },
+  }),
+  "GET /api/envelopes/:id/attachments/:attachmentId/file": () => ({
+    path: `/api/envelopes/${ids.envelope}/attachments/${ids.attachment}/file`,
+  }),
   "POST /api/templates": () => ({
     path: "/api/templates",
     init: {
@@ -277,6 +311,7 @@ const NOT_TENANT = [
   "POST /api/auth/*",
   "GET /api/sign/:token",
   "GET /api/sign/:token/downloads",
+  "GET /api/sign/:token/attachments/:attachmentId",
   "GET /api/sign/:token/embed",
   "POST /api/sign/:token/otp",
   "POST /api/sign/:token/otp/verify",
@@ -299,6 +334,8 @@ async function snapshot() {
     webhooks,
     apiKeys,
     folders,
+    envelopeDocuments,
+    attachments,
   ] = await Promise.all([
     prisma.document.findMany({
       where: { organizationId: alice.organizationId },
@@ -321,6 +358,14 @@ async function snapshot() {
     }),
     prisma.apiKey.findMany({ where: { organizationId: alice.organizationId } }),
     prisma.folder.findMany({ where: { organizationId: alice.organizationId } }),
+    prisma.envelopeDocument.findMany({
+      where: { envelopeId: ids.envelope },
+      orderBy: { id: "asc" },
+    }),
+    prisma.envelopeAttachment.findMany({
+      where: { envelopeId: ids.envelope },
+      orderBy: { id: "asc" },
+    }),
   ])
   return {
     documents,
@@ -332,6 +377,8 @@ async function snapshot() {
     webhooks,
     apiKeys,
     folders,
+    envelopeDocuments,
+    attachments,
   }
 }
 
@@ -346,6 +393,25 @@ beforeAll(async () => {
     json: { documentId: document.id, title: "Alice's lease" },
   })
   ids.envelope = ((await created.json()) as { envelope: { id: string } }).envelope.id
+  ids.envelopeDocument = (
+    await prisma.envelopeDocument.findFirstOrThrow({ where: { envelopeId: ids.envelope } })
+  ).id
+  const attachmentKey = `org/${alice.organizationId}/envelopes/${ids.envelope}/attachments/x`
+  await putObject(attachmentKey, new TextEncoder().encode("a,b\n1,2\n"), "text/csv")
+  ids.attachment = (
+    await prisma.envelopeAttachment.create({
+      data: {
+        envelopeId: ids.envelope,
+        name: "prices.csv",
+        contentType: "text/csv",
+        sizeBytes: 10,
+        sha256: "a".repeat(64),
+        s3Key: attachmentKey,
+        status: "READY",
+        uploadedById: alice.userId,
+      },
+    })
+  ).id
   const put = await request(alice, `/api/envelopes/${ids.envelope}/recipients`, {
     method: "PUT",
     json: { recipients: [{ name: "Tenant", email: "tenant@example.test" }] },

@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { MAX_ENVELOPE_DOCUMENTS } from "../envelope/documents"
 import { FIELD_TYPES, SIGNING_ORDERS } from "../shared/enums"
 import { NormalizedRectSchema, ReplaceRecipientsSchema } from "../shared/schemas"
 
@@ -12,6 +13,8 @@ export const ApiFieldSchema = z
   .object({
     /** 0-based index into `recipients` */
     recipient: z.number().int().min(0),
+    /** 0-based index into `documentIds` (ADR 0037); `page` is within that document. */
+    document: z.number().int().min(0).default(0),
     type: z.enum(FIELD_TYPES),
     page: z.number().int().min(1),
     required: z.boolean().default(true),
@@ -45,14 +48,33 @@ export const ApiCreateFromTemplateSchema = z.object({
 
 export const ApiCreateFromDocumentSchema = z
   .object({
-    documentId: z.string().min(1),
+    /** One document (older callers); same as `documentIds: [documentId]`. */
+    documentId: z.string().min(1).optional(),
+    /** The documents to sign, in order (ADR 0037). */
+    documentIds: z
+      .array(z.string().min(1).max(64))
+      .min(1)
+      .max(MAX_ENVELOPE_DOCUMENTS)
+      .refine((ids) => new Set(ids).size === ids.length, "Each document can be added once.")
+      .optional(),
     signingOrder: z.enum(SIGNING_ORDERS).default("PARALLEL"),
     recipients: ReplaceRecipientsSchema.shape.recipients,
     fields: z.array(ApiFieldSchema).max(500),
     ...common,
   })
   .superRefine((v, ctx) => {
+    const documents = v.documentIds?.length ?? (v.documentId ? 1 : 0)
+    if (documents === 0) {
+      ctx.addIssue({ code: "custom", path: ["documentIds"], message: "Pick a document." })
+    }
     v.fields.forEach((f, i) => {
+      if (f.document >= documents) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["fields", i, "document"],
+          message: "No such document",
+        })
+      }
       const r = v.recipients[f.recipient]
       if (!r) {
         ctx.addIssue({
@@ -69,6 +91,10 @@ export const ApiCreateFromDocumentSchema = z
       }
     })
   })
+
+/** `documentId` folded into `documentIds`, so services see one shape. */
+export const documentIdsOf = (v: { documentId?: string; documentIds?: string[] }): string[] =>
+  v.documentIds ?? (v.documentId ? [v.documentId] : [])
 
 export const ApiCreateEnvelopeSchema = z.union([
   ApiCreateFromTemplateSchema,

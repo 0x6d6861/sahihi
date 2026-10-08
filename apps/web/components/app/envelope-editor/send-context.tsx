@@ -11,7 +11,7 @@ import { Alert } from "@/components/arc/alert/alert"
 import { Button } from "@/components/arc/button/button"
 import { ApiError, api } from "@/lib/api"
 import type { EnvelopeDetail } from "@/lib/envelope-detail"
-import { type EditorStep, FIX_STEP } from "@/lib/envelope-editor"
+import { type EditorStep, FIX_STEP, splitPreflight } from "@/lib/envelope-editor"
 import {
   buildEnvelopeDetailsInput,
   detailsFromEnvelope,
@@ -79,11 +79,13 @@ export function SendProvider({
       const { issues } = await api<{ issues: PreflightIssue[] }>(
         `/envelopes/${envelopeId}/preflight`,
       )
-      setProblems(toProblems(issues))
-      if (issues.length === 0) {
-        // Start from what's saved; edits abandoned with Back last time are dropped.
+      const { inDialog, blocking: editorIssues } = splitPreflight(issues)
+      setProblems(toProblems(editorIssues))
+      if (editorIssues.length === 0) {
+        // Start from what's saved; edits abandoned with Back last time are dropped. Issues fixed
+        // in the dialog itself (a past expiry) show on their field.
         setDetails(detailsFromEnvelope(envelope))
-        setErrors({})
+        setErrors(inDialog)
         setReviewOpen(true)
       }
     } catch (err) {
@@ -156,7 +158,12 @@ export function SendProvider({
       router.refresh()
       const issues =
         (err instanceof ApiError && (err.body as { issues?: PreflightIssue[] })?.issues) || []
-      if (issues.length > 0) setProblems(toProblems(issues))
+      const { inDialog, blocking: editorIssues } = splitPreflight(issues)
+      if (Object.keys(inDialog).length > 0 && editorIssues.length === 0) {
+        // Still fixable in the dialog: reopen it with the error on the field.
+        setErrors(inDialog)
+        setReviewOpen(true)
+      } else if (issues.length > 0) setProblems(toProblems(issues))
       // Plan limit reached (docs/billing.md): keep the explanation on screen, not in a toast.
       else if (err instanceof ApiError && err.status === 402)
         setProblems([{ message: err.message }])

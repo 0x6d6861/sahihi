@@ -18,8 +18,10 @@ export interface FieldEditorContextValue {
   tool: FieldType | null
   activeRecipientId: string | null
   recipients: Map<string, EditorRecipient>
-  /** Intrinsic /Rotate of a page (1-based), from Document.pages. */
+  /** Intrinsic /Rotate of a page (1-based) of the active document, from Document.pages. */
   rotationOf: (page: number) => PageRotation
+  /** The document on screen (ADR 0037): `id` is the envelope document, `documentId` the library's. */
+  activeDocument: { id: string; documentId: string }
 }
 
 export const FieldEditorContext = createContext<FieldEditorContextValue | null>(null)

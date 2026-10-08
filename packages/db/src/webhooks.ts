@@ -31,7 +31,17 @@ export async function queueEnvelopeWebhook(
   const snapshot = await tx.envelope.findUniqueOrThrow({
     where: { id: input.envelopeId },
     include: {
-      document: { select: { id: true, name: true, sha256: true } },
+      documents: {
+        select: {
+          order: true,
+          signedSha256: true,
+          document: { select: { id: true, name: true, sha256: true } },
+        },
+      },
+      attachments: {
+        select: { name: true, sha256: true, status: true },
+        orderBy: { order: "asc" },
+      },
       certificate: { select: { code: true } },
       recipients: { orderBy: [{ order: "asc" }, { createdAt: "asc" }] },
     },

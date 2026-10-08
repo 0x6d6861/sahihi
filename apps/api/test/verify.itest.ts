@@ -19,13 +19,17 @@ beforeEach(async () => {
   const envelope = await prisma.envelope.create({
     data: {
       organizationId: alice.organizationId,
-      documentId: document.id,
+      documents: {
+        create: {
+          documentId: document.id,
+          signedSha256: signedSha,
+          signedS3Key: "org/x/envelopes/y/signed.pdf",
+        },
+      },
       createdById: alice.userId,
       title: "Lease",
       status: "COMPLETED",
       completedAt: new Date(),
-      signedSha256: signedSha,
-      signedS3Key: "org/x/envelopes/y/signed.pdf",
       recipients: {
         create: [
           {

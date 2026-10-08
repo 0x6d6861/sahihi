@@ -1,4 +1,10 @@
 export { processBulkSend, startBulkSend } from "./bulk-send"
+export {
+  attachDocuments,
+  documentsAuditData,
+  loadReadyDocuments,
+  type ReadyDocument,
+} from "./documents"
 export { createEmbeddedSigningLink } from "./embedded"
 export { EnvelopeError, notFound } from "./errors"
 export { createEnvelopeFromDocument } from "./from-document"

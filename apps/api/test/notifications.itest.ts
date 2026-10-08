@@ -258,7 +258,7 @@ describe("workspace events", () => {
       await prisma.envelope.create({
         data: {
           organizationId: free.organizationId,
-          documentId: document.id,
+          documents: { create: { documentId: document.id } },
           createdById: free.userId,
           title: `Earlier ${i}`,
           status: "SENT",

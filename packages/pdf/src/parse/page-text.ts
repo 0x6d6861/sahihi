@@ -1,21 +1,6 @@
-/// <reference path="../assets.d.ts" />
-import { isAbsolute, join } from "node:path"
-import { init, type WrappedPdfiumModule } from "@embedpdf/pdfium"
-// Bun copies the WASM next to the bundle (`bun build`) and resolves it to a path in source mode.
-import wasmPath from "@embedpdf/pdfium/pdfium.wasm" with { type: "file" }
+import type { WrappedPdfiumModule } from "@embedpdf/pdfium"
 import type { PageText, PdfRect } from "@sahihi/core"
-
-// PDFium (the same build the web viewer uses) is the text extractor: pdf-lib can't read text.
-let pdfium: Promise<WrappedPdfiumModule> | undefined
-function loadPdfium(): Promise<WrappedPdfiumModule> {
-  pdfium ??= (async () => {
-    const path = isAbsolute(wasmPath) ? wasmPath : join(import.meta.dir, wasmPath)
-    const m = await init({ wasmBinary: await Bun.file(path).arrayBuffer() })
-    m.PDFiumExt_Init()
-    return m
-  })()
-  return pdfium
-}
+import { loadPdfium, pdfiumHeap } from "../pdfium"
 
 /** Drawn paths thinner than this (points) in either direction may be rules; others are skipped. */
 const RULE_MAX_THICKNESS_PT = 3
@@ -45,9 +30,7 @@ export async function readPageText(
 ): Promise<PageText[]> {
   const m = await loadPdfium()
   const { wasmExports, UTF16ToString } = m.pdfium
-  // Emscripten replaces these views when memory grows (malloc), so read them at each use.
-  const heap = () =>
-    m.pdfium as unknown as { HEAPU8: Uint8Array; HEAPF32: Float32Array; HEAPF64: Float64Array }
+  const heap = () => pdfiumHeap(m)
   // Everything below is synchronous, so concurrent calls can't interleave on the shared module.
   const data = wasmExports.malloc(bytes.byteLength)
   const box = wasmExports.malloc(4 * 8)

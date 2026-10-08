@@ -36,7 +36,7 @@ export function CreateFolderButton({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="flex min-h-16 w-full items-center gap-3 rounded-xl border border-dashed py-2.5 ps-4 pe-2.5 text-start text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex min-h-16 w-full items-center gap-3 rounded-xl border border-dashed py-2.5 ps-4 pe-2.5 text-start text-muted-foreground outline-none press-subtle hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
           <FolderPlusIcon aria-hidden className="shrink-0" />
           <span className="flex min-w-0 flex-col gap-0.5">

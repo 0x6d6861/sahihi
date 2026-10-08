@@ -126,6 +126,14 @@ checks are strict (`docs/webhooks.md`, ADR 0013):
 
 ## Documents
 
+**Supporting files (ADR 0037)** are restricted to an allowlist (PDF, PNG, JPEG, WebP, DOCX,
+XLSX, PPTX, CSV, TXT; checked on the type, or on the extension when the browser sends none). They
+are capped at 25 MB, hashed on `complete`, and always served with `Content-Disposition: attachment`
+from the bucket, so none can render or run in our origin. Signers get them only after
+verification, while the envelope is live or done, and every download is audited. Nobody scans
+them for malware yet; that needs an external scanner.
+
+
 - The bucket is private. Every read or write uses a presigned URL (PUT for 5 minutes; GET short-lived
   with a `Content-Disposition` filename).
 - Uploads are re-validated on the server (size, PDF parse, not encrypted). The original's SHA-256 is

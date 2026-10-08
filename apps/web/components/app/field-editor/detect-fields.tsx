@@ -15,8 +15,9 @@ import { useFieldEditor } from "./context"
  * ("Buyer Signature", "Seller Date") are split across the recipients in list order; the rest go to
  * the active recipient. The sender reviews them like any placed field.
  */
-export function DetectFields({ documentId }: { documentId: string }) {
-  const { state, dispatch, activeRecipientId, recipients } = useFieldEditor()
+export function DetectFields() {
+  const { state, dispatch, activeRecipientId, recipients, activeDocument } = useFieldEditor()
+  const documentId = activeDocument.documentId
   const [pending, setPending] = useState(false)
 
   async function run() {
@@ -28,9 +29,10 @@ export function DetectFields({ documentId }: { documentId: string }) {
       )
       const owners = assignSuggestions(suggestions, [...recipients.keys()], activeRecipientId)
       const fields = withoutDuplicates(
-        state.fields,
+        state.fields.filter((f) => f.envelopeDocumentId === activeDocument.id),
         suggestions.map((s, i) => ({
           recipientId: owners[i] ?? activeRecipientId,
+          envelopeDocumentId: activeDocument.id,
           type: s.type,
           page: s.page,
           required: s.required,

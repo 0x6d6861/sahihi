@@ -18,10 +18,13 @@ export default async function EditEnvelopePage({ params }: { params: Promise<{ i
   if (status === 404 || !data) notFound()
   if (!isEditableDraft(data)) redirect(path)
   const e = data.envelope
-  // The original PDF (presigned, short-lived).
-  const file = await apiServer<{ url: string }>(
-    `/documents/${encodeURIComponent(e.document.id)}/file`,
+  // Each document's original PDF (presigned, short-lived), by envelope document id.
+  const urls = await Promise.all(
+    e.documents.map((d) =>
+      apiServer<{ url: string }>(`/documents/${encodeURIComponent(d.documentId)}/file`),
+    ),
   )
+  const files = Object.fromEntries(e.documents.map((d, i) => [d.id, urls[i]?.data?.url ?? null]))
 
-  return <EditorShell envelope={e} fileUrl={file.data?.url ?? null} audit={audit.data ?? null} />
+  return <EditorShell envelope={e} files={files} audit={audit.data ?? null} />
 }

@@ -5,8 +5,8 @@ import {
   consentTextSha256,
   DeclineSigningSchema,
   deriveOutcome,
-  downloadFileName,
   type FieldValueInput,
+  fieldsInReadingOrder,
   generateOtp,
   hashOtp,
   hashSigningToken,
@@ -15,6 +15,7 @@ import {
   OTP_RESEND_COOLDOWN_MS,
   otpResendWaitSec,
   SubmitSigningSchema,
+  safeFileName,
   timingSafeEqual,
   truncateReason,
   VerifyOtpSchema,
@@ -33,6 +34,11 @@ import { type Context, Hono } from "hono"
 import { getSignedCookie, setSignedCookie } from "hono/cookie"
 import { createMiddleware } from "hono/factory"
 import { HTTPException } from "hono/http-exception"
+import {
+  downloadLinks,
+  envelopeAttachmentsSelect,
+  envelopeDocumentsSelect,
+} from "../lib/envelope-documents"
 import { badRequest, clientMeta, conflict, parseJson } from "../lib/http"
 import { rateLimit } from "../middleware/rate-limit"
 
@@ -58,7 +64,8 @@ async function loadByToken(token: string) {
         include: {
           organization: { select: { name: true, logo: true } },
           createdBy: { select: { name: true, email: true } },
-          document: { select: { name: true, pageCount: true, pages: true, s3Key: true } },
+          documents: envelopeDocumentsSelect,
+          attachments: { ...envelopeAttachmentsSelect, where: { status: "READY" } },
           recipients: { select: { id: true, role: true, order: true, status: true } },
           certificate: { select: { s3Key: true, code: true } },
         },
@@ -145,6 +152,7 @@ export const signing = new Hono<SigningEnv>()
             where: { recipientId: s.id },
             select: {
               id: true,
+              envelopeDocumentId: true,
               type: true,
               page: true,
               x: true,
@@ -154,9 +162,12 @@ export const signing = new Hono<SigningEnv>()
               required: true,
               label: true,
             },
-            orderBy: [{ page: "asc" }, { y: "asc" }],
           })
         : []
+    const documentOrder = e.documents.map((d) => d.id)
+    // Supporting files are for recipients who proved who they are, while the envelope is live
+    // or done (ADR 0037).
+    const filesVisible = verified && !e.purgedAt && state !== "closed" && state !== "expired"
     return c.json({
       state,
       requiresVerification: !verified,
@@ -176,13 +187,27 @@ export const signing = new Hono<SigningEnv>()
         maskedEmail: maskEmail(s.email),
         maskedPhone: maskPhone(s.phone),
       },
-      document: {
-        name: e.document.name,
-        pageCount: e.document.pageCount,
-        pages: verified ? e.document.pages : null,
-      },
-      fields,
-      downloadsAvailable: state === "completed" && Boolean(e.signedS3Key && e.certificate),
+      // In signing order; `id` is what `/file?document=` and each field's `envelopeDocumentId` use.
+      documents: e.documents.map((d) => ({
+        id: d.id,
+        name: d.document.name,
+        pageCount: d.document.pageCount,
+        pages: verified ? d.document.pages : null,
+      })),
+      attachments: filesVisible
+        ? e.attachments.map((a) => ({
+            id: a.id,
+            name: a.name,
+            contentType: a.contentType,
+            sizeBytes: a.sizeBytes,
+          }))
+        : [],
+      // Document by document, then page, then top to bottom: the order "Next field" walks.
+      fields: fieldsInReadingOrder(fields, documentOrder),
+      downloadsAvailable:
+        state === "completed" &&
+        Boolean(e.certificate) &&
+        e.documents.every((d) => Boolean(d.signedS3Key)),
       // Embedded recipients: where the page may post its events (and be framed from).
       embed: s.delivery === "EMBEDDED" ? { origins: await embedOriginsFor(s) } : null,
       certificateCode: state === "completed" ? (e.certificate?.code ?? null) : null,
@@ -203,19 +228,8 @@ export const signing = new Hono<SigningEnv>()
         410,
       )
     }
-    if (linkState(s) !== "completed" || !s.envelope.signedS3Key || !s.envelope.certificate) {
-      return c.json({ error: "not_available" }, 409)
-    }
-    return c.json({
-      signed: await presignDownload(s.envelope.signedS3Key, {
-        fileName: downloadFileName(s.envelope.title, "signed"),
-        disposition: "attachment",
-      }),
-      certificate: await presignDownload(s.envelope.certificate.s3Key, {
-        fileName: downloadFileName(s.envelope.title, "certificate"),
-        disposition: "attachment",
-      }),
-    })
+    if (linkState(s) !== "completed") return c.json({ error: "not_available" }, 409)
+    return c.json(await downloadLinks(s.envelope))
   })
 
   .post(
@@ -323,9 +337,15 @@ export const signing = new Hono<SigningEnv>()
     return c.json({ ok: true })
   })
 
-  /** Presigned URL for the ORIGINAL document. First call marks the recipient VIEWED. */
+  /**
+   * Presigned URL for an ORIGINAL document of the envelope (`?document=<envelopeDocumentId>`, the
+   * first when omitted). The first call for any document marks the recipient VIEWED.
+   */
   .get("/:token/file", withSigner, requireReady, async (c) => {
     const s = c.get("signer")
+    const wanted = c.req.query("document")
+    const doc = wanted ? s.envelope.documents.find((d) => d.id === wanted) : s.envelope.documents[0]
+    if (!doc) return c.json({ error: "not_found" }, 404)
     if (s.status === "SENT") {
       await prisma.$transaction(async (tx) => {
         // Claimed, not just updated: two first views at once (prefetch and render, two tabs) must
@@ -352,7 +372,38 @@ export const signing = new Hono<SigningEnv>()
       })
     }
     return c.json({
-      url: await presignDownload(s.envelope.document.s3Key, { fileName: s.envelope.document.name }),
+      url: await presignDownload(doc.document.s3Key, { fileName: doc.document.name }),
+    })
+  })
+
+  /**
+   * A supporting file (ADR 0037), for a verified recipient while the envelope is live or done.
+   * Always a download (never inline, so no file can run in our origin). Audited.
+   */
+  .get("/:token/attachments/:attachmentId", withSigner, async (c) => {
+    const s = c.get("signer")
+    const state = linkState(s)
+    if (s.envelope.purgedAt) return c.json({ error: "purged" }, 410)
+    if (state === "closed" || state === "expired") {
+      return c.json({ error: "link_not_active", state }, 409)
+    }
+    if (!(await isVerified(c, s))) return c.json({ error: "verification_required" }, 401)
+    const a = s.envelope.attachments.find((x) => x.id === c.req.param("attachmentId"))
+    if (!a) return c.json({ error: "not_found" }, 404)
+    await prisma.$transaction(async (tx) => {
+      await appendAuditEvent(tx, {
+        envelopeId: s.envelopeId,
+        type: "recipient.attachment_viewed",
+        recipientId: s.id,
+        data: { attachmentId: a.id, name: a.name },
+        ...clientMeta(c),
+      })
+    })
+    return c.json({
+      url: await presignDownload(a.s3Key, {
+        fileName: safeFileName(a.name),
+        disposition: "attachment",
+      }),
     })
   })
 

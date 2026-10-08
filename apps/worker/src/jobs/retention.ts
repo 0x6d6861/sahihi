@@ -9,10 +9,12 @@ import {
   exportFolderName,
   isClosed,
   NOTIFICATION_TTL_DAYS,
+  numberedFileName,
   type PurgeReason,
   REDACTED,
   type RetentionYears,
   retentionCutoff,
+  signedDocumentFileName,
   verifyAuditChain,
 } from "@sahihi/core"
 import { appendAuditEvent, notifyUsers, prisma, toChainedEvent } from "@sahihi/db"
@@ -44,13 +46,13 @@ export async function purgeEnvelope(envelopeId: string, reason: PurgeReason) {
       organizationId: true,
       status: true,
       purgedAt: true,
-      documentId: true,
+      documents: { select: { documentId: true } },
     },
   })
   if (!e || e.purgedAt) return { skipped: true }
   if (!isClosed(e.status)) return { skipped: true, reason: "not closed" }
 
-  // 1. Files: signed PDF, certificate PDF, signature images.
+  // 1. Files: signed PDFs, certificate PDF, signature images, supporting files, the bundle.
   await deletePrefix(keys.envelopePrefix(e.organizationId, e.id))
 
   // 2. Personal data, in one transaction with the audit event.
@@ -63,10 +65,18 @@ export async function purgeEnvelope(envelopeId: string, reason: PurgeReason) {
         title: REDACTED.envelopeTitle,
         message: null,
         voidReason: null,
-        signedS3Key: null,
+        bundleS3Key: null,
       },
     })
     if (claimed.count === 0) return
+    await tx.envelopeDocument.updateMany({
+      where: { envelopeId: e.id },
+      data: { signedS3Key: null },
+    })
+    await tx.envelopeAttachment.updateMany({
+      where: { envelopeId: e.id },
+      data: { name: REDACTED.attachmentName },
+    })
     const recipients = await tx.recipient.findMany({
       where: { envelopeId: e.id },
       select: { id: true },
@@ -105,23 +115,26 @@ export async function purgeEnvelope(envelopeId: string, reason: PurgeReason) {
     })
   })
 
-  // 3. The original, once nothing still needs it (another live envelope or a template).
-  const [liveEnvelopes, templates] = await Promise.all([
-    prisma.envelope.count({ where: { documentId: e.documentId, purgedAt: null } }),
-    prisma.template.count({ where: { documentId: e.documentId } }),
-  ])
-  if (liveEnvelopes === 0 && templates === 0) {
+  // 3. Each original, once nothing still needs it (another live envelope or a template).
+  for (const { documentId } of e.documents) {
+    const [liveEnvelopes, templates] = await Promise.all([
+      prisma.envelopeDocument.count({
+        where: { documentId, envelope: { purgedAt: null } },
+      }),
+      prisma.templateDocument.count({ where: { documentId } }),
+    ])
+    if (liveEnvelopes > 0 || templates > 0) continue
     const doc = await prisma.document.findUnique({
-      where: { id: e.documentId },
-      select: { s3Key: true, deletedAt: true },
+      where: { id: documentId },
+      select: { s3Key: true, thumbnailKey: true, deletedAt: true },
     })
-    if (doc) {
-      await deleteObject(doc.s3Key).catch(() => {})
-      await prisma.document.update({
-        where: { id: e.documentId },
-        data: { name: REDACTED.documentName, deletedAt: doc.deletedAt ?? now },
-      })
-    }
+    if (!doc) continue
+    await deleteObject(doc.s3Key).catch(() => {})
+    if (doc.thumbnailKey) await deleteObject(doc.thumbnailKey).catch(() => {})
+    await prisma.document.update({
+      where: { id: documentId },
+      data: { name: REDACTED.documentName, deletedAt: doc.deletedAt ?? now, thumbnailKey: null },
+    })
   }
   return { purged: true }
 }
@@ -184,7 +197,13 @@ export async function buildExport(exportId: string) {
       orderBy: { createdAt: "asc" },
       take: EXPORT_MAX_ENVELOPES,
       include: {
-        document: { select: { name: true, sha256: true, s3Key: true, deletedAt: true } },
+        documents: {
+          orderBy: { order: "asc" },
+          include: {
+            document: { select: { name: true, sha256: true, s3Key: true, deletedAt: true } },
+          },
+        },
+        attachments: { where: { status: "READY" }, orderBy: { order: "asc" } },
         recipients: { orderBy: [{ order: "asc" }, { createdAt: "asc" }] },
         certificate: true,
         auditEvents: { orderBy: { seq: "asc" } },
@@ -213,8 +232,9 @@ export async function buildExport(exportId: string) {
           "README.txt",
           new TextEncoder().encode(
             "Sahihi workspace export.\n\nEach folder is one envelope: envelope.json (details and recipients), " +
-              "audit.json (the hash-chained audit trail and its verification), original.pdf, and for completed " +
-              "envelopes signed.pdf and certificate.pdf. manifest.json lists every envelope.\n",
+              "audit.json (the hash-chained audit trail and its verification), documents/ (each original and, " +
+              "for completed envelopes, its signed copy), supporting-files/, and certificate.pdf. " +
+              "manifest.json lists every envelope.\n",
           ),
         )
         const manifest = []
@@ -234,8 +254,12 @@ export async function buildExport(exportId: string) {
               completedAt: e.completedAt,
               voidedAt: e.voidedAt,
               voidReason: e.voidReason,
-              document: { name: e.document.name, sha256: e.document.sha256 },
-              signedSha256: e.signedSha256,
+              documents: e.documents.map((d) => ({
+                name: d.document.name,
+                sha256: d.document.sha256,
+                signedSha256: d.signedSha256,
+              })),
+              supportingFiles: e.attachments.map((a) => ({ name: a.name, sha256: a.sha256 })),
               certificate: e.certificate
                 ? {
                     code: e.certificate.code,
@@ -262,10 +286,26 @@ export async function buildExport(exportId: string) {
             `${folder}/audit.json`,
             json({ verification, events: e.auditEvents.map(toChainedEvent) }),
           )
-          if (!e.document.deletedAt) {
-            add(`${folder}/original.pdf`, await getObjectBytes(e.document.s3Key))
+          for (const [i, d] of e.documents.entries()) {
+            if (!d.document.deletedAt) {
+              add(
+                `${folder}/documents/${numberedFileName(i, d.document.name)}`,
+                await getObjectBytes(d.document.s3Key),
+              )
+            }
+            if (d.signedS3Key) {
+              add(
+                `${folder}/documents/${numberedFileName(i, signedDocumentFileName(d.document.name))}`,
+                await getObjectBytes(d.signedS3Key),
+              )
+            }
           }
-          if (e.signedS3Key) add(`${folder}/signed.pdf`, await getObjectBytes(e.signedS3Key))
+          for (const [i, a] of e.attachments.entries()) {
+            add(
+              `${folder}/supporting-files/${numberedFileName(i, a.name)}`,
+              await getObjectBytes(a.s3Key),
+            )
+          }
           if (e.certificate) {
             add(`${folder}/certificate.pdf`, await getObjectBytes(e.certificate.s3Key))
           }

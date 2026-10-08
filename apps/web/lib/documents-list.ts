@@ -6,10 +6,12 @@ import {
   MAX_TAG_LENGTH,
   normalizeLabelColor,
 } from "@sahihi/core"
+import { pluralize } from "./format"
+import { type ListLayout, parseListLayout } from "./list-layout"
 
 /**
  * The Documents page's state lives in the URL
- * (`/documents?folder=…&q=…&tag=…&color=…&status=…&sender=…&period=…&page=…`) so it stays a Server
+ * (`/documents?folder=…&q=…&tag=…&color=…&status=…&sender=…&period=…&page=…&layout=grid`) so it stays a Server
  * Component and links/back work. These helpers read it, build links and turn it into the API's
  * query (ADR 0022, 0025).
  */
@@ -24,6 +26,11 @@ export interface DocumentsView {
   sender?: string
   period?: DocumentPeriod
   page?: number
+  /**
+   * List or thumbnail grid (ADR 0033), only when the URL names one; it then wins over the saved
+   * choice and is saved (`lib/list-layout.ts`). Kept across folders, filters and pages.
+   */
+  layout?: ListLayout
 }
 
 export const PERIOD_LABEL: Record<DocumentPeriod, string> = {
@@ -56,6 +63,7 @@ export function parseDocumentsView(params: RawParams): DocumentsView {
     sender: one(params.sender) || undefined,
     period: oneOf(one(params.period), DOCUMENT_PERIODS),
     page: Number.isFinite(page) && page > 1 ? page : undefined,
+    layout: parseListLayout(params.layout),
   }
 }
 
@@ -85,6 +93,7 @@ export function documentsHref(view: DocumentsView, patch: Partial<DocumentsView>
   if (next.sender) qs.set("sender", next.sender)
   if (next.period) qs.set("period", next.period)
   if (next.page && next.page > 1) qs.set("page", String(next.page))
+  if (next.layout) qs.set("layout", next.layout)
   const s = qs.toString()
   return s ? `/documents?${s}` : "/documents"
 }
@@ -117,3 +126,23 @@ export function foldersApiQuery(view: DocumentsView): string {
 
 /** "Contracts / Leases" for a folder's path (root first). */
 export const folderPathLabel = (path: { name: string }[]) => path.map((p) => p.name).join(" / ")
+
+/** "3 documents, 1 folder", only the parts that aren't zero; "Empty" when both are. */
+export function folderSummary(documents: number, folders: number): string {
+  const parts = [
+    documents > 0 ? pluralize(documents, "document") : null,
+    folders > 0 ? pluralize(folders, "folder") : null,
+  ].filter(Boolean)
+  return parts.length > 0 ? parts.join(", ") : "Empty"
+}
+
+/** The line under a folder's name: where it lives (search results, `path` set) or what's in it. */
+export function folderMeta(folder: {
+  documentCount: number
+  folderCount: number
+  path?: { name: string }[]
+}): string {
+  return folder.path
+    ? `In ${folder.path.length > 0 ? folderPathLabel(folder.path) : "Documents"}`
+    : folderSummary(folder.documentCount, folder.folderCount)
+}

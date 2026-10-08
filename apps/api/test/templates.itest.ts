@@ -169,10 +169,11 @@ describe("use a template", () => {
         recipients: { orderBy: { order: "asc" } },
         fields: true,
         auditEvents: true,
+        documents: true,
       },
     })
     expect(created.status).toBe("DRAFT")
-    expect(created.documentId).toBe(documentId)
+    expect(created.documents.map((d) => d.documentId)).toEqual([documentId])
     expect(created.message).toBe("Please sign")
     expect(created.recipients.map((r) => [r.name, r.email, r.order, r.verification])).toEqual([
       ["Amina Hassan", "amina@example.test", 1, "EMAIL_OTP"],

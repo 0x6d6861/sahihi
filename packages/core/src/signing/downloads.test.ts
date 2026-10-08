@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test"
-import { contentDisposition, downloadFileName } from "./downloads"
+import {
+  bundleFileName,
+  contentDisposition,
+  downloadFileName,
+  signedDocumentFileName,
+} from "./downloads"
 
 describe("downloadFileName", () => {
   test("keeps the title readable, in any script", () => {
@@ -38,5 +43,14 @@ describe("contentDisposition", () => {
     const fallback = h.match(/filename="([^"]*)"/)?.[1]
     expect(fallback).toBe("a_b_c__d.pdf")
     expect(h).not.toMatch(/[\r\n]/)
+  })
+})
+
+describe("multi-document names (ADR 0037)", () => {
+  test("each document's signed copy keeps its own name; the bundle is a zip", () => {
+    expect(signedDocumentFileName("Annex A.PDF")).toBe("Annex A (signed).pdf")
+    expect(signedDocumentFileName("lease")).toBe("lease (signed).pdf")
+    expect(bundleFileName("Lease 2026")).toBe("Lease 2026 (signed files).zip")
+    expect(bundleFileName("///")).toBe("document (signed files).zip")
   })
 })

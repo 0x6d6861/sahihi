@@ -91,15 +91,26 @@ describe("embedding", () => {
         id: "env_1",
         title: "Mkataba wa Kodi – Nyéri",
         organizationName: "Ngũgĩ & Łukasz Ltd",
-        documentName: "mkataba.pdf",
-        pageCount: 1,
         sender: { name: "Анна Ковальчук", email: "anna@example.test" },
         createdAt: now,
         sentAt: now,
         completedAt: now,
-        originalSha256: "b".repeat(64),
-        signedSha256: "c".repeat(64),
       },
+      documents: [
+        {
+          name: "msa.pdf",
+          pageCount: 3,
+          originalSha256: "b".repeat(64),
+          signedSha256: "c".repeat(64),
+        },
+        {
+          name: "annex-a.pdf",
+          pageCount: 1,
+          originalSha256: "d".repeat(64),
+          signedSha256: "e".repeat(64),
+        },
+      ],
+      attachments: [{ name: "prices.xlsx", sizeBytes: 20480, sha256: "f".repeat(64) }],
       signers: [
         {
           name: "Αλέξανδρος Παπαδόπουλος",

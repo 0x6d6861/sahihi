@@ -1,4 +1,6 @@
 import { z } from "zod"
+import { ATTACHMENT_CONTENT_TYPES, MAX_ENVELOPE_DOCUMENTS } from "../envelope/documents"
+import { ENVELOPE_STAGES } from "../envelope/stages"
 import { DOCUMENT_PERIODS } from "../workspace/folders"
 import {
   MAX_TAG_LENGTH,
@@ -116,6 +118,33 @@ export const ListDocumentsQuerySchema = z.object({
 })
 export type ListDocumentsQuery = z.infer<typeof ListDocumentsQuerySchema>
 
+/** Rows per page on the Envelopes and Templates lists (ADR 0036). */
+export const ENVELOPES_PAGE_SIZE = 25
+export const TEMPLATES_PAGE_SIZE = 25
+
+/**
+ * The Envelopes list (ADR 0036): `q` matches the title, the document name or a recipient's name or
+ * email; `stage` is the Status chip; `senderId` is who created it; `period` uses the same windows
+ * as Documents.
+ */
+export const ListEnvelopesQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).max(10_000).default(1),
+  q: z.string().trim().max(200).optional(),
+  stage: z.enum(ENVELOPE_STAGES).optional(),
+  senderId: z.string().min(1).max(64).optional(),
+  period: z.enum(DOCUMENT_PERIODS).optional(),
+})
+export type ListEnvelopesQuery = z.infer<typeof ListEnvelopesQuerySchema>
+
+/** The Templates list (ADR 0036): `q` matches the name, description or document name. */
+export const ListTemplatesQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).max(10_000).default(1),
+  q: z.string().trim().max(200).optional(),
+  createdById: z.string().min(1).max(64).optional(),
+  period: z.enum(DOCUMENT_PERIODS).optional(),
+})
+export type ListTemplatesQuery = z.infer<typeof ListTemplatesQuerySchema>
+
 /**
  * Rename a document, move it into a folder (`folderId: null` = workspace root) and/or change its
  * labels. A rename is refused once a sent envelope uses the document (its name is evidence).
@@ -199,14 +228,57 @@ export const RecipientInputSchema = z
   })
 export type RecipientInput = z.infer<typeof RecipientInputSchema>
 
-export const CreateEnvelopeSchema = z.object({
-  documentId: z.string().min(1),
-  title: z.string().trim().min(1).max(200),
-  message: z.string().max(2000).optional(),
-  signingOrder: z.enum(SIGNING_ORDERS).default("PARALLEL"),
-  expiresAt: z.coerce.date().optional(),
-})
+/** Document ids for a new envelope, in signing order (ADR 0037): unique, 1 to 10. */
+const DocumentIdsSchema = z
+  .array(z.string().min(1).max(64))
+  .min(1)
+  .max(MAX_ENVELOPE_DOCUMENTS)
+  .refine((ids) => new Set(ids).size === ids.length, "Each document can be added once.")
+
+/**
+ * A new draft. `documentIds` lists the documents to sign in order; `documentId` (one document) is
+ * still accepted from older callers and means `documentIds: [documentId]`.
+ */
+export const CreateEnvelopeSchema = z
+  .object({
+    documentIds: DocumentIdsSchema.optional(),
+    documentId: z.string().min(1).max(64).optional(),
+    title: z.string().trim().min(1).max(200),
+    message: z.string().max(2000).optional(),
+    signingOrder: z.enum(SIGNING_ORDERS).default("PARALLEL"),
+    expiresAt: z.coerce.date().optional(),
+  })
+  .transform(({ documentId, documentIds, ...rest }, ctx) => {
+    const ids = documentIds ?? (documentId ? [documentId] : [])
+    if (ids.length === 0) {
+      ctx.addIssue({ code: "custom", path: ["documentIds"], message: "Pick a document." })
+      return z.NEVER
+    }
+    return { ...rest, documentIds: ids }
+  })
 export type CreateEnvelopeInput = z.infer<typeof CreateEnvelopeSchema>
+
+/** Add READY library documents to a draft (`POST /envelopes/:id/documents`), after the current ones. */
+export const AddEnvelopeDocumentsSchema = z.object({ documentIds: DocumentIdsSchema })
+
+/** The draft's documents in their new order (`PUT /envelopes/:id/documents/order`): every id once. */
+export const ReorderEnvelopeDocumentsSchema = z.object({
+  envelopeDocumentIds: z
+    .array(z.string().min(1).max(64))
+    .min(1)
+    .max(MAX_ENVELOPE_DOCUMENTS)
+    .refine((ids) => new Set(ids).size === ids.length, "Each document can appear once."),
+})
+
+/** A supporting file's upload (ADR 0037): an allowed type, at most 25 MB. */
+export const CreateAttachmentUploadSchema = z.object({
+  name: DocumentNameSchema,
+  sizeBytes: z.number().int().positive().max(MAX_UPLOAD_BYTES),
+  contentType: z.enum(ATTACHMENT_CONTENT_TYPES, {
+    message: "This file type can't be attached. Use a PDF, image, Office file, CSV or text file.",
+  }),
+})
+export type CreateAttachmentUploadInput = z.infer<typeof CreateAttachmentUploadSchema>
 
 /** A draft's details, edited in the draft editor's "Review & send" (`PUT /envelopes/:id/details`). */
 export const UpdateEnvelopeDetailsSchema = z.object({
@@ -218,13 +290,24 @@ export const UpdateEnvelopeDetailsSchema = z.object({
 })
 export type UpdateEnvelopeDetailsInput = z.infer<typeof UpdateEnvelopeDetailsSchema>
 
-/** Switch a draft to another document (`PUT /envelopes/:id/document`, after "Prepare document"). */
-export const ReplaceEnvelopeDocumentSchema = z.object({ documentId: z.string().min(1) })
+/**
+ * Switch one of a draft's documents to another (`PUT /envelopes/:id/document`, after "Prepare
+ * document"). `envelopeDocumentId` names which; omitted means the first (older callers).
+ */
+export const ReplaceEnvelopeDocumentSchema = z.object({
+  documentId: z.string().min(1),
+  envelopeDocumentId: z.string().min(1).max(64).optional(),
+})
 
 export const FieldInputSchema = z
   .object({
     id: z.string().optional(),
     recipientId: z.string().min(1),
+    /**
+     * The envelope document the field sits on; `page` is 1-based within it (ADR 0037). Omitted
+     * means the envelope's first document (callers built before multi-document envelopes).
+     */
+    envelopeDocumentId: z.string().min(1).max(64).optional(),
     type: z.enum(FIELD_TYPES),
     page: z.number().int().min(1),
     required: z.boolean().default(true),

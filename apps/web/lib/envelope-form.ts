@@ -61,8 +61,9 @@ const MESSAGES: Record<string, string> = {
 export function buildCreateEnvelopeInput(values: NewEnvelopeValues, now = new Date()): BuildResult {
   const expiresAt = values.expiresOn ? expiryFromDate(values.expiresOn) : undefined
   const message = values.message.trim()
+  // One document to start (more are added in the editor, ADR 0037).
   const parsed = CreateEnvelopeSchema.safeParse({
-    documentId: values.documentId,
+    documentIds: values.documentId ? [values.documentId] : [],
     title: values.title,
     message: message || undefined,
     signingOrder: values.sequential ? "SEQUENTIAL" : "PARALLEL",
@@ -72,10 +73,11 @@ export function buildCreateEnvelopeInput(values: NewEnvelopeValues, now = new Da
   const errors: FormErrors = parsed.success
     ? {}
     : Object.fromEntries(
-        Object.entries(issuesToFormErrors(parsed.error.issues)).map(([k, v]) => [
-          k,
-          MESSAGES[k] ?? v,
-        ]),
+        Object.entries(issuesToFormErrors(parsed.error.issues)).map(([k, v]) => {
+          // The form has one document picker; the API's list is `documentIds`.
+          const key = k.startsWith("documentIds") ? "documentId" : k
+          return [key, MESSAGES[key] ?? v]
+        }),
       )
   if (expiresAt && expiresAt.getTime() <= now.getTime()) {
     errors.expiresAt = "Pick a date in the future."
@@ -120,10 +122,11 @@ export function buildEnvelopeDetailsInput(
   const errors: FormErrors = parsed.success
     ? {}
     : Object.fromEntries(
-        Object.entries(issuesToFormErrors(parsed.error.issues)).map(([k, v]) => [
-          k,
-          MESSAGES[k] ?? v,
-        ]),
+        Object.entries(issuesToFormErrors(parsed.error.issues)).map(([k, v]) => {
+          // The form has one document picker; the API's list is `documentIds`.
+          const key = k.startsWith("documentIds") ? "documentId" : k
+          return [key, MESSAGES[key] ?? v]
+        }),
       )
   if (expiresAt && expiresAt.getTime() <= now.getTime()) {
     errors.expiresAt = "Pick a date in the future."

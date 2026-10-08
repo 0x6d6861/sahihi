@@ -29,9 +29,19 @@ export const verify = new Hono()
             id: true,
             title: true,
             completedAt: true,
-            signedSha256: true,
             organization: { select: { name: true } },
-            document: { select: { sha256: true, pageCount: true } },
+            documents: {
+              orderBy: { order: "asc" },
+              select: {
+                signedSha256: true,
+                document: { select: { name: true, sha256: true, pageCount: true } },
+              },
+            },
+            attachments: {
+              where: { status: "READY" },
+              orderBy: { order: "asc" },
+              select: { name: true, sha256: true },
+            },
             recipients: {
               where: { role: { not: "VIEWER" } },
               select: { name: true, email: true, signedAt: true, verification: true },
@@ -56,9 +66,18 @@ export const verify = new Hono()
         title: e.title,
         organization: e.organization.name,
         completedAt: e.completedAt,
-        originalSha256: e.document.sha256,
-        signedSha256: e.signedSha256,
-        pageCount: e.document.pageCount,
+        // Every document with its original and signed hash, in signing order (ADR 0037).
+        documents: e.documents.map((d) => ({
+          name: d.document.name,
+          pageCount: d.document.pageCount,
+          originalSha256: d.document.sha256,
+          signedSha256: d.signedSha256,
+        })),
+        attachments: e.attachments,
+        // The first document's, for clients built before multi-document envelopes.
+        originalSha256: e.documents[0]?.document.sha256 ?? null,
+        signedSha256: e.documents[0]?.signedSha256 ?? null,
+        pageCount: e.documents.reduce((n, d) => n + (d.document.pageCount ?? 0), 0),
         signers: e.recipients.map((r) => ({ ...r, email: mask(r.email) })),
       },
     })
@@ -69,14 +88,14 @@ export const verify = new Hono()
     // whether some unsigned file was ever uploaded to Sahihi.
     const { sha256 } = await parseJson(c, VerifyHashSchema)
     const [signed, cert] = await Promise.all([
-      prisma.envelope.findFirst({
+      prisma.envelopeDocument.findFirst({
         where: { signedSha256: sha256 },
-        select: { certificate: { select: { code: true } } },
+        select: { envelope: { select: { certificate: { select: { code: true } } } } },
       }),
       prisma.certificate.findFirst({ where: { sha256 }, select: { code: true } }),
     ])
-    if (signed?.certificate)
-      return c.json({ match: "signed_document", code: signed.certificate.code })
+    if (signed?.envelope.certificate)
+      return c.json({ match: "signed_document", code: signed.envelope.certificate.code })
     if (cert) return c.json({ match: "certificate", code: cert.code })
     return c.json({ match: null })
   })

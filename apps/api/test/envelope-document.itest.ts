@@ -49,13 +49,13 @@ describe("PUT /envelopes/:id/document", () => {
     const { document: prepared } = await uploadDocument(alice, undefined, "contract (prepared).pdf")
     const res = await putDocument(alice, envelopeId, prepared.id)
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ documentId: prepared.id, fieldsRemoved: 1 })
+    expect(await res.json()).toMatchObject({ documentId: prepared.id, fieldsRemoved: 1 })
 
     const e = await prisma.envelope.findUniqueOrThrow({
       where: { id: envelopeId },
-      include: { fields: true },
+      include: { fields: true, documents: true },
     })
-    expect(e.documentId).toBe(prepared.id)
+    expect(e.documents.map((d) => d.documentId)).toEqual([prepared.id])
     expect(e.fields).toHaveLength(0)
     const event = await prisma.auditEvent.findFirstOrThrow({
       where: { envelopeId, type: "envelope.document_replaced" },

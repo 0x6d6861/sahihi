@@ -4,6 +4,7 @@ export * from "./parse/page-text"
 
 export * from "./render/certificate"
 export * from "./render/stamp"
+export * from "./render/thumbnail"
 
 export {
   embedUnicodeFont,

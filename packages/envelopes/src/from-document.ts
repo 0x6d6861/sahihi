@@ -1,11 +1,13 @@
-import type { ApiCreateFromDocumentInput } from "@sahihi/core"
+import { type ApiCreateFromDocumentInput, documentIdsOf } from "@sahihi/core"
 import { appendAuditEvent, prisma } from "@sahihi/db"
-import { EnvelopeError, notFound } from "./errors"
+import { attachDocuments, documentsAuditData, loadReadyDocuments } from "./documents"
+import { EnvelopeError } from "./errors"
 import { type Actor, actorData } from "./send"
 
 /**
- * Document + recipients + fields → DRAFT envelope in one transaction (public API). Recipients and
- * fields are validated by ApiCreateFromDocumentSchema; this checks the document and page numbers.
+ * Documents + recipients + fields → DRAFT envelope in one transaction (public API). Recipients and
+ * fields are validated by ApiCreateFromDocumentSchema; this checks the documents (READY, this
+ * workspace, within limits) and each field's page in its own document (ADR 0037).
  */
 export async function createEnvelopeFromDocument(input: {
   organizationId: string
@@ -13,18 +15,8 @@ export async function createEnvelopeFromDocument(input: {
   data: ApiCreateFromDocumentInput
 }) {
   const d = input.data
-  const doc = await prisma.document.findFirst({
-    where: {
-      id: d.documentId,
-      organizationId: input.organizationId,
-      deletedAt: null,
-      status: "READY",
-    },
-    select: { id: true, sha256: true, pageCount: true },
-  })
-  if (!doc) notFound("Document")
-  const document = doc as NonNullable<typeof doc>
-  const bad = d.fields.findIndex((f) => f.page > (document.pageCount ?? 0))
+  const documents = await loadReadyDocuments(input.organizationId, documentIdsOf(d))
+  const bad = d.fields.findIndex((f) => f.page > (documents[f.document]?.pageCount ?? 0))
   if (bad >= 0) {
     throw new EnvelopeError(400, "validation_error", `Page ${d.fields[bad]?.page} does not exist`, {
       issues: [{ path: `fields.${bad}.page`, message: "Page does not exist" }],
@@ -40,7 +32,6 @@ export async function createEnvelopeFromDocument(input: {
     const envelope = await tx.envelope.create({
       data: {
         organizationId: input.organizationId,
-        documentId: document.id,
         createdById: input.actor.userId,
         title: d.title,
         message: d.message ?? null,
@@ -48,6 +39,7 @@ export async function createEnvelopeFromDocument(input: {
         expiresAt: d.expiresAt,
       },
     })
+    const documentRows = await attachDocuments(tx, envelope.id, documents)
     const ids: string[] = []
     for (const [i, r] of d.recipients.entries()) {
       const saved = await tx.recipient.create({
@@ -68,6 +60,7 @@ export async function createEnvelopeFromDocument(input: {
     await tx.field.createMany({
       data: d.fields.map((f) => ({
         envelopeId: envelope.id,
+        envelopeDocumentId: documentRows[f.document] as string,
         recipientId: ids[f.recipient] as string,
         type: f.type,
         page: f.page,
@@ -83,7 +76,7 @@ export async function createEnvelopeFromDocument(input: {
       envelopeId: envelope.id,
       type: "envelope.created",
       actorUserId: input.actor.userId,
-      data: { documentId: document.id, documentSha256: document.sha256, ...actorData(input.actor) },
+      data: { documents: documentsAuditData(documents), ...actorData(input.actor) },
       ipAddress: input.actor.ipAddress ?? null,
       userAgent: input.actor.userAgent ?? null,
     })

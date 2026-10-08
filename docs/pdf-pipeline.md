@@ -61,7 +61,7 @@ a row menu (Open, Create envelope, Move to…) and coss `Pagination`
 (`lib/pagination.ts#pageWindow`, links keep the folder and filters). A page past the end redirects
 to the last page; an invalid query or an unknown folder redirects to `/documents`.
 
-Detail page (`app/(app)/documents/[id]/`): for a `READY` document it fetches the presigned GET from
+Detail page (`app/(app)/documents/[id]/`): the breadcrumb is Documents › the folders it lives in (root first, from `folderPath` on `GET /documents/:id`) › its name. For a `READY` document it fetches the presigned GET from
 `/documents/:id/file` on the server and renders `components/app/document-viewer.tsx`, which is Extend
 `PDFViewer` loaded with `next/dynamic` (`ssr: false`), `showUpload={false}` and read-only. "Create
 envelope" posts a DRAFT envelope titled after the file (`envelopeTitleFromFileName`) and opens it.
@@ -75,6 +75,23 @@ Abandoned uploads: the `documents.sweep-uploads` maintenance job runs every 15 m
 `FAILED` ("Upload was not completed") and soft-deletes them (`deletedAt`), then deletes the storage
 object in case the PUT landed but `complete` never ran. The update only matches rows that are still
 `UPLOADING`, so a late `complete` wins and reruns are no-ops.
+
+### Thumbnails (ADR 0033)
+
+Once a document is READY (upload `complete`, `POST /api/v1/documents`), the API queues
+`document.thumbnail` on the `documents` queue, after the write; a Redis outage only logs. The
+worker (`apps/worker/src/jobs/thumbnails.ts`) renders page 1 with PDFium (`renderThumbnail` in
+`@sahihi/pdf`: 480px wide, as displayed with /Rotate applied, on white, annotations included;
+pages taller than 1.5× their width keep their top part), encodes it as PNG (`encodePng`, no
+dependency) and stores `thumbnail.png` next to the original, then sets `Document.thumbnailKey`.
+A file PDFium can't render gets `thumbnailError` and is not retried. The job id is the document id
+and the worker skips documents that are gone or already done, so reruns are no-ops. The hourly
+`documents.sweep-thumbnails` maintenance job queues READY documents with neither a thumbnail nor a
+failure (backfill, lost jobs).
+
+The list returns `thumbnailUrl` per item: `presignCacheable` (signed at the start of a 15-minute
+window, valid 30 minutes, `Cache-Control: private, max-age=900`), so repeat visits hit the browser
+cache. The web grid (List / Grid saved in the `sahihi-documents-layout` cookie, `DocumentCard`) shows it in Extend `FileThumbnail`.
 
 Planned: optional DOCX→PDF conversion (LibreOffice in the worker).
 
@@ -160,6 +177,16 @@ and `EMAIL` are **filled by the server** from recipient data, and client values 
 
 ## 3. Finalize (`apps/worker/src/jobs/finalize.ts`)
 
+**Several documents (ADR 0037).** An envelope's documents (`EnvelopeDocument`, in `order`) are
+finalized one by one. Each gets its own hash check, its own fields stamped, its own seal and its own
+`signed/{envelopeDocumentId}.pdf`. A document that already has `signedS3Key` is skipped, so a retry
+resumes where it stopped. The certificate lists every document (original and signed SHA-256) and the
+supporting files (SHA-256, "shared with signers, not signed"). Last, `bundle.zip` ("Download all":
+numbered signed PDFs, the certificate, `supporting-files/`) is streamed to a temp file and stored as
+`Envelope.bundleS3Key`. It's a convenience: if it fails, the envelope still completes, and the next
+finalize run retries it.
+
+
 Triggered when the last actionable recipient signs (`jobId: finalize:<envelopeId>`).
 
 1. Load the envelope. It must be `COMPLETED`. If a certificate already exists, **skip** (idempotent).
@@ -208,6 +235,14 @@ certificate embeds Regular and Bold. Fonts are **subset**, so a stamped PDF grow
   embed Helvetica.
 
 ## 4. Downloads
+
+`GET /envelopes/:id/downloads`, `GET /sign/:token/downloads` and `GET /v1/envelopes/:id/downloads`
+return `{ documents: [{ id, name, url }], certificate, attachments: [{ id, name, url }], bundle,
+signed }` (ADR 0037). `signed` is the first document's, for older callers. Everything is a
+presigned, attachment-disposition URL. With one document, its signed copy is still named after the
+envelope title ("Lease (signed).pdf"); with several, each keeps its own name. The web shows an Arc
+`SplitButton`: "Download all" plus each file in its menu.
+
 
 - Sender: `GET /api/envelopes/:id/downloads` (org-scoped). Recipient: `GET /api/sign/:token/downloads`,
   with the fresh link from the completion email. Both return `{ signed, certificate }` presigned

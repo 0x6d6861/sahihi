@@ -74,6 +74,10 @@ on rotated pages. pdf-lib rotates counter-clockwise around `(x, y)`.
 
 ## Rules
 
+- Since ADR 0037 a field's `page` is within its own document (`envelopeDocumentId`). Every
+  conversion here is per document, using that document's `pages` metadata.
+
+
 1. Store and transmit **only** normalized rects. Validate them with `NormalizedRectSchema`, which
    requires the field to lie within the page.
 2. `page` is **1-based** everywhere (API, DB, UI). pdf-lib's `getPages()` is 0-based, so use

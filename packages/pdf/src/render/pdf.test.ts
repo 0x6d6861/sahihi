@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { degrees, PDFDocument } from "pdf-lib"
 import { inspectPdf, PdfInspectionError } from "../parse/inspect"
+import { readPageText } from "../parse/page-text"
 import { renderCertificate } from "./certificate"
 import { pngFromDataUrl, stampFields } from "./stamp"
 
@@ -101,15 +102,26 @@ describe("renderCertificate", () => {
         id: "env_1",
         title: "Master Services Agreement",
         organizationName: "Acme Ltd",
-        documentName: "msa.pdf",
-        pageCount: 3,
         sender: { name: "Heri", email: "heri@example.com" },
         createdAt: now,
         sentAt: now,
         completedAt: now,
-        originalSha256: "b".repeat(64),
-        signedSha256: "c".repeat(64),
       },
+      documents: [
+        {
+          name: "msa.pdf",
+          pageCount: 3,
+          originalSha256: "b".repeat(64),
+          signedSha256: "c".repeat(64),
+        },
+        {
+          name: "annex-a.pdf",
+          pageCount: 1,
+          originalSha256: "d".repeat(64),
+          signedSha256: "e".repeat(64),
+        },
+      ],
+      attachments: [{ name: "prices.xlsx", sizeBytes: 20480, sha256: "f".repeat(64) }],
       signers: [
         {
           name: "Amina Otieno",
@@ -146,5 +158,18 @@ describe("renderCertificate", () => {
     })
     const doc = await PDFDocument.load(bytes)
     expect(doc.getPageCount()).toBeGreaterThan(1)
+    // Every document with both hashes, and the supporting file with its hash (ADR 0037).
+    const text = (await readPageText(bytes))[0]?.text ?? ""
+    for (const expected of [
+      "1. msa.pdf (3 pages)",
+      "2. annex-a.pdf (1 page)",
+      "b".repeat(64),
+      "e".repeat(64),
+      "prices.xlsx (20 KB)",
+      "f".repeat(64),
+      "SHARED WITH SIGNERS, NOT SIGNED",
+    ]) {
+      expect(text.replace(/\s+/g, " ")).toContain(expected)
+    }
   })
 })

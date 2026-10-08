@@ -65,6 +65,13 @@ Error bodies are `{ "error": "<code>", "message": "…" }`, plus `issues` on val
 
 ### Creating an envelope
 
+`documentIds` lists the documents to sign, in order (up to 10). `documentId` still works and
+means one document. Each field may set `document`, a 0-based index into `documentIds` (default 0);
+its `page` is within that document. Envelope responses and webhook payloads list `documents[]`
+(each with `sha256` and `signedSha256`) and `attachments[]`, and keep `document` / `signedSha256`
+as the first document's for older integrations (ADR 0037).
+
+
 From an uploaded document. Fields reference recipients **by index**, and coordinates are normalized
 0–1 with a top-left origin (docs/coordinates.md):
 

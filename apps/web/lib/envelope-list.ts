@@ -1,44 +1,77 @@
-import type { EnvelopeStatus } from "@sahihi/core"
+import {
+  DOCUMENT_PERIODS,
+  type DocumentPeriod,
+  ENVELOPE_STAGES,
+  type EnvelopeStage,
+} from "@sahihi/core"
+import { type ListLayout, parseListLayout } from "./list-layout"
 
 /**
- * Views of the envelope list (`?view=`): one segmented control over the same data. "In progress"
- * covers sent and partly signed; "Closed" covers declined, voided and expired.
+ * The Envelopes page's state lives in the URL
+ * (`/envelopes?q=…&stage=…&sender=…&period=…&page=…&layout=grid`) so it stays a Server Component
+ * and links/back work (ADR 0036). These helpers read it, build links and turn it into the API's
+ * query.
  */
-export const ENVELOPE_VIEWS = ["all", "drafts", "active", "completed", "closed"] as const
-export type EnvelopeView = (typeof ENVELOPE_VIEWS)[number]
+export interface EnvelopesView {
+  q?: string
+  stage?: EnvelopeStage
+  sender?: string
+  period?: DocumentPeriod
+  page?: number
+  layout?: ListLayout
+}
 
-export const ENVELOPE_VIEW_LABEL: Record<EnvelopeView, string> = {
-  all: "All",
+export const ENVELOPE_STAGE_LABEL: Record<EnvelopeStage, string> = {
   drafts: "Drafts",
   active: "In progress",
   completed: "Completed",
   closed: "Closed",
 }
 
-const VIEW_OF: Record<EnvelopeStatus, Exclude<EnvelopeView, "all">> = {
-  DRAFT: "drafts",
-  SENT: "active",
-  IN_PROGRESS: "active",
-  COMPLETED: "completed",
-  DECLINED: "closed",
-  VOIDED: "closed",
-  EXPIRED: "closed",
+type RawParams = Record<string, string | string[] | undefined>
+const one = (v: string | string[] | undefined) => (typeof v === "string" ? v.trim() : "")
+const oneOf = <T extends string>(v: string, allowed: readonly T[]) =>
+  (allowed as readonly string[]).includes(v) ? (v as T) : undefined
+
+/** Reads the URL; unknown values are dropped rather than sent to the API. */
+export function parseEnvelopesView(params: RawParams): EnvelopesView {
+  const page = Number.parseInt(one(params.page), 10)
+  return {
+    q: one(params.q).slice(0, 200) || undefined,
+    stage: oneOf(one(params.stage), ENVELOPE_STAGES),
+    sender: one(params.sender) || undefined,
+    period: oneOf(one(params.period), DOCUMENT_PERIODS),
+    page: Number.isFinite(page) && page > 1 ? page : undefined,
+    layout: parseListLayout(params.layout),
+  }
 }
 
-export function parseEnvelopeView(raw: string | string[] | undefined): EnvelopeView {
-  return typeof raw === "string" && (ENVELOPE_VIEWS as readonly string[]).includes(raw)
-    ? (raw as EnvelopeView)
-    : "all"
+export const hasEnvelopeFilters = (v: EnvelopesView) =>
+  Boolean(v.q || v.stage || v.sender || v.period)
+
+/** `/envelopes` link for `view` with `patch` applied. Changing anything but the page resets it. */
+export function envelopesHref(view: EnvelopesView, patch: Partial<EnvelopesView> = {}): string {
+  const next: EnvelopesView = { ...view, ...patch }
+  if (!("page" in patch)) next.page = undefined
+  const qs = new URLSearchParams()
+  if (next.q) qs.set("q", next.q)
+  if (next.stage) qs.set("stage", next.stage)
+  if (next.sender) qs.set("sender", next.sender)
+  if (next.period) qs.set("period", next.period)
+  if (next.page && next.page > 1) qs.set("page", String(next.page))
+  if (next.layout) qs.set("layout", next.layout)
+  const s = qs.toString()
+  return s ? `/envelopes?${s}` : "/envelopes"
 }
 
-export const inView = (status: EnvelopeStatus, view: EnvelopeView) =>
-  view === "all" || VIEW_OF[status] === view
-
-/** How many envelopes fall in each view. */
-export function viewCounts(statuses: EnvelopeStatus[]): Record<EnvelopeView, number> {
-  const counts = { all: statuses.length, drafts: 0, active: 0, completed: 0, closed: 0 }
-  for (const s of statuses) counts[VIEW_OF[s]] += 1
-  return counts
+/** Query string for `GET /api/envelopes`. */
+export function envelopesApiQuery(view: EnvelopesView): string {
+  const qs = new URLSearchParams({ page: String(view.page ?? 1) })
+  if (view.q) qs.set("q", view.q)
+  if (view.stage) qs.set("stage", view.stage)
+  if (view.sender) qs.set("senderId", view.sender)
+  if (view.period) qs.set("period", view.period)
+  return qs.toString()
 }
 
 /** "Achieng Otieno", "Achieng Otieno and Baraka Mwangi", "Achieng Otieno + 2 more"; "No recipients yet". */

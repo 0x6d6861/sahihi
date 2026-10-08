@@ -27,12 +27,27 @@ export async function sendEnvelope(input: {
 }): Promise<{ notified: number }> {
   const envelope = await prisma.envelope.findFirst({
     where: { id: input.envelopeId, organizationId: input.organizationId },
-    include: { recipients: true, fields: { select: { recipientId: true, type: true } } },
+    include: {
+      recipients: true,
+      fields: { select: { recipientId: true, type: true } },
+      documents: {
+        orderBy: { order: "asc" },
+        select: { document: { select: { id: true, name: true, sha256: true } } },
+      },
+      attachments: {
+        orderBy: { order: "asc" },
+        select: { name: true, sha256: true, status: true },
+      },
+    },
   })
   if (!envelope) notFound("Envelope")
   const e = envelope as NonNullable<typeof envelope>
   assertTransition(e.status, "SENT")
 
+  // Supporting files still uploading would reach recipients half-finished (ADR 0037).
+  if (e.attachments.some((a) => a.status !== "READY")) {
+    throw new EnvelopeError(409, "attachments_pending", "Wait for the files to finish uploading")
+  }
   const issues = sendPreflight(e)
   if (issues.length > 0) {
     throw new EnvelopeError(400, "preflight_failed", issues[0]?.message ?? "Not ready to send", {
@@ -51,6 +66,9 @@ export async function sendEnvelope(input: {
       data: {
         recipients: e.recipients.length,
         signingOrder: e.signingOrder,
+        // What was sent, fixed in the audit trail (ADR 0037).
+        documents: e.documents.map((d) => d.document),
+        attachments: e.attachments.map((a) => ({ name: a.name, sha256: a.sha256 })),
         ...actorData(input.actor),
       },
       ipAddress: input.actor.ipAddress ?? null,

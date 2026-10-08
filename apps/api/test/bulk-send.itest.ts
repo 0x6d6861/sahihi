@@ -142,7 +142,7 @@ describe("bulk send", () => {
       await prisma.envelope.create({
         data: {
           organizationId: free.organizationId,
-          documentId: docs.id,
+          documents: { create: { documentId: docs.id } },
           createdById: free.userId,
           title: `Old ${i}`,
           status: "SENT",
@@ -156,7 +156,7 @@ describe("bulk send", () => {
     await prisma.envelope.create({
       data: {
         organizationId: free.organizationId,
-        documentId: docs.id,
+        documents: { create: { documentId: docs.id } },
         createdById: free.userId,
         title: "Meanwhile",
         status: "SENT",
@@ -197,10 +197,11 @@ describe("bulk send", () => {
     const draft = await prisma.envelope.create({
       data: {
         organizationId: alice.organizationId,
-        documentId: document.id,
+        documents: { create: { documentId: document.id } },
         createdById: alice.userId,
         title: "Pre-created",
       },
+      include: { documents: true },
     })
     await prisma.recipient.create({
       data: { envelopeId: draft.id, name: "P", email: "p@example.test" },
@@ -209,6 +210,7 @@ describe("bulk send", () => {
     await prisma.field.create({
       data: {
         envelopeId: draft.id,
+        envelopeDocumentId: draft.documents[0]?.id as string,
         recipientId: r.id,
         type: "SIGNATURE",
         page: 1,

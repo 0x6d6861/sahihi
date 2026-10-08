@@ -5,6 +5,7 @@ import type {
   RecipientStatus,
   SigningOrder,
 } from "@sahihi/core"
+import type { AttachmentView, EnvelopeDocumentView } from "./envelope-documents"
 import type { SavedRecipient } from "./recipients"
 
 /** `GET /envelopes/:id` → `envelope`, read by the envelope page and the draft editor. */
@@ -15,7 +16,10 @@ export interface EnvelopeDetail {
   status: EnvelopeStatus
   signingOrder: SigningOrder
   expiresAt: string | null
-  document: { id: string; name: string; pageCount: number; pages: { rotation: number }[] | null }
+  /** The documents to sign, in signing order (ADR 0037). */
+  documents: EnvelopeDocumentView[]
+  /** Supporting files: shared with recipients, never signed. */
+  attachments: AttachmentView[]
   recipients: (SavedRecipient & {
     status: RecipientStatus
     colorIndex: number
@@ -26,6 +30,7 @@ export interface EnvelopeDetail {
   fields: (NormalizedRect & {
     id: string
     recipientId: string
+    envelopeDocumentId: string
     type: FieldType
     page: number
     required: boolean

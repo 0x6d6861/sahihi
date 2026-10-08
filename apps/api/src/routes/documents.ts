@@ -22,15 +22,18 @@ import {
   getObjectBytes,
   headObject,
   keys,
+  presignCacheable,
   presignDownload,
   presignUpload,
 } from "@sahihi/infra"
 import { inspectPdf, PdfInspectionError, readFormWidgets, readPageText } from "@sahihi/pdf"
 import { Hono } from "hono"
 import type { AppEnv } from "../lib/env"
+import { loadFolderTree } from "../lib/folder-tree"
 import { badRequest, conflict, notFound, parseJson, parseQuery } from "../lib/http"
 import { colorsInUse, hasTag, resolveTags, TAG_SELECT, tagMatches, tagsInUse } from "../lib/labels"
 import { actor, assertCanDeleteDocument, assertCanMoveDocument } from "../lib/permissions"
+import { queueThumbnail } from "../lib/thumbnails"
 import { requireOrg } from "../middleware/session"
 
 /**
@@ -103,6 +106,7 @@ export const documents = new Hono<AppEnv>()
           pages: info.pages as unknown as object,
         },
       })
+      await queueThumbnail(updated.id)
       return c.json({ document: updated })
     } catch (err) {
       if (!(err instanceof PdfInspectionError)) throw err
@@ -153,9 +157,11 @@ export const documents = new Hono<AppEnv>()
         take: pageSize,
         include: {
           // Sent envelopes freeze the name (it's on the signing page and the certificate).
-          _count: { select: { envelopes: { where: { status: { not: "DRAFT" } } } } },
+          _count: {
+            select: { envelopeDocuments: { where: { envelope: { status: { not: "DRAFT" } } } } },
+          },
           source: { select: { id: true, name: true, deletedAt: true } },
-          uploadedBy: { select: { id: true, name: true } },
+          uploadedBy: { select: { id: true, name: true, image: true } },
           folder: { select: { id: true, name: true } },
           tags: TAG_SELECT,
         },
@@ -172,13 +178,21 @@ export const documents = new Hono<AppEnv>()
     ])
     const me = actor(c)
     return c.json({
-      items: items.map((d) => {
-        const mine = canMoveDocument(me, d)
-        return {
-          ...d,
-          permissions: { move: mine, label: mine, rename: mine && d._count.envelopes === 0 },
-        }
-      }),
+      items: await Promise.all(
+        items.map(async (d) => {
+          const mine = canMoveDocument(me, d)
+          return {
+            ...d,
+            // Cacheable presigned URL (ADR 0033); null until the worker has rendered it.
+            thumbnailUrl: d.thumbnailKey ? await presignCacheable(d.thumbnailKey) : null,
+            permissions: {
+              move: mine,
+              label: mine,
+              rename: mine && d._count.envelopeDocuments === 0,
+            },
+          }
+        }),
+      ),
       page: query.page,
       pageSize,
       total,
@@ -200,8 +214,13 @@ export const documents = new Hono<AppEnv>()
     })
     if (!doc) notFound("Document")
     const me = actor(c)
+    // Where it lives, root first, for the breadcrumb ([] at the top level).
+    const folderPath = doc.folderId
+      ? (await loadFolderTree(c.get("organizationId"))).pathOf(doc.folderId)
+      : []
     return c.json({
       document: doc,
+      folderPath,
       permissions: { delete: canDeleteDocument(me, doc), label: canMoveDocument(me, doc) },
     })
   })
@@ -265,7 +284,10 @@ export const documents = new Hono<AppEnv>()
     assertCanMoveDocument(c, doc)
     if (input.name !== undefined && input.name !== doc.name) {
       const sent = await prisma.envelope.count({
-        where: scope.envelope({ documentId: doc.id, status: { not: "DRAFT" } }),
+        where: scope.envelope({
+          documents: { some: { documentId: doc.id } },
+          status: { not: "DRAFT" },
+        }),
       })
       if (sent > 0) conflict("This document was sent for signature, so its name can't change")
     }
@@ -294,20 +316,32 @@ export const documents = new Hono<AppEnv>()
     const scope = forOrganization(c.get("organizationId"))
     const doc = await prisma.document.findFirst({
       where: scope.document({ id: c.req.param("id") }),
-      include: { envelopes: { where: { status: { not: "DRAFT" } }, select: { id: true } } },
+      include: {
+        envelopeDocuments: {
+          where: { envelope: { status: { not: "DRAFT" } } },
+          select: { id: true },
+        },
+      },
     })
     if (!doc) notFound("Document")
     assertCanDeleteDocument(c, doc)
     // A template carries its document (its fields are placed on these pages).
-    const usedBy = await prisma.template.count({ where: { documentId: doc.id } })
+    const usedBy = await prisma.template.count({
+      where: { documents: { some: { documentId: doc.id } } },
+    })
     if (usedBy > 0) {
       conflict(
         `Used by ${usedBy} template${usedBy === 1 ? "" : "s"}. Delete ${usedBy === 1 ? "it" : "them"} first.`,
       )
     }
     // Sent envelopes reference the original forever (evidence). Soft delete only.
-    await prisma.document.update({ where: { id: doc.id }, data: { deletedAt: new Date() } })
-    if (doc.envelopes.length === 0) {
+    await prisma.document.update({
+      where: { id: doc.id },
+      data: { deletedAt: new Date(), thumbnailKey: null },
+    })
+    // The preview only serves the Documents list, which no longer shows it.
+    if (doc.thumbnailKey) await deleteObject(doc.thumbnailKey).catch(() => {})
+    if (doc.envelopeDocuments.length === 0) {
       await deleteObject(doc.s3Key).catch(() => {})
     }
     return c.body(null, 204)

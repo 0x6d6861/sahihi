@@ -18,7 +18,7 @@ async function seedCompleted(finalized: boolean) {
   const envelope = await prisma.envelope.create({
     data: {
       organizationId: alice.organizationId,
-      documentId: document.id,
+      documents: { create: { documentId: document.id } },
       createdById: alice.userId,
       title: TITLE,
       status: "COMPLETED",
@@ -34,17 +34,21 @@ async function seedCompleted(finalized: boolean) {
         ],
       },
     },
-    include: { recipients: true },
+    include: { recipients: true, documents: true },
   })
   envelopeId = envelope.id
   recipientId = envelope.recipients[0]?.id as string
   if (!finalized) return
-  const signedKey = keys.signed(alice.organizationId, envelope.id)
+  const signedKey = keys.signedDocument(
+    alice.organizationId,
+    envelope.id,
+    envelope.documents[0]?.id as string,
+  )
   const certKey = keys.certificate(alice.organizationId, envelope.id)
   await putObject(signedKey, signedBytes, "application/pdf")
   await putObject(certKey, certBytes, "application/pdf")
-  await prisma.envelope.update({
-    where: { id: envelope.id },
+  await prisma.envelopeDocument.updateMany({
+    where: { envelopeId: envelope.id },
     data: { signedS3Key: signedKey, signedSha256: "5".repeat(64) },
   })
   await prisma.certificate.create({

@@ -2,6 +2,13 @@
 
 ## v1: Certificate of Completion (INTERNAL provider)
 
+Since ADR 0037 the certificate lists every document of the envelope, numbered in signing order, with
+its page count and original and signed SHA-256. It also lists the supporting files with their size
+and SHA-256 under "Supporting files (shared with signers, not signed)". `/verify/<code>` shows the
+same; `POST /verify/hash` matches any signed document or the certificate, never an original or a
+supporting file.
+
+
 Every completed envelope gets `certificate.pdf`, rendered by `packages/pdf/src/render/certificate.ts`. It
 is stored **separately** from `signed.pdf` so it can quote the signed document's hash.
 

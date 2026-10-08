@@ -2,7 +2,6 @@ import {
   CreateFolderSchema,
   canManageFolder,
   checkFolderMove,
-  folderPath,
   hasPermission,
   ListFoldersQuerySchema,
   MAX_FOLDER_DEPTH,
@@ -12,37 +11,13 @@ import {
 import { forOrganization, prisma } from "@sahihi/db"
 import { Hono } from "hono"
 import type { AppEnv } from "../lib/env"
+import { type FolderTree, loadFolderTree as loadTree } from "../lib/folder-tree"
 import { badRequest, conflict, forbidden, notFound, parseJson, parseQuery } from "../lib/http"
 import { resolveTags, TAG_SELECT } from "../lib/labels"
 import { actor, assertCanManageFolder } from "../lib/permissions"
 import { requireOrg } from "../middleware/session"
 
-/**
- * Every folder in the org (id, name, parent, labels). Folder trees are small; one query serves
- * paths, checks and folder search.
- */
-async function loadTree(organizationId: string) {
-  const rows = await prisma.folder.findMany({
-    where: forOrganization(organizationId).folder(),
-    select: {
-      id: true,
-      name: true,
-      parentId: true,
-      createdById: true,
-      createdAt: true,
-      color: true,
-      tags: TAG_SELECT,
-    },
-    orderBy: [{ name: "asc" }, { id: "asc" }],
-  })
-  const byId = new Map(rows.map((f) => [f.id, f]))
-  const parentOf = new Map(rows.map((f) => [f.id, f.parentId]))
-  const pathOf = (id: string) =>
-    folderPath(id, parentOf).map((p) => ({ id: p, name: byId.get(p)?.name ?? "" }))
-  return { rows, byId, parentOf, pathOf }
-}
-
-type Tree = Awaited<ReturnType<typeof loadTree>>
+type Tree = FolderTree
 
 /** Sibling names are unique (case-insensitive) so breadcrumbs and "Move to…" stay unambiguous. */
 function assertNameFree(tree: Tree, parentId: string | null, name: string, exceptId?: string) {
@@ -121,6 +96,15 @@ export const folders = new Hono<AppEnv>()
         })
       : []
     const docsIn = new Map(docCounts.map((r) => [r.folderId, r._count._all]))
+    // Who created each listed folder, for the Documents list's Sender column (avatar + name).
+    const creators = new Map(
+      (
+        await prisma.user.findMany({
+          where: { id: { in: [...new Set(children.map((f) => f.createdById))] } },
+          select: { id: true, name: true, image: true },
+        })
+      ).map((u) => [u.id, u]),
+    )
 
     return c.json({
       folder: folder
@@ -138,6 +122,7 @@ export const folders = new Hono<AppEnv>()
         id: f.id,
         name: f.name,
         createdAt: f.createdAt,
+        createdBy: creators.get(f.createdById) ?? null,
         documentCount: docsIn.get(f.id) ?? 0,
         folderCount: tree.rows.filter((x) => x.parentId === f.id).length,
         color: f.color,

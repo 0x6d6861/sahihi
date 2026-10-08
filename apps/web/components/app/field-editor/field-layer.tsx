@@ -47,12 +47,15 @@ function layerPoint(e: React.PointerEvent, layer: HTMLElement): Point {
  * the editor's own shortcuts.
  */
 export function FieldLayer({ pageNumber }: { pageNumber: number }) {
-  const { state, dispatch, tool, activeRecipientId, recipients, rotationOf } = useFieldEditor()
+  const { state, dispatch, tool, activeRecipientId, recipients, rotationOf, activeDocument } =
+    useFieldEditor()
   const rot = rotationOf(pageNumber)
   const layerRef = useRef<HTMLDivElement>(null)
   const drag = useRef<Drag | null>(null)
   const [preview, setPreview] = useState<NormalizedRect | null>(null)
-  const fields = state.fields.filter((f) => f.page === pageNumber)
+  const fields = state.fields.filter(
+    (f) => f.page === pageNumber && f.envelopeDocumentId === activeDocument.id,
+  )
   const placing = tool !== null && activeRecipientId !== null
 
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
@@ -121,6 +124,7 @@ export function FieldLayer({ pageNumber }: { pageNumber: number }) {
     if (d.kind === "draw" && tool && activeRecipientId) {
       dispatch({
         type: "place",
+        envelopeDocumentId: activeDocument.id,
         page: pageNumber,
         recipientId: activeRecipientId,
         fieldType: tool,
@@ -170,7 +174,7 @@ export function FieldLayer({ pageNumber }: { pageNumber: number }) {
             onKeyDown={onKeyDown}
             style={{ ...rectStyle(displayedToLocalRect(f, rot)), containerType: "size" }}
             className={cn(
-              "pointer-events-auto absolute cursor-move overflow-hidden rounded-sm border-2 text-left outline-none",
+              "enter-pop pointer-events-auto absolute cursor-move overflow-hidden rounded-sm border-2 text-left outline-none",
               RECIPIENT_COLORS[(r?.colorIndex ?? 0) % RECIPIENT_COLORS.length],
               selected && "ring-2 ring-ring ring-offset-1",
             )}

@@ -3,7 +3,13 @@
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { MoveToFolderDialog } from "@/components/app/folders/move-to-folder-dialog"
-import { FileTextIcon, FolderInputIcon, PencilIcon, SendIcon } from "@/components/app/icons"
+import {
+  EllipsisVerticalIcon,
+  FileTextIcon,
+  FolderInputIcon,
+  PencilIcon,
+  SendIcon,
+} from "@/components/app/icons"
 import { EditItemDialog } from "@/components/app/labels/edit-item-dialog"
 import { toastManager } from "@/components/app/toast"
 import { type DropdownItem, DropdownMenu } from "@/components/arc/dropdown-menu/dropdown-menu"
@@ -17,6 +23,7 @@ import type { TagRef } from "@/lib/labels"
 export function DocumentRowActions({
   document,
   allTags,
+  compact = false,
 }: {
   document: {
     id: string
@@ -30,6 +37,8 @@ export function DocumentRowActions({
   }
   /** Every tag in use in the workspace, for the tag picker. */
   allTags: TagRef[]
+  /** A round ⋮ trigger instead of "Actions", for grid cards (ADR 0034). */
+  compact?: boolean
 }) {
   const router = useRouter()
   const [moving, setMoving] = useState(false)
@@ -38,7 +47,9 @@ export function DocumentRowActions({
   return (
     <>
       <DropdownMenu
-        label="Actions"
+        label={compact ? `Actions for ${document.name}` : "Actions"}
+        iconOnly={compact}
+        icon={compact ? <EllipsisVerticalIcon /> : undefined}
         items={[
           {
             label: "Open",

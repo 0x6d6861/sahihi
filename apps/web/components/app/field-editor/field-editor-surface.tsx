@@ -3,6 +3,7 @@
 import type { FieldType } from "@sahihi/core"
 import dynamic from "next/dynamic"
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { DocumentSwitcher } from "@/components/app/envelope/document-switcher"
 import { SettingsIcon } from "@/components/app/icons"
 import { toastManager } from "@/components/app/toast"
 import { Button } from "@/components/arc/button/button"
@@ -39,6 +40,19 @@ const VIEW_ONLY_FEATURES = {
   comments: false,
 }
 
+/** One of the envelope's documents in the field editor (ADR 0037). */
+export interface EditorDocument {
+  /** Envelope document id (what fields point at). */
+  id: string
+  /** Library document id (field detection reads it). */
+  documentId: string
+  name: string
+  /** Presigned URL of the original; null when it couldn't be loaded. */
+  src: string | null
+  /** Intrinsic /Rotate per page (index = page - 1), from Document.pages. */
+  pageRotations: number[]
+}
+
 // Stable reference: PDFEditor memoizes page rendering on renderPageOverlay.
 const renderPageOverlay = (p: PDFEditorPageOverlayProps) => <FieldLayer pageNumber={p.pageNumber} />
 
@@ -53,10 +67,8 @@ export function FieldEditorSurface({
   state,
   dispatch,
   recipients,
-  src,
-  fileName,
-  documentId,
-  pageRotations,
+  documents,
+  detect = false,
   status,
   onRetry,
   frameClassName,
@@ -65,16 +77,22 @@ export function FieldEditorSurface({
   dispatch: (action: EditorAction) => void
   /** Recipients that may own fields (VIEWERs excluded), in list order. */
   recipients: EditorRecipient[]
-  src: string
-  fileName: string
-  /** Offers "Detect fields" (form fields and anchor tags, ADR 0020) when set. */
-  documentId?: string
-  /** Intrinsic /Rotate per page (index = page - 1), from Document.pages. */
-  pageRotations: number[]
+  /** The envelope's documents in signing order; one is on screen at a time (ADR 0037). */
+  documents: EditorDocument[]
+  /** Offers "Detect fields" (form fields and anchor tags, ADR 0020) on the active document. */
+  detect?: boolean
   status?: AutosaveStatus
   onRetry?: () => void
   frameClassName?: string
 }) {
+  const [activeId, setActiveId] = useState(documents[0]?.id ?? "")
+  // A document removed elsewhere: fall back to the first.
+  const active = documents.find((d) => d.id === activeId) ?? documents[0]
+  const pageRotations = active?.pageRotations ?? []
+  function switchDocument(id: string) {
+    setActiveId(id)
+    dispatch({ type: "select", key: null })
+  }
   const [tool, setTool] = useState<FieldType | null>(null)
   const [activeRecipientId, setActiveRecipientId] = useState<string | null>(
     recipients[0]?.id ?? null,
@@ -98,10 +116,23 @@ export function FieldEditorSurface({
     },
     [rotationsKey],
   )
-  const ctx = useMemo(
-    () => ({ state, dispatch, tool, activeRecipientId, recipients: recipientMap, rotationOf }),
-    [state, dispatch, tool, activeRecipientId, recipientMap, rotationOf],
+  const activeDocument = useMemo(
+    () => ({ id: active?.id ?? "", documentId: active?.documentId ?? "" }),
+    [active?.id, active?.documentId],
   )
+  const ctx = useMemo(
+    () => ({
+      state,
+      dispatch,
+      tool,
+      activeRecipientId,
+      recipients: recipientMap,
+      rotationOf,
+      activeDocument,
+    }),
+    [state, dispatch, tool, activeRecipientId, recipientMap, rotationOf, activeDocument],
+  )
+  const fieldCount = (id: string) => state.fields.filter((f) => f.envelopeDocumentId === id).length
 
   const toolProps = {
     recipients,
@@ -124,9 +155,17 @@ export function FieldEditorSurface({
           </DrawerTrigger>
         </span>
         <DrawerContent side="right" title="Fields">
-          <FieldPalette {...toolProps} documentId={documentId} />
+          <FieldPalette {...toolProps} detect={detect} />
         </DrawerContent>
       </Drawer>
+      <DocumentSwitcher
+        documents={documents}
+        value={active?.id ?? ""}
+        onValueChange={switchDocument}
+        accessory={(id) => (
+          <span className="text-muted-foreground tabular-nums">{fieldCount(id) || ""}</span>
+        )}
+      />
       <span className="max-lg:hidden">
         Pick a field type on the right, then click or drag on a page.
       </span>
@@ -136,10 +175,12 @@ export function FieldEditorSurface({
     </div>
   )
 
-  const editor = (
+  const editor = active?.src ? (
     <PDFEditor
-      src={src}
-      fileName={fileName}
+      // One viewer per document: switching loads the other PDF fresh.
+      key={active.id}
+      src={active.src}
+      fileName={active.name}
       defaultMode="view"
       defaultZoom="fit-width"
       showUpload={false}
@@ -151,6 +192,8 @@ export function FieldEditorSurface({
       onToast={(t) => toastManager.add({ title: t.message, type: t.tone })}
       className="size-full"
     />
+  ) : (
+    <p className="p-6 text-muted-foreground text-sm">The document could not be loaded.</p>
   )
 
   return (
@@ -161,7 +204,7 @@ export function FieldEditorSurface({
           aria-label="Field tools"
           className="w-72 shrink-0 border-l bg-background max-lg:hidden"
         >
-          <FieldPalette {...toolProps} documentId={documentId} />
+          <FieldPalette {...toolProps} detect={detect} />
         </aside>
       </div>
     </FieldEditorContext.Provider>

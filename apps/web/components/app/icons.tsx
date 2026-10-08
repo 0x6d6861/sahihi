@@ -6,10 +6,16 @@ import {
   UnavailableIcon as HugeBanIcon,
   Notification01Icon as HugeBellIcon,
   Calendar03Icon as HugeCalendarIcon,
+  Tick02Icon as HugeCheckIcon,
   CheckmarkSquare01Icon as HugeCheckSquareIcon,
+  AlertCircleIcon as HugeCircleAlertIcon,
+  CheckmarkCircle02Icon as HugeCircleCheckIcon,
+  CancelCircleIcon as HugeCircleXIcon,
   Copy01Icon as HugeClipboardCopyIcon,
+  TimeQuarterPassIcon as HugeClockAlertIcon,
   Download01Icon as HugeDownloadIcon,
   MoreHorizontalIcon as HugeEllipsisIcon,
+  MoreVerticalIcon as HugeEllipsisVerticalIcon,
   EraserIcon as HugeEraserIcon,
   ViewIcon as HugeEyeIcon,
   FileEditIcon as HugeFilePenLineIcon,
@@ -21,13 +27,17 @@ import {
   FolderTransferIcon as HugeFolderInputIcon,
   FolderAddIcon as HugeFolderPlusIcon,
   Home01Icon as HugeHomeIcon,
+  HourglassIcon as HugeHourglassIcon,
   ImageUploadIcon as HugeImageUpIcon,
   Key01Icon as HugeKeyRoundIcon,
   LicenseDraftIcon as HugeLayoutTemplateIcon,
+  Loading03Icon as HugeLoaderIcon,
   SquareLock02Icon as HugeLockIcon,
   Mail01Icon as HugeMailIcon,
+  MailSend01Icon as HugeMailSendIcon,
   Cursor01Icon as HugeMousePointer2Icon,
   PackageIcon as HugePackageIcon,
+  Pdf02Icon as HugePdfIcon,
   PencilEdit02Icon as HugePencilIcon,
   Pen01Icon as HugePenLineIcon,
   PlusSignIcon as HugePlusIcon,
@@ -78,6 +88,7 @@ export const CheckSquareIcon = icon(HugeCheckSquareIcon)
 export const ClipboardCopyIcon = icon(HugeClipboardCopyIcon)
 export const DownloadIcon = icon(HugeDownloadIcon)
 export const EllipsisIcon = icon(HugeEllipsisIcon)
+export const EllipsisVerticalIcon = icon(HugeEllipsisVerticalIcon)
 export const EraserIcon = icon(HugeEraserIcon)
 export const EyeIcon = icon(HugeEyeIcon)
 export const FilePenLineIcon = icon(HugeFilePenLineIcon)
@@ -95,6 +106,7 @@ export const LayoutTemplateIcon = icon(HugeLayoutTemplateIcon)
 export const LockIcon = icon(HugeLockIcon)
 export const MailIcon = icon(HugeMailIcon)
 export const MousePointer2Icon = icon(HugeMousePointer2Icon)
+export const PdfIcon = icon(HugePdfIcon)
 export const PackageIcon = icon(HugePackageIcon)
 export const PencilIcon = icon(HugePencilIcon)
 export const PenLineIcon = icon(HugePenLineIcon)
@@ -116,3 +128,11 @@ export const UserPlusIcon = icon(HugeUserPlusIcon)
 export const UsersIcon = icon(HugeUsersIcon)
 export const WebhookIcon = icon(HugeWebhookIcon)
 export const XIcon = icon(HugeXIcon)
+export const CheckIcon = icon(HugeCheckIcon)
+export const CircleAlertIcon = icon(HugeCircleAlertIcon)
+export const CircleCheckIcon = icon(HugeCircleCheckIcon)
+export const CircleXIcon = icon(HugeCircleXIcon)
+export const ClockAlertIcon = icon(HugeClockAlertIcon)
+export const HourglassIcon = icon(HugeHourglassIcon)
+export const LoaderIcon = icon(HugeLoaderIcon)
+export const MailSendIcon = icon(HugeMailSendIcon)

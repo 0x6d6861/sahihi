@@ -13,7 +13,21 @@ const MAX_BASE_LENGTH = 120
  * back to "document".
  */
 export function downloadFileName(title: string, kind: DownloadKind): string {
-  const base =
+  return `${fileBase(title)} (${kind === "signed" ? "signed" : "certificate"}).pdf`
+}
+
+/** "Download all" of an envelope (ADR 0037): `Lease 2026 (signed files).zip`. */
+export function bundleFileName(title: string): string {
+  return `${fileBase(title)} (signed files).zip`
+}
+
+/** A document's own name without `.pdf`, for its signed copy: `Annex A.pdf` → `Annex A (signed).pdf`. */
+export function signedDocumentFileName(documentName: string): string {
+  return downloadFileName(documentName.replace(/\.pdf$/i, ""), "signed")
+}
+
+function fileBase(title: string): string {
+  return (
     title
       .normalize("NFC")
       .replace(/[^\p{L}\p{N}\s.,_()'&+-]/gu, " ")
@@ -21,7 +35,7 @@ export function downloadFileName(title: string, kind: DownloadKind): string {
       .trim()
       .slice(0, MAX_BASE_LENGTH)
       .trim() || "document"
-  return `${base} (${kind === "signed" ? "signed" : "certificate"}).pdf`
+  )
 }
 
 /**

@@ -13,6 +13,8 @@ import {
 
 export interface SignerField extends NormalizedRect {
   id: string
+  /** The envelope document it sits on (ADR 0037); `page` is within it. */
+  envelopeDocumentId: string
   type: FieldType
   page: number
   required: boolean

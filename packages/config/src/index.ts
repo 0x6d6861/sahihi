@@ -86,6 +86,7 @@ export const QUEUES = {
   finalize: "envelope-finalize",
   maintenance: "maintenance",
   webhooks: "webhooks",
+  documents: "documents",
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]

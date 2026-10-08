@@ -4,6 +4,7 @@ import { processBulkSend } from "@sahihi/envelopes"
 import {
   captureError,
   createLogger,
+  type DocumentJobs,
   type FinalizeJobs,
   flushErrors,
   getQueues,
@@ -25,6 +26,7 @@ import {
   purgeOrganizationStorage,
   retentionSweep,
 } from "./jobs/retention"
+import { renderDocumentThumbnail, sweepThumbnails } from "./jobs/thumbnails"
 import { deliverWebhook, sweepWebhookOutbox } from "./jobs/webhooks"
 
 getEnv() // fail fast on bad config
@@ -49,6 +51,7 @@ const workers = [
       if (job.name === "envelopes.expire") return expireEnvelopes()
       if (job.name === "envelopes.remind") return remindRecipients()
       if (job.name === "documents.sweep-uploads") return sweepAbandonedUploads()
+      if (job.name === "documents.sweep-thumbnails") return sweepThumbnails()
       if (job.name === "webhooks.sweep") return sweepWebhookOutbox()
       if (job.name === "retention.sweep") return retentionSweep()
       if (job.name === "exports.cleanup") return cleanupExports()
@@ -82,6 +85,11 @@ const workers = [
       concurrency: 10,
       settings: { backoffStrategy: (attemptsMade: number) => webhookRetryDelayMs(attemptsMade) },
     },
+  ),
+  new Worker<DocumentJobs["document.thumbnail"]>(
+    QUEUES.documents,
+    (job: Job<DocumentJobs["document.thumbnail"]>) => renderDocumentThumbnail(job.data.documentId),
+    { connection, concurrency: 2 },
   ),
 ]
 
@@ -124,6 +132,11 @@ await maintenance.raw.upsertJobScheduler(
   "sweep-uploads-15m",
   { pattern: "*/15 * * * *", tz: "Africa/Nairobi" },
   { name: "documents.sweep-uploads", data: {} },
+)
+await maintenance.raw.upsertJobScheduler(
+  "thumbnails-sweep-hourly",
+  { pattern: "20 * * * *" },
+  { name: "documents.sweep-thumbnails", data: {} },
 )
 await maintenance.raw.upsertJobScheduler(
   "webhooks-sweep-5m",

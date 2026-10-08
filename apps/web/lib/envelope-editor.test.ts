@@ -6,6 +6,7 @@ import {
   isEditorStep,
   nextStep,
   resolveStep,
+  splitPreflight,
   stepEnabled,
   stepHint,
   stepNumber,
@@ -69,5 +70,28 @@ describe("stepHint", () => {
     expect(stepHint("recipients", false)).toBe("Who signs, approves or gets a copy")
     expect(stepHint("fields", false)).toBe("Add a signer or approver first")
     expect(stepHint("fields", true)).toBe("Place fields on the pages for each recipient")
+  })
+})
+
+describe("splitPreflight", () => {
+  test("a past expiry is fixed in the review dialog, not listed above the editor", () => {
+    const { inDialog, blocking } = splitPreflight([
+      { code: "expiry_in_past", message: "The expiry date is in the past." },
+    ])
+    expect(blocking).toEqual([])
+    expect(inDialog.expiresAt).toContain("Pick a later day or clear the expiry")
+  })
+
+  test("other issues still block the dialog", () => {
+    const { inDialog, blocking } = splitPreflight([
+      {
+        code: "missing_signature_field",
+        message: "Amina needs a signature field.",
+        recipientId: "r1",
+      },
+      { code: "expiry_in_past", message: "The expiry date is in the past." },
+    ])
+    expect(blocking.map((i) => i.code)).toEqual(["missing_signature_field"])
+    expect(Object.keys(inDialog)).toEqual(["expiresAt"])
   })
 })

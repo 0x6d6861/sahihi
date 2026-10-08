@@ -1,15 +1,13 @@
 "use client"
 
 import { DOCUMENT_LIST_STATUSES, DOCUMENT_PERIODS, labelColorName } from "@sahihi/core"
-import { useRouter } from "next/navigation"
-import { useEffect, useRef, useState, useTransition } from "react"
 import { ColorDot } from "@/components/app/labels/labels"
 import {
-  type FilterChip,
-  FilterMenu,
-  FilterToolbar,
-} from "@/components/arc/filter-toolbar/filter-toolbar"
-import { SearchField } from "@/components/arc/search-field/search-field"
+  ListSearch,
+  type SearchChip,
+  uniqueLabels,
+  useListNavigation,
+} from "@/components/app/list-search"
 import {
   type DocumentsView,
   documentsHref,
@@ -17,60 +15,70 @@ import {
   PERIOD_LABEL,
 } from "@/lib/documents-list"
 import type { TagRef } from "@/lib/labels"
-
-const SEARCH_DELAY_MS = 300
-
-type FilterKey = "tag" | "color" | "status" | "sender" | "period"
-type Field = {
-  id: FilterKey
-  label: string
-  options: { value: string; label: string; icon?: React.ReactNode }[]
-}
+import type { ListLayout } from "@/lib/list-layout"
 
 /**
- * Search box and Tag / Color / Status / Sender / Period filters (Arc search field + filter
- * toolbar). State lives in the URL; the page (a Server Component) re-renders on navigation.
- * Search (names and tags), tag and color span every folder (ADR 0022, 0025).
+ * The Documents page's search section (ADR 0035): search, then Status / People / Added / Tags /
+ * Color chips and the List / Grid switch. State lives in the URL; search (names and tags), tag and
+ * color span every folder (ADR 0022, 0025).
  */
 export function DocumentsToolbar({
   view,
+  layout,
   senders,
   tags,
   colors,
 }: {
   view: DocumentsView
+  /** The layout on screen: the URL's, else the saved one. */
+  layout: ListLayout
   senders: { id: string; name: string }[]
   /** Tags in use in the workspace. */
   tags: TagRef[]
   /** Label colours in use in the workspace (`#RRGGBB`). */
   colors: string[]
 }) {
-  const router = useRouter()
-  const [pending, startTransition] = useTransition()
-  const [q, setQ] = useState(view.q ?? "")
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const nav = useListNavigation("documents", view.layout)
+  const go = (patch: Partial<DocumentsView>) => nav.go(documentsHref(view, patch))
 
-  // Back/forward or a breadcrumb click changes the URL under us.
-  useEffect(() => setQ(view.q ?? ""), [view.q])
-  useEffect(() => () => clearTimeout(timer.current), [])
-
-  const go = (patch: Partial<DocumentsView>) =>
-    startTransition(() => router.replace(documentsHref(view, patch), { scroll: false }))
-
-  function onSearch(value: string) {
-    setQ(value)
-    clearTimeout(timer.current)
-    timer.current = setTimeout(() => go({ q: value.trim() || undefined }), SEARCH_DELAY_MS)
-  }
-
-  const fields: Field[] = [
-    ...(tags.length > 0
+  const chips: SearchChip[] = [
+    {
+      id: "status",
+      label: "Status",
+      any: "Any status",
+      current: view.status,
+      options: DOCUMENT_LIST_STATUSES.map((s) => ({ value: s, label: LIST_STATUS_LABEL[s] })),
+    },
+    {
+      id: "sender",
+      label: "People",
+      any: "Anyone",
+      current: view.sender,
+      options: uniqueLabels(senders.map((s) => ({ value: s.id, label: s.name }))),
+    },
+    {
+      id: "period",
+      label: "Added",
+      any: "Any time",
+      current: view.period,
+      options: DOCUMENT_PERIODS.map((p) => ({ value: p, label: PERIOD_LABEL[p] })),
+    },
+    // A tag or colour from a link that's no longer on anything still shows, so it can be cleared.
+    ...(tags.length > 0 || view.tag
       ? [
           {
             id: "tag",
-            label: "Tag",
-            options: tags.map((t) => ({ value: t.name, label: t.name })),
-          } satisfies Field,
+            label: "Tags",
+            any: "Any tag",
+            current: view.tag,
+            caseInsensitive: true,
+            options: uniqueLabels([
+              ...tags.map((t) => ({ value: t.name, label: t.name })),
+              ...(view.tag && !tags.some((t) => t.name.toLowerCase() === view.tag?.toLowerCase())
+                ? [{ value: view.tag, label: view.tag }]
+                : []),
+            ]),
+          } satisfies SearchChip,
         ]
       : []),
     ...(colors.length > 0 || view.color
@@ -78,84 +86,41 @@ export function DocumentsToolbar({
           {
             id: "color",
             label: "Color",
+            any: "Any color",
+            current: view.color,
             options: [...new Set([...colors, ...(view.color ? [view.color] : [])])].map((c) => ({
               value: c,
               label: labelColorName(c),
               icon: <ColorDot color={c} />,
             })),
-          } satisfies Field,
+          } satisfies SearchChip,
         ]
       : []),
-    {
-      id: "status",
-      label: "Status",
-      options: DOCUMENT_LIST_STATUSES.map((s) => ({ value: s, label: LIST_STATUS_LABEL[s] })),
-    },
-    {
-      id: "sender",
-      label: "Sender",
-      options: senders.map((s) => ({ value: s.id, label: s.name })),
-    },
-    {
-      id: "period",
-      label: "Period",
-      options: DOCUMENT_PERIODS.map((p) => ({ value: p, label: PERIOD_LABEL[p] })),
-    },
   ]
 
-  const chips: FilterChip[] = fields.flatMap((field) => {
-    const current = view[field.id]
-    const option = field.options.find((o) =>
-      field.id === "tag" ? o.value.toLowerCase() === current?.toLowerCase() : o.value === current,
-    )
-    return option ? [{ id: field.id, label: field.label, value: option.label }] : []
-  })
-  // A tag from a link that's no longer on anything still shows, so it can be removed.
-  if (view.tag && !chips.some((c) => c.id === "tag")) {
-    chips.unshift({ id: "tag", label: "Tag", value: view.tag })
-  }
-
-  function addFilter(chip: FilterChip) {
-    const field = fields.find((f) => f.id === chip.id)
-    const option = field?.options.find((o) => o.label === chip.value)
-    if (field && option) go({ [field.id]: option.value } as Partial<DocumentsView>)
-  }
-
   return (
-    <div className="flex flex-col gap-3" aria-busy={pending}>
-      <div className="flex items-end gap-2">
-        <div className="min-w-0 flex-1 sm:max-w-sm">
-          <SearchField
-            label="Search documents"
-            value={q}
-            placeholder="Name or tag"
-            onValueChange={onSearch}
-          />
-        </div>
-        {/* Centred on the 44px search input (the trigger is 36px). */}
-        <div className="flex h-11 items-center">
-          <FilterMenu fields={fields} active={chips} onSelect={addFilter} align="end" />
-        </div>
-      </div>
-      {/* The chip strip only appears once a filter is applied, so an idle toolbar stays one row. */}
-      {chips.length > 0 && (
-        <FilterToolbar
-          label="Applied filters"
-          filters={chips}
-          onRemove={(id) => go({ [id as FilterKey]: undefined })}
-          onClearAll={() => {
-            setQ("")
-            go({
-              q: undefined,
-              tag: undefined,
-              color: undefined,
-              status: undefined,
-              sender: undefined,
-              period: undefined,
-            })
-          }}
-        />
-      )}
-    </div>
+    <ListSearch
+      label="Search documents"
+      placeholder="Search documents and folders"
+      query={view.q ?? ""}
+      onQueryChange={(q) => go({ q })}
+      chips={chips}
+      onChipChange={(id, value) => go({ [id]: value } as Partial<DocumentsView>)}
+      onClearChips={() =>
+        go({
+          tag: undefined,
+          color: undefined,
+          status: undefined,
+          sender: undefined,
+          period: undefined,
+        })
+      }
+      layout={layout}
+      // Same page either way: both layouts show the same documents.
+      onLayoutChange={(l) =>
+        nav.setLayout(l, documentsHref(view, { layout: undefined, page: view.page }))
+      }
+      pending={nav.pending}
+    />
   )
 }

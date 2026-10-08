@@ -16,7 +16,7 @@ async function loadTemplate(templateId: string, organizationId: string) {
   const t = await prisma.template.findFirst({
     where: { id: templateId, organizationId },
     include: {
-      document: { select: { status: true, deletedAt: true } },
+      documents: { select: { document: { select: { status: true, deletedAt: true } } } },
       roles: {
         select: {
           id: true,
@@ -49,11 +49,11 @@ export async function startBulkSend(input: {
   data: CreateBulkSendInput
 }) {
   const template = await loadTemplate(input.templateId, input.organizationId)
-  if (template.document.status !== "READY" || template.document.deletedAt) {
+  if (template.documents.some((d) => d.document.status !== "READY" || d.document.deletedAt)) {
     throw new EnvelopeError(
       400,
       "document_unavailable",
-      "This template's document is no longer available",
+      "A document of this template is no longer available",
     )
   }
   const forUse: TemplateForUse = {

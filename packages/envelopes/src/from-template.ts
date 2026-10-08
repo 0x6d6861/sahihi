@@ -1,5 +1,7 @@
 import { draftFromTemplate, type UseTemplateInput } from "@sahihi/core"
 import { appendAuditEvent, prisma } from "@sahihi/db"
+import { copyObject, keys } from "@sahihi/infra"
+import { attachDocuments } from "./documents"
 import { EnvelopeError, notFound } from "./errors"
 import { type Actor, actorData } from "./send"
 
@@ -17,6 +19,7 @@ const roleSelect = {
 
 const fieldSelect = {
   roleId: true,
+  templateDocumentId: true,
   type: true,
   page: true,
   x: true,
@@ -43,18 +46,27 @@ export async function createEnvelopeFromTemplate(input: {
   const template = await prisma.template.findFirst({
     where: { id: input.templateId, organizationId: input.organizationId },
     include: {
-      document: { select: { id: true, status: true, deletedAt: true, sha256: true } },
+      documents: {
+        orderBy: { order: "asc" },
+        select: {
+          id: true,
+          document: {
+            select: { id: true, name: true, status: true, deletedAt: true, sha256: true },
+          },
+        },
+      },
+      attachments: { orderBy: { order: "asc" } },
       roles: { select: roleSelect, orderBy: { order: "asc" } },
       fields: { select: fieldSelect },
     },
   })
   if (!template) notFound("Template")
   const t = template as NonNullable<typeof template>
-  if (t.document.status !== "READY" || t.document.deletedAt) {
+  if (t.documents.some((d) => d.document.status !== "READY" || d.document.deletedAt)) {
     throw new EnvelopeError(
       400,
       "document_unavailable",
-      "This template's document is no longer available",
+      "A document of this template is no longer available",
     )
   }
   if (input.data.expiresAt && input.data.expiresAt <= new Date()) {
@@ -78,7 +90,6 @@ export async function createEnvelopeFromTemplate(input: {
     const created = await tx.envelope.create({
       data: {
         organizationId: input.organizationId,
-        documentId: t.document.id,
         createdById: input.actor.userId,
         title: input.data.title,
         message: input.data.message ?? t.message,
@@ -86,6 +97,34 @@ export async function createEnvelopeFromTemplate(input: {
         expiresAt: input.data.expiresAt,
       },
     })
+    const documentRows = await attachDocuments(
+      tx,
+      created.id,
+      t.documents.map((d) => d.document),
+    )
+    const envelopeDocumentByTemplateDocument = new Map(
+      t.documents.map((d, i) => [d.id, documentRows[i] as string]),
+    )
+    // Supporting files: the envelope gets its own copies (the template keeps its objects).
+    for (const [i, a] of t.attachments.entries()) {
+      const row = await tx.envelopeAttachment.create({
+        data: {
+          envelopeId: created.id,
+          name: a.name,
+          contentType: a.contentType,
+          sizeBytes: a.sizeBytes,
+          sha256: a.sha256,
+          s3Key: `pending:${crypto.randomUUID()}`,
+          status: "READY",
+          order: i,
+          uploadedById: input.actor.userId,
+        },
+        select: { id: true },
+      })
+      const key = keys.attachment(input.organizationId, created.id, row.id)
+      await copyObject(a.s3Key, key)
+      await tx.envelopeAttachment.update({ where: { id: row.id }, data: { s3Key: key } })
+    }
     const recipientIdByRole = new Map<string, string>()
     for (const { roleId, ...r } of draft.recipients) {
       const saved = await tx.recipient.create({ data: { ...r, envelopeId: created.id } })
@@ -95,6 +134,7 @@ export async function createEnvelopeFromTemplate(input: {
     await tx.field.createMany({
       data: draft.fields.map((f) => ({
         envelopeId: created.id,
+        envelopeDocumentId: envelopeDocumentByTemplateDocument.get(f.templateDocumentId) as string,
         recipientId: recipientIdByRole.get(f.roleId) as string,
         type: f.type,
         page: f.page,
@@ -111,8 +151,12 @@ export async function createEnvelopeFromTemplate(input: {
       type: "envelope.created",
       actorUserId: input.actor.userId,
       data: {
-        documentId: t.document.id,
-        documentSha256: t.document.sha256,
+        documents: t.documents.map((d) => ({
+          id: d.document.id,
+          name: d.document.name,
+          sha256: d.document.sha256,
+        })),
+        attachments: t.attachments.map((a) => ({ name: a.name, sha256: a.sha256 })),
         templateId: t.id,
         ...actorData(input.actor),
         ...input.auditExtra,

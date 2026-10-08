@@ -1,7 +1,8 @@
-import type { TemplateForUse } from "@sahihi/core"
+import { documentsSummary, type TemplateForUse } from "@sahihi/core"
 import { notFound } from "next/navigation"
 import { Breadcrumb } from "@/components/arc/breadcrumb/breadcrumb"
 import { apiServer } from "@/lib/api-server"
+import { documentsLine } from "@/lib/envelope-documents"
 import { UseTemplateForm } from "./use-template-form"
 
 interface TemplateDetail extends TemplateForUse {
@@ -9,7 +10,9 @@ interface TemplateDetail extends TemplateForUse {
   name: string
   description: string | null
   message: string | null
-  document: { id: string; name: string; pageCount: number }
+  /** In signing order (ADR 0037). */
+  documents: { id: string; name: string; pageCount: number | null }[]
+  attachments: { id: string; name: string }[]
 }
 
 export const metadata = { title: "Use template" }
@@ -23,7 +26,10 @@ export default async function UseTemplatePage({ params }: { params: Promise<{ id
   if (status === 404 || !data) notFound()
   const t = data.template
 
-  const pages = `${t.document.pageCount} ${t.document.pageCount === 1 ? "page" : "pages"}`
+  const files =
+    t.attachments.length > 0
+      ? `, ${t.attachments.length} supporting ${t.attachments.length === 1 ? "file" : "files"}`
+      : ""
   const fields = `${t.fields.length} ${t.fields.length === 1 ? "field" : "fields"}`
 
   return (
@@ -32,8 +38,10 @@ export default async function UseTemplatePage({ params }: { params: Promise<{ id
         <Breadcrumb items={[{ label: "Templates", href: "/templates" }, { label: t.name }]} />
         <h1 className="font-medium text-2xl tracking-tight">New envelope</h1>
         <p className="text-muted-foreground text-sm">
-          From <span className="text-foreground">{t.name}</span>: {t.document.name}, {pages},{" "}
-          {fields}. You can still adjust fields and recipients before sending.
+          From <span className="text-foreground">{t.name}</span>:{" "}
+          {documentsSummary(t.documents.map((d) => d.name))} ({documentsLine(t.documents)}),{" "}
+          {fields}
+          {files}. You can still adjust fields and recipients before sending.
         </p>
       </header>
       <UseTemplateForm

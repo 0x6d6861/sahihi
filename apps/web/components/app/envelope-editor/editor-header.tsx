@@ -55,14 +55,15 @@ const STEP_ICONS: Record<EditorStep, IconSvgElement> = {
  */
 export function EditorHeader({
   envelope: e,
-  fileUrl,
+  files,
   audit,
   step,
   onStepChange,
   hasFieldOwners,
 }: {
   envelope: EnvelopeDetail
-  fileUrl: string | null
+  /** Each document's original by envelope document id (ADR 0037). */
+  files: Record<string, string | null>
   audit: { events: AuditEventRow[]; verification: ChainVerification } | null
   step: EditorStep
   onStepChange: (step: EditorStep) => void
@@ -76,18 +77,23 @@ export function EditorHeader({
 
   // The split button's menu: the other envelope actions (Save as template is its main half).
   const actions: SplitButtonAction[] = []
-  if (fileUrl) {
+  // One envelope document: its original and library page. Several: they're in the Documents step.
+  const only = e.documents.length === 1 ? e.documents[0] : undefined
+  const onlyUrl = only ? files[only.id] : null
+  if (only && onlyUrl) {
     actions.push({
       label: "Download original",
       icon: <DownloadIcon />,
-      onSelect: () => downloadFile(fileUrl, e.document.name),
+      onSelect: () => downloadFile(onlyUrl, only.name),
     })
   }
-  actions.push({
-    label: "Open document",
-    icon: <FileTextIcon />,
-    onSelect: () => router.push(`/documents/${e.document.id}`),
-  })
+  if (only) {
+    actions.push({
+      label: "Open document",
+      icon: <FileTextIcon />,
+      onSelect: () => router.push(`/documents/${only.documentId}`),
+    })
+  }
   if (audit) {
     actions.push({
       label: "Activity",

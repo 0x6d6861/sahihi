@@ -20,6 +20,11 @@ signed document straight away.
 
 ## Request
 
+`data.envelope.documents` lists every document (`id`, `name`, `sha256`, `signedSha256`) in signing
+order, and `data.envelope.attachments` the supporting files (`name`, `sha256`). `document` and
+`signedSha256` are the first document's, kept for receivers built before ADR 0037.
+
+
 ```http
 POST <your URL>
 Content-Type: application/json

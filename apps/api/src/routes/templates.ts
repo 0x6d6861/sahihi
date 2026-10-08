@@ -1,15 +1,19 @@
 import {
   canManageTemplate,
+  ListTemplatesQuerySchema,
+  periodStart,
   SaveTemplateSchema,
+  TEMPLATES_PAGE_SIZE,
   templateRolesFromEnvelope,
   UpdateTemplateSchema,
   UseTemplateRequestSchema,
 } from "@sahihi/core"
-import { forOrganization, prisma } from "@sahihi/db"
+import { forOrganization, type Prisma, prisma } from "@sahihi/db"
 import { createEnvelopeFromTemplate } from "@sahihi/envelopes"
+import { copyObject, deleteObject, keys, presignCacheable } from "@sahihi/infra"
 import { Hono } from "hono"
 import type { AppEnv } from "../lib/env"
-import { badRequest, clientMeta, notFound, parseJson } from "../lib/http"
+import { badRequest, clientMeta, notFound, parseJson, parseQuery } from "../lib/http"
 import { actor, assertCanManageTemplate } from "../lib/permissions"
 import { sendAfterCreate } from "../lib/send-after-create"
 import { requireOrg } from "../middleware/session"
@@ -35,6 +39,7 @@ const roleSelect = {
 const fieldSelect = {
   id: true,
   roleId: true,
+  templateDocumentId: true,
   type: true,
   page: true,
   x: true,
@@ -56,14 +61,22 @@ export const templates = new Hono<AppEnv>()
     const envelope = await prisma.envelope.findFirst({
       where: scope.envelope({ id: input.envelopeId }),
       include: {
-        document: { select: { id: true, status: true, deletedAt: true } },
+        documents: {
+          orderBy: { order: "asc" },
+          select: {
+            id: true,
+            documentId: true,
+            document: { select: { status: true, deletedAt: true } },
+          },
+        },
+        attachments: { where: { status: "READY" }, orderBy: { order: "asc" } },
         recipients: { orderBy: [{ order: "asc" }, { createdAt: "asc" }] },
         fields: true,
       },
     })
     if (!envelope) notFound("Envelope")
-    if (envelope.document.status !== "READY" || envelope.document.deletedAt) {
-      badRequest("This envelope's document is no longer available")
+    if (envelope.documents.some((d) => d.document.status !== "READY" || d.document.deletedAt)) {
+      badRequest("A document of this envelope is no longer available")
     }
     const built = templateRolesFromEnvelope(envelope.recipients, input.roles)
     if (!built.ok) badRequest(built.message)
@@ -72,7 +85,6 @@ export const templates = new Hono<AppEnv>()
       const created = await tx.template.create({
         data: {
           organizationId: orgId,
-          documentId: envelope.documentId,
           createdById: c.get("user").id,
           name: input.name,
           description: input.description || null,
@@ -80,6 +92,34 @@ export const templates = new Hono<AppEnv>()
           signingOrder: envelope.signingOrder,
         },
       })
+      // The documents in order; fields are re-pointed at the template's own document rows.
+      const templateDocumentByEnvelopeDocument = new Map<string, string>()
+      for (const [i, d] of envelope.documents.entries()) {
+        const row = await tx.templateDocument.create({
+          data: { templateId: created.id, documentId: d.documentId, order: i },
+          select: { id: true },
+        })
+        templateDocumentByEnvelopeDocument.set(d.id, row.id)
+      }
+      // Supporting files: the template keeps its own copies, so it outlives the envelope's
+      // retention (ADR 0037).
+      for (const [i, a] of envelope.attachments.entries()) {
+        const id = crypto.randomUUID()
+        const key = keys.templateAttachment(orgId, created.id, id)
+        await copyObject(a.s3Key, key)
+        await tx.templateAttachment.create({
+          data: {
+            id,
+            templateId: created.id,
+            name: a.name,
+            contentType: a.contentType,
+            sizeBytes: a.sizeBytes,
+            sha256: a.sha256 ?? "",
+            s3Key: key,
+            order: i,
+          },
+        })
+      }
       const roleIdByRecipient = new Map<string, string>()
       for (const { recipientId, ...role } of built.roles) {
         const saved = await tx.templateRole.create({ data: { ...role, templateId: created.id } })
@@ -88,6 +128,9 @@ export const templates = new Hono<AppEnv>()
       await tx.templateField.createMany({
         data: envelope.fields.map((f) => ({
           templateId: created.id,
+          templateDocumentId: templateDocumentByEnvelopeDocument.get(
+            f.envelopeDocumentId,
+          ) as string,
           roleId: roleIdByRecipient.get(f.recipientId) as string,
           type: f.type,
           page: f.page,
@@ -104,25 +147,74 @@ export const templates = new Hono<AppEnv>()
     return c.json({ template }, 201)
   })
 
+  /**
+   * The Templates list (ADR 0036), newest first, 25 a page. `q` matches the name, the description
+   * or the document's name; `createdById` (Saved by chip) and `period` narrow it. Each item carries
+   * its document's first-page thumbnail (ADR 0033).
+   */
   .get("/", async (c) => {
     const scope = forOrganization(c.get("organizationId"))
-    const rows = await prisma.template.findMany({
-      where: scope.template(),
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: 100,
-      include: {
-        document: { select: { id: true, name: true, pageCount: true } },
-        createdBy: { select: { name: true } },
-        roles: { select: { label: true, role: true }, orderBy: { order: "asc" } },
-        _count: { select: { fields: true } },
-      },
-    })
+    const query = parseQuery(c, ListTemplatesQuerySchema)
+    const pageSize = TEMPLATES_PAGE_SIZE
+    const q = query.q
+    const filters: Prisma.TemplateWhereInput = {
+      ...(query.createdById && { createdById: query.createdById }),
+      ...(query.period && { createdAt: { gte: periodStart(query.period, new Date()) } }),
+      ...(q && {
+        OR: [
+          { name: { contains: q, mode: "insensitive" } },
+          { description: { contains: q, mode: "insensitive" } },
+          { documents: { some: { document: { name: { contains: q, mode: "insensitive" } } } } },
+        ],
+      }),
+    }
+    const where = scope.template(filters)
+    const [rows, total, savers] = await prisma.$transaction([
+      prisma.template.findMany({
+        where,
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        skip: (query.page - 1) * pageSize,
+        take: pageSize,
+        include: {
+          documents: {
+            orderBy: { order: "asc" },
+            select: {
+              document: { select: { id: true, name: true, pageCount: true, thumbnailKey: true } },
+            },
+          },
+          createdBy: { select: { id: true, name: true, image: true } },
+          roles: { select: { label: true, role: true }, orderBy: { order: "asc" } },
+          _count: { select: { fields: true } },
+        },
+      }),
+      prisma.template.count({ where }),
+      // "Saved by" chip options: everyone who saved a template in this workspace.
+      prisma.user.findMany({
+        where: { templates: { some: scope.template() } },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      }),
+    ])
     const a = actor(c)
     return c.json({
-      items: rows.map(({ createdById, ...t }) => ({
-        ...t,
-        permissions: { manage: canManageTemplate(a, { createdById }) },
-      })),
+      items: await Promise.all(
+        rows.map(async ({ createdById, documents, ...t }) => {
+          const docs = documents.map(({ document: { thumbnailKey: _key, ...d } }) => d)
+          const thumbnailKey = documents[0]?.document.thumbnailKey
+          return {
+            ...t,
+            // The first document (rows show it and "+ N more"; ADR 0037), then all of them.
+            document: docs[0] ?? null,
+            documents: docs,
+            thumbnailUrl: thumbnailKey ? await presignCacheable(thumbnailKey) : null,
+            permissions: { manage: canManageTemplate(a, { createdById }) },
+          }
+        }),
+      ),
+      page: query.page,
+      pageSize,
+      total,
+      savers,
     })
   })
 
@@ -131,14 +223,38 @@ export const templates = new Hono<AppEnv>()
     const template = await prisma.template.findFirst({
       where: scope.template({ id: c.req.param("id") }),
       include: {
-        document: { select: { id: true, name: true, pageCount: true, pages: true } },
+        documents: {
+          orderBy: { order: "asc" },
+          select: {
+            id: true,
+            documentId: true,
+            order: true,
+            document: { select: { name: true, pageCount: true, pages: true } },
+          },
+        },
+        attachments: {
+          orderBy: { order: "asc" },
+          select: { id: true, name: true, contentType: true, sizeBytes: true },
+        },
         roles: { select: roleSelect, orderBy: { order: "asc" } },
         fields: { select: fieldSelect, orderBy: [{ page: "asc" }, { y: "asc" }] },
       },
     })
     if (!template) notFound("Template")
+    const { documents, ...rest } = template
     return c.json({
-      template,
+      template: {
+        ...rest,
+        // `id` is the template document (what fields' `templateDocumentId` points at).
+        documents: documents.map((d) => ({
+          id: d.id,
+          documentId: d.documentId,
+          order: d.order,
+          name: d.document.name,
+          pageCount: d.document.pageCount,
+          pages: d.document.pages,
+        })),
+      },
       permissions: { manage: canManageTemplate(actor(c), template) },
     })
   })
@@ -165,11 +281,14 @@ export const templates = new Hono<AppEnv>()
     const scope = forOrganization(c.get("organizationId"))
     const template = await prisma.template.findFirst({
       where: scope.template({ id: c.req.param("id") }),
+      include: { attachments: { select: { s3Key: true } } },
     })
     if (!template) notFound("Template")
     assertCanManageTemplate(c, template)
-    // Envelopes created from it are independent copies; only the template goes.
+    // Envelopes created from it are independent copies; only the template and its own copies of
+    // supporting files go.
     await prisma.template.delete({ where: { id: template.id } })
+    for (const a of template.attachments) await deleteObject(a.s3Key).catch(() => {})
     return c.body(null, 204)
   })
 

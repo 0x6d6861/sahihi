@@ -2,6 +2,15 @@
 
 ## Drafting
 
+**Documents and supporting files (ADR 0037).** An envelope holds up to 10 documents to sign (500
+pages in all), in order, plus up to 10 supporting files that recipients can download but don't
+sign (PDF, images, Office files, CSV, text; 25 MB each). The editor's first step, "Documents",
+adds documents (from the library, or upload), reorders and removes them, and prepares the pages
+of any one of them. `PUT /envelopes/:id/document` takes `envelopeDocumentId` and drops only that
+document's fields. Every field has an `envelopeDocumentId`. Sending waits until no supporting
+file is still uploading; `envelope.sent` records every document's and file's name and hash.
+
+
 1. `POST /api/envelopes { documentId, title, message?, signingOrder, expiresAt? }` creates a `DRAFT`
    (audit `envelope.created`). The document must be `READY`.
    Web: `/envelopes/new?documentId=…` (from the document page's "Create envelope" or the envelopes
@@ -148,6 +157,14 @@ error shows on the field. "Resend code in 0:27" counts down from the server's `r
 and for too many attempts.
 
 ### Signing surface
+
+With several documents (ADR 0037) the session returns `documents[]` in order and fields in
+reading order (document, page, top to bottom). An Arc segmented control switches documents and
+shows how many required fields are left on each. "Next field" walks every document and switches
+when needed. `GET /sign/:token/file?document=<envelopeDocumentId>` returns each original. Verified
+recipients see "Supporting files" under the message. `GET /sign/:token/attachments/:id` returns a
+download (never inline) and records `recipient.attachment_viewed`.
+
 
 - `GET /:token/file` returns a presigned URL for the original PDF. The **first call** marks the
   recipient `VIEWED` (and the envelope `IN_PROGRESS`) and audits `recipient.viewed`.

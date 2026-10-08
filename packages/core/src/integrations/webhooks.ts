@@ -259,8 +259,14 @@ export interface WebhookEnvelopeSource {
   completedAt: Date | null
   voidedAt: Date | null
   voidReason: string | null
-  document: { id: string; name: string; sha256: string | null }
-  signedSha256: string | null
+  /** In signing order (ADR 0037). */
+  documents: {
+    order: number
+    signedSha256: string | null
+    document: { id: string; name: string; sha256: string | null }
+  }[]
+  /** Supporting files (ready ones only). */
+  attachments: { name: string; sha256: string | null; status: string }[]
   certificate: { code: string } | null
   recipients: {
     id: string
@@ -280,6 +286,8 @@ export interface WebhookEnvelopeSource {
  * envelope's data; never tokens, hashes of tokens, OTPs or IP addresses.
  */
 export function envelopeEventData(e: WebhookEnvelopeSource, extra: Record<string, unknown> = {}) {
+  const documents = [...e.documents].sort((a, b) => a.order - b.order)
+  const first = documents[0]
   return {
     envelope: {
       id: e.id,
@@ -291,8 +299,21 @@ export function envelopeEventData(e: WebhookEnvelopeSource, extra: Record<string
       completedAt: e.completedAt?.toISOString() ?? null,
       voidedAt: e.voidedAt?.toISOString() ?? null,
       voidReason: e.voidReason,
-      document: { id: e.document.id, name: e.document.name, sha256: e.document.sha256 },
-      signedSha256: e.signedSha256,
+      // `document` / `signedSha256` are the first document's, kept for receivers built before
+      // multi-document envelopes (ADR 0037); `documents` lists them all in order.
+      document: first
+        ? { id: first.document.id, name: first.document.name, sha256: first.document.sha256 }
+        : null,
+      signedSha256: first?.signedSha256 ?? null,
+      documents: documents.map((d) => ({
+        id: d.document.id,
+        name: d.document.name,
+        sha256: d.document.sha256,
+        signedSha256: d.signedSha256,
+      })),
+      attachments: e.attachments
+        .filter((a) => a.status === "READY")
+        .map((a) => ({ name: a.name, sha256: a.sha256 })),
       certificateCode: e.certificate?.code ?? null,
       recipients: e.recipients.map((r) => ({
         id: r.id,

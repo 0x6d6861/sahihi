@@ -31,14 +31,15 @@ export function FieldPalette({
   onToolChange,
   activeRecipientId,
   onRecipientChange,
-  documentId,
+  detect = false,
 }: {
   recipients: EditorRecipient[]
   tool: FieldType | null
   onToolChange: (tool: FieldType | null) => void
   activeRecipientId: string | null
   onRecipientChange: (id: string) => void
-  documentId?: string
+  /** Offers "Detect fields" (form fields and anchor tags, ADR 0020) on the active document. */
+  detect?: boolean
 }) {
   const { state } = useFieldEditor()
   const field = state.fields.find((f) => f.key === state.selected)
@@ -61,7 +62,7 @@ export function FieldPalette({
             <legend className="sr-only">Field type</legend>
             <Toggle
               variant="outline"
-              className="justify-start"
+              className="press justify-start"
               pressed={tool === null}
               onPressedChange={(pressed) => pressed && onToolChange(null)}
             >
@@ -74,7 +75,7 @@ export function FieldPalette({
                 <Toggle
                   key={type}
                   variant="outline"
-                  className="justify-start"
+                  className="press justify-start"
                   pressed={tool === type}
                   disabled={!activeRecipientId}
                   onPressedChange={(pressed) => onToolChange(pressed ? type : null)}
@@ -88,7 +89,7 @@ export function FieldPalette({
           <p className="text-muted-foreground text-xs">
             Pick a type, then click or drag on a page. Choose Select to move or resize fields.
           </p>
-          {documentId && <DetectFields documentId={documentId} />}
+          {detect && <DetectFields />}
         </Section>
         <Separator />
         <Section title={field ? `${FIELD_LABELS[field.type]} settings` : "Field settings"}>
