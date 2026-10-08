@@ -81,8 +81,12 @@ jobs:
           elif [ "$HAS_API_KEY" = "true" ]; then
             echo "::warning::The Claude OAuth token is missing or not working; using ANTHROPIC_API_KEY."
             echo "mode=api" >> "$GITHUB_OUTPUT"
+          elif [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            # Not set up yet: skip rather than turn every PR red.
+            echo "::warning::Claude review is off: set CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY."
+            echo "mode=none" >> "$GITHUB_OUTPUT"
           else
-            echo "::error::Neither CLAUDE_CODE_OAUTH_TOKEN nor ANTHROPIC_API_KEY is usable."
+            echo "::error::The Claude OAuth token doesn't work and ANTHROPIC_API_KEY isn't set."
             exit 1
           fi
 
@@ -138,8 +142,12 @@ jobs:
           elif [ "$HAS_API_KEY" = "true" ]; then
             echo "::warning::The Claude OAuth token is missing or not working; using ANTHROPIC_API_KEY."
             echo "mode=api" >> "$GITHUB_OUTPUT"
+          elif [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            # Not set up yet: skip rather than turn every PR red.
+            echo "::warning::Claude review is off: set CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY."
+            echo "mode=none" >> "$GITHUB_OUTPUT"
           else
-            echo "::error::Neither CLAUDE_CODE_OAUTH_TOKEN nor ANTHROPIC_API_KEY is usable."
+            echo "::error::The Claude OAuth token doesn't work and ANTHROPIC_API_KEY isn't set."
             exit 1
           fi
 
