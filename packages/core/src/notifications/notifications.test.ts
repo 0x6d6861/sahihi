@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import {
+  decodeNotificationCursor,
   describeNotification,
+  encodeNotificationCursor,
   isNotificationEnabled,
   ListNotificationsQuerySchema,
   MarkNotificationsReadSchema,
@@ -83,6 +85,20 @@ describe("tones", () => {
     expect(tone("envelope.declined")).toBe("warning")
     expect(tone("billing.quota_reached")).toBe("warning")
     expect(tone("recipient.signed")).toBe("info")
+  })
+})
+
+describe("notification cursor", () => {
+  test("round-trips the position", () => {
+    const createdAt = new Date("2026-10-07T12:00:00.123Z")
+    const cursor = encodeNotificationCursor({ createdAt, id: "cmabc123" })
+    expect(cursor).toBe(`${createdAt.getTime()}.cmabc123`)
+    expect(decodeNotificationCursor(cursor)).toEqual({ createdAt, id: "cmabc123" })
+  })
+  test("anything else is not a cursor", () => {
+    for (const bad of ["", "cmabc123", "abc.def", "123.", ".abc", "123.a b", "1.2.3"]) {
+      expect(decodeNotificationCursor(bad)).toBeNull()
+    }
   })
 })
 

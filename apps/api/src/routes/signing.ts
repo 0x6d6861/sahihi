@@ -328,10 +328,13 @@ export const signing = new Hono<SigningEnv>()
     const s = c.get("signer")
     if (s.status === "SENT") {
       await prisma.$transaction(async (tx) => {
-        await tx.recipient.update({
-          where: { id: s.id },
+        // Claimed, not just updated: two first views at once (prefetch and render, two tabs) must
+        // record and report one view, not two.
+        const claimed = await tx.recipient.updateMany({
+          where: { id: s.id, status: "SENT" },
           data: { status: "VIEWED", viewedAt: new Date() },
         })
+        if (claimed.count === 0) return
         if (s.envelope.status === "SENT") {
           await tx.envelope.update({ where: { id: s.envelopeId }, data: { status: "IN_PROGRESS" } })
         }
@@ -344,7 +347,7 @@ export const signing = new Hono<SigningEnv>()
         await notifyEnvelopeOwner(tx, {
           envelopeId: s.envelopeId,
           type: "recipient.viewed",
-          recipientId: s.id,
+          recipient: s,
         })
       })
     }
@@ -486,7 +489,7 @@ export const signing = new Hono<SigningEnv>()
         await notifyEnvelopeOwner(tx, {
           envelopeId: s.envelopeId,
           type: "recipient.signed",
-          recipientId: s.id,
+          recipient: s,
         })
       }
       // envelope.completed is emitted by finalize, once the signed PDF and certificate exist.
@@ -539,7 +542,7 @@ export const signing = new Hono<SigningEnv>()
       await notifyEnvelopeOwner(tx, {
         envelopeId: s.envelopeId,
         type: "envelope.declined",
-        recipientId: s.id,
+        recipient: s,
         data: { reason: truncateReason(reason) },
       })
       return queueEnvelopeWebhook(tx, {

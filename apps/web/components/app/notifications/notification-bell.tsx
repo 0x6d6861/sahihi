@@ -7,13 +7,18 @@ import { toastManager } from "@/components/app/toast"
 import { NotificationCenter } from "@/components/arc/notification-center/notification-center"
 import { api } from "@/lib/api"
 import {
+  applyLocalChanges,
   BELL_PAGE_SIZE,
   type CenterItem,
   createActionBatcher,
+  isMarkAll,
+  mergeBellPages,
   NOTIFICATIONS_POLL_MS,
+  type NotificationAction,
   type NotificationItem,
   type NotificationPage,
   notificationsSignature,
+  pendingLocalChanges,
   toCenterItems,
 } from "@/lib/notifications"
 
@@ -25,50 +30,78 @@ const ACTION_PATH = {
 
 /**
  * The bell in the top bar: Arc's notification center (docs/notifications.md) fed from
- * `/api/notifications`. The center keeps its own copy of the list after mount, so the bell polls
- * while the tab is visible and remounts it with the new list when something changed, but never
- * while it's open. Read, unread and dismiss are sent back in batches. An item's "Open" action
- * (ADR 0030) closes the panel, marks it read and goes to its page.
+ * `/api/notifications`. The center keeps its own copy of the list after mount, so the bell keeps
+ * two things: the server's list (polled while the tab is visible) and the changes made in the bell
+ * that the server hasn't shown back yet. What it shows is always the first with the second on top,
+ * so a poll that raced a change can't undo it. It remounts the center with that list when it
+ * differs from what's shown, but never while it's open.
+ *
+ * Read, unread and dismiss go back in batches; the center's "Mark all read" goes as `{ all: true }`.
+ * An item's "Open" action (ADR 0030) closes the panel, marks it read and goes to its page.
  */
 export function NotificationBell() {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const [seed, setSeed] = useState<{ key: number; items: CenterItem[] }>({ key: 0, items: [] })
-  /** What the server has, as last loaded and changed locally since */
-  const current = useRef<NotificationItem[]>([])
+  /** The server's list, as last loaded */
+  const server = useRef<NotificationItem[]>([])
+  /** Changes made here that `server` doesn't show yet */
+  const changes = useRef(new Map<string, NotificationAction>())
   /** Signature of what the mounted center shows */
   const shown = useRef("")
   const open = useRef(false)
-  const pending = useRef<NotificationItem[] | null>(null)
 
-  const mount = useCallback((items: NotificationItem[]) => {
-    current.current = items
-    shown.current = notificationsSignature(items)
-    setSeed((s) => ({ key: s.key + 1, items: toCenterItems(items) }))
-  }, [])
+  const visible = useCallback(
+    (now: Date) => applyLocalChanges(server.current, changes.current, now),
+    [],
+  )
+
+  /** Remounts the center with the current list when it differs from what it shows. */
+  const refresh = useCallback(
+    (force = false) => {
+      const now = new Date()
+      const items = visible(now)
+      const signature = notificationsSignature(items, now)
+      if (!force && signature === shown.current) return
+      shown.current = signature
+      setSeed((s) => ({ key: s.key + 1, items: toCenterItems(items, now) }))
+    },
+    [visible],
+  )
 
   const load = useCallback(async () => {
     try {
-      const page = await api<NotificationPage>(`/notifications?limit=${BELL_PAGE_SIZE}`)
-      if (notificationsSignature(page.items) === shown.current) return
-      if (open.current) pending.current = page.items
-      else mount(page.items)
+      const limit = `limit=${BELL_PAGE_SIZE}`
+      const [unread, recent] = await Promise.all([
+        api<NotificationPage>(`/notifications?unread=1&${limit}`),
+        api<NotificationPage>(`/notifications?${limit}`),
+      ])
+      server.current = mergeBellPages(unread.items, recent.items)
+      changes.current = pendingLocalChanges(server.current, changes.current)
+      if (!open.current) refresh()
     } catch {
       // A missed poll is harmless: the next one catches up.
     }
-  }, [mount])
+  }, [refresh])
 
   const queue = useMemo(
     () =>
       createActionBatcher(
-        (action, ids) => api(ACTION_PATH[action], { method: "POST", json: { ids } }),
-        () => {
+        (action, ids) => {
+          const unreadIds = server.current.filter((n) => !n.readAt).map((n) => n.id)
+          if (action === "read" && isMarkAll(ids, unreadIds)) {
+            return api(ACTION_PATH.read, { method: "POST", json: { all: true } })
+          }
+          return api(ACTION_PATH[action], { method: "POST", json: { ids } })
+        },
+        (_err, action, ids) => {
           toastManager.add({ title: "Couldn't update your notifications", type: "error" })
-          // Show the server's state again on the next poll.
-          shown.current = ""
+          // Those changes didn't happen: show the server's state again once the panel closes.
+          for (const id of ids) if (changes.current.get(id) === action) changes.current.delete(id)
+          if (!open.current) refresh()
         },
       ),
-    [],
+    [refresh],
   )
 
   useEffect(() => {
@@ -86,41 +119,39 @@ export function NotificationBell() {
     }
   }, [load])
 
-  /** Mirrors the center's own change, so the next poll sees nothing new and doesn't remount it. */
-  function changed(items: NotificationItem[]) {
-    current.current = items
-    shown.current = notificationsSignature(items)
+  /** Records a change the center already shows, so nothing remounts it for that alone. */
+  function record(id: string, action: NotificationAction) {
+    changes.current.set(id, action)
+    shown.current = notificationsSignature(visible(new Date()))
+    queue(action, id)
   }
 
   function onReadChange(item: { id: string }, read: boolean) {
-    const readAt = read ? new Date().toISOString() : null
-    changed(current.current.map((n) => (n.id === item.id ? { ...n, readAt } : n)))
-    queue(read ? "read" : "unread", item.id)
+    record(item.id, read ? "read" : "unread")
   }
 
   function onDismiss(item: { id: string }) {
-    changed(current.current.filter((n) => n.id !== item.id))
-    queue("dismiss", item.id)
-  }
-
-  function onOpen(item: { id: string }) {
-    const n = current.current.find((x) => x.id === item.id)
-    const href = n ? describeNotification(n).href : null
-    if (!n || !href) return
-    if (!n.readAt) onReadChange(n, true)
-    onOpenChange(false)
-    // The center still shows it unread: remount it from the local list, which has it read.
-    mount(current.current)
-    router.push(href)
+    record(item.id, "dismiss")
   }
 
   function onOpenChange(next: boolean) {
     setIsOpen(next)
     open.current = next
-    if (next || !pending.current) return
-    const items = pending.current
-    pending.current = null
-    if (notificationsSignature(items) !== shown.current) mount(items)
+    // Polls that arrived while it was open, and time labels that moved on, show now.
+    if (!next) refresh()
+  }
+
+  function onOpen(item: { id: string }) {
+    const n = server.current.find((x) => x.id === item.id)
+    const href = n ? describeNotification(n).href : null
+    if (!n || !href) return
+    const read = changes.current.get(n.id) === "read" || (!changes.current.has(n.id) && n.readAt)
+    if (!read) record(n.id, "read")
+    setIsOpen(false)
+    open.current = false
+    // The center itself still shows it unread (it wasn't marked from its own button).
+    refresh(true)
+    router.push(href)
   }
 
   return (

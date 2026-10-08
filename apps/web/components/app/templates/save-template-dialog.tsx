@@ -1,7 +1,7 @@
 "use client"
 
 import { defaultRoleLabels, type RecipientRole, SaveTemplateSchema } from "@sahihi/core"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { ButtonLink } from "@/components/app/button-link"
 import { DialogActions } from "@/components/app/confirm-dialog"
 import { useDraftState } from "@/components/app/envelope/draft-state"
@@ -69,18 +69,22 @@ export function SaveTemplateDialog({
     setOpen(next)
   }
 
-  // Start each opening from a clean form, however it was opened.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reset only when it opens
-  useEffect(() => {
-    if (!open) return
-    setName(envelopeTitle)
-    setDescription("")
-    setLabels(defaultRoleLabels(recipients))
-    setKeep(recipients.map(() => false))
-    setErrors({})
-    setProblems([])
-    setSavedId(null)
-  }, [open])
+  // Start each opening from a clean form, however it was opened. Done while rendering the opening
+  // (React's "adjust state when a prop changes"), not in an effect, so the dialog never shows the
+  // last session's form or "Template saved" view for a frame.
+  const [wasOpen, setWasOpen] = useState(open)
+  if (open !== wasOpen) {
+    setWasOpen(open)
+    if (open) {
+      setName(envelopeTitle)
+      setDescription("")
+      setLabels(defaultRoleLabels(recipients))
+      setKeep(recipients.map(() => false))
+      setErrors({})
+      setProblems([])
+      setSavedId(null)
+    }
+  }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()

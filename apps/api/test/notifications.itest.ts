@@ -140,6 +140,32 @@ describe("envelope events", () => {
     expect(await typesOf(alice)).toEqual(["recipient.viewed"])
   })
 
+  test("two first views at once are one view: one notification, one audit event", async () => {
+    await request(alice, "/api/notifications/preferences", {
+      method: "PUT",
+      json: { settings: { "recipient.viewed": true } },
+    })
+    const { envelopeId, signers } = await sentEnvelope(alice, ["Amina"])
+    const token = signers[0]?.token as string
+    const views = await Promise.all([1, 2, 3].map(() => request(null, `/api/sign/${token}/file`)))
+    expect(views.map((r) => r.status)).toEqual([200, 200, 200])
+    expect(await typesOf(alice)).toEqual(["recipient.viewed"])
+    const audits = await prisma.auditEvent.count({
+      where: { envelopeId, type: "recipient.viewed" },
+    })
+    expect(audits).toBe(1)
+  })
+
+  test("a sender who signs their own envelope isn't told about it", async () => {
+    const me = await prisma.user.findUniqueOrThrow({ where: { id: alice.userId } })
+    const { signers } = await sentEnvelope(alice, ["Amina", "Self"])
+    const self = signers[1]
+    if (!self) throw new Error("no signer")
+    await prisma.recipient.update({ where: { id: self.id }, data: { email: me.email } })
+    expect((await sign(self.token, self.fieldId)).status).toBe(200)
+    expect(await typesOf(alice)).toEqual([])
+  })
+
   test("a decline is reported with its reason", async () => {
     const { signers } = await sentEnvelope(alice, ["Amina"])
     const res = await request(null, `/api/sign/${signers[0]?.token}/decline`, {
@@ -275,6 +301,16 @@ describe("API", () => {
     expect(third.nextCursor).toBeNull()
   })
 
+  test("a cursor still pages after its item was dismissed", async () => {
+    await seed(alice, 4)
+    const first = await list(alice, "?limit=2")
+    const lastId = first.items.at(-1)?.id
+    await request(alice, "/api/notifications/dismiss", { method: "POST", json: { ids: [lastId] } })
+    const second = await list(alice, `?limit=2&cursor=${first.nextCursor}`)
+    expect(second.items.map((i) => i.data.envelopeCount)).toEqual([1, 0])
+    expect((await request(alice, "/api/notifications?cursor=not-a-cursor")).status).toBe(400)
+  })
+
   test("mark some or all as read", async () => {
     await seed(alice, 3)
     const { items } = await list(alice)
@@ -322,6 +358,7 @@ describe("API", () => {
     const stranger = await createSender("stranger")
     const { items } = await list(alice)
     const ids = items.map((i) => i.id)
+    const aliceCursor = (await list(alice, "?limit=1")).nextCursor
 
     for (const s of [colleague, stranger]) {
       expect((await list(s)).items).toEqual([])
@@ -334,8 +371,9 @@ describe("API", () => {
       expect(await unread.json()).toEqual({ updated: 0 })
       const gone = await request(s, "/api/notifications/dismiss", { method: "POST", json: { ids } })
       expect(await gone.json()).toEqual({ deleted: 0 })
-      const cursor = await request(s, `/api/notifications?cursor=${ids[0]}`)
-      expect(cursor.status).toBe(400)
+      // A cursor is only a position: following alice's still lists only the caller's own.
+      const page = await list(s, `?limit=1&cursor=${aliceCursor}`)
+      expect(page.items).toEqual([])
     }
     expect((await list(alice)).unreadCount).toBe(2)
     expect((await list(alice)).items).toHaveLength(2)

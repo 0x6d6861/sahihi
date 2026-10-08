@@ -95,14 +95,78 @@ export function toCenterItems(
 }
 
 /**
- * What the bell shows, as a comparable string: ids in order plus read state. The notification
- * center only takes its list on mount, so the bell remounts it when this changes.
+ * What the bell shows, as a comparable string: ids in order, read state and the time labels. The
+ * notification center only takes its list on mount, so the bell remounts it (while closed) when
+ * this changes, which also moves "now" on to "5m".
  */
-export function notificationsSignature(items: readonly NotificationItem[]): string {
-  return items.map((n) => `${n.id}:${n.readAt ? 1 : 0}`).join(",")
+export function notificationsSignature(
+  items: readonly NotificationItem[],
+  now: Date = new Date(),
+): string {
+  return items.map((n) => `${n.id}:${n.readAt ? 1 : 0}:${timeAgo(n.createdAt, now)}`).join(",")
+}
+
+/** The bell's list: unread ones first loaded on their own, so old unread ones aren't cut off. */
+export function mergeBellPages(...pages: (readonly NotificationItem[])[]): NotificationItem[] {
+  const byId = new Map<string, NotificationItem>()
+  for (const page of pages) for (const n of page) byId.set(n.id, n)
+  return [...byId.values()].sort(
+    (a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id),
+  )
 }
 
 export type NotificationAction = "read" | "unread" | "dismiss"
+
+/** Changes made in the bell that the server hasn't shown back yet, by notification id. */
+export type LocalChanges = ReadonlyMap<string, NotificationAction>
+
+/** The server's list with the bell's own changes on top: what the bell shows. */
+export function applyLocalChanges(
+  items: readonly NotificationItem[],
+  changes: LocalChanges,
+  now: Date = new Date(),
+): NotificationItem[] {
+  if (changes.size === 0) return [...items]
+  const out: NotificationItem[] = []
+  for (const n of items) {
+    const change = changes.get(n.id)
+    if (change === "dismiss") continue
+    if (change === "read") out.push(n.readAt ? n : { ...n, readAt: now.toISOString() })
+    else if (change === "unread") out.push({ ...n, readAt: null })
+    else out.push(n)
+  }
+  return out
+}
+
+/** The changes the server's list doesn't reflect yet; the rest are done and can be forgotten. */
+export function pendingLocalChanges(
+  items: readonly NotificationItem[],
+  changes: LocalChanges,
+): Map<string, NotificationAction> {
+  const byId = new Map(items.map((n) => [n.id, n]))
+  const pending = new Map<string, NotificationAction>()
+  for (const [id, change] of changes) {
+    const n = byId.get(id)
+    const done =
+      change === "dismiss"
+        ? !n
+        : // Gone from the list (dismissed elsewhere or past the page): nothing left to show.
+          !n || (change === "read" ? n.readAt !== null : n.readAt === null)
+    if (!done) pending.set(id, change)
+  }
+  return pending
+}
+
+/**
+ * Whether a batch of "read" ids is the center's "Mark all read": several ids at once that cover
+ * every unread notification loaded (single toggles arrive one per tick). The bell then sends
+ * `{ all: true }`, which also covers unread ones older than the loaded list.
+ */
+export function isMarkAll(readIds: readonly string[], unreadIds: readonly string[]): boolean {
+  if (readIds.length < 2 || unreadIds.length === 0) return false
+  const read = new Set(readIds)
+  return unreadIds.every((id) => read.has(id))
+}
 
 /**
  * Collects the notification center's per-item callbacks ("Mark all read" calls back once per
@@ -111,7 +175,8 @@ export type NotificationAction = "read" | "unread" | "dismiss"
  */
 export function createActionBatcher(
   send: (action: NotificationAction, ids: string[]) => Promise<unknown>,
-  onError: (err: unknown) => void,
+  /** A request failed: those ids' changes didn't happen. */
+  onError: (err: unknown, action: NotificationAction, ids: string[]) => void,
   schedule: (flush: () => void) => void = (flush) => {
     setTimeout(flush, 0)
   },
@@ -129,10 +194,11 @@ export function createActionBatcher(
       const ids = [...queues[action]]
       queues[action].clear()
       for (let i = 0; i < ids.length; i += 100) {
+        const chunk = ids.slice(i, i + 100)
         try {
-          await send(action, ids.slice(i, i + 100))
+          await send(action, chunk)
         } catch (err) {
-          onError(err)
+          onError(err, action, chunk)
         }
       }
     }

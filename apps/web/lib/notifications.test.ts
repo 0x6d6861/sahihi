@@ -1,12 +1,16 @@
 import { describe, expect, test } from "bun:test"
 import { formatDate } from "./format"
 import {
+  applyLocalChanges,
   createActionBatcher,
   groupPreferences,
+  isMarkAll,
+  mergeBellPages,
   type NotificationAction,
   type NotificationItem,
   notificationsSignature,
   openLabelFor,
+  pendingLocalChanges,
   timeAgo,
   toCenterItems,
 } from "./notifications"
@@ -82,11 +86,82 @@ describe("openLabelFor", () => {
 })
 
 describe("notificationsSignature", () => {
-  test("changes with new items, order and read state only", () => {
-    const base = notificationsSignature([n("a"), n("b")])
-    expect(notificationsSignature([n("a"), n("b"), { ...n("c") }])).not.toBe(base)
-    expect(notificationsSignature([n("a", { readAt: "x" }), n("b")])).not.toBe(base)
-    expect(notificationsSignature([n("a", { data: { envelopeCount: 9 } }), n("b")])).toBe(base)
+  const now = new Date("2026-10-07T12:00:30Z")
+  test("changes with new items, order and read state, not with data", () => {
+    const base = notificationsSignature([n("a"), n("b")], now)
+    expect(notificationsSignature([n("a"), n("b"), n("c")], now)).not.toBe(base)
+    expect(notificationsSignature([n("a", { readAt: "x" }), n("b")], now)).not.toBe(base)
+    expect(notificationsSignature([n("a", { data: { envelopeCount: 9 } }), n("b")], now)).toBe(base)
+  })
+  test("changes when a time label moves on, so the bell doesn't stay on 'now'", () => {
+    const later = new Date("2026-10-07T12:06:00Z")
+    expect(notificationsSignature([n("a")], later)).not.toBe(notificationsSignature([n("a")], now))
+  })
+})
+
+describe("mergeBellPages", () => {
+  test("one list, newest first, no duplicates", () => {
+    const merged = mergeBellPages(
+      [n("old-unread", { createdAt: "2026-09-01T00:00:00Z" }), n("b")],
+      [n("b"), n("c", { createdAt: "2026-10-07T13:00:00Z" })],
+    )
+    expect(merged.map((x) => x.id)).toEqual(["c", "b", "old-unread"])
+  })
+})
+
+describe("local changes", () => {
+  const now = new Date("2026-10-07T12:00:00Z")
+  test("applied on top of the server's list", () => {
+    const shown = applyLocalChanges(
+      [n("a"), n("b"), n("c", { readAt: "2026-10-07T11:00:00Z" })],
+      new Map([
+        ["a", "read"],
+        ["b", "dismiss"],
+        ["c", "unread"],
+      ]),
+      now,
+    )
+    expect(shown.map((x) => [x.id, x.readAt])).toEqual([
+      ["a", now.toISOString()],
+      ["c", null],
+    ])
+  })
+  test("a poll that predates the change doesn't undo it", () => {
+    // The user marked A read and dismissed B; the poll's list was fetched before either landed.
+    const changes = new Map<string, NotificationAction>([
+      ["a", "read"],
+      ["b", "dismiss"],
+    ])
+    const stale = [n("a"), n("b")]
+    const pending = pendingLocalChanges(stale, changes)
+    expect([...pending]).toEqual([
+      ["a", "read"],
+      ["b", "dismiss"],
+    ])
+    expect(applyLocalChanges(stale, pending, now).map((x) => [x.id, x.readAt])).toEqual([
+      ["a", now.toISOString()],
+    ])
+  })
+  test("forgotten once the server shows them", () => {
+    const changes = new Map<string, NotificationAction>([
+      ["a", "read"],
+      ["b", "dismiss"],
+      ["c", "unread"],
+    ])
+    const fresh = [n("a", { readAt: "2026-10-07T12:00:01Z" }), n("c")]
+    expect(pendingLocalChanges(fresh, changes).size).toBe(0)
+  })
+})
+
+describe("isMarkAll", () => {
+  test("several reads covering every loaded unread one", () => {
+    expect(isMarkAll(["a", "b"], ["a", "b"])).toBe(true)
+    expect(isMarkAll(["a", "b", "c"], ["a", "b"])).toBe(true)
+  })
+  test("not a single toggle or a partial batch", () => {
+    expect(isMarkAll(["a"], ["a"])).toBe(false)
+    expect(isMarkAll(["a", "b"], ["a", "b", "c"])).toBe(false)
+    expect(isMarkAll(["a", "b"], [])).toBe(false)
   })
 })
 
@@ -100,7 +175,7 @@ describe("createActionBatcher", () => {
         sent.push([action, ids])
         if (fail) throw new Error("offline")
       },
-      (err) => errors.push(err),
+      (_err, action, ids) => errors.push([action, ids]),
       (flush) => {
         pending = flush
       },
@@ -140,13 +215,16 @@ describe("createActionBatcher", () => {
     expect(sent.map(([, ids]) => ids.length)).toEqual([100, 50])
   })
 
-  test("failures are reported and the batch goes on", async () => {
+  test("failures are reported with their ids and the batch goes on", async () => {
     const { queue, sent, errors, flush } = setup(true)
     queue("read", "a")
     queue("dismiss", "b")
     await flush()
     expect(sent).toHaveLength(2)
-    expect(errors).toHaveLength(2)
+    expect(errors).toEqual([
+      ["read", ["a"]],
+      ["dismiss", ["b"]],
+    ])
   })
 })
 

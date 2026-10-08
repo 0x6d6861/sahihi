@@ -34,16 +34,14 @@ export async function voidEnvelope(input: {
       ipAddress: input.actor.ipAddress ?? null,
       userAgent: input.actor.userAgent ?? null,
     })
-    // Only when someone else voided it: the creator knows what they did.
-    const actorUser = await tx.user.findUnique({
-      where: { id: input.actor.userId },
-      select: { name: true },
-    })
+    // Only when someone else voided it: the creator knows what they did. The voider's name is read
+    // only then.
     await notifyEnvelopeOwner(tx, {
       envelopeId: e.id,
       type: "envelope.voided",
       exceptUserId: input.actor.userId,
-      data: { actorName: actorUser?.name, reason: truncateReason(input.reason) },
+      actorUserId: input.actor.userId,
+      data: { reason: truncateReason(input.reason) },
     })
     return queueEnvelopeWebhook(tx, { envelopeId: e.id, type: "envelope.voided" })
   })

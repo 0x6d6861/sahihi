@@ -174,7 +174,7 @@ export function isNotificationEnabled(type: NotificationType, settings: Notifica
 export const NOTIFICATION_PAGE_SIZE = 20
 
 export const ListNotificationsQuerySchema = z.object({
-  /** The id of the last item of the previous page */
+  /** `nextCursor` of the previous page (`encodeNotificationCursor`) */
   cursor: z.string().min(1).max(64).optional(),
   limit: z.coerce.number().int().min(1).max(50).default(NOTIFICATION_PAGE_SIZE),
   unread: z
@@ -184,6 +184,22 @@ export const ListNotificationsQuerySchema = z.object({
 })
 
 const NotificationIds = z.array(z.string().min(1).max(64)).min(1).max(100)
+
+/**
+ * Keyset cursor for the notification list: the last item's position (`createdAt` in ms and id),
+ * not just its id, so a page still follows after that item was dismissed or cleaned up.
+ */
+export function encodeNotificationCursor(item: { createdAt: Date; id: string }): string {
+  return `${item.createdAt.getTime()}.${item.id}`
+}
+
+/** The position in a cursor, or null when it isn't one. */
+export function decodeNotificationCursor(cursor: string): { createdAt: Date; id: string } | null {
+  const match = /^(\d{1,15})\.([A-Za-z0-9_-]{1,40})$/.exec(cursor)
+  if (!match) return null
+  const createdAt = new Date(Number(match[1]))
+  return Number.isNaN(createdAt.getTime()) ? null : { createdAt, id: match[2] as string }
+}
 
 export const MarkNotificationsReadSchema = z.union([
   z.object({ ids: NotificationIds }),
