@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { DragCard, DragRow, SelectCell } from "@/components/app/files/drag-items"
 import { CreateFolderButton } from "@/components/app/folders/create-folder-button"
 import {
   FolderCard,
@@ -9,8 +10,9 @@ import { FolderIcon } from "@/components/app/icons"
 import { ColorDot, ColorName, TagBadges } from "@/components/app/labels/labels"
 import { Person } from "@/components/app/people"
 import { Breadcrumb } from "@/components/arc/breadcrumb/breadcrumb"
-import { TableCell, TableRow } from "@/components/ui/table"
+import { TableCell } from "@/components/ui/table"
 import { folderMeta } from "@/lib/documents-list"
+import type { DropTarget, MovableItem } from "@/lib/file-moves"
 import { formatDate, formatDateTime } from "@/lib/format"
 import type { TagRef } from "@/lib/labels"
 
@@ -42,6 +44,26 @@ export const parentLabel = (parent: { name: string } | null | undefined) =>
 /** The open folder's parent, or a search result's own parent. */
 const parentOf = (f: FolderCardData, current: Ref | null, searching: boolean) =>
   searching ? f.path?.at(-1) : current
+
+/**
+ * A folder as something to drag (where it sits) and a place to drop (its path, root first),
+ * for All files (ADR 0039). `path` is the open folder's breadcrumb path.
+ */
+function folderDrag(f: FolderCardData, current: Ref | null, path: Ref[], searching: boolean) {
+  const parents = searching ? (f.path ?? []) : path.length > 0 ? path : current ? [current] : []
+  const item: MovableItem = {
+    kind: "folder",
+    id: f.id,
+    name: f.name,
+    folderId: parentOf(f, current, searching)?.id ?? null,
+  }
+  const target: DropTarget = {
+    folderId: f.id,
+    name: f.name,
+    path: [...parents.map((p) => p.id), f.id],
+  }
+  return { item, target, canMove: f.permissions.manage }
+}
 
 /** Shown inside folders only. The last item is the current folder (no link). */
 export function FolderBreadcrumb({
@@ -98,6 +120,7 @@ export function FolderHeading({
 export function FolderCards({
   folders,
   current,
+  path = [],
   searching,
   canCreate,
   allTags,
@@ -106,6 +129,8 @@ export function FolderCards({
 }: {
   folders: FolderCardData[]
   current: Ref | null
+  /** The open folder's path, for drop targets (All files). */
+  path?: Ref[]
   searching: boolean
   canCreate: boolean
   allTags: TagRef[]
@@ -125,15 +150,22 @@ export function FolderCards({
           folders.map((f) => {
             const parent = parentOf(f, current, searching)
             return (
-              <FolderCard
+              <DragCard
                 key={f.id}
-                folder={f}
-                href={hrefFor(f.id)}
-                parentId={parent?.id ?? null}
-                parentName={parentLabel(parent)}
-                allTags={allTags}
-                rootLabel={rootLabel}
-              />
+                as="div"
+                className="rounded-xl"
+                selectClassName="start-1.5 top-1/2 -translate-y-1/2"
+                {...folderDrag(f, current, path, searching)}
+              >
+                <FolderCard
+                  folder={f}
+                  href={hrefFor(f.id)}
+                  parentId={parent?.id ?? null}
+                  parentName={parentLabel(parent)}
+                  allTags={allTags}
+                  rootLabel={rootLabel}
+                />
+              </DragCard>
             )
           })
         )}
@@ -151,6 +183,7 @@ export function FolderCards({
 export function FolderRows({
   folders,
   current,
+  path = [],
   searching,
   allTags,
   hrefFor,
@@ -159,6 +192,8 @@ export function FolderRows({
 }: {
   folders: FolderCardData[]
   current: Ref | null
+  /** The open folder's path, for drop targets (All files). */
+  path?: Ref[]
   searching: boolean
   allTags: TagRef[]
   hrefFor: (folderId: string) => string
@@ -168,7 +203,8 @@ export function FolderRows({
   return folders.map((f) => {
     const parent = parentOf(f, current, searching)
     return (
-      <TableRow key={`folder-${f.id}`}>
+      <DragRow key={`folder-${f.id}`} {...folderDrag(f, current, path, searching)}>
+        <SelectCell {...folderDrag(f, current, path, searching)} />
         <TableCell
           className="w-full max-w-0 ps-3"
           colSpan={columns === 2 ? undefined : columns + 1}
@@ -221,7 +257,7 @@ export function FolderRows({
             allTags={allTags}
           />
         </TableCell>
-      </TableRow>
+      </DragRow>
     )
   })
 }

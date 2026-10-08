@@ -81,3 +81,52 @@ export function mergeNewestFirst<T extends { createdAt: Date | string; id: strin
     .sort((a, b) => time(b) - time(a) || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0))
     .slice((page - 1) * pageSize, page * pageSize)
 }
+
+/** What can be dragged or picked together and moved into a folder (ADR 0039). */
+export const MOVABLE_KINDS = [...FILE_KINDS, "folder"] as const
+export type MovableKind = (typeof MOVABLE_KINDS)[number]
+
+/** Most items one move may carry (a full page of files plus its folders). */
+export const MAX_MOVE_ITEMS = 100
+
+/**
+ * `POST /files/move`: move documents, envelopes, templates and folders into one folder
+ * (`folderId: null` = workspace root). All or nothing (ADR 0039).
+ */
+const movableItems = z
+  .array(z.object({ kind: z.enum(MOVABLE_KINDS), id: z.string().min(1).max(64) }))
+  .max(MAX_MOVE_ITEMS, `Move at most ${MAX_MOVE_ITEMS} items at a time`)
+  .refine(
+    (items) => new Set(items.map((i) => `${i.kind}:${i.id}`)).size === items.length,
+    "Each item may appear only once",
+  )
+
+export const MoveItemsSchema = z.object({
+  items: movableItems.refine((items) => items.length > 0, "Pick something to move"),
+  folderId: z.string().min(1).max(64).nullable(),
+})
+export type MoveItemsInput = z.infer<typeof MoveItemsSchema>
+
+/** The name a folder made by dropping one file on another starts with (ADR 0039). */
+export const NEW_FOLDER_NAME = "New folder"
+
+/**
+ * `POST /files/group`: drop items onto a file and both land in a new folder inside `parentId`
+ * (null = workspace root), named "New folder" (or "New folder 2", … when taken). At least two
+ * items: the file dropped on and what was dragged. All or nothing, like a move.
+ */
+export const GroupItemsSchema = z.object({
+  items: movableItems.refine((items) => items.length >= 2, "Drop something onto another item"),
+  parentId: z.string().min(1).max(64).nullable(),
+})
+export type GroupItemsInput = z.infer<typeof GroupItemsSchema>
+
+/** `base`, or `base 2`, `base 3`, … : the first one no sibling uses (case-insensitive). */
+export function uniqueFolderName(base: string, taken: readonly string[]): string {
+  const used = new Set(taken.map((n) => n.toLocaleLowerCase()))
+  if (!used.has(base.toLocaleLowerCase())) return base
+  for (let i = 2; ; i++) {
+    const name = `${base} ${i}`
+    if (!used.has(name.toLocaleLowerCase())) return name
+  }
+}
