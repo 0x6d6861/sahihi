@@ -82,6 +82,7 @@ export function createNonce(): string {
 
 /** App routes that need a session (the optimistic cookie check in proxy.ts). */
 const PROTECTED_PREFIXES = [
+  "/files",
   "/documents",
   "/envelopes",
   "/templates",

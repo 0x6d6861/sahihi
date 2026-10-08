@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
+import { HOME_HREF } from "@/lib/nav"
 
 export default function Home() {
-  redirect("/documents")
+  redirect(HOME_HREF)
 }

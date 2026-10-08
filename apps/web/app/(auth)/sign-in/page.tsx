@@ -9,6 +9,7 @@ import { Button } from "@/components/arc/button/button"
 import { Input } from "@/components/arc/input/input"
 import { PasswordField } from "@/components/arc/password-field/password-field"
 import { signIn } from "@/lib/auth-client"
+import { HOME_HREF } from "@/lib/nav"
 
 /**
  * REFERENCE PATTERN for forms: a native form with Arc fields (label, description and error on the
@@ -16,7 +17,7 @@ import { signIn } from "@/lib/auth-client"
  */
 function SignInForm() {
   const router = useRouter()
-  const next = useSearchParams().get("next") ?? "/documents"
+  const next = useSearchParams().get("next") ?? HOME_HREF
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
 

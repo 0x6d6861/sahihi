@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { initials, isFullPage, isNavActive } from "./nav"
+import { APP_NAV, HOME_HREF, initials, isFullPage, isNavActive } from "./nav"
 
 describe("isNavActive", () => {
   test("matches the section and pages below it", () => {
@@ -9,6 +9,13 @@ describe("isNavActive", () => {
   test("does not match siblings sharing a prefix", () => {
     expect(isNavActive("/envelopes-archive", "/envelopes")).toBe(false)
     expect(isNavActive("/documents", "/envelopes")).toBe(false)
+  })
+})
+
+describe("APP_NAV", () => {
+  test("All files comes first and is home (ADR 0038)", () => {
+    expect(APP_NAV.map((n) => n.href)).toEqual(["/files", "/documents", "/envelopes", "/templates"])
+    expect(HOME_HREF).toBe("/files")
   })
 })
 

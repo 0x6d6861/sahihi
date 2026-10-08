@@ -42,7 +42,13 @@ export function useListNavigation(page: ListPage, urlLayout: ListLayout | undefi
   }
 }
 
-export type ChipOption = { value: string; label: string; icon?: ReactNode }
+export type ChipOption = {
+  value: string
+  label: string
+  icon?: ReactNode
+  /** Starts a new group in the menu (a separator above it). */
+  separatorBefore?: boolean
+}
 
 export interface SearchChip {
   id: string
@@ -209,7 +215,7 @@ export function ListSearch({
                     ...chip.options.map((o, i) => ({
                       label: o.label,
                       icon: value?.value === o.value ? <CheckIcon /> : (o.icon ?? <span />),
-                      separatorBefore: i === 0,
+                      separatorBefore: i === 0 || o.separatorBefore,
                       onSelect: () => onChipChange(chip.id, o.value),
                     })),
                   ]}

@@ -41,6 +41,7 @@ export * from "./templates/templates"
 
 export * from "./workspace/billing"
 export * from "./workspace/branding"
+export * from "./workspace/files"
 export * from "./workspace/folders"
 export * from "./workspace/labels"
 export * from "./workspace/members"

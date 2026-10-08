@@ -1,14 +1,15 @@
 /**
- * List or grid on the Documents, Envelopes and Templates pages (ADR 0033, 0036). The last choice
+ * List or grid on the All files, Documents, Envelopes and Templates pages (ADR 0033, 0036, 0038). The last choice
  * on each page is saved in its own cookie so the page opens the same way next time; a
  * `?layout=list|grid` link wins over the cookie and is saved too.
  */
 export type ListLayout = "list" | "grid"
-export type ListPage = "documents" | "envelopes" | "templates"
+export type ListPage = "files" | "documents" | "envelopes" | "templates"
 
 export const LIST_LAYOUTS = ["list", "grid"] as const
 
 export const LIST_LAYOUT_COOKIE: Record<ListPage, string> = {
+  files: "sahihi-files-layout",
   documents: "sahihi-documents-layout",
   envelopes: "sahihi-envelopes-layout",
   templates: "sahihi-templates-layout",

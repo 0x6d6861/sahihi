@@ -39,7 +39,6 @@ import {
   getQueues,
   headObject,
   keys,
-  presignCacheable,
   presignDownload,
   presignUpload,
 } from "@sahihi/infra"
@@ -66,6 +65,7 @@ import {
 } from "../lib/http"
 import { colorsInUse, resolveTags, TAG_SELECT, tagsInUse } from "../lib/labels"
 import { envelopeWhere } from "../lib/list-filters"
+import { envelopeListInclude, envelopeListItem } from "../lib/list-items"
 import { actor, assertCanManageEnvelope } from "../lib/permissions"
 import { requireOrg } from "../middleware/session"
 
@@ -195,21 +195,7 @@ export const envelopes = new Hono<AppEnv>()
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         skip: (query.page - 1) * pageSize,
         take: pageSize,
-        include: {
-          documents: {
-            orderBy: { order: "asc" },
-            select: {
-              document: { select: { id: true, name: true, pageCount: true, thumbnailKey: true } },
-            },
-          },
-          recipients: {
-            select: { id: true, name: true, status: true, role: true },
-            orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-          },
-          createdBy: { select: { id: true, name: true, image: true } },
-          folder: { select: { id: true, name: true } },
-          tags: TAG_SELECT,
-        },
+        include: envelopeListInclude,
       }),
       prisma.envelope.count({ where }),
       // "Sent by" chip options: everyone who created an envelope in this workspace.
@@ -220,20 +206,7 @@ export const envelopes = new Hono<AppEnv>()
       }),
     ])
     const me = actor(c)
-    const items = await Promise.all(
-      rows.map(async ({ documents, ...e }) => {
-        const docs = documents.map(({ document: { thumbnailKey: _key, ...d } }) => d)
-        const thumbnailKey = documents[0]?.document.thumbnailKey
-        return {
-          ...e,
-          // The first document (list rows show it and "+ N more"; ADR 0037), then all of them.
-          document: docs[0] ?? null,
-          documents: docs,
-          thumbnailUrl: thumbnailKey ? await presignCacheable(thumbnailKey) : null,
-          permissions: { manage: canManageEnvelope(me, e) },
-        }
-      }),
-    )
+    const items = await Promise.all(rows.map((e) => envelopeListItem(e, me)))
     return c.json({
       items,
       page: query.page,

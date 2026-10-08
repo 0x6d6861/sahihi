@@ -9,13 +9,14 @@ import {
 } from "@sahihi/core"
 import { forOrganization, prisma } from "@sahihi/db"
 import { createEnvelopeFromTemplate } from "@sahihi/envelopes"
-import { copyObject, deleteObject, keys, presignCacheable } from "@sahihi/infra"
+import { copyObject, deleteObject, keys } from "@sahihi/infra"
 import { Hono } from "hono"
 import type { AppEnv } from "../lib/env"
 import { assertFolderInOrg } from "../lib/folder-tree"
 import { badRequest, clientMeta, notFound, parseJson, parseQuery } from "../lib/http"
 import { colorsInUse, resolveTags, TAG_SELECT, tagsInUse } from "../lib/labels"
 import { templateWhere } from "../lib/list-filters"
+import { templateListInclude, templateListItem } from "../lib/list-items"
 import { actor, assertCanManageTemplate } from "../lib/permissions"
 import { sendAfterCreate } from "../lib/send-after-create"
 import { requireOrg } from "../middleware/session"
@@ -172,19 +173,7 @@ export const templates = new Hono<AppEnv>()
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         skip: (query.page - 1) * pageSize,
         take: pageSize,
-        include: {
-          documents: {
-            orderBy: { order: "asc" },
-            select: {
-              document: { select: { id: true, name: true, pageCount: true, thumbnailKey: true } },
-            },
-          },
-          createdBy: { select: { id: true, name: true, image: true } },
-          roles: { select: { label: true, role: true }, orderBy: { order: "asc" } },
-          _count: { select: { fields: true } },
-          folder: { select: { id: true, name: true } },
-          tags: TAG_SELECT,
-        },
+        include: templateListInclude,
       }),
       prisma.template.count({ where }),
       // "Saved by" chip options: everyone who saved a template in this workspace.
@@ -196,20 +185,7 @@ export const templates = new Hono<AppEnv>()
     ])
     const a = actor(c)
     return c.json({
-      items: await Promise.all(
-        rows.map(async ({ createdById, documents, ...t }) => {
-          const docs = documents.map(({ document: { thumbnailKey: _key, ...d } }) => d)
-          const thumbnailKey = documents[0]?.document.thumbnailKey
-          return {
-            ...t,
-            // The first document (rows show it and "+ N more"; ADR 0037), then all of them.
-            document: docs[0] ?? null,
-            documents: docs,
-            thumbnailUrl: thumbnailKey ? await presignCacheable(thumbnailKey) : null,
-            permissions: { manage: canManageTemplate(a, { createdById }) },
-          }
-        }),
-      ),
+      items: await Promise.all(rows.map((t) => templateListItem(t, a))),
       page: query.page,
       pageSize,
       total,

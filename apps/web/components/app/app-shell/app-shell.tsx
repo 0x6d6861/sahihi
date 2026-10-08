@@ -1,6 +1,12 @@
 "use client"
 
-import { File02Icon, LicenseDraftIcon, SentIcon, SignatureIcon } from "@hugeicons/core-free-icons"
+import {
+  File02Icon,
+  Folder01Icon,
+  LicenseDraftIcon,
+  SentIcon,
+  SignatureIcon,
+} from "@hugeicons/core-free-icons"
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -12,6 +18,7 @@ import { OrgSwitcher, type ShellOrganization } from "./org-switcher"
 import { type ShellUser, UserMenu } from "./user-menu"
 
 const NAV_ICONS: Record<AppNavHref, IconSvgElement> = {
+  "/files": Folder01Icon,
   "/documents": File02Icon,
   "/envelopes": SentIcon,
   "/templates": LicenseDraftIcon,

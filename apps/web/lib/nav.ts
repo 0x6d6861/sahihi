@@ -3,12 +3,17 @@
  * the component. Settings is reached from the user menu only (ADR 0026).
  */
 export const APP_NAV: readonly { href: AppNavHref; label: string }[] = [
+  // Home (ADR 0038): documents, envelopes and templates together, in their shared folders.
+  { href: "/files", label: "All files" },
   { href: "/documents", label: "Documents" },
   { href: "/envelopes", label: "Envelopes" },
   { href: "/templates", label: "Templates" },
 ]
 
-export type AppNavHref = "/documents" | "/envelopes" | "/templates"
+export type AppNavHref = "/files" | "/documents" | "/envelopes" | "/templates"
+
+/** Where the app opens after sign-in, onboarding or a workspace switch (ADR 0038). */
+export const HOME_HREF = "/files"
 
 /**
  * Settings pages: the tab bar on every settings page. Your account first (profile, security,

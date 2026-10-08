@@ -248,6 +248,7 @@ const TENANT: Record<string, Case> = {
 const LISTS = [
   "GET /api/documents",
   "GET /api/folders",
+  "GET /api/files",
   "GET /api/envelopes",
   "GET /api/templates",
   "GET /api/webhooks",

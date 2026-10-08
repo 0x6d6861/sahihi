@@ -21,7 +21,6 @@ import {
   getObjectBytes,
   headObject,
   keys,
-  presignCacheable,
   presignDownload,
   presignUpload,
 } from "@sahihi/infra"
@@ -32,6 +31,7 @@ import { loadFolderTree } from "../lib/folder-tree"
 import { badRequest, conflict, notFound, parseJson, parseQuery } from "../lib/http"
 import { colorsInUse, resolveTags, TAG_SELECT, tagsInUse } from "../lib/labels"
 import { documentWhere } from "../lib/list-filters"
+import { documentListInclude, documentListItem } from "../lib/list-items"
 import { actor, assertCanDeleteDocument, assertCanMoveDocument } from "../lib/permissions"
 import { queueThumbnail } from "../lib/thumbnails"
 import { requireOrg } from "../middleware/session"
@@ -144,16 +144,7 @@ export const documents = new Hono<AppEnv>()
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         skip: (query.page - 1) * pageSize,
         take: pageSize,
-        include: {
-          // Sent envelopes freeze the name (it's on the signing page and the certificate).
-          _count: {
-            select: { envelopeDocuments: { where: { envelope: { status: { not: "DRAFT" } } } } },
-          },
-          source: { select: { id: true, name: true, deletedAt: true } },
-          uploadedBy: { select: { id: true, name: true, image: true } },
-          folder: { select: { id: true, name: true } },
-          tags: TAG_SELECT,
-        },
+        include: documentListInclude,
       }),
       prisma.document.count({ where }),
       // "Sender" filter options: everyone who uploaded a listed document in this workspace.
@@ -167,21 +158,7 @@ export const documents = new Hono<AppEnv>()
     ])
     const me = actor(c)
     return c.json({
-      items: await Promise.all(
-        items.map(async (d) => {
-          const mine = canMoveDocument(me, d)
-          return {
-            ...d,
-            // Cacheable presigned URL (ADR 0033); null until the worker has rendered it.
-            thumbnailUrl: d.thumbnailKey ? await presignCacheable(d.thumbnailKey) : null,
-            permissions: {
-              move: mine,
-              label: mine,
-              rename: mine && d._count.envelopeDocuments === 0,
-            },
-          }
-        }),
-      ),
+      items: await Promise.all(items.map((d) => documentListItem(d, me))),
       page: query.page,
       pageSize,
       total,

@@ -96,6 +96,7 @@ describe("helpers", () => {
 
   test("isProtectedPath covers the app routes, not public ones", () => {
     for (const p of [
+      "/files",
       "/documents",
       "/envelopes/abc",
       "/templates/t1/use",
