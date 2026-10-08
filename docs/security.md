@@ -56,6 +56,9 @@ tenants must never see each other's data.**
 | `/api/sign/:token/otp` | 5 / 15 min / token |
 | `/api/verify/*` | 30 / min / IP |
 | `/api/branding/:orgId/logo.png` (public workspace logo, ADR 0028) | 300 / min / IP |
+
+`/api/avatars/:userId` is not public: it needs a session and only serves people who share a
+workspace with that user.
 | `/api/v1/*` (public API) | 1200 / min / IP, then 600 / min / API key |
 
 better-auth applies its own limits to `/api/auth/*`.

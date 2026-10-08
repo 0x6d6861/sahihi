@@ -52,6 +52,7 @@ opens Profile.
 
 | What | How |
 |---|---|
+| Picture | `PUT/DELETE /api/me/avatar`. The browser crops the centre square to 256×256 PNG; the API checks it (`avatarProblem`), stores `user/{userId}/avatar-{version}.png` (row `UserAvatar`) and sets `User.image` to `/api/avatars/{userId}?v={version}` (`avatarUrl`). The account menu and members table read `User.image`. A photo is personal data, so `GET /api/avatars/:userId` (`routes/avatars.ts`) needs a session and serves only the user and people sharing a workspace with them (others get 404), `Cache-Control: private`. A `databaseHooks.user.update.before` hook refuses `image` through better-auth's `update-user` |
 | Name | better-auth `update-user` (`UpdateProfileSchema`) |
 | Email | better-auth `change-email`. A verified user gets a confirmation link at the **current** address (`auth.change-email` job); following it sends the usual verification link to the new address, and the email changes once that's followed |
 | Saved signature and initials | `GET/PUT /api/me/signatures`, `DELETE /api/me/signatures/:kind` (`apps/api/src/routes/me.ts`, `requireUser`: session, no active org needed). PNGs (`SaveSignatureSchema`, same cap as signing) at `user/{userId}/{kind}-{version}.png`; row `SavedSignature` |

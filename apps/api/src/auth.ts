@@ -71,8 +71,9 @@ export const auth = betterAuth({
       update: {
         // The picture is uploaded through PUT /api/me/avatar, which sets `image` to our own URL.
         // Refusing it here keeps `update-user` from pointing it anywhere else.
-        before: async (user, ctx) => {
-          if (ctx && "image" in user) {
+        // update-user always passes an `image` key (undefined when only the name changes).
+        before: async (user) => {
+          if (user.image !== undefined) {
             throw new APIError("BAD_REQUEST", { message: "Upload a picture in Settings → Profile" })
           }
         },
@@ -118,7 +119,8 @@ export const auth = betterAuth({
           if (organization.logo) throw new APIError("BAD_REQUEST", { message: LOGO_MESSAGE })
         },
         beforeUpdateOrganization: async ({ organization }) => {
-          if ("logo" in organization) throw new APIError("BAD_REQUEST", { message: LOGO_MESSAGE })
+          if (organization.logo !== undefined)
+            throw new APIError("BAD_REQUEST", { message: LOGO_MESSAGE })
         },
         // Pending invitations hold a seat, so an invite that could never be accepted is refused now.
         beforeCreateInvitation: async ({ organization }) => {

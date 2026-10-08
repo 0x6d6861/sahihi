@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test"
-import { backupCodesText, brandingLogoPath, fitWithin, totpSecretFromUri } from "./account"
+import {
+  backupCodesText,
+  brandingLogoPath,
+  centerSquare,
+  fitWithin,
+  totpSecretFromUri,
+} from "./account"
 
 describe("brandingLogoPath", () => {
   test("keeps only our branding route, as a same-origin path", () => {
@@ -46,4 +52,10 @@ describe("fitWithin", () => {
     expect(fitWithin(400, 400, 640, 160)).toEqual({ width: 160, height: 160 })
     expect(fitWithin(100, 50, 640, 160)).toEqual({ width: 100, height: 50 })
   })
+})
+
+test("centerSquare crops the middle of the longer side", () => {
+  expect(centerSquare(400, 300)).toEqual({ x: 50, y: 0, size: 300 })
+  expect(centerSquare(300, 500)).toEqual({ x: 0, y: 100, size: 300 })
+  expect(centerSquare(256, 256)).toEqual({ x: 0, y: 0, size: 256 })
 })
