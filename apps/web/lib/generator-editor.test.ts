@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { findStarter } from "@sahihi/core"
+import { findStarter, STARTERS } from "@sahihi/core"
 import { blankKey, fromEditorDoc, toEditorDoc } from "./generator-editor"
 
 const nda = () => {
@@ -9,8 +9,8 @@ const nda = () => {
 }
 
 describe("editor conversion", () => {
-  test("round-trips a starter unchanged", () => {
-    const { content } = nda()
+  test.each(STARTERS.map((s) => [s.key, s] as const))("round-trips %s unchanged", (_, s) => {
+    const { content } = s.build()
     expect(fromEditorDoc(toEditorDoc(content))).toEqual(content)
   })
 

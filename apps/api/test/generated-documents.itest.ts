@@ -1,8 +1,10 @@
 import { afterAll, beforeEach, describe, expect, test } from "bun:test"
 import {
   currentSigners,
+  documentFields,
   type GeneratedDocumentData,
   type SignersDefinition,
+  STARTERS,
   sha256Hex,
 } from "@sahihi/core"
 import { prisma } from "@sahihi/db"
@@ -836,4 +838,56 @@ describe("signers", () => {
     const b = currentSigners(after.version.data).fields.party_b ?? []
     expect(b.map((f) => f.fieldType)).toEqual(["SIGNATURE", "DATE_SIGNED"])
   })
+})
+
+describe("starters", () => {
+  beforeEach(() => enableAssistant(alice))
+
+  test.each(STARTERS.map((s) => [s.key] as const))(
+    "%s goes from a fresh draft to an envelope that can be sent",
+    async (starter) => {
+      const created = await request(alice, "/api/generated-documents", {
+        method: "POST",
+        json: { starter },
+      })
+      expect(created.status).toBe(201)
+      const { id } = await json<{ id: string }>(created)
+      const { version } = await detail(alice, id)
+      const filled = await request(alice, `/api/generated-documents/${id}/variables`, {
+        method: "POST",
+        json: {
+          baseVersionId: version.id,
+          source: "answer",
+          values: version.data.variables.map((v) => ({ key: v.key, value: `${v.label} value` })),
+        },
+      })
+      expect(filled.status).toBe(200)
+      const signers = await putSigners(alice, id, (def) => {
+        def.roles = def.roles.map((r, i) => ({
+          ...r,
+          name: `Person ${i + 1}`,
+          email: `person${i + 1}@example.com`,
+        }))
+      })
+      expect(signers.status).toBe(200)
+      const { version: ready } = await json<{ version: { id: string } }>(signers)
+
+      const res = await request(alice, `/api/generated-documents/${id}/finalize`, {
+        method: "POST",
+        json: { versionId: ready.id, acknowledged: true },
+      })
+      expect(res.status).toBe(201)
+      const { envelopeId } = await json<{ envelopeId: string }>(res)
+      const envelope = await prisma.envelope.findUniqueOrThrow({
+        where: { id: envelopeId },
+        include: { recipients: true, fields: true },
+      })
+      expect(envelope.recipients).toHaveLength(version.data.roles.length)
+      expect(envelope.fields).toHaveLength(documentFields(version.data.content).length)
+      const preflight = await json<{ issues: unknown[] }>(
+        await request(alice, `/api/envelopes/${envelopeId}/preflight`),
+      )
+      expect(preflight.issues).toEqual([])
+    },
+  )
 })

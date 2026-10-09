@@ -5,12 +5,11 @@ Members draft a document with an AI assistant, fill in every blank, name the sig
 envelope with the signers as recipients and their fields already placed. From there the existing
 flow takes over (Review & send → sign → certificate). See ADR 0042.
 
-What ships today (roadmap P6): one starter (Mutual NDA), the assistant's questions and blank
+What ships today (roadmap P6): five starters (see Starters), the assistant's questions and blank
 filling, a rich-text editor for the wording (sections, blanks, lists, tables, bold, italic,
 underline), assistant edit proposals with a diff to accept or reject, signers and their fields
 (signature, initials, full name, date signed, text, checkbox; initials on every page), set by the
-person or proposed by the assistant, a PDF preview, finalise. Not yet: more starters, saving a
-generated document as a template.
+person or proposed by the assistant, a PDF preview, finalise. Not yet: saving a generated document as a template.
 
 ## Availability
 
@@ -54,8 +53,25 @@ never prompts or model output. `GeneratedDocument.messages` keeps the conversati
 
 ## Starters
 
-Curated documents in code (`starters.ts`): fixed, reviewed wording, every specific a blank. A test
-checks each starter is valid, uses every blank it declares and prefills nothing.
+Curated documents in code (`packages/core/src/generation/starters/`, one file each, written with
+the builders in `build.ts`): fixed, reviewed wording, every specific a blank. The wording is
+jurisdiction-neutral; the governing law, where there is one, is a blank too.
+
+| Starter | Signers | Notes |
+|---|---|---|
+| Mutual NDA | First party, Second party | |
+| Offer letter | Employer, Candidate | A "Key terms" table; the candidate signs to accept |
+| IT acceptable use policy | Approver, Employee | The employee ticks an acknowledgement checkbox, then signs |
+| Board resolution | Director 1, Director 2 | Add directors in the Signers tab |
+| Invoice cover letter | Sender, Client | Unnumbered letter sections; the client signs to acknowledge receipt |
+
+What a signer signs to ("I accept this offer…") sits inside their signature block, so a page break
+never separates it from the signature.
+
+Tests check that every starter is valid, uses every blank it declares and prefills nothing. Once
+filled in and with contacts, a starter passes the finalise preflight and becomes an envelope that
+can be sent. Its wording holds no amount, date, duration, percentage, email or phone number: the
+same check the assistant's proposals get (`unattestedSpecifics`).
 
 ## The assistant (`apps/api/src/lib/assistant/`)
 

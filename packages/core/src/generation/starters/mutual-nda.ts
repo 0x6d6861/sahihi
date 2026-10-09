@@ -1,60 +1,7 @@
-import type {
-  BlockNode,
-  FieldNode,
-  GeneratedDocumentData,
-  GeneratedFieldType,
-  InlineNode,
-  Paragraph,
-  Section,
-  Variable,
-} from "./model"
+import type { GeneratedDocumentData } from "../model"
+import { blank, ol, p, role, section, signatureBlock, t, v } from "./build"
 
-/**
- * Starters: curated documents the assistant fills in (docs/ai-documents.md → Starters). The wording
- * is fixed and reviewed; every specific (party, date, amount, duration, law) is a blank the
- * assistant asks about. Starters are code, not database rows, so they ship with a review.
- */
-
-const t = (text: string, bold = false): InlineNode =>
-  bold ? { type: "text", text, marks: [{ type: "bold" }] } : { type: "text", text }
-const v = (key: string, bold = false): InlineNode =>
-  bold
-    ? { type: "variable", attrs: { key }, marks: [{ type: "bold" }] }
-    : { type: "variable", attrs: { key } }
-const p = (...content: InlineNode[]): Paragraph => ({ type: "paragraph", content })
-const ol = (...items: InlineNode[][]): BlockNode => ({
-  type: "orderedList",
-  content: items.map((content) => ({ type: "listItem", content: [p(...content)] })),
-})
-const section = (id: string, title: string, ...content: BlockNode[]): Section => ({
-  type: "section",
-  attrs: { id, title, numbered: true },
-  content,
-})
-const field = (id: string, fieldType: GeneratedFieldType, label?: string): FieldNode => ({
-  type: "field",
-  attrs: { id, fieldType, required: true, ...(label ? { label } : {}) },
-})
-const blank = (key: string, label: string, type: Variable["type"], hint?: string): Variable => ({
-  key,
-  label,
-  type,
-  ...(hint ? { hint } : {}),
-  value: null,
-  status: "unresolved",
-})
-const signatureBlock = (roleKey: string, partyKey: string): BlockNode => ({
-  type: "signatureBlock",
-  attrs: { roleKey },
-  content: [
-    p(t("For "), v(partyKey, true)),
-    field(`${roleKey}_signature`, "SIGNATURE", "Signature"),
-    field(`${roleKey}_name`, "NAME", "Name"),
-    field(`${roleKey}_date`, "DATE_SIGNED", "Date"),
-  ],
-})
-
-function mutualNda(): GeneratedDocumentData {
+export function mutualNda(): GeneratedDocumentData {
   return {
     title: "Mutual Non-Disclosure Agreement",
     pageSize: "A4",
@@ -84,24 +31,7 @@ function mutualNda(): GeneratedDocumentData {
       ),
       blank("governing_law", "Governing law", "jurisdiction", "Country or state whose law applies"),
     ],
-    roles: [
-      {
-        key: "party_a",
-        label: "First party",
-        recipientRole: "SIGNER",
-        name: null,
-        email: null,
-        initialsOnEveryPage: false,
-      },
-      {
-        key: "party_b",
-        label: "Second party",
-        recipientRole: "SIGNER",
-        name: null,
-        email: null,
-        initialsOnEveryPage: false,
-      },
-    ],
+    roles: [role("party_a", "First party"), role("party_b", "Second party")],
     content: {
       type: "doc",
       content: [
@@ -216,30 +146,10 @@ function mutualNda(): GeneratedDocumentData {
           "signatures",
           "Signatures",
           p(t("Each Party signs this Agreement on the date shown below.")),
-          signatureBlock("party_a", "party_a_name"),
-          signatureBlock("party_b", "party_b_name"),
+          signatureBlock("party_a", [t("For "), v("party_a_name", true)]),
+          signatureBlock("party_b", [t("For "), v("party_b_name", true)]),
         ),
       ],
     },
   }
-}
-
-export interface Starter {
-  key: string
-  name: string
-  description: string
-  build: () => GeneratedDocumentData
-}
-
-export const STARTERS: readonly Starter[] = [
-  {
-    key: "mutual-nda",
-    name: "Mutual NDA",
-    description: "Two parties share confidential information with each other.",
-    build: mutualNda,
-  },
-]
-
-export function findStarter(key: string): Starter | undefined {
-  return STARTERS.find((s) => s.key === key)
 }

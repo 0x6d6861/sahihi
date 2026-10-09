@@ -12,6 +12,7 @@ import {
 import { envelopeDraftFromGenerated } from "./envelope"
 import { GeneratedDocumentDataSchema, type Section, TextNodeSchema } from "./model"
 import { generationPreflight } from "./preflight"
+import { sectionText, unattestedSpecifics } from "./proposals"
 import { isValueAttested } from "./provenance"
 import { AskQuestionsInputSchema, AskQuestionsResultSchema } from "./schemas"
 import { findStarter, STARTERS } from "./starters"
@@ -42,6 +43,47 @@ describe("starters", () => {
     )
     expect(data.variables.every((v) => v.value === null && v.status === "unresolved")).toBe(true)
     expect(data.roles.every((r) => r.name === null && r.email === null)).toBe(true)
+  })
+
+  test("keys are unique", () => {
+    expect(new Set(STARTERS.map((s) => s.key)).size).toBe(STARTERS.length)
+  })
+
+  test.each(STARTERS.map((s) => [s.key, s] as const))(
+    "%s is ready to finalise once filled in and signers are named",
+    (_, s) => {
+      const data = s.build()
+      const values = data.variables.map((v) => ({ key: v.key, value: `value of ${v.key}` }))
+      const contacts = data.roles.map((r, i) => ({
+        key: r.key,
+        name: `Person ${i + 1}`,
+        email: `person${i + 1}@example.com`,
+      }))
+      const ready = applyRoleContacts(applyVariableUpdates(data, values, "answer"), contacts)
+      expect(generationPreflight(ready)).toEqual([])
+    },
+  )
+
+  test.each(STARTERS.map((s) => [s.key, s] as const))(
+    "%s wording holds no specifics: amounts, dates and durations are blanks",
+    (_, s) => {
+      const data = s.build()
+      for (const section of data.content.content) {
+        expect(unattestedSpecifics(sectionText(section, data.variables), [])).toEqual([])
+      }
+    },
+  )
+
+  test("the policy's employee ticks an acknowledgement before signing", () => {
+    const data = findStarter("acceptable-use-policy")?.build()
+    if (!data) throw new Error("missing starter")
+    const employee = documentFields(data.content).filter((f) => f.roleKey === "employee")
+    expect(employee.map((f) => f.field.fieldType)).toEqual([
+      "CHECKBOX",
+      "SIGNATURE",
+      "NAME",
+      "DATE_SIGNED",
+    ])
   })
 
   test("build returns a fresh copy each time", () => {

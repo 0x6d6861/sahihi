@@ -2,8 +2,11 @@ import { describe, expect, test } from "bun:test"
 import {
   applyRoleContacts,
   applyVariableUpdates,
+  documentFields,
   findStarter,
   type GeneratedDocumentData,
+  STARTERS,
+  type Starter,
   sha256Hex,
 } from "@sahihi/core"
 import { PDFDict, PDFDocument, PDFName } from "pdf-lib"
@@ -314,4 +317,37 @@ describe("signer fields", () => {
     expect(glyph?.x).toBeGreaterThan((box?.rect.x ?? 0) + (box?.rect.width ?? 0))
     expect(Math.abs((glyph?.y ?? 0) - (box?.rect.y ?? 0))).toBeLessThan(box?.rect.height ?? 0)
   })
+})
+
+describe("every starter", () => {
+  const fill = (s: Starter) => {
+    const data = s.build()
+    return applyRoleContacts(
+      applyVariableUpdates(
+        data,
+        data.variables.map((v) => ({ key: v.key, value: `${v.label} value` })),
+        "answer",
+      ),
+      data.roles.map((r, i) => ({
+        key: r.key,
+        name: `Person ${i + 1}`,
+        email: `p${i}@example.com`,
+      })),
+    )
+  }
+
+  test.each(STARTERS.map((s) => [s.key, s] as const))(
+    "%s renders deterministically with each field placed once",
+    async (_, s) => {
+      const a = await composeGeneratedDocument(fill(s), { date: DATE })
+      const b = await composeGeneratedDocument(fill(s), { date: DATE })
+      expect(await sha256Hex(a.bytes)).toBe(await sha256Hex(b.bytes))
+      expect(a.pages.length).toBeLessThan(10)
+      expect(a.fields.map((f) => f.id).sort()).toEqual(
+        documentFields(fill(s).content)
+          .map((f) => f.field.id)
+          .sort(),
+      )
+    },
+  )
 })

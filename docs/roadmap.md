@@ -117,7 +117,8 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
 - [x] Assistant-defined signers and fields (one `define_signers` proposal covers roles and field
       placement), a Signers tab to edit them, initials on every page, text and checkbox fields
       (ADR 0045)
-- [ ] More starters (offer letter, policy, board resolution, invoice cover letter)
+- [x] More starters (offer letter, IT acceptable use policy, board resolution, invoice cover
+      letter), each tested from draft to a sendable envelope
 - [ ] Save a generated document as a template (blanks and roles intact)
 - [ ] Lock a finalised document's fields in the envelope editor; new version after send
 - [ ] Plan quota for assistant turns; generated documents in exports and retention
