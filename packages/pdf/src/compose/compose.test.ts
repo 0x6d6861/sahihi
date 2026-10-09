@@ -269,3 +269,49 @@ describe("italics and tables", () => {
     }
   })
 })
+
+describe("signer fields", () => {
+  test("initials on every page: one box per page per signer, in the bottom margin", async () => {
+    const data = filled()
+    data.roles = data.roles.map((r) => ({ ...r, initialsOnEveryPage: true }))
+    const out = await composeGeneratedDocument(data, { date: DATE })
+    const initials = out.fields.filter((f) => f.id.includes("_initials_p"))
+    expect(initials).toHaveLength(out.pages.length * 2)
+    for (const f of initials) {
+      expect(f.fieldType).toBe("INITIALS")
+      expect(f.rect.y + f.rect.height).toBeLessThan(72) // below the text area
+      expect(f.rect.x + f.rect.width).toBeLessThanOrEqual(595.28 - 72 + 0.01)
+    }
+    const page1 = initials.filter((f) => f.page === 1).map((f) => f.rect.x)
+    expect(page1[0]).toBeLessThan(page1[1] as number) // role order, left to right
+    // The text's own fields are where they were.
+    expect(out.fields.filter((f) => !f.id.includes("_initials_p")).map((f) => f.id)).toEqual(
+      (await composeGeneratedDocument(filled(), { date: DATE })).fields.map((f) => f.id),
+    )
+  })
+
+  test("a checkbox is a square with its statement beside it", async () => {
+    const data = filled()
+    const sig = data.content.content.find((s) => s.attrs.id === "signatures")
+    const block = sig?.content.find((b) => b.type === "signatureBlock")
+    if (block?.type === "signatureBlock") {
+      block.content.push({
+        type: "field",
+        attrs: { id: "party_a_terms", fieldType: "CHECKBOX", required: true, label: "I agree" },
+      })
+    }
+    const out = await composeGeneratedDocument(data, { date: DATE })
+    const box = out.fields.find((f) => f.id === "party_a_terms")
+    expect(box?.rect.width).toBe(FIELD_SIZES.CHECKBOX.width)
+    const pages = await readPageText(out.bytes, {
+      measure: (text) => {
+        const i = text.indexOf("I agree")
+        return i < 0 ? [] : [[i, i + 1]]
+      },
+    })
+    const page = pages[(box?.page ?? 1) - 1]
+    const glyph = page?.boxes.get(page.text.indexOf("I agree"))
+    expect(glyph?.x).toBeGreaterThan((box?.rect.x ?? 0) + (box?.rect.width ?? 0))
+    expect(Math.abs((glyph?.y ?? 0) - (box?.rect.y ?? 0))).toBeLessThan(box?.rect.height ?? 0)
+  })
+})

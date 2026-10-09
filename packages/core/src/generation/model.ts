@@ -196,6 +196,8 @@ export const SignerRoleSchema = z.object({
   /** Contact of the person who signs. Comes from the Signers tab, never from the body text. */
   name: z.string().trim().max(120).nullable().default(null),
   email: z.string().trim().toLowerCase().max(254).nullable().default(null),
+  /** Signers only: an initials field in the bottom margin of every page (placed by the renderer). */
+  initialsOnEveryPage: z.boolean().default(false),
 })
 export type SignerRole = z.infer<typeof SignerRoleSchema>
 

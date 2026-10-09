@@ -1,7 +1,7 @@
 "use client"
 
 import type { ToolCallMessagePartComponent } from "@assistant-ui/react"
-import { diffWords, numberSections } from "@sahihi/core"
+import { type DiffPart, diffLines, diffWords, numberSections } from "@sahihi/core"
 import { useEffect, useRef, useState } from "react"
 import { Badge } from "@/components/arc/badge/badge"
 import { Button } from "@/components/arc/button/button"
@@ -87,7 +87,14 @@ function Proposal({ view }: { view: ProposalView }) {
         </span>
       </header>
       <p className="text-muted-foreground text-sm">{view.rationale}</p>
-      <Diff before={view.before} after={view.after} />
+      <Diff
+        parts={
+          // One line per signer: compare whole lines, or the diff reads as noise.
+          view.kind === "set_signers"
+            ? diffLines(view.before, view.after)
+            : diffWords(view.before, view.after)
+        }
+      />
       {error && (
         <p className="text-destructive-foreground text-sm" role="alert">
           {error}
@@ -117,10 +124,10 @@ function Proposal({ view }: { view: ProposalView }) {
 }
 
 /** Removed words struck through, added words highlighted; long unchanged runs stay readable. */
-function Diff({ before, after }: { before: string; after: string }) {
+function Diff({ parts }: { parts: DiffPart[] }) {
   return (
     <p className="max-h-72 overflow-y-auto whitespace-pre-wrap rounded-xl border bg-background p-3 text-sm leading-relaxed">
-      {diffWords(before, after).map((part, i) =>
+      {parts.map((part, i) =>
         part.kind === "same" ? (
           // biome-ignore lint/suspicious/noArrayIndexKey: diff parts have no ids; order is stable
           <span key={i}>{part.text}</span>

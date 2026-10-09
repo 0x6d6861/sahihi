@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { DocContentSchema, VariableSchema, VariableValueSchema } from "./model"
+import { SignersDefinitionSchema } from "./signers"
 
 /**
  * Validators shared by the assistant's tools (server), the chat UI that renders them (web) and the
@@ -66,21 +67,15 @@ export const UpdateVariablesSchema = z.object({
 })
 export type UpdateVariablesInput = z.infer<typeof UpdateVariablesSchema>
 
-/** `PUT /generated-documents/:id/roles`. Contacts are checked in full by the finalise preflight. */
-export const UpdateRolesSchema = z.object({
+/**
+ * `PUT /generated-documents/:id/signers`: roles, contacts and each role's fields, applied with
+ * `applySigners`. Contacts are checked in full by the finalise preflight.
+ */
+export const UpdateSignersSchema = z.object({
   baseVersionId: z.string().min(1).max(64),
-  roles: z
-    .array(
-      z.object({
-        key: VariableKey,
-        name: z.string().trim().max(120).nullable(),
-        email: z.string().trim().max(254).nullable(),
-      }),
-    )
-    .min(1)
-    .max(20),
+  signers: SignersDefinitionSchema,
 })
-export type UpdateRolesInput = z.infer<typeof UpdateRolesSchema>
+export type UpdateSignersInput = z.infer<typeof UpdateSignersSchema>
 
 /**
  * `PUT /generated-documents/:id/content`: the text as edited in the editor, plus any blanks the

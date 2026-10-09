@@ -1,6 +1,7 @@
 import { RecipientInputSchema } from "../shared/schemas"
 import { documentFields, referencedVariableKeys, structureIssues } from "./document"
 import type { GeneratedDocumentData } from "./model"
+import { MAX_PAGE_INITIALS } from "./signers"
 
 /**
  * Checks before a generated document can be finalised into a PDF and a DRAFT envelope
@@ -16,6 +17,7 @@ export type GenerationPreflightCode =
   | "missing_name"
   | "invalid_email"
   | "duplicate_email"
+  | "too_many_initials"
 
 export interface GenerationPreflightIssue {
   code: GenerationPreflightCode
@@ -51,6 +53,13 @@ export function generationPreflight(data: GeneratedDocumentData): GenerationPref
   const signers = data.roles.filter((r) => r.recipientRole === "SIGNER")
   if (signers.length === 0) {
     issues.push({ code: "no_signers", message: "Add at least one signer." })
+  }
+  const initialling = signers.filter((r) => r.initialsOnEveryPage).length
+  if (initialling > MAX_PAGE_INITIALS) {
+    issues.push({
+      code: "too_many_initials",
+      message: `At most ${MAX_PAGE_INITIALS} signers can initial every page.`,
+    })
   }
   const fields = documentFields(data.content)
   const seenEmails = new Map<string, string>()

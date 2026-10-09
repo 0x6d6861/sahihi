@@ -7,9 +7,10 @@ flow takes over (Review & send → sign → certificate). See ADR 0042.
 
 What ships today (roadmap P6): one starter (Mutual NDA), the assistant's questions and blank
 filling, a rich-text editor for the wording (sections, blanks, lists, tables, bold, italic,
-underline), assistant edit proposals with a diff to accept or reject, signer contacts, a PDF
-preview, finalise. Not yet: the assistant defining signers or placing fields, more starters, saving
-a generated document as a template.
+underline), assistant edit proposals with a diff to accept or reject, signers and their fields
+(signature, initials, full name, date signed, text, checkbox; initials on every page), set by the
+person or proposed by the assistant, a PDF preview, finalise. Not yet: more starters, saving a
+generated document as a template.
 
 ## Availability
 
@@ -39,7 +40,7 @@ The source of a document is structured, never Markdown: a ProseMirror-compatible
 | `variable` node | An atomic blank pointing at `variables[key]`. The value never sits in the text |
 | `signatureBlock` | Where one signer role signs: caption paragraphs and `field` nodes (`SIGNATURE`, `INITIALS`, `NAME`, `DATE_SIGNED`, `TEXT`, `CHECKBOX`) |
 | `variables[]` | `key`, `label`, `type`, `hint`, `value` (null until filled), `status` (`unresolved`, `answered`, `skipped`), `source` (`answer`, `chat`, `edit`) |
-| `roles[]` | Signer roles: `key`, `label`, `SIGNER` or `VIEWER`, and the contact (`name`, `email`) |
+| `roles[]` | Signer roles: `key`, `label`, `SIGNER` or `VIEWER` (gets a copy), the contact (`name`, `email`), and `initialsOnEveryPage` (signers only) |
 
 Signer identity is data: emails exist only in `roles`, and party names in the body are blanks, so
 the text and the signer list can't disagree. `structureIssues` checks the references the schema
@@ -72,6 +73,7 @@ Tools (schemas in `packages/core/src/generation/schemas.ts`):
 | `ask_questions` | Browser (human in the loop) | Up to 3 questions, each about one blank, with up to 4 generic options. The card saves the answers (`POST …/variables`, source `answer`; skipped = blank marked `skipped`), then returns them as the tool result and the assistant continues |
 | `propose_section_edit` | Server | Proposes replacing or deleting one section (see **Proposals**). Nothing changes until the person accepts |
 | `propose_sections` | Server | Proposes new sections after a given one (or at the start) |
+| `define_signers` | Server | Proposes the signers (see **Signers**): every role and its fields. Contacts only if the person stated them |
 | `set_variables` | Server | Fills blanks with values the person typed in the chat. Each value must appear, word for word (case, spacing and edge punctuation aside), in something the person said or answered (`isValueAttested`); otherwise nothing changes, `variables.rejected` is recorded and the model is told to ask instead |
 
 ### Clarifying questions
@@ -81,6 +83,33 @@ into the blank they're about, skipped blanks stay visibly unresolved, and finali
 any blank the text uses is empty. The prompt adds: never invent names, amounts, dates, durations,
 legal terms or jurisdictions; ask with the tool, never in prose; options only for generic choices,
 never a person's details.
+
+## Signers (ADR 0045)
+
+Who signs and where is one definition (`SignersDefinition`, `packages/core/src/generation/signers.ts`):
+the roles (label, signer or gets a copy, contact, initials on every page) and each role's fields
+(`SIGNATURE`, `INITIALS`, `NAME`, `DATE_SIGNED`, `TEXT`, `CHECKBOX`; a label says what to fill in or
+what's being agreed to; required or not). `applySigners` turns it into roles plus signature blocks
+in the text:
+
+- a role's first signature block gets the new fields (its caption and existing field ids are kept;
+  extra blocks for the same role are merged into it);
+- a new role with fields gets a "For <role>" block in the section holding the other blocks, or a
+  new "Signatures" section at the end;
+- a removed role, or one left without fields, loses its blocks; a viewer can't have fields
+  (`SignersError`, 400).
+
+The Signers tab edits the definition (add or remove signers, signer or copy, contacts, initials on
+every page, fields) and saves it with `PUT /api/generated-documents/:id/signers` (a version, event
+`roles.updated`). The assistant proposes one with `define_signers`; it goes through the proposal
+flow, is out of date if the signers changed since, and may only include names or emails the person
+said (otherwise contacts are kept or left empty). Signer contacts never go in the body text.
+
+**Initials on every page:** for each signer with the option on, the renderer puts an initials box
+in the bottom margin of every page (right-aligned in role order; the page number moves left), with
+ids `<role>_initials_p<n>`, so they reach the envelope like any other field. At most five signers
+(`MAX_PAGE_INITIALS`, a preflight issue). A checkbox renders as a square with its statement beside
+it; a text field as a labelled line.
 
 ## Proposals (ADR 0044)
 
@@ -127,8 +156,8 @@ validates with `DocContentSchema` before anything is saved.
 - **Blanks:** "Insert a blank" picks one of the document's blanks or names a new one (key from the
   label, `blankKey`); new blanks are declared in the same save and start unresolved. Clicking a
   blank fills it, as before.
-- **Signature blocks** can be moved or deleted, not edited inside; adding signers and fields is a
-  later item.
+- **Signature blocks** can be moved or deleted, not edited inside; signers and fields are set in
+  the Signers tab (below).
 - Read-only for people who can't edit and once finalised.
 
 ## Finalise
@@ -189,7 +218,9 @@ ADR 0009).
   Discuss button that attaches the section to the next message (one message, then it clears).
   Blanks are chips: dashed and highlighted while empty ("skipped" when skipped), the value once
   filled; click to fill.
-- **Signers** tab: name and email per role, with the preflight's problems on the fields.
+- **Signers** tab: a `Panel` per role (role, signer or copy, name, email, initials on every page,
+  the role's fields with "Add field"), "Add signer", "Save signers"; the preflight's problems show on
+  the fields. A suggested set of signers shows as a line-by-line diff in its card.
 - **Preview** tab: the rendered PDF.
 - Finalise: an Arc dialog with the required "I've read the whole document" confirmation.
 

@@ -114,8 +114,9 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
       tables, in the editor and the PDF; edits apply over answers given meanwhile (ADR 0043)
 - [x] Assistant edit proposals (`propose_section_edit`, `propose_sections`) with a diff and
       accept/reject, each accepted change a version; invented specifics refused (ADR 0044)
-- [ ] Assistant-defined signers and fields (`define_signers`, `place_signature_field`), initials on
-      every page, text and checkbox fields
+- [x] Assistant-defined signers and fields (one `define_signers` proposal covers roles and field
+      placement), a Signers tab to edit them, initials on every page, text and checkbox fields
+      (ADR 0045)
 - [ ] More starters (offer letter, policy, board resolution, invoice cover letter)
 - [ ] Save a generated document as a template (blanks and roles intact)
 - [ ] Lock a finalised document's fields in the envelope editor; new version after send

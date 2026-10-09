@@ -35,6 +35,7 @@ const toolkit = defineToolkit({
   set_variables: { type: "backend", render: AppliedNote },
   propose_section_edit: { type: "backend", render: ProposalCard },
   propose_sections: { type: "backend", render: ProposalCard },
+  define_signers: { type: "backend", render: ProposalCard },
 })
 const config = AuiConfig({ tools: Tools({ toolkit }) })
 

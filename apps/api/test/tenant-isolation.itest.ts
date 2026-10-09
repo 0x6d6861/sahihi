@@ -309,13 +309,15 @@ const TENANT: Record<string, Case> = {
     path: `/api/generated-documents/${ids.generatedDocument}/proposals/${ids.proposal}/reject`,
     init: { method: "POST" },
   }),
-  "PUT /api/generated-documents/:id/roles": () => ({
-    path: `/api/generated-documents/${ids.generatedDocument}/roles`,
+  "PUT /api/generated-documents/:id/signers": () => ({
+    path: `/api/generated-documents/${ids.generatedDocument}/signers`,
     init: {
       method: "PUT",
       json: {
         baseVersionId: ids.generatedVersion,
-        roles: [{ key: "party_a", name: "Mallory", email: "mallory@example.test" }],
+        signers: {
+          roles: [{ key: "party_a", label: "Mallory", name: "Mallory", email: "m@example.test" }],
+        },
       },
     },
   }),

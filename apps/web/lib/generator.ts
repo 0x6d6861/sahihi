@@ -31,7 +31,7 @@ export interface GeneratorDetail {
 /** An assistant proposal as the page shows it (`GET /generated-documents/:id`). */
 export interface ProposalView {
   id: string
-  kind: "replace_section" | "delete_section" | "insert_sections"
+  kind: "replace_section" | "delete_section" | "insert_sections" | "set_signers"
   sectionId: string | null
   /** STALE also for pending proposals whose section has changed since. */
   status: ProposalStatus
@@ -109,6 +109,7 @@ export function proposalTitle(
     ? `${numbers.get(section.attrs.id) ? `${numbers.get(section.attrs.id)}. ` : ""}${section.attrs.title}`
     : "a section"
   if (view.kind === "insert_sections") return "Suggested new section"
+  if (view.kind === "set_signers") return "Suggested signers"
   if (view.kind === "delete_section") return `Suggested removal of ${name}`
   return `Suggested edit to ${name}`
 }

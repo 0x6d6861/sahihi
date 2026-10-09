@@ -1,6 +1,6 @@
 "use client"
 
-import type { DocContent, VariableType } from "@sahihi/core"
+import type { DocContent, SignersDefinition, VariableType } from "@sahihi/core"
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react"
 import { api } from "@/lib/api"
 import type { GeneratorDetail } from "@/lib/generator"
@@ -20,7 +20,8 @@ interface GeneratorState {
     values: { key: string; value: string | null }[],
     source: "answer" | "edit",
   ) => Promise<void>
-  saveRoles: (roles: { key: string; name: string | null; email: string | null }[]) => Promise<void>
+  /** Saves who signs and where (roles, contacts, fields). */
+  saveSigners: (signers: SignersDefinition) => Promise<void>
   /** Saves edited text on top of `baseVersionId`; resolves with the new version's id. */
   saveContent: (input: {
     baseVersionId: string
@@ -80,12 +81,12 @@ export function GeneratorProvider({
     [base, applySaved],
   )
 
-  const saveRoles = useCallback<GeneratorState["saveRoles"]>(
-    async (roles) => {
+  const saveSigners = useCallback<GeneratorState["saveSigners"]>(
+    async (signers) => {
       applySaved(
-        await api<Pick<GeneratorDetail, "version" | "issues">>(`${base}/roles`, {
+        await api<Pick<GeneratorDetail, "version" | "issues">>(`${base}/signers`, {
           method: "PUT",
-          json: { baseVersionId: versionId.current, roles },
+          json: { baseVersionId: versionId.current, signers },
         }),
       )
     },
@@ -136,7 +137,7 @@ export function GeneratorProvider({
       detail,
       refresh,
       saveVariables,
-      saveRoles,
+      saveSigners,
       saveContent,
       decideProposal,
       selectedSectionId,
@@ -150,7 +151,7 @@ export function GeneratorProvider({
       detail,
       refresh,
       saveVariables,
-      saveRoles,
+      saveSigners,
       saveContent,
       decideProposal,
       selectedSectionId,

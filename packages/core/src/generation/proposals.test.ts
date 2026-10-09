@@ -3,6 +3,7 @@ import { applyVariableUpdates, referencedVariableKeys } from "./document"
 import {
   applyProposal,
   buildProposal,
+  diffLines,
   diffWords,
   draftInline,
   isProposalStale,
@@ -291,4 +292,12 @@ describe("diffWords", () => {
     expect(diffWords("", "new text")).toEqual([{ kind: "added", text: "new text" }])
     expect(diffWords("old", "")).toEqual([{ kind: "removed", text: "old" }])
   })
+})
+
+test("diffLines compares whole lines", () => {
+  expect(diffLines("A: x\nB: y", "A: x\nB: z\nC: w")).toEqual([
+    { kind: "same", text: "A: x\n" },
+    { kind: "removed", text: "B: y" },
+    { kind: "added", text: "B: z\nC: w" },
+  ])
 })

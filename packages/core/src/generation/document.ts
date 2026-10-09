@@ -108,6 +108,12 @@ export function structureIssues(data: GeneratedDocumentData): StructureIssue[] {
     }
   }
   const reported = new Set<string>()
+  for (const r of data.roles) {
+    if (r.recipientRole === "VIEWER" && r.initialsOnEveryPage) {
+      issues.push({ code: "viewer_has_fields", roleKey: r.key })
+      reported.add(r.key)
+    }
+  }
   for (const f of documentFields(data.content)) {
     seeId(f.field.id)
     const role = roles.get(f.roleKey)

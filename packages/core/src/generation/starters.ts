@@ -85,8 +85,22 @@ function mutualNda(): GeneratedDocumentData {
       blank("governing_law", "Governing law", "jurisdiction", "Country or state whose law applies"),
     ],
     roles: [
-      { key: "party_a", label: "First party", recipientRole: "SIGNER", name: null, email: null },
-      { key: "party_b", label: "Second party", recipientRole: "SIGNER", name: null, email: null },
+      {
+        key: "party_a",
+        label: "First party",
+        recipientRole: "SIGNER",
+        name: null,
+        email: null,
+        initialsOnEveryPage: false,
+      },
+      {
+        key: "party_b",
+        label: "Second party",
+        recipientRole: "SIGNER",
+        name: null,
+        email: null,
+        initialsOnEveryPage: false,
+      },
     ],
     content: {
       type: "doc",

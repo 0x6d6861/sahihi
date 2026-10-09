@@ -8,10 +8,19 @@ import {
   type MarkType,
   type Section,
   SectionSchema,
+  SignerRoleSchema,
   type Variable,
   VariableSchema,
 } from "./model"
 import { isValueAttested } from "./provenance"
+import {
+  applySigners,
+  currentSigners,
+  SignerFieldSchema,
+  SignersDefinitionSchema,
+  SignersError,
+  signersText,
+} from "./signers"
 
 /**
  * Assistant edit proposals (docs/ai-documents.md → Proposals, ADR 0044). The assistant never edits
@@ -75,6 +84,26 @@ export const ProposeSectionsInputSchema = z.object({
 })
 export type ProposeSectionsInput = z.infer<typeof ProposeSectionsInputSchema>
 
+/**
+ * Who signs and where. Contacts are optional: left out, an existing role keeps its contact; given,
+ * they must be something the person said.
+ */
+export const DefineSignersInputSchema = z.object({
+  roles: z
+    .array(
+      SignerRoleSchema.pick({ key: true, label: true, recipientRole: true }).extend({
+        initialsOnEveryPage: z.boolean().default(false),
+        name: z.string().trim().min(1).max(120).optional(),
+        email: z.string().trim().toLowerCase().max(254).optional(),
+      }),
+    )
+    .min(1)
+    .max(20),
+  fields: z.record(z.string(), z.array(SignerFieldSchema.omit({ id: true })).max(12)).default({}),
+  rationale: Rationale,
+})
+export type DefineSignersInput = z.infer<typeof DefineSignersInputSchema>
+
 // ── What is stored ───────────────────────────────────────────────────────────
 export const ProposalChangeSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("replace_section"), sectionId: z.string(), section: SectionSchema }),
@@ -84,6 +113,7 @@ export const ProposalChangeSchema = z.discriminatedUnion("kind", [
     afterSectionId: z.string().nullable(),
     sections: z.array(SectionSchema).min(1),
   }),
+  z.object({ kind: z.literal("set_signers"), signers: SignersDefinitionSchema }),
 ])
 export type ProposalChange = z.infer<typeof ProposalChangeSchema>
 
@@ -190,11 +220,13 @@ export type BuildProposalResult =
 export function buildProposal(
   input:
     | ({ tool: "propose_section_edit" } & ProposeSectionEditInput)
-    | ({ tool: "propose_sections" } & ProposeSectionsInput),
+    | ({ tool: "propose_sections" } & ProposeSectionsInput)
+    | ({ tool: "define_signers" } & DefineSignersInput),
   data: GeneratedDocumentData,
   userTexts: readonly string[],
   newId: () => string,
 ): BuildProposalResult {
+  if (input.tool === "define_signers") return buildSignersProposal(input, data, userTexts, newId)
   const sections = data.content.content
   const find = (id: string) => sections.find((s) => s.attrs.id === id)
 
@@ -268,12 +300,51 @@ export function buildProposal(
   }
 }
 
+function buildSignersProposal(
+  input: DefineSignersInput,
+  data: GeneratedDocumentData,
+  userTexts: readonly string[],
+  newId: () => string,
+): BuildProposalResult {
+  const unsaid = input.roles
+    .flatMap((r) => [r.name, r.email])
+    .filter((v): v is string => Boolean(v) && !isValueAttested(v as string, userTexts))
+  if (unsaid.length) {
+    return {
+      ok: false,
+      error: `The person never said ${unsaid.map((v) => JSON.stringify(v)).join(", ")}. Leave contacts out; they're entered in the Signers tab.`,
+    }
+  }
+  const existing = new Map(data.roles.map((r) => [r.key, r]))
+  const signers = SignersDefinitionSchema.parse({
+    roles: input.roles.map((r) => ({
+      ...r,
+      name: r.name ?? existing.get(r.key)?.name ?? null,
+      email: r.email ?? existing.get(r.key)?.email ?? null,
+    })),
+    fields: input.fields,
+  })
+  const payload: ProposalPayload = { change: { kind: "set_signers", signers }, newVariables: [] }
+  try {
+    const next = applyProposal(data, payload, newId)
+    if (structureIssues(GeneratedDocumentDataSchema.parse(next)).length) {
+      return { ok: false, error: "Those signers don't fit the document." }
+    }
+  } catch (err) {
+    if (err instanceof SignersError) return { ok: false, error: err.message }
+    return { ok: false, error: "Those signers don't fit the document." }
+  }
+  return { ok: true, payload, sectionId: null }
+}
+
 /** The data with the proposal applied. Throws when its target is gone. */
 export function applyProposal(
   data: GeneratedDocumentData,
   payload: ProposalPayload,
+  newId: () => string = () => `f_${crypto.randomUUID().slice(0, 8)}`,
 ): GeneratedDocumentData {
   const { change } = payload
+  if (change.kind === "set_signers") return applySigners(data, change.signers, newId)
   const sections = data.content.content
   let next: Section[]
   if (change.kind === "insert_sections") {
@@ -312,6 +383,9 @@ export function isProposalStale(
   if (change.kind === "insert_sections") {
     return change.afterSectionId !== null && !find(current, change.afterSectionId)
   }
+  if (change.kind === "set_signers") {
+    return JSON.stringify(currentSigners(base)) !== JSON.stringify(currentSigners(current))
+  }
   const then = find(base, change.sectionId)
   const now = find(current, change.sectionId)
   return !now || JSON.stringify(then) !== JSON.stringify(now)
@@ -345,6 +419,9 @@ export function proposalTexts(
 ): { before: string; after: string } {
   const variables = [...base.variables, ...payload.newVariables]
   const { change } = payload
+  if (change.kind === "set_signers") {
+    return { before: signersText(currentSigners(base)), after: signersText(change.signers) }
+  }
   if (change.kind === "insert_sections") {
     return { before: "", after: change.sections.map((s) => sectionText(s, variables)).join("\n\n") }
   }
@@ -364,8 +441,17 @@ export interface DiffPart {
 
 /** Word-level diff (whitespace kept), by longest common subsequence. Large inputs diff whole. */
 export function diffWords(before: string, after: string): DiffPart[] {
-  const a = before.split(/(\s+)/).filter(Boolean)
-  const b = after.split(/(\s+)/).filter(Boolean)
+  return diffTokens(before, after, /(\s+)/)
+}
+
+/** Line-level diff (line breaks kept): for lists such as the signers. */
+export function diffLines(before: string, after: string): DiffPart[] {
+  return diffTokens(before, after, /(\n)/)
+}
+
+function diffTokens(before: string, after: string, separator: RegExp): DiffPart[] {
+  const a = before.split(separator).filter(Boolean)
+  const b = after.split(separator).filter(Boolean)
   if (a.length * b.length > 4_000_000) {
     return [
       ...(before ? [{ kind: "removed" as const, text: before }] : []),

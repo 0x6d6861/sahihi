@@ -8,7 +8,7 @@ import type {
   SignatureBlock,
   Table,
 } from "@sahihi/core"
-import { numberSections } from "@sahihi/core"
+import { MAX_PAGE_INITIALS, numberSections } from "@sahihi/core"
 import { PDFDocument, type PDFFont, type PDFPage, rgb } from "pdf-lib"
 import { embedUnicodeFont } from "../text/fonts"
 import { sanitizeForFont } from "../text/text"
@@ -33,6 +33,10 @@ const HEADING = { size: 12, before: 14, after: 6 }
 const PARAGRAPH_AFTER = 6
 const LIST_INDENT = 22
 const TABLE_PAD = 5
+const CHECKBOX_GAP = 8
+/** Initials boxes in the bottom margin: their bottom edge this far above the page's bottom. */
+const PAGE_INITIALS = { y: 34 }
+
 const FOOTER = { size: 8, y: 36 }
 const FIELD_LABEL = { size: 8, gap: 3, after: 10 }
 const INK = rgb(0.1, 0.1, 0.1)
@@ -253,10 +257,23 @@ class Layout {
       page: pageIndex + 1,
       rect: { x, y: this.height - this.top - size.height, width: size.width, height: size.height },
     })
-    // Signing line along the bottom edge; the label goes under it, outside the box, so a stamped
-    // signature never covers it.
-    this.page.ops.push({ kind: "rule", x, top: this.top + size.height, width: size.width })
+    this.page.ops.push(fieldMark(f.fieldType, x, this.top, size))
   }
+}
+
+/**
+ * How an empty field looks: a checkbox is a square; anything else a signing line along the bottom
+ * edge, with its label under it, outside the box, so a stamped signature never covers it.
+ */
+function fieldMark(
+  fieldType: GeneratedFieldType,
+  x: number,
+  top: number,
+  size: { width: number; height: number },
+): Op {
+  return fieldType === "CHECKBOX"
+    ? { kind: "box", x, top, width: size.width, height: size.height }
+    : { kind: "rule", x, top: top + size.height, width: size.width }
 }
 
 const plain: Style = { bold: false, italic: false, underline: false, blank: false }
@@ -400,51 +417,113 @@ function layoutSignatureBlock(
   block: SignatureBlock,
   words: (n: InlineNode[]) => Word[],
 ) {
-  // Measure first so the whole block moves to the next page if it doesn't fit.
-  const parts = block.content.map((c) =>
-    c.type === "paragraph"
-      ? { kind: "text" as const, lines: L.lines(words(c.content), BODY.size, L.contentWidth) }
-      : { kind: "field" as const, attrs: c.attrs, size: FIELD_SIZES[c.attrs.fieldType] },
-  )
-  const fieldHeight = (h: number) => h + FIELD_LABEL.gap + FIELD_LABEL.size + FIELD_LABEL.after
+  // Measure first so the whole block moves to the next page if it doesn't fit. A checkbox's label
+  // is the statement being ticked: body text beside the box, wrapped.
+  const parts = block.content.map((c) => {
+    if (c.type === "paragraph") {
+      return { kind: "text" as const, lines: L.lines(words(c.content), BODY.size, L.contentWidth) }
+    }
+    const size = FIELD_SIZES[c.attrs.fieldType]
+    const label = c.attrs.label ?? FIELD_LABELS[c.attrs.fieldType]
+    if (c.attrs.fieldType === "CHECKBOX") {
+      const lines = L.lines(
+        words([{ type: "text", text: label }]),
+        BODY.size,
+        L.contentWidth - size.width - CHECKBOX_GAP,
+      )
+      const height = Math.max(size.height, lines.length * BODY.leading) + FIELD_LABEL.after
+      return { kind: "checkbox" as const, attrs: c.attrs, size, lines, height }
+    }
+    const height = size.height + 2 * FIELD_LABEL.gap + FIELD_LABEL.size + FIELD_LABEL.after
+    return { kind: "field" as const, attrs: c.attrs, size, label, height }
+  })
   const height =
     BODY.leading +
-    parts.reduce(
-      (h, p) =>
-        h + (p.kind === "text" ? p.lines.length * BODY.leading : fieldHeight(p.size.height)),
-      0,
-    )
+    parts.reduce((h, p) => h + (p.kind === "text" ? p.lines.length * BODY.leading : p.height), 0)
   L.top += BODY.leading // breathing room above the block
   L.ensure(height)
+  const field = (attrs: (typeof parts)[number] & { kind: "field" | "checkbox" }) => ({
+    id: attrs.attrs.id,
+    roleKey: block.attrs.roleKey,
+    fieldType: attrs.attrs.fieldType,
+    required: attrs.attrs.required,
+    label: attrs.attrs.label,
+  })
   for (const p of parts) {
     if (p.kind === "text") {
       L.writeLines(p.lines, MARGIN.x, BODY.size, BODY.leading)
       continue
     }
+    if (p.kind === "checkbox") {
+      L.addField(field(p), MARGIN.x, p.size)
+      p.lines.forEach((line, i) => {
+        // The first line's text sits level with the box.
+        L.writeLine(
+          line,
+          MARGIN.x + p.size.width + CHECKBOX_GAP,
+          L.top + i * BODY.leading,
+          BODY.size,
+        )
+      })
+      L.top += p.height
+      continue
+    }
     L.top += FIELD_LABEL.gap
-    L.addField(
-      {
-        id: p.attrs.id,
-        roleKey: block.attrs.roleKey,
-        fieldType: p.attrs.fieldType,
-        required: p.attrs.required,
-        label: p.attrs.label,
-      },
-      MARGIN.x,
-      p.size,
-    )
+    L.addField(field(p), MARGIN.x, p.size)
     L.top += p.size.height + FIELD_LABEL.gap
     L.page.ops.push({
       kind: "text",
       x: MARGIN.x,
       top: L.top,
-      text: p.attrs.label ?? FIELD_LABELS[p.attrs.fieldType],
+      text: p.label,
       size: FIELD_LABEL.size,
       style: plain,
       muted: true,
     })
     L.top += FIELD_LABEL.size + FIELD_LABEL.after
   }
+}
+
+/**
+ * Initials on every page: for each signer who initials every page, an initials box in the bottom
+ * margin of every page, right-aligned in role order, labelled under it.
+ */
+function placePageInitials(
+  L: Layout,
+  data: GeneratedDocumentData,
+  size: readonly [number, number],
+) {
+  const roles = data.roles.filter((r) => r.recipientRole === "SIGNER" && r.initialsOnEveryPage)
+  if (roles.length > MAX_PAGE_INITIALS) {
+    throw new ComposeError(`At most ${MAX_PAGE_INITIALS} signers can initial every page`)
+  }
+  const box = FIELD_SIZES.INITIALS
+  const bottom = size[1] - PAGE_INITIALS.y - box.height
+  L.pages.forEach((page, i) => {
+    roles.forEach((role, j) => {
+      const x = size[0] - MARGIN.x - (roles.length - j) * box.width - (roles.length - 1 - j) * 10
+      L.fields.push({
+        id: `${role.key}_initials_p${i + 1}`,
+        roleKey: role.key,
+        fieldType: "INITIALS",
+        required: true,
+        label: "Initials",
+        page: i + 1,
+        rect: { x, y: PAGE_INITIALS.y, width: box.width, height: box.height },
+      })
+      page.ops.push(fieldMark("INITIALS", x, bottom, box))
+      page.ops.push({
+        kind: "text",
+        x,
+        top: bottom + box.height + FIELD_LABEL.gap,
+        text: sanitizeForFont(`Initials: ${role.label}`, L.font(plain)),
+        size: FIELD_LABEL.size,
+        style: plain,
+        muted: true,
+      })
+    })
+  })
+  return roles.length > 0
 }
 
 // ── Drawing ──────────────────────────────────────────────────────────────────
@@ -546,13 +625,15 @@ export async function composeGeneratedDocument(
     for (const block of section.content) layoutBlock(L, block, data, opts, fonts)
   }
 
+  // With initials in the bottom margin, the page number moves to the left so they never meet.
+  const initials = placePageInitials(L, data, size)
   const pages: PageBox[] = []
   L.pages.forEach((p, i) => {
     const page = doc.addPage([size[0], size[1]])
     draw(page, p.ops, fonts, size[1])
     const footer = `Page ${i + 1} of ${L.pages.length}`
     page.drawText(footer, {
-      x: (size[0] - fonts.regular.widthOfTextAtSize(footer, FOOTER.size)) / 2,
+      x: initials ? MARGIN.x : (size[0] - fonts.regular.widthOfTextAtSize(footer, FOOTER.size)) / 2,
       y: FOOTER.y,
       size: FOOTER.size,
       font: fonts.regular,

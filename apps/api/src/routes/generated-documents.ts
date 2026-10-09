@@ -1,7 +1,7 @@
 import {
   ApiCreateFromDocumentSchema,
   applyProposal,
-  applyRoleContacts,
+  applySigners,
   applyVariableUpdates,
   CreateGeneratedDocumentSchema,
   canEditGeneratedDocument,
@@ -16,10 +16,11 @@ import {
   isProposalStale,
   ProposalPayloadSchema,
   proposalTexts,
+  SignersError,
   sha256Hex,
   structureIssues,
   UpdateContentSchema,
-  UpdateRolesSchema,
+  UpdateSignersSchema,
   UpdateVariablesSchema,
 } from "@sahihi/core"
 import { forOrganization, prisma } from "@sahihi/db"
@@ -419,16 +420,20 @@ export const generatedDocuments = new Hono<AppEnv>()
     return c.body(null, 204)
   })
 
-  .put("/:id/roles", async (c) => {
-    const input = await parseJson(c, UpdateRolesSchema)
+  /** Who signs and where: roles, contacts and each role's fields (`applySigners`). */
+  .put("/:id/signers", async (c) => {
+    const input = await parseJson(c, UpdateSignersSchema)
     const { doc, version } = await loadGeneratedDocument(c.get("organizationId"), c.req.param("id"))
     assertCanEdit(c, doc)
-    let data: ReturnType<typeof applyRoleContacts>
+    let data: ReturnType<typeof applySigners>
     try {
-      data = applyRoleContacts(version.data, input.roles)
+      data = applySigners(version.data, input.signers, () => `f_${crypto.randomUUID().slice(0, 8)}`)
     } catch (err) {
-      badRequest((err as Error).message)
+      if (err instanceof SignersError) badRequest(err.message)
+      throw err
     }
+    const issues = structureIssues(data)
+    if (issues.length) badRequest(`The signers don't fit the document: ${issues[0]?.code}`)
     const next = await appendVersionOrConflict({
       generatedDocumentId: doc.id,
       baseVersionId: input.baseVersionId,
@@ -436,7 +441,7 @@ export const generatedDocuments = new Hono<AppEnv>()
       actor: "USER",
       userId: c.get("user").id,
       reason: "Updated signers",
-      event: { type: "roles.updated", data: { keys: input.roles.map((r) => r.key) } },
+      event: { type: "roles.updated", data: { keys: input.signers.roles.map((r) => r.key) } },
     })
     return c.json({ version: next, issues: generationPreflight(next.data) })
   })

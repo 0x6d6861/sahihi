@@ -1,5 +1,10 @@
 import { afterAll, beforeEach, describe, expect, test } from "bun:test"
-import { type GeneratedDocumentData, sha256Hex } from "@sahihi/core"
+import {
+  currentSigners,
+  type GeneratedDocumentData,
+  type SignersDefinition,
+  sha256Hex,
+} from "@sahihi/core"
 import { prisma } from "@sahihi/db"
 import { getObjectBytes } from "@sahihi/infra"
 import { simulateReadableStream } from "ai"
@@ -95,19 +100,26 @@ async function fillEverything(sender: Sender, id: string) {
     },
   })
   expect(res.status).toBe(200)
-  const next = (await json<{ version: { id: string } }>(res)).version
-  const roles = await request(sender, `/api/generated-documents/${id}/roles`, {
-    method: "PUT",
-    json: {
-      baseVersionId: next.id,
-      roles: [
-        { key: "party_a", name: "Amina Otieno", email: "amina@example.com" },
-        { key: "party_b", name: "Peter Kamau", email: "peter@example.org" },
-      ],
-    },
+  const signers = await putSigners(sender, id, (def) => {
+    def.roles = def.roles.map((r) =>
+      r.key === "party_a"
+        ? { ...r, name: "Amina Otieno", email: "amina@example.com" }
+        : { ...r, name: "Peter Kamau", email: "peter@example.org" },
+    )
   })
-  expect(roles.status).toBe(200)
-  return (await json<{ version: { id: string } }>(roles)).version.id
+  expect(signers.status).toBe(200)
+  return (await json<{ version: { id: string } }>(signers)).version.id
+}
+
+/** Reads the document's signers, lets `change` edit them, and saves them. */
+async function putSigners(sender: Sender, id: string, change: (def: SignersDefinition) => void) {
+  const { version } = await detail(sender, id)
+  const def = currentSigners(version.data)
+  change(def)
+  return request(sender, `/api/generated-documents/${id}/signers`, {
+    method: "PUT",
+    json: { baseVersionId: version.id, signers: def },
+  })
 }
 
 beforeEach(async () => {
@@ -349,12 +361,11 @@ describe("finalize", () => {
   test("signers need distinct emails", async () => {
     const id = await createNda(alice)
     const versionId = await fillEverything(alice, id)
-    const res = await request(alice, `/api/generated-documents/${id}/roles`, {
-      method: "PUT",
-      json: {
-        baseVersionId: versionId,
-        roles: [{ key: "party_b", name: "Peter Kamau", email: "AMINA@example.com" }],
-      },
+    expect(versionId).toBeTruthy()
+    const res = await putSigners(alice, id, (def) => {
+      def.roles = def.roles.map((r) =>
+        r.key === "party_b" ? { ...r, email: "AMINA@example.com" } : r,
+      )
     })
     const { issues } = await json<{ issues: { code: string }[] }>(res)
     expect(issues.map((i) => i.code)).toEqual(["duplicate_email"])
@@ -679,5 +690,150 @@ describe("assistant proposals", () => {
         })
       ).status,
     ).toBe(403)
+  })
+})
+
+describe("signers", () => {
+  beforeEach(() => enableAssistant(alice))
+
+  test("a witness who initials every page, a copy for legal, and extra fields reach the envelope", async () => {
+    const id = await createNda(alice)
+    await fillEverything(alice, id)
+    const res = await putSigners(alice, id, (def) => {
+      def.roles.push(
+        {
+          key: "witness",
+          label: "Witness",
+          recipientRole: "SIGNER",
+          name: "Wanjiru Kariuki",
+          email: "wanjiru@example.net",
+          initialsOnEveryPage: true,
+        },
+        {
+          key: "legal",
+          label: "Legal team",
+          recipientRole: "VIEWER",
+          name: "Legal",
+          email: "legal@example.com",
+          initialsOnEveryPage: false,
+        },
+      )
+      def.fields.witness = [
+        { fieldType: "SIGNATURE", required: true },
+        { fieldType: "TEXT", label: "ID number", required: true },
+        { fieldType: "CHECKBOX", label: "I saw both parties sign", required: true },
+      ]
+    })
+    expect(res.status).toBe(200)
+    const d = await detail(alice, id)
+    expect(d.issues).toEqual([])
+
+    const finalize = await request(alice, `/api/generated-documents/${id}/finalize`, {
+      method: "POST",
+      json: { versionId: d.version.id, acknowledged: true },
+    })
+    expect(finalize.status).toBe(201)
+    const { envelopeId } = await json<{ envelopeId: string }>(finalize)
+    const envelope = await prisma.envelope.findUniqueOrThrow({
+      where: { id: envelopeId },
+      include: { recipients: { orderBy: { colorIndex: "asc" } }, fields: true, documents: true },
+    })
+    const document = await prisma.document.findUniqueOrThrow({
+      where: { id: envelope.documents[0]?.documentId as string },
+    })
+    expect(envelope.recipients.map((r) => [r.name, r.role])).toEqual([
+      ["Amina Otieno", "SIGNER"],
+      ["Peter Kamau", "SIGNER"],
+      ["Wanjiru Kariuki", "SIGNER"],
+      ["Legal", "VIEWER"],
+    ])
+    const witness = envelope.recipients[2]?.id
+    const witnessFields = envelope.fields.filter((f) => f.recipientId === witness)
+    expect(witnessFields.filter((f) => f.type === "INITIALS")).toHaveLength(
+      document.pageCount as number,
+    )
+    expect(
+      new Set(witnessFields.filter((f) => f.type === "INITIALS").map((f) => f.page)).size,
+    ).toBe(document.pageCount as number)
+    expect(
+      witnessFields
+        .map((f) => f.type)
+        .filter((t) => t !== "INITIALS")
+        .sort(),
+    ).toEqual(["CHECKBOX", "SIGNATURE", "TEXT"])
+    expect(witnessFields.find((f) => f.type === "TEXT")?.label).toBe("ID number")
+    expect(envelope.fields.some((f) => f.recipientId === envelope.recipients[3]?.id)).toBe(false)
+    const preflight = await json<{ issues: unknown[] }>(
+      await request(alice, `/api/envelopes/${envelopeId}/preflight`),
+    )
+    expect(preflight.issues).toEqual([])
+  })
+
+  test("refuses fields for someone who only gets a copy", async () => {
+    const id = await createNda(alice)
+    const res = await putSigners(alice, id, (def) => {
+      def.roles = def.roles.map((r) =>
+        r.key === "party_b" ? { ...r, recipientRole: "VIEWER" } : r,
+      )
+    })
+    expect(res.status).toBe(400)
+  })
+
+  test("the assistant proposes signers; contacts it wasn't given are refused", async () => {
+    const id = await createNda(alice)
+    const roles = [
+      { key: "party_a", label: "Employer", recipientRole: "SIGNER" },
+      { key: "party_b", label: "Employee", recipientRole: "SIGNER", initialsOnEveryPage: true },
+    ]
+    const fields = {
+      party_a: [{ fieldType: "SIGNATURE" }],
+      party_b: [{ fieldType: "SIGNATURE" }, { fieldType: "DATE_SIGNED" }],
+    }
+    setAssistantModelForTests(
+      toolThenReply("define_signers", {
+        roles: roles.map((r) => (r.key === "party_b" ? { ...r, email: "emp@example.com" } : r)),
+        fields,
+        rationale: "Employment roles",
+      }),
+    )
+    const refused = await request(alice, `/api/generated-documents/${id}/chat`, {
+      method: "POST",
+      json: {
+        messages: [{ id: "m1", role: "user", parts: [{ type: "text", text: "Set signers" }] }],
+      },
+    })
+    expect(await refused.text()).toContain("never said")
+
+    setAssistantModelForTests(
+      toolThenReply("define_signers", { roles, fields, rationale: "Employment roles" }),
+    )
+    const ok = await request(alice, `/api/generated-documents/${id}/chat`, {
+      method: "POST",
+      json: {
+        messages: [{ id: "m1", role: "user", parts: [{ type: "text", text: "Set signers" }] }],
+      },
+    })
+    expect(ok.status).toBe(200)
+    await ok.text()
+    const d = await json<Detail & { proposals: { id: string; after: string }[] }>(
+      await request(alice, `/api/generated-documents/${id}`),
+    )
+    const proposal = d.proposals[0]
+    expect(proposal?.after).toContain("Employee (signs, initials every page)")
+    const accept = await request(
+      alice,
+      `/api/generated-documents/${id}/proposals/${proposal?.id}/accept`,
+      {
+        method: "POST",
+      },
+    )
+    expect(accept.status).toBe(200)
+    const after = await detail(alice, id)
+    expect(after.version.data.roles.map((r) => [r.label, r.initialsOnEveryPage])).toEqual([
+      ["Employer", false],
+      ["Employee", true],
+    ])
+    const b = currentSigners(after.version.data).fields.party_b ?? []
+    expect(b.map((f) => f.fieldType)).toEqual(["SIGNATURE", "DATE_SIGNED"])
   })
 })
