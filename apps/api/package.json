@@ -10,6 +10,8 @@
     "typecheck": "tsc -p ."
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "4.0.78",
+    "@ai-sdk/openai": "4.0.91",
     "@better-auth/passkey": "1.7.6",
     "@bull-board/api": "9.10.1",
     "@bull-board/hono": "9.10.1",
@@ -19,6 +21,7 @@
     "@sahihi/envelopes": "workspace:*",
     "@sahihi/infra": "workspace:*",
     "@sahihi/pdf": "workspace:*",
+    "ai": "7.0.137",
     "better-auth": "1.7.6",
     "hono": "4.13.9",
     "zod": "4.6.5"

@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test"
 import {
   canDeleteDocument,
+  canEditGeneratedDocument,
   canManageEnvelope,
   canManageFolder,
   canManageTemplate,
   canMoveDocument,
+  canUseAssistant,
   hasPermission,
   ORG_ROLES,
 } from "./permissions"
@@ -104,5 +106,19 @@ describe("webhooks", () => {
     expect(hasPermission("owner", { webhook: ["manage"] })).toBe(true)
     expect(hasPermission("admin", { webhook: ["manage"] })).toBe(true)
     expect(hasPermission("member", { webhook: ["manage"] })).toBe(false)
+  })
+})
+
+describe("AI document assistant", () => {
+  test("every role may use it (the workspace setting is the real switch)", () => {
+    for (const role of ORG_ROLES) expect(canUseAssistant(role)).toBe(true)
+    expect(canUseAssistant("stranger")).toBe(false)
+  })
+
+  test("generated documents follow the envelope rule", () => {
+    const doc = { createdById: "u-alice" }
+    expect(canEditGeneratedDocument({ userId: "u-alice", role: "member" }, doc)).toBe(true)
+    expect(canEditGeneratedDocument({ userId: "u-bob", role: "member" }, doc)).toBe(false)
+    expect(canEditGeneratedDocument({ userId: "u-bob", role: "admin" }, doc)).toBe(true)
   })
 })

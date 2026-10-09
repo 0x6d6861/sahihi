@@ -26,7 +26,7 @@ import {
   FolderRows,
   type FoldersPageData,
 } from "@/components/app/folders/folder-section"
-import { FileSearchIcon, PlusIcon } from "@/components/app/icons"
+import { FileSearchIcon, PlusIcon, SparklesIcon } from "@/components/app/icons"
 import { ColorDot, ColorName, TagBadges } from "@/components/app/labels/labels"
 import { ListGrid } from "@/components/app/list-card"
 import { ListPagination } from "@/components/app/list-pagination"
@@ -219,6 +219,10 @@ export default async function FilesPage({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <CreateFolderButton parentId={current?.id} allTags={allTags} />
+            <ButtonLink variant="secondary" href="/generate">
+              <SparklesIcon aria-hidden />
+              Draft with AI
+            </ButtonLink>
             <ButtonLink
               variant="secondary"
               href={

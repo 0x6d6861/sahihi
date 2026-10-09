@@ -64,6 +64,7 @@ tenants must never see each other's data.**
 | `/api/branding/:orgId/logo.png` (public workspace logo, ADR 0028) | 300 / min / IP |
 | `/api/account/*` (confirm account deletion, ADR 0040) | 10 / min / IP |
 | `POST /api/me/deletion` (password check before deleting an account) | 5 / 10 min / user |
+| `POST /api/generated-documents/:id/chat` (AI assistant turns, docs/ai-documents.md) | 20 / min / user |
 
 `/api/avatars/:userId` is not public: it needs a session and only serves people who share a
 workspace with that user.
@@ -176,6 +177,11 @@ them for malware yet; that needs an external scanner.
 - Deleting an account (ADR 0040) erases the person (name, email, sign-in methods, picture,
   signatures, notifications, memberships) and keeps their work under "Deleted user". The emailed
   link's token is stored only as a hash, like signing tokens.
+- AI document assistant (docs/ai-documents.md, ADR 0042): document text, blanks and the
+  conversation go to the configured model provider (`AI_MODEL`). Off until a workspace's owner or
+  admin turns it on. Signer emails aren't sent; events record which keys changed, never prompts or
+  model output. The server rebuilds the document context every turn and ignores client-supplied
+  instructions, and blank values set by the model must be something the person said.
 - Planned: a DPA template for tenants, and data residency options.
 - Don't put PII in logs. Log ids, not emails.
 

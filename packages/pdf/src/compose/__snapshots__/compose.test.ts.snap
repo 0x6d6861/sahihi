@@ -1,0 +1,54 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`composeGeneratedDocument field coordinates are stable (snapshot) 1`] = `
+[
+  {
+    "height": 40,
+    "id": "party_a_signature",
+    "page": 2,
+    "width": 180,
+    "x": 72,
+    "y": 305.39,
+  },
+  {
+    "height": 20,
+    "id": "party_a_name",
+    "page": 2,
+    "width": 180,
+    "x": 72,
+    "y": 261.39,
+  },
+  {
+    "height": 20,
+    "id": "party_a_date",
+    "page": 2,
+    "width": 120,
+    "x": 72,
+    "y": 217.39,
+  },
+  {
+    "height": 40,
+    "id": "party_b_signature",
+    "page": 3,
+    "width": 180,
+    "x": 72,
+    "y": 711.39,
+  },
+  {
+    "height": 20,
+    "id": "party_b_name",
+    "page": 3,
+    "width": 180,
+    "x": 72,
+    "y": 667.39,
+  },
+  {
+    "height": 20,
+    "id": "party_b_date",
+    "page": 3,
+    "width": 120,
+    "x": 72,
+    "y": 623.39,
+  },
+]
+`;

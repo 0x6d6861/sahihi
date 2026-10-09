@@ -22,6 +22,7 @@ import { embedding } from "./routes/embedding"
 import { envelopes } from "./routes/envelopes"
 import { files } from "./routes/files"
 import { folders } from "./routes/folders"
+import { generatedDocuments } from "./routes/generated-documents"
 import { me } from "./routes/me"
 import { notifications } from "./routes/notifications"
 import { signing } from "./routes/signing"
@@ -72,6 +73,7 @@ export function createApp() {
     .route("/api/files", files)
     .route("/api/envelopes", envelopes)
     .route("/api/templates", templates)
+    .route("/api/generated-documents", generatedDocuments)
     .route("/api/templates/:id/bulk-sends", startBulkSendRoute)
     .route("/api/bulk-sends", bulkSends)
     .route("/api/billing", billing)

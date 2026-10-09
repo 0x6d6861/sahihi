@@ -10,6 +10,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@assistant-ui/ai-sdk": "0.0.12",
+    "@assistant-ui/react": "0.15.26",
     "@base-ui/react": "1.8.0",
     "@better-auth/passkey": "1.7.6",
     "@daypicker/react": "10.0.1",
@@ -54,6 +56,7 @@
     "@radix-ui/react-tooltip": "1.3.0",
     "@sahihi/core": "workspace:*",
     "@sentry/nextjs": "11.1.0",
+    "ai": "7.0.137",
     "better-auth": "1.7.6",
     "border-beam": "1.4.1",
     "class-variance-authority": "0.7.1",

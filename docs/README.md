@@ -9,6 +9,7 @@
 | [pdf-pipeline.md](pdf-pipeline.md) | Upload/inspect, server-side stamping, finalize job |
 | [certificates.md](certificates.md) | Certificate of Completion, verification, CA integration plan |
 | [templates.md](templates.md) | Save an envelope as a template, use it |
+| [ai-documents.md](ai-documents.md) | Draft a document with the AI assistant, finalise it into a PDF and a draft envelope |
 | [webhooks.md](webhooks.md) | Signed event delivery to customer endpoints |
 | [notifications.md](notifications.md) | In-app notifications: types, audiences, preferences, the Inbox |
 | [public-api.md](public-api.md) | `/api/v1`, API keys, scopes, endpoints |

@@ -105,6 +105,21 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
 - [x] Passkeys, delete account (erase the person, keep the work; ADR 0040), forgot/reset password
       pages (`docs/auth.md`)
 
+## P6: AI document generator (`docs/ai-documents.md`, ADR 0042)
+
+- [x] Thin slice: Mutual NDA starter → assistant questions (≤ 3 per batch, skip) and blank filling
+      with a provenance check → signers → PDF render (pdf-lib, deterministic, field rects) →
+      finalise into a READY document and a DRAFT envelope; workspace opt-in and `ai:use`
+- [ ] Rich-text editing: TipTap with section, blank and field nodes; italics (font) and tables
+- [ ] Assistant edit proposals (`propose_section_edit`, `propose_sections`) with an inline diff and
+      accept/reject, each accepted change a version
+- [ ] Assistant-defined signers and fields (`define_signers`, `place_signature_field`), initials on
+      every page, text and checkbox fields
+- [ ] More starters (offer letter, policy, board resolution, invoice cover letter)
+- [ ] Save a generated document as a template (blanks and roles intact)
+- [ ] Lock a finalised document's fields in the envelope editor; new version after send
+- [ ] Plan quota for assistant turns; generated documents in exports and retention
+
 ## Later
 
 - [ ] **CA integration** via `SigningProvider` (PAdES-B-LT), see `docs/certificates.md`

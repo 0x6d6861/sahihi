@@ -29,6 +29,8 @@ export const orgStatements = {
   /** Public API keys (docs/public-api.md) */
   api: ["manage"],
   billing: ["manage"],
+  /** The AI document assistant (docs/ai-documents.md); the workspace must also turn it on. */
+  ai: ["use"],
 } as const
 
 export const orgAc = createAccessControl(orgStatements)
@@ -44,6 +46,7 @@ export const orgRoles = {
     data: ["manage"],
     api: ["manage"],
     billing: ["manage"],
+    ai: ["use"],
   }),
   admin: orgAc.newRole({
     ...adminAc.statements,
@@ -54,6 +57,7 @@ export const orgRoles = {
     webhook: ["manage"],
     data: ["manage"],
     api: ["manage"],
+    ai: ["use"],
   }),
   member: orgAc.newRole({
     ...memberAc.statements,
@@ -61,6 +65,7 @@ export const orgRoles = {
     envelope: ["create"],
     template: ["create"],
     folder: ["create"],
+    ai: ["use"],
   }),
 }
 
@@ -122,4 +127,14 @@ export function canManageTemplate(actor: Actor, template: { createdById: string 
   return (
     template.createdById === actor.userId || hasPermission(actor.role, { template: ["manage-any"] })
   )
+}
+
+/** Use the AI document assistant (the workspace must also have it turned on). */
+export function canUseAssistant(role: string): boolean {
+  return hasPermission(role, { ai: ["use"] })
+}
+
+/** Edit or finalise an AI-generated document: the envelope rule, since it becomes one. */
+export function canEditGeneratedDocument(actor: Actor, doc: { createdById: string }): boolean {
+  return canManageEnvelope(actor, doc)
 }
