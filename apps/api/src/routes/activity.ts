@@ -40,11 +40,17 @@ export const activity = new Hono<AppEnv>()
       const { id, occurredAt } = cursor as NonNullable<typeof cursor>
       after = { OR: [{ occurredAt: { lt: occurredAt } }, { occurredAt, id: { lt: id } }] }
     }
-    // Acting members by name, former ones included (audit rows outlive membership). Matching ids
-    // outside this workspace are harmless: the events are scoped by envelope below.
+    // Acting members by name, former ones included (audit rows outlive membership): users who are
+    // members now or own an envelope here. Scoped so the cap never crowds out this workspace's actors.
     const namedActors = query.q
       ? await prisma.user.findMany({
-          where: { name: { contains: query.q, mode: "insensitive" } },
+          where: {
+            name: { contains: query.q, mode: "insensitive" },
+            OR: [
+              { members: { some: { organizationId } } },
+              { envelopes: { some: forOrganization(organizationId).envelope() } },
+            ],
+          },
           select: { id: true },
           take: ACTOR_SEARCH_LIMIT,
         })

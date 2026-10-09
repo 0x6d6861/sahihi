@@ -175,4 +175,17 @@ describe("workspace activity", () => {
     await prisma.member.deleteMany({ where: { userId: bob.userId } })
     expect(await titles("?q=bob")).toEqual(["envelope.created NDA"])
   })
+
+  test("a name search is not crowded out by users of other workspaces", async () => {
+    await prisma.user.createMany({
+      data: Array.from({ length: 250 }, (_, i) => ({
+        id: `outsider-${i}`,
+        name: `zz outsider ${i}`,
+        email: `outsider-${i}@example.test`,
+      })),
+    })
+    const zoe = await joinOrganization(alice, "zz zoe", "member")
+    await draft(zoe, "Zoe's NDA")
+    expect((await list(alice, "?q=zz")).items.map((i) => i.envelopeTitle)).toEqual(["Zoe's NDA"])
+  })
 })
