@@ -891,3 +891,168 @@ describe("starters", () => {
     },
   )
 })
+
+describe("templates", () => {
+  beforeEach(() => enableAssistant(alice))
+
+  /** An offer letter with every blank and both contacts filled in. */
+  async function filledOffer() {
+    const created = await request(alice, "/api/generated-documents", {
+      method: "POST",
+      json: { starter: "offer-letter" },
+    })
+    const { id } = await json<{ id: string }>(created)
+    const { version } = await detail(alice, id)
+    await request(alice, `/api/generated-documents/${id}/variables`, {
+      method: "POST",
+      json: {
+        baseVersionId: version.id,
+        source: "answer",
+        values: version.data.variables.map((v) => ({ key: v.key, value: `${v.label} value` })),
+      },
+    })
+    const signers = await putSigners(alice, id, (def) => {
+      def.roles = def.roles.map((r) =>
+        r.key === "employer"
+          ? { ...r, name: "Wanjiru Kariuki", email: "hr@acme.example" }
+          : { ...r, name: "Otieno Ouma", email: "otieno@example.com" },
+      )
+    })
+    const { version: filled } = await json<{ version: { id: string } }>(signers)
+    return { id, versionId: filled.id }
+  }
+
+  const save = (sender: Sender, id: string, body: Record<string, unknown>) =>
+    request(sender, `/api/generated-documents/${id}/template`, { method: "POST", json: body })
+
+  test("keeps only the chosen values and contacts; a new document starts from it", async () => {
+    const { id, versionId } = await filledOffer()
+    const res = await save(alice, id, {
+      versionId,
+      name: "Acme offer letter",
+      keepValues: ["employer_name", "employer_address"],
+      keepContacts: ["employer"],
+    })
+    expect(res.status).toBe(201)
+    const { id: templateId } = await json<{ id: string }>(res)
+
+    const stored = await prisma.generationTemplate.findUniqueOrThrow({ where: { id: templateId } })
+    expect(stored).toMatchObject({ starter: "offer-letter", sourceGeneratedDocumentId: id })
+    const data = stored.data as unknown as GeneratedDocumentData
+    expect(data.variables.filter((v) => v.value !== null).map((v) => v.key)).toEqual([
+      "employer_name",
+      "employer_address",
+    ])
+    expect(data.roles.map((r) => r.email)).toEqual(["hr@acme.example", null])
+
+    // The event names what was kept, never the values.
+    const event = await prisma.generatedDocumentEvent.findFirstOrThrow({
+      where: { generatedDocumentId: id, type: "template.saved" },
+    })
+    expect(event.data).toEqual({
+      templateId,
+      keptValues: ["employer_name", "employer_address"],
+      keptContacts: ["employer"],
+    })
+    expect(JSON.stringify(event.data)).not.toContain("Employer's name value")
+
+    const list = await json<{ items: { id: string; name: string; canManage: boolean }[] }>(
+      await request(alice, "/api/generated-documents/templates"),
+    )
+    expect(list.items.map((t) => [t.id, t.name, t.canManage])).toEqual([
+      [templateId, "Acme offer letter", true],
+    ])
+
+    const started = await request(alice, "/api/generated-documents", {
+      method: "POST",
+      json: { templateId },
+    })
+    expect(started.status).toBe(201)
+    const { id: newId } = await json<{ id: string }>(started)
+    const fresh = await detail(alice, newId)
+    expect(fresh.version.data).toEqual(data)
+    expect(fresh.messages).toEqual([])
+    expect(
+      (await prisma.generatedDocument.findUniqueOrThrow({ where: { id: newId } })).templateId,
+    ).toBe(templateId)
+    // Only what was cleared is left to do.
+    expect(fresh.issues.some((i) => i.variableKey === "employer_name")).toBe(false)
+    expect(fresh.issues.some((i) => i.variableKey === "salary")).toBe(true)
+    const roleIssues = fresh.issues.filter((i) => i.roleKey)
+    expect(roleIssues.length).toBeGreaterThan(0)
+    expect(roleIssues.every((i) => i.roleKey === "candidate")).toBe(true)
+  })
+
+  test("refuses to keep what isn't filled in, and versions of other documents", async () => {
+    const { id, versionId } = await filledOffer()
+    const nda = await createNda(alice)
+    const { version: ndaVersion } = await detail(alice, nda)
+    expect(
+      (await save(alice, nda, { versionId: ndaVersion.id, name: "x", keepValues: ["term"] }))
+        .status,
+    ).toBe(400)
+    expect((await save(alice, id, { versionId, name: "x", keepValues: ["nope"] })).status).toBe(400)
+    expect((await save(alice, id, { versionId: ndaVersion.id, name: "x" })).status).toBe(404)
+  })
+
+  test("any member can save and use one; only its saver, an admin or the owner delete it", async () => {
+    const { id, versionId } = await filledOffer()
+    const bob = await joinOrganization(alice, "bob", "member")
+    const carol = await joinOrganization(alice, "carol", "member")
+    const res = await save(bob, id, { versionId, name: "Bob's offer" })
+    expect(res.status).toBe(201)
+    const { id: templateId } = await json<{ id: string }>(res)
+
+    const started = await request(carol, "/api/generated-documents", {
+      method: "POST",
+      json: { templateId },
+    })
+    expect(started.status).toBe(201)
+    const { id: carolsDoc } = await json<{ id: string }>(started)
+
+    const carolList = await json<{ items: { canManage: boolean }[] }>(
+      await request(carol, "/api/generated-documents/templates"),
+    )
+    expect(carolList.items.map((t) => t.canManage)).toEqual([false])
+    const del = (s: Sender) =>
+      request(s, `/api/generated-documents/templates/${templateId}`, { method: "DELETE" })
+    expect((await del(carol)).status).toBe(403)
+    expect((await del(alice)).status).toBe(204)
+    expect((await del(alice)).status).toBe(404)
+
+    // Documents started from it keep their content.
+    const after = await detail(carol, carolsDoc)
+    expect(after.version.data.title).toBe("Offer of Employment")
+    expect(
+      (await prisma.generatedDocument.findUniqueOrThrow({ where: { id: carolsDoc } })).templateId,
+    ).toBeNull()
+  })
+
+  test("another workspace's template can't be used or deleted", async () => {
+    const { id, versionId } = await filledOffer()
+    const { id: templateId } = await json<{ id: string }>(
+      await save(alice, id, { versionId, name: "Private" }),
+    )
+    const mallory = await createSender("mallory")
+    await enableAssistant(mallory)
+    expect(
+      (
+        await request(mallory, "/api/generated-documents", {
+          method: "POST",
+          json: { templateId },
+        })
+      ).status,
+    ).toBe(404)
+    expect(
+      (
+        await request(mallory, `/api/generated-documents/templates/${templateId}`, {
+          method: "DELETE",
+        })
+      ).status,
+    ).toBe(404)
+    const list = await json<{ items: unknown[] }>(
+      await request(mallory, "/api/generated-documents/templates"),
+    )
+    expect(list.items).toEqual([])
+  })
+})

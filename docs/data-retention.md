@@ -57,7 +57,8 @@ e.g. for a data subject's erasure request. It's the "Delete data" button on the 
 The owner uses **Settings → Data → Delete workspace** and types the name to confirm. That calls
 better-auth's `organization.delete`:
 - DB rows cascade: documents, envelopes, recipients, fields, audit trails, certificates,
-  templates, webhooks, exports, settings, notifications.
+  templates, webhooks, exports, settings, notifications, AI-generated documents and their
+  templates.
 - The `afterDeleteOrganization` hook queues `organization.purge-storage`, which deletes everything
   under `org/<id>/` in storage (`deletePrefix`, which refuses any prefix that isn't a workspace
   folder).

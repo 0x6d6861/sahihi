@@ -1,10 +1,15 @@
 import { STARTERS } from "@sahihi/core"
 import Link from "next/link"
-import { EnableAssistant, StartFromStarter } from "@/components/app/generator/start-actions"
+import {
+  DeleteTemplate,
+  EnableAssistant,
+  StartDocument,
+} from "@/components/app/generator/start-actions"
 import { Panel } from "@/components/app/panel"
 import { Badge } from "@/components/arc/badge/badge"
 import { EmptyState } from "@/components/arc/empty-state/empty-state"
 import { apiServer } from "@/lib/api-server"
+import type { GenerationTemplateItem } from "@/lib/generator"
 
 interface Settings {
   configured: boolean
@@ -48,15 +53,19 @@ export default async function GeneratePage() {
     )
   }
 
-  const { data } = await apiServer<{ items: DraftItem[] }>("/generated-documents")
+  const [{ data }, { data: templateData }] = await Promise.all([
+    apiServer<{ items: DraftItem[] }>("/generated-documents"),
+    apiServer<{ items: GenerationTemplateItem[] }>("/generated-documents/templates"),
+  ])
   const drafts = data?.items ?? []
+  const templates = templateData?.items ?? []
   return (
     <div className="flex flex-col gap-8">
       <header className="flex flex-col gap-2">
         <h1 className="font-medium text-2xl tracking-tight">Draft with AI</h1>
         <p className="text-muted-foreground text-sm">
-          Pick a starter. The assistant asks for every detail it needs and never fills in what it
-          doesn't know. Review the result before you send it.
+          Pick a starter or one of your workspace's templates. The assistant asks for every detail
+          it needs and never fills in what it doesn't know. Review the result before you send it.
         </p>
       </header>
 
@@ -69,12 +78,41 @@ export default async function GeneratePage() {
                 <span className="text-muted-foreground text-sm">{s.description}</span>
               </div>
               <div>
-                <StartFromStarter starter={s.key} />
+                <StartDocument from={{ starter: s.key }} />
               </div>
             </li>
           ))}
         </ul>
       </Panel>
+
+      {templates.length > 0 && (
+        <Panel
+          title="Workspace templates"
+          description="Saved from documents drafted here, with their wording, blanks and signers."
+        >
+          <ul className="grid gap-3 sm:grid-cols-2">
+            {templates.map((t) => (
+              <li key={t.id} className="flex flex-col gap-3 rounded-xl border p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <span className="truncate font-medium">{t.name}</span>
+                    {t.description && (
+                      <span className="text-muted-foreground text-sm">{t.description}</span>
+                    )}
+                    <span className="text-muted-foreground text-xs">
+                      Saved by {t.createdBy.name}
+                    </span>
+                  </div>
+                  {t.canManage && <DeleteTemplate id={t.id} name={t.name} />}
+                </div>
+                <div>
+                  <StartDocument from={{ templateId: t.id }} />
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
 
       <Panel title="Your drafts">
         {drafts.length === 0 ? (

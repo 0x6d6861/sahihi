@@ -119,7 +119,8 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
       (ADR 0045)
 - [x] More starters (offer letter, IT acceptable use policy, board resolution, invoice cover
       letter), each tested from draft to a sendable envelope
-- [ ] Save a generated document as a template (blanks and roles intact)
+- [x] Save a generated document as a template (blanks and roles intact; chosen answers and
+      contacts kept), listed on Draft with AI (ADR 0046)
 - [ ] Lock a finalised document's fields in the envelope editor; new version after send
 - [ ] Plan quota for assistant turns; generated documents in exports and retention
 

@@ -167,8 +167,11 @@ export type VariableType = (typeof VARIABLE_TYPES)[number]
 export const VARIABLE_STATUSES = ["unresolved", "answered", "skipped"] as const
 export type VariableStatus = (typeof VARIABLE_STATUSES)[number]
 
-/** Where a value came from: a question answer, the user's chat message, or a direct edit. */
-export const VALUE_SOURCES = ["answer", "chat", "edit"] as const
+/**
+ * Where a value came from: a question answer, the user's chat message, a direct edit, or the
+ * workspace template the document started from (kept on purpose when the template was saved).
+ */
+export const VALUE_SOURCES = ["answer", "chat", "edit", "template"] as const
 export type ValueSource = (typeof VALUE_SOURCES)[number]
 
 export const VariableValueSchema = z.string().trim().min(1).max(500)
@@ -241,5 +244,7 @@ export const GENERATION_EVENT_TYPES = [
   /** One assistant reply: model and token usage, never the prompt or the text. */
   "assistant.turn",
   "document.finalized",
+  /** Saved as a workspace template: its id and which values and contacts were kept (keys only). */
+  "template.saved",
 ] as const
 export type GenerationEventType = (typeof GENERATION_EVENT_TYPES)[number]

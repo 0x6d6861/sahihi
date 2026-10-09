@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { AskQuestionsInput } from "@sahihi/core"
-import { findStarter, numberSections } from "@sahihi/core"
+import { applyRoleContacts, applyVariableUpdates, findStarter, numberSections } from "@sahihi/core"
 import {
   answeredLines,
   answerValues,
@@ -10,6 +10,7 @@ import {
   proposalTitle,
   questionResult,
   roleIssues,
+  templateChoices,
 } from "./generator"
 
 const input: AskQuestionsInput = {
@@ -102,5 +103,30 @@ describe("proposals", () => {
       view({ kind: "insert_sections", sectionId: null }),
     ])
     expect([...ids]).toEqual(["purpose"])
+  })
+})
+
+test("templateChoices offers filled blanks in text order and roles with a contact", () => {
+  const nda = findStarter("mutual-nda")?.build()
+  if (!nda) throw new Error("missing starter")
+  const data = applyRoleContacts(
+    applyVariableUpdates(
+      nda,
+      [
+        { key: "governing_law", value: "Kenya" },
+        { key: "party_a_name", value: "Acme Ltd" },
+      ],
+      "answer",
+    ),
+    [{ key: "party_a", name: "Amina Otieno", email: "amina@example.com" }],
+  )
+  expect(templateChoices(data)).toEqual({
+    values: [
+      { key: "party_a_name", label: "First party's name", value: "Acme Ltd" },
+      { key: "governing_law", label: "Governing law", value: "Kenya" },
+    ],
+    contacts: [
+      { key: "party_a", label: "First party", contact: "Amina Otieno, amina@example.com" },
+    ],
   })
 })

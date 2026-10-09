@@ -53,6 +53,7 @@ model User {
   notifications           Notification[]
   notificationPreferences NotificationPreference[]
   generatedDocuments      GeneratedDocument[]
+  generationTemplates     GenerationTemplate[]
 
   @@map("user")
 }
@@ -165,6 +166,7 @@ model Organization {
   notifications           Notification[]
   notificationPreferences NotificationPreference[]
   generatedDocuments      GeneratedDocument[]
+  generationTemplates     GenerationTemplate[]
 
   @@map("organization")
 }
@@ -951,16 +953,45 @@ model GeneratedDocument {
   document           Document?               @relation(fields: [documentId], references: [id], onDelete: SetNull)
   envelopeId         String?
   envelope           Envelope?               @relation(fields: [envelopeId], references: [id], onDelete: SetNull)
+  /// The workspace template it started from, if any (lineage only: the data was copied)
+  templateId         String?
+  template           GenerationTemplate?     @relation("StartedFromTemplate", fields: [templateId], references: [id], onDelete: SetNull)
   createdAt          DateTime                @default(now())
   updatedAt          DateTime                @updatedAt
 
   versions  GeneratedDocumentVersion[]
+  savedAsTemplates GenerationTemplate[] @relation("SavedFrom")
   events    GeneratedDocumentEvent[]
   proposals GeneratedDocumentProposal[]
 
   @@index([organizationId, createdAt])
   @@index([documentId])
   @@index([envelopeId])
+  @@index([templateId])
+}
+
+/// A generated document saved to start others from (docs/ai-documents.md → Templates): its
+/// `GeneratedDocumentData` with values and contacts cleared except the ones the person kept.
+model GenerationTemplate {
+  id                        String              @id @default(cuid())
+  organizationId            String
+  organization              Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdById               String
+  createdBy                 User                @relation(fields: [createdById], references: [id])
+  name                      String
+  description               String?
+  /// Starter of the document it was saved from (`STARTERS` in @sahihi/core)
+  starter                   String
+  data                      Json
+  sourceGeneratedDocumentId String?
+  sourceGeneratedDocument   GeneratedDocument?  @relation("SavedFrom", fields: [sourceGeneratedDocumentId], references: [id], onDelete: SetNull)
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
+
+  documents GeneratedDocument[] @relation("StartedFromTemplate")
+
+  @@index([organizationId, createdAt])
+  @@index([sourceGeneratedDocumentId])
 }
 
 /// One state of a generated document: `GeneratedDocumentData` from @sahihi/core (title, content

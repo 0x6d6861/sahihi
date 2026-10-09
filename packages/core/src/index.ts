@@ -23,6 +23,7 @@ export * from "./generation/provenance"
 export * from "./generation/schemas"
 export * from "./generation/signers"
 export * from "./generation/starters"
+export * from "./generation/templates"
 
 export * from "./geometry/coordinates"
 

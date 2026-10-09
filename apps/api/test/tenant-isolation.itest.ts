@@ -34,6 +34,7 @@ const ids = {
   generatedDocument: "",
   generatedVersion: "",
   proposal: "",
+  generationTemplate: "",
 }
 
 type Case = () => { path: string; init?: RequestInit & { json?: unknown } }
@@ -321,6 +322,19 @@ const TENANT: Record<string, Case> = {
       },
     },
   }),
+  // Starting from a template takes its id: another workspace's is a 404.
+  "POST /api/generated-documents": () => ({
+    path: "/api/generated-documents",
+    init: { method: "POST", json: { templateId: ids.generationTemplate } },
+  }),
+  "POST /api/generated-documents/:id/template": () => ({
+    path: `/api/generated-documents/${ids.generatedDocument}/template`,
+    init: { method: "POST", json: { versionId: ids.generatedVersion, name: "Stolen" } },
+  }),
+  "DELETE /api/generated-documents/templates/:templateId": () => ({
+    path: `/api/generated-documents/templates/${ids.generationTemplate}`,
+    init: { method: "DELETE" },
+  }),
   "POST /api/generated-documents/:id/finalize": () => ({
     path: `/api/generated-documents/${ids.generatedDocument}/finalize`,
     init: { method: "POST", json: { versionId: ids.generatedVersion, acknowledged: true } },
@@ -351,6 +365,7 @@ const LISTS = [
   // Every envelope's audit events in the caller's workspace only (activity.itest.ts).
   "GET /api/activity",
   "GET /api/generated-documents",
+  "GET /api/generated-documents/templates",
 ]
 
 /**
@@ -374,8 +389,6 @@ const isStaffDashboard = (route: string) =>
 const NOT_TENANT = [
   // Creates in the caller's own org and takes no ids from the request.
   "POST /api/webhooks",
-  // A new AI document from a code starter, in the caller's own org; no ids.
-  "POST /api/generated-documents",
   // The caller's own workspace AI switch; no ids.
   "GET /api/generated-documents/settings",
   "PUT /api/generated-documents/settings",
@@ -447,6 +460,7 @@ async function snapshot() {
     envelopeDocuments,
     attachments,
     generatedDocuments,
+    generationTemplates,
   ] = await Promise.all([
     prisma.document.findMany({
       where: { organizationId: alice.organizationId },
@@ -481,6 +495,7 @@ async function snapshot() {
       where: { organizationId: alice.organizationId },
       include: { versions: true, proposals: true },
     }),
+    prisma.generationTemplate.findMany({ where: { organizationId: alice.organizationId } }),
   ])
   return {
     documents,
@@ -495,6 +510,7 @@ async function snapshot() {
     envelopeDocuments,
     attachments,
     generatedDocuments,
+    generationTemplates,
   }
 }
 
@@ -614,6 +630,15 @@ beforeAll(async () => {
       },
     })
   ).id
+  const template = await request(
+    alice,
+    `/api/generated-documents/${ids.generatedDocument}/template`,
+    {
+      method: "POST",
+      json: { versionId: ids.generatedVersion, name: "Our NDA" },
+    },
+  )
+  ids.generationTemplate = ((await template.json()) as { id: string }).id
 })
 
 afterAll(() => setAssistantModelForTests(null))
@@ -674,6 +699,7 @@ describe("tenant isolation", () => {
       "/api/data/exports",
       "/api/bulk-sends",
       "/api/generated-documents",
+      "/api/generated-documents/templates",
     ]) {
       const mine = (await (await request(alice, path)).json()) as { items: unknown[] }
       const theirs = (await (await request(mallory, path)).json()) as { items: unknown[] }

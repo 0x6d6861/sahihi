@@ -6,6 +6,7 @@ import {
   CreateGeneratedDocumentSchema,
   canEditGeneratedDocument,
   canEditWorkspace,
+  canManageTemplate,
   canUseAssistant,
   envelopeDraftFromGenerated,
   FinalizeGeneratedDocumentSchema,
@@ -13,12 +14,16 @@ import {
   type GeneratedDocumentData,
   GeneratedDocumentDataSchema,
   generationPreflight,
+  hasPermission,
   isProposalStale,
   ProposalPayloadSchema,
   proposalTexts,
+  SaveGenerationTemplateSchema,
   SignersError,
   sha256Hex,
   structureIssues,
+  TemplateKeepError,
+  templateDataFrom,
   UpdateContentSchema,
   UpdateSignersSchema,
   UpdateVariablesSchema,
@@ -42,7 +47,7 @@ import {
   lockGeneratedDocument,
 } from "../lib/generated-documents"
 import { badRequest, clientMeta, conflict, forbidden, notFound, parseJson } from "../lib/http"
-import { actor } from "../lib/permissions"
+import { actor, assertCanManageTemplate } from "../lib/permissions"
 import { queueThumbnail } from "../lib/thumbnails"
 import { rateLimit } from "../middleware/rate-limit"
 import { requireOrg } from "../middleware/session"
@@ -134,25 +139,51 @@ export const generatedDocuments = new Hono<AppEnv>()
   })
 
   .post("/", async (c) => {
-    const { starter: key } = await parseJson(c, CreateGeneratedDocumentSchema)
-    const starter = findStarter(key)
-    if (!starter) badRequest("Unknown starter")
-    const data = starter.build()
+    const input = await parseJson(c, CreateGeneratedDocumentSchema)
+    const organizationId = c.get("organizationId")
+    let origin: {
+      starter: string
+      data: GeneratedDocumentData
+      reason: string
+      templateId?: string
+    }
+    if ("starter" in input) {
+      const starter = findStarter(input.starter)
+      if (!starter) badRequest("Unknown starter")
+      origin = {
+        starter: starter.key,
+        data: starter.build(),
+        reason: `Started from ${starter.name}`,
+      }
+    } else {
+      const template = await prisma.generationTemplate.findFirst({
+        where: forOrganization(organizationId).generationTemplate({ id: input.templateId }),
+      })
+      if (!template) notFound("Template")
+      origin = {
+        starter: template.starter,
+        data: GeneratedDocumentDataSchema.parse(template.data),
+        reason: `Started from template "${template.name}"`,
+        templateId: template.id,
+      }
+    }
+    const { data } = origin
     const userId = c.get("user").id
     const doc = await prisma.$transaction(async (tx) => {
       const created = await tx.generatedDocument.create({
         data: {
-          organizationId: c.get("organizationId"),
+          organizationId,
           createdById: userId,
           title: data.title,
-          starter: starter.key,
+          starter: origin.starter,
+          templateId: origin.templateId ?? null,
           versions: {
             create: {
               number: 1,
               data: data as unknown as object,
               actor: "USER",
               createdById: userId,
-              reason: `Started from ${starter.name}`,
+              reason: origin.reason,
             },
           },
         },
@@ -164,11 +195,50 @@ export const generatedDocuments = new Hono<AppEnv>()
         actor: "USER",
         actorUserId: userId,
         versionId: created.versions[0]?.id,
-        data: { starter: starter.key },
+        data: origin.templateId
+          ? { starter: origin.starter, templateId: origin.templateId }
+          : { starter: origin.starter },
       })
       return created
     })
     return c.json({ id: doc.id }, 201)
+  })
+
+  /** The workspace's templates, newest first (docs/ai-documents.md → Templates). */
+  .get("/templates", async (c) => {
+    const templates = await prisma.generationTemplate.findMany({
+      where: forOrganization(c.get("organizationId")).generationTemplate(),
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: 100,
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        createdById: true,
+        createdAt: true,
+        createdBy: { select: { name: true } },
+      },
+    })
+    const who = actor(c)
+    return c.json({
+      items: templates.map(({ createdById, ...t }) => ({
+        ...t,
+        canManage: canManageTemplate(who, { createdById }),
+      })),
+    })
+  })
+
+  .delete("/templates/:templateId", async (c) => {
+    const template = await prisma.generationTemplate.findFirst({
+      where: forOrganization(c.get("organizationId")).generationTemplate({
+        id: c.req.param("templateId"),
+      }),
+    })
+    if (!template) notFound("Template")
+    assertCanManageTemplate(c, template)
+    // Documents started from it keep their own copy of the data; only the link goes.
+    await prisma.generationTemplate.delete({ where: { id: template.id } })
+    return c.body(null, 204)
   })
 
   .get("/:id", async (c) => {
@@ -452,6 +522,58 @@ export const generatedDocuments = new Hono<AppEnv>()
    * the PDF but failed before the envelope, calling again creates only the envelope (the render is
    * deterministic, so the fields still match the stored PDF).
    */
+  /**
+   * Save a version as a workspace template. Anyone who can open the document may, finalised or
+   * not; values and contacts are cleared unless listed in `keepValues` / `keepContacts`.
+   */
+  .post("/:id/template", async (c) => {
+    if (!hasPermission(c.get("memberRole"), { template: ["create"] })) {
+      forbidden("You can't save templates in this workspace")
+    }
+    const { doc } = await loadGeneratedDocument(c.get("organizationId"), c.req.param("id"))
+    const input = await parseJson(c, SaveGenerationTemplateSchema)
+    const version = await prisma.generatedDocumentVersion.findFirst({
+      where: { id: input.versionId, generatedDocumentId: doc.id },
+    })
+    if (!version) notFound("Version")
+    let data: GeneratedDocumentData
+    try {
+      data = templateDataFrom(GeneratedDocumentDataSchema.parse(version.data), input)
+    } catch (err) {
+      if (err instanceof TemplateKeepError) badRequest(err.message)
+      throw err
+    }
+    const userId = c.get("user").id
+    const template = await prisma.$transaction(async (tx) => {
+      const created = await tx.generationTemplate.create({
+        data: {
+          organizationId: doc.organizationId,
+          createdById: userId,
+          name: input.name,
+          description: input.description || null,
+          starter: doc.starter,
+          data: data as unknown as object,
+          sourceGeneratedDocumentId: doc.id,
+        },
+      })
+      await appendEvent(tx, {
+        generatedDocumentId: doc.id,
+        type: "template.saved",
+        actor: "USER",
+        actorUserId: userId,
+        versionId: version.id,
+        // Keys only: the values themselves stay in the template.
+        data: {
+          templateId: created.id,
+          keptValues: input.keepValues,
+          keptContacts: input.keepContacts,
+        },
+      })
+      return created
+    })
+    return c.json({ id: template.id }, 201)
+  })
+
   .post("/:id/finalize", async (c) => {
     const input = await parseJson(c, FinalizeGeneratedDocumentSchema)
     const orgId = c.get("organizationId")

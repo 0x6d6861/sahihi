@@ -50,5 +50,8 @@ export function forOrganization(organizationId: string) {
     generatedDocument: (
       where: Prisma.GeneratedDocumentWhereInput = {},
     ): Prisma.GeneratedDocumentWhereInput => ({ ...where, organizationId }),
+    generationTemplate: (
+      where: Prisma.GenerationTemplateWhereInput = {},
+    ): Prisma.GenerationTemplateWhereInput => ({ ...where, organizationId }),
   }
 }

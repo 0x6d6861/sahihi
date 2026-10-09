@@ -16,6 +16,7 @@ import { ChatPanel } from "./chat-panel"
 import { DocumentEditor } from "./editor/document-editor"
 import { FinalizeDialog } from "./finalize-dialog"
 import { GeneratorProvider, useGenerator } from "./generator-context"
+import { SaveTemplateDialog } from "./save-template-dialog"
 import { SignersPanel } from "./signers-panel"
 
 type DocumentTab = "preview" | "editing" | "signers"
@@ -39,6 +40,7 @@ function Frame() {
   const [pane, setPane] = useState<"chat" | "document">("chat")
   const [tab, setTab] = useState<DocumentTab>("editing")
   const [finalizeOpen, setFinalizeOpen] = useState(false)
+  const [templateOpen, setTemplateOpen] = useState(false)
   const finalized = detail.document.status === "FINALIZED"
   const blocking = detail.issues.length
 
@@ -65,6 +67,9 @@ function Frame() {
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <Button variant="secondary" onClick={() => setTemplateOpen(true)}>
+            Save as template
+          </Button>
           {finalized && detail.document.envelopeId ? (
             <ButtonLink variant="primary" href={`/envelopes/${detail.document.envelopeId}`}>
               Open envelope
@@ -146,6 +151,7 @@ function Frame() {
       </div>
 
       <FinalizeDialog open={finalizeOpen} onOpenChange={setFinalizeOpen} />
+      <SaveTemplateDialog open={templateOpen} onOpenChange={setTemplateOpen} />
     </div>
   )
 }

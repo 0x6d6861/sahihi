@@ -9,7 +9,7 @@ What ships today (roadmap P6): five starters (see Starters), the assistant's que
 filling, a rich-text editor for the wording (sections, blanks, lists, tables, bold, italic,
 underline), assistant edit proposals with a diff to accept or reject, signers and their fields
 (signature, initials, full name, date signed, text, checkbox; initials on every page), set by the
-person or proposed by the assistant, a PDF preview, finalise. Not yet: saving a generated document as a template.
+person or proposed by the assistant, a PDF preview, finalise, and workspace templates saved from a document (see Templates).
 
 ## Availability
 
@@ -38,7 +38,7 @@ The source of a document is structured, never Markdown: a ProseMirror-compatible
 | `table` | A plain grid of `tableRow`s of `tableCell` / `tableHeader` cells holding paragraphs. Every row has the same number of cells; no merged cells |
 | `variable` node | An atomic blank pointing at `variables[key]`. The value never sits in the text |
 | `signatureBlock` | Where one signer role signs: caption paragraphs and `field` nodes (`SIGNATURE`, `INITIALS`, `NAME`, `DATE_SIGNED`, `TEXT`, `CHECKBOX`) |
-| `variables[]` | `key`, `label`, `type`, `hint`, `value` (null until filled), `status` (`unresolved`, `answered`, `skipped`), `source` (`answer`, `chat`, `edit`) |
+| `variables[]` | `key`, `label`, `type`, `hint`, `value` (null until filled), `status` (`unresolved`, `answered`, `skipped`), `source` (`answer`, `chat`, `edit`, `template`) |
 | `roles[]` | Signer roles: `key`, `label`, `SIGNER` or `VIEWER` (gets a copy), the contact (`name`, `email`), and `initialsOnEveryPage` (signers only) |
 
 Signer identity is data: emails exist only in `roles`, and party names in the body are blanks, so
@@ -72,6 +72,32 @@ Tests check that every starter is valid, uses every blank it declares and prefil
 filled in and with contacts, a starter passes the finalise preflight and becomes an envelope that
 can be sent. Its wording holds no amount, date, duration, percentage, email or phone number: the
 same check the assistant's proposals get (`unattestedSpecifics`).
+
+## Templates (ADR 0046)
+
+A document can be saved as a **workspace template** to start others from: its wording, blanks,
+signer roles and fields, from any version (finalised documents too). Templates are listed on
+`/generate` under the starters, as "Workspace templates". They are separate from envelope
+templates, which are a PDF with placed fields (`docs/templates.md`).
+
+- **What's kept** (`templateDataFrom`): the text and signers as they are. Answers and contacts are
+  cleared, except the ones the person ticks in the save dialog ("Keep these answers", "Keep these
+  signers' contacts"), for a company's own name, address or signatory. A kept answer counts as
+  filled (`source: "template"`), so the assistant doesn't ask for it again. Blanks the text no
+  longer uses are dropped.
+- **Saving:** `POST /generated-documents/:id/template` with `{ versionId, name, description?,
+  keepValues, keepContacts }`. Anyone who can open the document and has `template:create` can save.
+  Keeping a blank that's empty or a contact that isn't set is a 400. The document gets a
+  `template.saved` event naming the template and the kept keys, never their values.
+- **Using:** `POST /generated-documents` with `{ templateId }` instead of `{ starter }`. Version 1
+  is a copy of the template's data; the new document records `templateId` and starts with an empty
+  conversation.
+- **Listing and deleting:** `GET /generated-documents/templates` (newest first, `canManage` per
+  row) and `DELETE /generated-documents/templates/:templateId`, for the member who saved it, an
+  admin or the owner (`canManageTemplate`, as for envelope templates). Documents started from a
+  deleted template keep their text; only the link is cleared.
+
+There's no editing a template in place: start a document from it, change it, and save it again.
 
 ## The assistant (`apps/api/src/lib/assistant/`)
 
@@ -219,7 +245,7 @@ ADR 0009).
 
 ## Web (`/generate`, `components/app/generator/`)
 
-- `/generate`: starters and your drafts; the switch for owners and admins while it's off. "Draft
+- `/generate`: starters, workspace templates (with delete for those who may) and your drafts; the switch for owners and admins while it's off. "Draft
   with AI" on All files links here.
 - `/generate/:id`: a full page (`isFullPage`) with its own bar (back, title, version, Finalise or
   Open envelope). Assistant on the left, document on the right; on phones one pane at a time, both
@@ -239,10 +265,14 @@ ADR 0009).
   the fields. A suggested set of signers shows as a line-by-line diff in its card.
 - **Preview** tab: the rendered PDF.
 - Finalise: an Arc dialog with the required "I've read the whole document" confirmation.
+- Save as template: an Arc dialog from the top bar with the name, a description, and a tick box
+  per filled answer and per signer contact to keep (all off by default). It confirms in place
+  with a link to `/generate`.
 
 ## Data handling
 
 Document text, blanks and the conversation are sent to the configured model provider, which is
 why workspaces opt in. Signer emails are not in the prompt (only whether a contact is set). Logs
-and events never hold prompts or model output. Generated documents, versions, events and the
-conversation are workspace data: deleting the workspace deletes them.
+and events never hold prompts or model output. Generated documents, versions, events, the
+conversation and workspace templates are workspace data: deleting the workspace deletes them. A
+template holds only the answers and contacts someone chose to keep.

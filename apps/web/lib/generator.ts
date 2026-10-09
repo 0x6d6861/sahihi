@@ -7,6 +7,7 @@ import type {
   ProposalStatus,
   Variable,
 } from "@sahihi/core"
+import { referencedVariableKeys } from "@sahihi/core"
 
 /**
  * Pure helpers for the AI document generator (docs/ai-documents.md → Web). DOM-free so they're
@@ -128,4 +129,34 @@ export const PROPOSAL_STATUS_LABEL: Record<ProposalStatus, string> = {
   ACCEPTED: "Accepted",
   REJECTED: "Rejected",
   STALE: "Out of date",
+}
+
+/**
+ * What the "Save as template" dialog offers to keep: filled blanks the text uses, in the text's
+ * order, and roles with a contact. Everything else is cleared anyway.
+ */
+export function templateChoices(data: GeneratedDocumentData) {
+  const byKey = new Map(data.variables.map((v) => [v.key, v]))
+  const values = referencedVariableKeys(data.content).flatMap((key) => {
+    const v = byKey.get(key)
+    return v?.value != null ? [{ key, label: v.label, value: v.value }] : []
+  })
+  const contacts = data.roles
+    .filter((r) => r.name || r.email)
+    .map((r) => ({
+      key: r.key,
+      label: r.label,
+      contact: [r.name, r.email].filter(Boolean).join(", "),
+    }))
+  return { values, contacts }
+}
+
+/** A workspace template as `/generate` lists it (`GET /generated-documents/templates`). */
+export interface GenerationTemplateItem {
+  id: string
+  name: string
+  description: string | null
+  createdAt: string
+  createdBy: { name: string }
+  canManage: boolean
 }
