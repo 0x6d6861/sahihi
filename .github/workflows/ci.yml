@@ -33,13 +33,26 @@ jobs:
         run: bun run db:generate
 
       - name: Test
-        run: bun run test
+        run: mkdir -p reports && bun run test --reporter=junit --reporter-outfile=reports/unit.xml
+
+      # Totals, failures and a per-file table on the run page; failures also annotate the diff.
+      - name: Test report
+        if: ${{ !cancelled() }}
+        run: bun scripts/test-summary.ts "Unit tests" reports/unit.xml "$GITHUB_STEP_SUMMARY"
 
       - name: Typecheck
         run: bun run typecheck
 
       - name: Lint
         run: bun run lint
+
+      - name: Upload JUnit report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-unit-${{ github.run_id }}
+          path: reports/
+          retention-days: 14
 
   # API and worker integration tests (docs/testing.md). Postgres and Redis as service containers;
   # MinIO via `docker run` (service containers can't take the `server /data` command). Runs after the
@@ -95,7 +108,19 @@ jobs:
 
       # sahihi_test is created and migrated by apps/api/test/preload.ts.
       - name: Integration tests
-        run: bun run test:integration
+        run: mkdir -p reports && bun run test:integration --reporter=junit --reporter-outfile=reports/integration.xml
+
+      - name: Test report
+        if: ${{ !cancelled() }}
+        run: bun scripts/test-summary.ts "Integration tests" reports/integration.xml "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload JUnit report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-integration-${{ github.run_id }}
+          path: reports/
+          retention-days: 14
 
   # The Playwright E2E journey (docs/testing.md → E2E) on its own api/web/worker: the same
   # infrastructure as `bun run infra:up` (Postgres, Redis, Mailpit, MinIO). Runs after the fast
@@ -186,12 +211,18 @@ jobs:
         env:
           CI: "true"
 
-      - name: Upload Playwright report and traces
-        if: failure()
+      - name: Test report
+        if: ${{ !cancelled() }}
+        run: bun scripts/test-summary.ts "E2E" reports/e2e.xml "$GITHUB_STEP_SUMMARY"
+
+      # The HTML report on every run (traces and screenshots are kept for failures).
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: playwright-${{ github.run_id }}
           path: |
             apps/e2e/playwright-report/
             apps/e2e/test-results/
+            reports/
           retention-days: 7

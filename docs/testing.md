@@ -29,10 +29,16 @@ Integration tests are named `*.itest.ts`, so neither it nor a bare `bun test` pi
   - `integration`: Postgres 17 and Redis 7 as service containers, and MinIO, then
     `bun run test:integration`.
   - `e2e`: the same plus Mailpit (pinned to v1.31.2), then `bun run test:e2e`. Chromium is cached
-    per Playwright version. On failure, the Playwright report and traces are uploaded as an
+    per Playwright version. The Playwright report (and traces, on failure) are uploaded as an
     artifact for 7 days.
   - MinIO is started with `docker run` in both, because service containers can't take its
     `server /data` command, and the bucket is created with aws-cli, like `minio-init`.
+- **Test reports:** every suite writes JUnit (`bun test --reporter=junit`, Playwright's `junit`
+  reporter) to `reports/`, and `scripts/test-summary.ts` turns it into the job summary on the run
+  page: passed / failed / skipped, each failure with its message, and a per-file table. Failures
+  with a file and line also become `::error` annotations on the PR diff. The XML is kept as an
+  artifact (`junit-*`, 14 days). It runs even when the tests fail; locally,
+  `bun scripts/test-summary.ts "<title>" <report.xml>` prints the markdown.
 
 `.github/workflows/claude-review.yml` (`anthropics/claude-code-action@v1`) has two jobs:
 - **`review`:** Claude reviews every non-draft PR from this repository when it opens, gets new
