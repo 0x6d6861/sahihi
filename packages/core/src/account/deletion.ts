@@ -34,6 +34,8 @@ export const hashDeletionToken = (token: string) => sha256Hex(`delete-account:${
 export interface Membership {
   organizationId: string
   organizationName: string
+  /** Tells apart workspaces with the same name. */
+  organizationCreatedAt: Date
   role: string
   ownerCount: number
 }
@@ -45,5 +47,9 @@ export interface Membership {
 export function deletionBlockers(memberships: readonly Membership[]) {
   return memberships
     .filter((m) => !canLeaveWorkspace(m.role, m.ownerCount))
-    .map((m) => ({ id: m.organizationId, name: m.organizationName }))
+    .map((m) => ({
+      id: m.organizationId,
+      name: m.organizationName,
+      createdAt: m.organizationCreatedAt,
+    }))
 }

@@ -27,11 +27,13 @@ function ResetPasswordForm() {
 
   if (!token || params.get("error")) {
     return (
-      <Panel title="This link has expired" headingLevel={1} className="w-full max-w-sm">
+      <Panel title="This link doesn't work" headingLevel={1} className="w-full max-w-sm">
         <p className="text-muted-foreground text-sm">
-          Reset links work once and for 1 hour. Ask for a new one.
+          {params.get("error")
+            ? "Reset links work once and for 1 hour. Ask for a new one."
+            : "Open the link from the reset email, or ask for a new one."}
         </p>
-        <ButtonLink href="/forgot-password" className="w-full">
+        <ButtonLink href="/forgot-password" variant="primary" className="w-full">
           Send a new link
         </ButtonLink>
       </Panel>

@@ -2,7 +2,7 @@
 
 import type { FieldType } from "@sahihi/core"
 import dynamic from "next/dynamic"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { DocumentSwitcher } from "@/components/app/envelope/document-switcher"
 import { SettingsIcon } from "@/components/app/icons"
 import { toastManager } from "@/components/app/toast"
@@ -53,6 +53,56 @@ export interface EditorDocument {
   pageRotations: number[]
 }
 
+/**
+ * Starting zoom for the view-only editors: "automatic" fits the width but stops at 100 %, so a
+ * wide screen shows the whole width of the page without blowing it up past life size.
+ */
+export const EDITOR_ZOOM = "automatic" as const
+
+/**
+ * The viewer's frame, with a page-shaped skeleton over it until the first page has drawn. The
+ * viewer's own spinner is a few pixels wide, and the engine, the document and the first render
+ * take seconds on a cold load. Pages are `blob:` images; `load` doesn't bubble, so a capture
+ * listener on the frame catches the first one. The skeleton sits below the editor's two toolbar
+ * rows, which work already. `failed` drops it so the viewer's error shows.
+ */
+export function PdfFrame({
+  docKey,
+  failed,
+  children,
+}: {
+  /** The document on screen; a new one shows the skeleton again. */
+  docKey: string
+  failed: boolean
+  children: React.ReactNode
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [drawn, setDrawn] = useState<string | null>(null)
+  useEffect(() => {
+    const frame = ref.current
+    if (!frame) return
+    const onLoad = (e: Event) => {
+      const t = e.target
+      if (t instanceof HTMLImageElement && t.src.startsWith("blob:")) setDrawn(docKey)
+    }
+    frame.addEventListener("load", onLoad, true)
+    return () => frame.removeEventListener("load", onLoad, true)
+  }, [docKey])
+  return (
+    <div ref={ref} className="relative min-w-0 flex-1">
+      {children}
+      {drawn !== docKey && !failed && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-20 bottom-0 flex justify-center overflow-hidden bg-background p-6"
+        >
+          <Skeleton className="aspect-[1/1.294] w-full max-w-150" />
+        </div>
+      )}
+    </div>
+  )
+}
+
 // Stable reference: PDFEditor memoizes page rendering on renderPageOverlay.
 const renderPageOverlay = (p: PDFEditorPageOverlayProps) => <FieldLayer pageNumber={p.pageNumber} />
 
@@ -94,6 +144,11 @@ export function FieldEditorSurface({
     dispatch({ type: "select", key: null })
   }
   const [tool, setTool] = useState<FieldType | null>(null)
+  // A document whose PDF failed to load (the viewer shows why).
+  const [failedId, setFailedId] = useState<string | null>(null)
+  const placed = useCallback((keepTool: boolean) => {
+    if (!keepTool) setTool(null)
+  }, [])
   const [activeRecipientId, setActiveRecipientId] = useState<string | null>(
     recipients[0]?.id ?? null,
   )
@@ -126,11 +181,12 @@ export function FieldEditorSurface({
       dispatch,
       tool,
       activeRecipientId,
+      placed,
       recipients: recipientMap,
       rotationOf,
       activeDocument,
     }),
-    [state, dispatch, tool, activeRecipientId, recipientMap, rotationOf, activeDocument],
+    [state, dispatch, tool, activeRecipientId, placed, recipientMap, rotationOf, activeDocument],
   )
   const fieldCount = (id: string) => state.fields.filter((f) => f.envelopeDocumentId === id).length
 
@@ -166,9 +222,6 @@ export function FieldEditorSurface({
           <span className="text-muted-foreground tabular-nums">{fieldCount(id) || ""}</span>
         )}
       />
-      <span className="max-lg:hidden">
-        Pick a field type on the right, then click or drag on a page.
-      </span>
       <span className="ml-auto flex items-center gap-2">
         <SaveStatus status={status} onRetry={onRetry} />
       </span>
@@ -182,13 +235,14 @@ export function FieldEditorSurface({
       src={active.src}
       fileName={active.name}
       defaultMode="view"
-      defaultZoom="fit-width"
+      defaultZoom={EDITOR_ZOOM}
       showUpload={false}
       showDownload={false}
       persistSignatures={false}
       features={VIEW_ONLY_FEATURES}
       renderPageOverlay={renderPageOverlay}
       ribbonContent={ribbon}
+      onDocumentLoadError={() => setFailedId(active.id)}
       onToast={(t) => toastManager.add({ title: t.message, type: t.tone })}
       className="size-full"
     />
@@ -199,7 +253,9 @@ export function FieldEditorSurface({
   return (
     <FieldEditorContext.Provider value={ctx}>
       <div className={cn("flex size-full min-h-0 overflow-hidden", frameClassName)}>
-        <div className="min-w-0 flex-1">{editor}</div>
+        <PdfFrame docKey={active?.id ?? ""} failed={!active?.src || failedId === active?.id}>
+          {editor}
+        </PdfFrame>
         <aside
           aria-label="Field tools"
           className="w-72 shrink-0 border-l bg-background max-lg:hidden"

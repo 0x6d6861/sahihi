@@ -2,7 +2,7 @@
 
 import type { NormalizedRect } from "@sahihi/core"
 import { useRef, useState } from "react"
-import { FIELD_LABELS, RECIPIENT_COLORS } from "@/lib/constants"
+import { FIELD_LABEL_CLASS, FIELD_LABELS, RECIPIENT_COLORS } from "@/lib/constants"
 import { keyToAction, localPoint, placementRect } from "@/lib/field-editor"
 import {
   displayedToLocalRect,
@@ -47,8 +47,16 @@ function layerPoint(e: React.PointerEvent, layer: HTMLElement): Point {
  * the editor's own shortcuts.
  */
 export function FieldLayer({ pageNumber }: { pageNumber: number }) {
-  const { state, dispatch, tool, activeRecipientId, recipients, rotationOf, activeDocument } =
-    useFieldEditor()
+  const {
+    state,
+    dispatch,
+    tool,
+    activeRecipientId,
+    placed,
+    recipients,
+    rotationOf,
+    activeDocument,
+  } = useFieldEditor()
   const rot = rotationOf(pageNumber)
   const layerRef = useRef<HTMLDivElement>(null)
   const drag = useRef<Drag | null>(null)
@@ -131,6 +139,7 @@ export function FieldLayer({ pageNumber }: { pageNumber: number }) {
         from: d.from,
         to: localToDisplayedPoint(layerPoint(e, layer), rot),
       })
+      placed(e.shiftKey)
     }
   }
 
@@ -180,8 +189,11 @@ export function FieldLayer({ pageNumber }: { pageNumber: number }) {
             )}
           >
             {/* Upright in the displayed frame, so the handle sits at the displayed bottom-right. */}
-            <span style={uprightContentStyle(rot)} className="flex items-center px-1">
-              <span className="pointer-events-none truncate font-medium text-[10px] leading-none">
+            <span
+              style={uprightContentStyle(rot)}
+              className="flex items-center justify-center px-1"
+            >
+              <span className={cn("pointer-events-none", FIELD_LABEL_CLASS)}>
                 {f.label || FIELD_LABELS[f.type]}
                 {f.required ? " *" : ""}
               </span>

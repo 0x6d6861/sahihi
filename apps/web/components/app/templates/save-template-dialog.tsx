@@ -2,6 +2,7 @@
 
 import { defaultRoleLabels, type RecipientRole, SaveTemplateSchema } from "@sahihi/core"
 import { useState } from "react"
+import { AlertList, AlertListItem } from "@/components/app/alert-list"
 import { ButtonLink } from "@/components/app/button-link"
 import { DialogActions } from "@/components/app/confirm-dialog"
 import { useDraftState } from "@/components/app/envelope/draft-state"
@@ -176,11 +177,11 @@ export function SaveTemplateDialog({
           <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
             {problems.length > 0 && (
               <Alert tone="warning" title="Before you save">
-                <ul className="flex flex-col gap-1">
+                <AlertList>
                   {problems.map((p) => (
-                    <li key={p}>{p}</li>
+                    <AlertListItem key={p}>{p}</AlertListItem>
                   ))}
-                </ul>
+                </AlertList>
               </Alert>
             )}
             <Input

@@ -11,12 +11,13 @@ describe("account deletion", () => {
     const m = (role: string, ownerCount: number, id = role) => ({
       organizationId: id,
       organizationName: `Org ${id}`,
+      organizationCreatedAt: new Date("2026-01-01"),
       role,
       ownerCount,
     })
     expect(deletionBlockers([m("member", 1), m("admin", 1), m("owner", 2)])).toEqual([])
     expect(deletionBlockers([m("owner", 1, "solo"), m("member", 1)])).toEqual([
-      { id: "solo", name: "Org solo" },
+      { id: "solo", name: "Org solo", createdAt: new Date("2026-01-01") },
     ])
   })
 

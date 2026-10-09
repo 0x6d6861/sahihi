@@ -87,7 +87,7 @@ export function FieldPalette({
             })}
           </fieldset>
           <p className="text-muted-foreground text-xs">
-            Pick a type, then click or drag on a page. Choose Select to move or resize fields.
+            Pick a type, then click or drag on a page. Hold <Kbd>⇧</Kbd> to place several.
           </p>
           {detect && <DetectFields />}
         </Section>

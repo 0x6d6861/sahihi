@@ -1,6 +1,7 @@
 "use client"
 
 import type { PreflightIssue } from "@sahihi/core"
+import { AlertList, AlertListItem } from "@/components/app/alert-list"
 import { DialogActions } from "@/components/app/confirm-dialog"
 import { DIALOG_WITH_POPOVERS, RevealPopovers } from "@/components/app/dialog-popovers"
 import { SendIcon } from "@/components/app/icons"
@@ -137,20 +138,22 @@ export function ReviewSendDialog({
 
             {issues.length > 0 && (
               <Alert tone="warning" title="Before you send">
-                <ul className="list-disc ps-4">
+                <AlertList bullets>
                   {issues.map((i) => (
-                    <li key={`${i.code}-${i.recipientId ?? ""}`}>{i.message}</li>
+                    <AlertListItem key={`${i.code}-${i.recipientId ?? ""}`}>
+                      {i.message}
+                    </AlertListItem>
                   ))}
-                </ul>
+                </AlertList>
               </Alert>
             )}
             {unplaced.length > 0 && (
               <Alert tone="danger" title="Fix these first">
-                <ul className="list-disc ps-4">
+                <AlertList bullets>
                   {unplaced.map(([key, msg]) => (
-                    <li key={key}>{msg}</li>
+                    <AlertListItem key={key}>{msg}</AlertListItem>
                   ))}
-                </ul>
+                </AlertList>
               </Alert>
             )}
 

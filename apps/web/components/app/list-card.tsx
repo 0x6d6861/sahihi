@@ -7,8 +7,8 @@ import { cn } from "@/lib/utils"
 /**
  * A tile in the Documents, Envelopes and Templates grids, in the manner of a Google Drive file
  * tile (ADR 0033, 0034, 0036): a tonal card with no border; a title row (type icon, title, ⋮
- * menu); the top of the document's first page in a 4:3 window (white paper in both themes, a PDF
- * mark until the worker has rendered it); and one quiet footer line. The whole card is a link; the
+ * menu); the top of the document's first page in a 4:3 window (the page image, a PDF mark on white
+ * paper until the worker has rendered it); and one quiet footer line. The whole card is a link; the
  * menu sits above it. Hover darkens the card's tone.
  */
 export function ListCard({
@@ -57,8 +57,15 @@ export function ListCard({
         <div className="relative z-10">{menu}</div>
       </div>
 
-      {/* Paper stays white in both themes. The window shows the top of the page, like Drive. */}
-      <div className="on-paper relative overflow-hidden rounded-xl">
+      {/* The window shows the top of the page, like Drive. The page image is the paper (dimmed a
+          little in dark); until it loads, the window keeps the card's own tone so dark mode doesn't
+          flash white. Without an image yet, the PDF mark sits on white paper. */}
+      <div
+        className={cn(
+          "relative overflow-hidden rounded-xl",
+          thumbnailUrl ? "dark:[&_img]:brightness-95" : "on-paper",
+        )}
+      >
         {documentCount > 1 && (
           <span className="absolute end-2 bottom-2 z-10 rounded-full border bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground tabular-nums leading-none">
             {documentCount} documents

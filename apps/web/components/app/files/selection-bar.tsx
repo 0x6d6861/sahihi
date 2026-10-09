@@ -30,6 +30,8 @@ export function SelectionBar() {
 
   return (
     <>
+      {/* Room at the end of the page so the bar never covers the last row or the pagination. */}
+      {open && <div aria-hidden className="h-16" />}
       {/* Always mounted so it can slide in and out: up from 8 px on the enter curve, back down a
           little faster when the selection clears. Inert while hidden. */}
       <div

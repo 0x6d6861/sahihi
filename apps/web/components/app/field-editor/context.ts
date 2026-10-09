@@ -17,6 +17,11 @@ export interface FieldEditorContextValue {
   /** Field type being placed, or null for the select tool. */
   tool: FieldType | null
   activeRecipientId: string | null
+  /**
+   * A field was just placed: back to Select, so a stray click doesn't drop another one. Holding
+   * Shift (`keepTool`) keeps the type for placing several in a row.
+   */
+  placed: (keepTool: boolean) => void
   recipients: Map<string, EditorRecipient>
   /** Intrinsic /Rotate of a page (1-based) of the active document, from Document.pages. */
   rotationOf: (page: number) => PageRotation

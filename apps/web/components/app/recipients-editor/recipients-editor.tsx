@@ -40,7 +40,10 @@ export function RecipientsEditor({
     initial.length > 0 ? rowsFromSaved(initial) : [emptyRow(1)],
   )
   const [errors, setErrors] = useState<FormErrors>({})
-  const [dirty, setDirty] = useState(initial.length === 0)
+  // A new envelope's blank row isn't a change: nothing to lose, and Send's preflight then says
+  // what's really missing ("Add a recipient") instead of "Save your changes".
+  const [dirty, setDirty] = useState(false)
+  const blank = initial.length === 0 && !dirty
   const [pending, setPending] = useState(false)
   useRegisterDraftEditor("recipients", {
     unsavedMessage: () => (dirty ? "Save your recipient changes first." : null),
@@ -114,9 +117,9 @@ export function RecipientsEditor({
         </Button>
         <div className="flex items-center gap-3">
           <span className="text-muted-foreground text-sm" aria-live="polite">
-            {dirty ? "Unsaved changes" : "All changes saved"}
+            {blank ? null : dirty ? "Unsaved changes" : "All changes saved"}
           </span>
-          <Button type="submit" loading={pending} disabled={!dirty}>
+          <Button type="submit" loading={pending} disabled={!dirty && !blank}>
             Save recipients
           </Button>
         </div>

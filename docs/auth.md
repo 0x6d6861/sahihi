@@ -95,7 +95,9 @@ creator and belong to the workspace, so the `User` row stays as **"Deleted user"
 
 1. Settings → Security → Delete account: the password (`POST /api/me/deletion`, 5 tries / 10 min
    per user). Refused (409) while the user is the last owner of a workspace (`deletionBlockers`);
-   the panel lists those workspaces up front (`GET /api/me/deletion`).
+   the panel lists those workspaces up front (`GET /api/me/deletion`), one row each with its
+   creation date (and time, when names repeat). Members and Delete workspace switch to that
+   workspace first, since those settings act on the active one.
 2. An email (`auth.delete-account`) with a link to `/delete-account?token=…`, valid 1 hour. Only
    the token's hash is stored (`verification`, `delete-account:<hash>` → user id).
 3. The page asks once more; `POST /api/account/delete` (public, rate-limited, works on any
@@ -264,7 +266,9 @@ continues. After removal, only admins and owners can change those envelopes (the
 - `/sign-in?next=…` → back to `next`. New sessions start with the user's **first workspace active**
   (`databaseHooks.session.create.before` in `auth.ts`, by earliest `Member.createdAt`). Without it,
   every sign-in of an existing member landed on `/onboarding` and could create a duplicate
-  workspace. Users with no membership still get `/onboarding`.
+  workspace. Users with no membership still get `/onboarding`. Someone already signed in who opens
+  `/sign-in` or `/sign-up` goes to `/files` (their layouts ask the API for the session, not just
+  the cookie, so an expired cookie can't loop).
 - `/accept-invitation/[id]` → `organization.acceptInvitation`
 - Workspace switcher (sidebar header, `components/app/app-shell/org-switcher.tsx`): lists
   `GET /api/auth/organization/list` (only the user's memberships). Choosing one calls

@@ -289,7 +289,15 @@ describe("deleting an account (ADR 0040)", () => {
 
   test("the last owner of a workspace can't delete until someone else owns it", async () => {
     const owner = await createSender("owner")
-    expect((await request(owner, "/api/me/deletion")).status).toBe(200)
+    const listed = await request(owner, "/api/me/deletion")
+    expect(listed.status).toBe(200)
+    // The creation date tells apart workspaces with the same name.
+    const { blockers } = (await listed.json()) as {
+      blockers: { id: string; name: string; createdAt: string }[]
+    }
+    expect(blockers).toEqual([
+      { id: owner.organizationId, name: "owner Ltd", createdAt: expect.any(String) },
+    ])
     const res = await ask(owner, owner.password)
     expect(res.status).toBe(409)
     expect(((await res.json()) as { error: string }).error).toContain("owner Ltd")

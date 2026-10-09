@@ -46,6 +46,13 @@ export const FIELD_LABELS: Record<FieldType, string> = {
  * Recipient colours for the field editor, as Tailwind classes using theme
  * tokens only (no hard-coded hex). Index = Recipient.colorIndex % length.
  */
+/**
+ * A placed field's label (editor and preview): centred, and sized from the field's height (the
+ * field is a size container) between 10 and 16 px, so it stays readable at any zoom.
+ */
+export const FIELD_LABEL_CLASS =
+  "truncate text-center font-medium text-[clamp(10px,35cqh,16px)] leading-none"
+
 export const RECIPIENT_COLORS = [
   "border-info bg-info/10 text-info-foreground",
   "border-success bg-success/10 text-success-foreground",
