@@ -6,6 +6,7 @@ import {
   type GeneratedDocumentData,
   sha256Hex,
 } from "@sahihi/core"
+import { PDFDict, PDFDocument, PDFName } from "pdf-lib"
 import { inspectPdf } from "../parse/inspect"
 import { readPageText } from "../parse/page-text"
 import { ComposeError, composeGeneratedDocument, FIELD_SIZES } from "./document"
@@ -166,5 +167,105 @@ describe("composeGeneratedDocument", () => {
     const boxes = pages.flatMap((p) => [...p.boxes.values()])
     expect(boxes.length).toBeGreaterThan(0)
     for (const b of boxes) expect(b.x + b.width).toBeLessThanOrEqual(595.28 - 72 + 0.5)
+  })
+})
+
+/** The /BaseFont names of every font in a PDF. */
+async function baseFonts(bytes: Uint8Array): Promise<string[]> {
+  const doc = await PDFDocument.load(bytes)
+  const names: string[] = []
+  for (const [, obj] of doc.context.enumerateIndirectObjects()) {
+    if (!(obj instanceof PDFDict) || obj.get(PDFName.of("Type")) !== PDFName.of("Font")) continue
+    const base = obj.get(PDFName.of("BaseFont"))
+    if (base instanceof PDFName) names.push(base.decodeText())
+  }
+  return names
+}
+
+describe("italics and tables", () => {
+  const cell = (text: string, type: "tableCell" | "tableHeader" = "tableCell") => ({
+    type,
+    attrs: { colspan: 1 as const, rowspan: 1 as const, colwidth: null },
+    content: [{ type: "paragraph" as const, content: [{ type: "text" as const, text }] }],
+  })
+
+  /** The filled NDA with blocks appended to its Purpose section. */
+  function withBlocks(blocks: GeneratedDocumentData["content"]["content"][number]["content"]) {
+    const data = filled()
+    const purpose = data.content.content.find((s) => s.attrs.id === "purpose")
+    purpose?.content.push(...blocks)
+    return data
+  }
+
+  test("italic text uses the italic face", async () => {
+    const data = withBlocks([
+      {
+        type: "paragraph",
+        content: [
+          { type: "text", text: "Emphasis", marks: [{ type: "italic" }] },
+          { type: "text", text: " and both", marks: [{ type: "italic" }, { type: "bold" }] },
+        ],
+      },
+    ])
+    const out = await composeGeneratedDocument(data, { date: DATE })
+    const faces = await baseFonts(out.bytes)
+    expect(faces.some((f) => f.startsWith("NotoSans-Italic-"))).toBe(true)
+    expect(faces.some((f) => f.startsWith("NotoSans-BoldItalic-"))).toBe(true)
+  })
+
+  test("table cells hold their text inside equal columns", async () => {
+    const data = withBlocks([
+      {
+        type: "table",
+        content: [
+          {
+            type: "tableRow",
+            content: [cell("Item", "tableHeader"), cell("Amount", "tableHeader")],
+          },
+          {
+            type: "tableRow",
+            content: [cell("Consulting fees for the pilot"), cell("KES 100,000")],
+          },
+        ],
+      },
+    ])
+    const out = await composeGeneratedDocument(data, { date: DATE })
+    const pages = await readPageText(out.bytes, {
+      measure: (text) => {
+        const ranges: [number, number][] = []
+        for (const t of ["Consulting", "KES"]) {
+          const i = text.indexOf(t)
+          if (i >= 0) ranges.push([i, i + t.length])
+        }
+        return ranges
+      },
+    })
+    const page = pages.find((p) => p.text.includes("Consulting"))
+    const at = (t: string) => page?.boxes.get(page.text.indexOf(t))
+    const consulting = at("Consulting")
+    const kes = at("KES")
+    const half = 72 + (595.28 - 144) / 2
+    expect(consulting?.x).toBeGreaterThan(72)
+    expect(consulting?.x).toBeLessThan(half)
+    expect(kes?.x).toBeGreaterThan(half)
+    expect(await sha256Hex(out.bytes)).toBe(
+      await sha256Hex((await composeGeneratedDocument(data, { date: DATE })).bytes),
+    )
+  })
+
+  test("rows move to the next page whole", async () => {
+    const rows = Array.from({ length: 80 }, (_, i) => ({
+      type: "tableRow" as const,
+      content: [cell(`Row ${i} first line`), cell(`Row ${i} value`)],
+    }))
+    const out = await composeGeneratedDocument(withBlocks([{ type: "table", content: rows }]), {
+      date: DATE,
+    })
+    const pages = await readPageText(out.bytes)
+    for (let i = 0; i < 80; i++) {
+      const holders = pages.filter((p) => p.text.includes(`Row ${i} first`))
+      const values = pages.filter((p) => p.text.includes(`Row ${i} value`))
+      expect(holders.map((p) => p.page)).toEqual(values.map((p) => p.page))
+    }
   })
 })

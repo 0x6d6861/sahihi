@@ -10,7 +10,7 @@ import {
   structureIssues,
 } from "./document"
 import { envelopeDraftFromGenerated } from "./envelope"
-import { GeneratedDocumentDataSchema } from "./model"
+import { GeneratedDocumentDataSchema, type Section, TextNodeSchema } from "./model"
 import { generationPreflight } from "./preflight"
 import { isValueAttested } from "./provenance"
 import { AskQuestionsInputSchema, AskQuestionsResultSchema } from "./schemas"
@@ -290,5 +290,91 @@ describe("envelopeDraftFromGenerated", () => {
     expect(() =>
       envelopeDraftFromGenerated(filled(), [{ ...f, roleKey: "party_a", page: 3 }], [page]),
     ).toThrow("Field on missing page 3")
+  })
+})
+
+describe("tables and italics", () => {
+  const cell = (text: string, type: "tableCell" | "tableHeader" = "tableCell") => ({
+    type,
+    content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+  })
+  const withTable = (rows: ReturnType<typeof cell>[][]) => {
+    const data = nda()
+    const purpose = data.content.content.find((s) => s.attrs.id === "purpose")
+    const parsed = GeneratedDocumentDataSchema.parse({
+      ...data,
+      content: {
+        ...data.content,
+        content: data.content.content.map((s) =>
+          s === purpose
+            ? {
+                ...s,
+                content: [
+                  ...s.content,
+                  {
+                    type: "table",
+                    content: rows.map((r) => ({ type: "tableRow", content: r })),
+                  },
+                ],
+              }
+            : s,
+        ),
+      },
+    })
+    return parsed
+  }
+
+  test("tables parse with editor defaults, and blanks inside cells count as used", () => {
+    const data = withTable([[cell("Item", "tableHeader"), cell("Amount", "tableHeader")]])
+    const purpose = data.content.content.find((s) => s.attrs.id === "purpose")
+    const table = purpose?.content.at(-1)
+    expect(table?.type).toBe("table")
+    if (table?.type === "table") {
+      expect(table.content[0]?.content[0]?.attrs).toEqual({
+        colspan: 1,
+        rowspan: 1,
+        colwidth: null,
+      })
+      table.content[0]?.content[0]?.content[0]?.content.push({
+        type: "variable",
+        attrs: { key: "term" },
+      })
+    }
+    expect(referencedVariableKeys(data.content)).toContain("term")
+    expect(sectionForPrompt(purpose as Section, 2)).toContain("| Item{{term}} | Amount |")
+  })
+
+  test("merged cells are refused and ragged rows reported", () => {
+    const data = nda()
+    expect(
+      GeneratedDocumentDataSchema.safeParse({
+        ...data,
+        content: {
+          type: "doc",
+          content: [
+            {
+              type: "section",
+              attrs: { id: "s", title: "S" },
+              content: [
+                {
+                  type: "table",
+                  content: [
+                    { type: "tableRow", content: [{ ...cell("a"), attrs: { colspan: 2 } }] },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      }).success,
+    ).toBe(false)
+    const ragged = withTable([[cell("a"), cell("b")], [cell("c")]])
+    expect(structureIssues(ragged)).toEqual([{ code: "ragged_table", sectionId: "purpose" }])
+  })
+
+  test("italic is a mark", () => {
+    expect(
+      TextNodeSchema.safeParse({ type: "text", text: "x", marks: [{ type: "italic" }] }).success,
+    ).toBe(true)
   })
 })

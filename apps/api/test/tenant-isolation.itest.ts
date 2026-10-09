@@ -287,6 +287,19 @@ const TENANT: Record<string, Case> = {
       },
     },
   }),
+  "PUT /api/generated-documents/:id/content": () => ({
+    path: `/api/generated-documents/${ids.generatedDocument}/content`,
+    init: {
+      method: "PUT",
+      json: {
+        baseVersionId: ids.generatedVersion,
+        content: {
+          type: "doc",
+          content: [{ type: "section", attrs: { id: "x", title: "Mine now" }, content: [] }],
+        },
+      },
+    },
+  }),
   "PUT /api/generated-documents/:id/roles": () => ({
     path: `/api/generated-documents/${ids.generatedDocument}/roles`,
     init: {

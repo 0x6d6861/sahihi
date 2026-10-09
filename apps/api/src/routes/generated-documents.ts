@@ -9,8 +9,11 @@ import {
   envelopeDraftFromGenerated,
   FinalizeGeneratedDocumentSchema,
   findStarter,
+  GeneratedDocumentDataSchema,
   generationPreflight,
   sha256Hex,
+  structureIssues,
+  UpdateContentSchema,
   UpdateRolesSchema,
   UpdateVariablesSchema,
 } from "@sahihi/core"
@@ -259,6 +262,64 @@ export const generatedDocuments = new Hono<AppEnv>()
       event: {
         type: "variables.updated",
         data: { source: input.source, keys: input.values.map((v) => v.key), skipped },
+      },
+    })
+    return c.json({ version: next, issues: generationPreflight(next.data) })
+  })
+
+  /**
+   * The text as edited in the editor. Blanks and signers live outside the text, so an edit made
+   * on an older version still applies when only they changed since (an answered question while
+   * the person was typing); a text change in between is a 409.
+   */
+  .put("/:id/content", async (c) => {
+    const input = await parseJson(c, UpdateContentSchema)
+    const { doc, version: latest } = await loadGeneratedDocument(
+      c.get("organizationId"),
+      c.req.param("id"),
+    )
+    assertCanEdit(c, doc)
+    if (input.baseVersionId !== latest.id) {
+      const base = await prisma.generatedDocumentVersion.findFirst({
+        where: { id: input.baseVersionId, generatedDocumentId: doc.id },
+        select: { data: true },
+      })
+      if (!base) badRequest("Unknown version")
+      const baseContent = GeneratedDocumentDataSchema.parse(base.data).content
+      if (JSON.stringify(baseContent) !== JSON.stringify(latest.data.content)) {
+        throw new HTTPException(409, {
+          res: Response.json(
+            {
+              error: "stale_version",
+              message: "The text changed since you loaded it. Reload to see the latest version.",
+            },
+            { status: 409 },
+          ),
+        })
+      }
+    }
+    const taken = input.newVariables.find((v) => latest.data.variables.some((x) => x.key === v.key))
+    if (taken) badRequest(`A blank called "${taken.key}" already exists`)
+    const data = {
+      ...latest.data,
+      content: input.content,
+      variables: [
+        ...latest.data.variables,
+        ...input.newVariables.map((v) => ({ ...v, value: null, status: "unresolved" as const })),
+      ],
+    }
+    const issues = structureIssues(data)
+    if (issues.length) badRequest(`The document doesn't hold together: ${issues[0]?.code}`)
+    const next = await appendVersionOrConflict({
+      generatedDocumentId: doc.id,
+      baseVersionId: latest.id,
+      data,
+      actor: "USER",
+      userId: c.get("user").id,
+      reason: "Edited the text",
+      event: {
+        type: "content.updated",
+        data: { newVariables: input.newVariables.map((v) => v.key) },
       },
     })
     return c.json({ version: next, issues: generationPreflight(next.data) })

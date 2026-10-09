@@ -5,6 +5,8 @@ import {
   AtIcon as HugeAtSignIcon,
   UnavailableIcon as HugeBanIcon,
   Notification01Icon as HugeBellIcon,
+  TextBoldIcon as HugeBoldIcon,
+  BracketsIcon as HugeBracesIcon,
   Calendar03Icon as HugeCalendarIcon,
   Tick02Icon as HugeCheckIcon,
   CheckmarkSquare01Icon as HugeCheckSquareIcon,
@@ -29,8 +31,11 @@ import {
   Home01Icon as HugeHomeIcon,
   HourglassIcon as HugeHourglassIcon,
   ImageUploadIcon as HugeImageUpIcon,
+  TextItalicIcon as HugeItalicIcon,
   Key01Icon as HugeKeyRoundIcon,
   LicenseDraftIcon as HugeLayoutTemplateIcon,
+  LeftToRightListBulletIcon as HugeListIcon,
+  LeftToRightListNumberIcon as HugeListOrderedIcon,
   Loading03Icon as HugeLoaderIcon,
   SquareLock02Icon as HugeLockIcon,
   Mail01Icon as HugeMailIcon,
@@ -49,10 +54,12 @@ import {
   SecurityCheckIcon as HugeShieldCheckIcon,
   SignatureIcon as HugeSignatureIcon,
   AiMagicIcon as HugeSparklesIcon,
+  TableIcon as HugeTableIcon,
   Tag01Icon as HugeTagIcon,
   Delete02Icon as HugeTrash2Icon,
   Alert02Icon as HugeTriangleAlertIcon,
   TextIcon as HugeTypeIcon,
+  TextUnderlineIcon as HugeUnderlineIcon,
   Upload01Icon as HugeUploadIcon,
   UserIcon as HugeUserIcon,
   UserRemove01Icon as HugeUserMinusIcon,
@@ -140,3 +147,10 @@ export const ClockAlertIcon = icon(HugeClockAlertIcon)
 export const HourglassIcon = icon(HugeHourglassIcon)
 export const LoaderIcon = icon(HugeLoaderIcon)
 export const MailSendIcon = icon(HugeMailSendIcon)
+export const BoldIcon = icon(HugeBoldIcon)
+export const ItalicIcon = icon(HugeItalicIcon)
+export const UnderlineIcon = icon(HugeUnderlineIcon)
+export const ListIcon = icon(HugeListIcon)
+export const ListOrderedIcon = icon(HugeListOrderedIcon)
+export const TableIcon = icon(HugeTableIcon)
+export const BracesIcon = icon(HugeBracesIcon)

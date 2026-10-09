@@ -110,7 +110,8 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
 - [x] Thin slice: Mutual NDA starter → assistant questions (≤ 3 per batch, skip) and blank filling
       with a provenance check → signers → PDF render (pdf-lib, deterministic, field rects) →
       finalise into a READY document and a DRAFT envelope; workspace opt-in and `ai:use`
-- [ ] Rich-text editing: TipTap with section, blank and field nodes; italics (font) and tables
+- [x] Rich-text editing: TipTap with section, blank and signature-block nodes; italics (font) and
+      tables, in the editor and the PDF; edits apply over answers given meanwhile (ADR 0043)
 - [ ] Assistant edit proposals (`propose_section_edit`, `propose_sections`) with an inline diff and
       accept/reject, each accepted change a version
 - [ ] Assistant-defined signers and fields (`define_signers`, `place_signature_field`), initials on

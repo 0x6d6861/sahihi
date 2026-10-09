@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { VariableSchema, VariableValueSchema } from "./model"
+import { DocContentSchema, VariableSchema, VariableValueSchema } from "./model"
 
 /**
  * Validators shared by the assistant's tools (server), the chat UI that renders them (web) and the
@@ -81,6 +81,27 @@ export const UpdateRolesSchema = z.object({
     .max(20),
 })
 export type UpdateRolesInput = z.infer<typeof UpdateRolesSchema>
+
+/**
+ * `PUT /generated-documents/:id/content`: the text as edited in the editor, plus any blanks the
+ * person inserted that don't exist yet. Applied on top of the latest version when only blanks or
+ * signers changed since `baseVersionId`; a 409 when the text itself changed.
+ */
+export const UpdateContentSchema = z.object({
+  baseVersionId: z.string().min(1).max(64),
+  content: DocContentSchema,
+  newVariables: z
+    .array(
+      z.object({
+        key: VariableKey,
+        label: VariableSchema.shape.label,
+        type: VariableSchema.shape.type,
+      }),
+    )
+    .max(20)
+    .default([]),
+})
+export type UpdateContentInput = z.infer<typeof UpdateContentSchema>
 
 export const FinalizeGeneratedDocumentSchema = z.object({
   versionId: z.string().min(1).max(64),

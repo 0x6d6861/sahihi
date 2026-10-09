@@ -6,10 +6,11 @@ import type {
   PageBox,
   PdfRect,
   SignatureBlock,
+  Table,
 } from "@sahihi/core"
 import { numberSections } from "@sahihi/core"
 import { PDFDocument, type PDFFont, type PDFPage, rgb } from "pdf-lib"
-import { embedUnicodeFonts, type UnicodeFonts } from "../text/fonts"
+import { embedUnicodeFont } from "../text/fonts"
 import { sanitizeForFont } from "../text/text"
 
 /**
@@ -31,6 +32,7 @@ const TITLE = { size: 18, after: 18 }
 const HEADING = { size: 12, before: 14, after: 6 }
 const PARAGRAPH_AFTER = 6
 const LIST_INDENT = 22
+const TABLE_PAD = 5
 const FOOTER = { size: 8, y: 36 }
 const FIELD_LABEL = { size: 8, gap: 3, after: 10 }
 const INK = rgb(0.1, 0.1, 0.1)
@@ -84,7 +86,19 @@ export interface ComposeOptions {
 export class ComposeError extends Error {}
 
 // ── Layout ───────────────────────────────────────────────────────────────────
-type Style = { bold: boolean; underline: boolean; blank: boolean }
+type Style = { bold: boolean; italic: boolean; underline: boolean; blank: boolean }
+
+interface Fonts {
+  regular: PDFFont
+  bold: PDFFont
+  italic: PDFFont
+  boldItalic: PDFFont
+}
+
+function fontFor(fonts: Fonts, style: Pick<Style, "bold" | "italic">): PDFFont {
+  if (style.bold) return style.italic ? fonts.boldItalic : fonts.bold
+  return style.italic ? fonts.italic : fonts.regular
+}
 type Segment = { text: string; style: Style }
 type Word = Segment[]
 
@@ -99,6 +113,8 @@ type Op =
       muted?: boolean
     }
   | { kind: "rule"; x: number; top: number; width: number }
+  /** A table cell's border. */
+  | { kind: "box"; x: number; top: number; width: number; height: number }
 
 interface Page {
   ops: Op[]
@@ -113,7 +129,7 @@ class Layout {
   private readonly height: number
 
   constructor(
-    private readonly fonts: UnicodeFonts,
+    private readonly fonts: Fonts,
     size: readonly [number, number],
   ) {
     this.width = size[0]
@@ -147,7 +163,7 @@ class Layout {
   }
 
   font(style: Style): PDFFont {
-    return style.bold ? this.fonts.bold : this.fonts.regular
+    return fontFor(this.fonts, style)
   }
 
   measure(word: Word, size: number) {
@@ -206,26 +222,24 @@ class Layout {
 
   /** Writes wrapped lines at `x`, moving down. A line never splits across pages. */
   writeLines(lines: Word[][], x: number, size: number, leading: number) {
-    const space = this.fonts.regular.widthOfTextAtSize(" ", size)
     for (const line of lines) {
       this.ensure(leading)
-      let cx = x
-      line.forEach((word, i) => {
-        if (i > 0) cx += space
-        for (const seg of word) {
-          this.page.ops.push({
-            kind: "text",
-            x: cx,
-            top: this.top,
-            text: seg.text,
-            size,
-            style: seg.style,
-          })
-          cx += this.font(seg.style).widthOfTextAtSize(seg.text, size)
-        }
-      })
+      this.writeLine(line, x, this.top, size)
       this.top += leading
     }
+  }
+
+  /** One line at a fixed position on the current page (table cells place their own lines). */
+  writeLine(line: Word[], x: number, top: number, size: number) {
+    const space = this.fonts.regular.widthOfTextAtSize(" ", size)
+    let cx = x
+    line.forEach((word, i) => {
+      if (i > 0) cx += space
+      for (const seg of word) {
+        this.page.ops.push({ kind: "text", x: cx, top, text: seg.text, size, style: seg.style })
+        cx += this.font(seg.style).widthOfTextAtSize(seg.text, size)
+      }
+    })
   }
 
   addField(
@@ -245,7 +259,7 @@ class Layout {
   }
 }
 
-const plain: Style = { bold: false, underline: false, blank: false }
+const plain: Style = { bold: false, italic: false, underline: false, blank: false }
 
 function toWords(
   nodes: InlineNode[],
@@ -256,6 +270,7 @@ function toWords(
   for (const n of nodes) {
     const style: Style = {
       bold: n.marks?.some((m) => m.type === "bold") ?? false,
+      italic: n.marks?.some((m) => m.type === "italic") ?? false,
       underline: n.marks?.some((m) => m.type === "underline") ?? false,
       blank: false,
     }
@@ -286,11 +301,11 @@ function toWords(
   return words
 }
 
-function sanitizeWords(words: Word[], fonts: UnicodeFonts): Word[] {
+function sanitizeWords(words: Word[], fonts: Fonts): Word[] {
   return words.map((w) =>
     w.map((s) => ({
       ...s,
-      text: sanitizeForFont(s.text, s.style.bold ? fonts.bold : fonts.regular),
+      text: sanitizeForFont(s.text, fontFor(fonts, s.style)),
     })),
   )
 }
@@ -300,7 +315,7 @@ function layoutBlock(
   block: BlockNode,
   data: GeneratedDocumentData,
   opts: ComposeOptions,
-  fonts: UnicodeFonts,
+  fonts: Fonts,
 ) {
   const words = (nodes: InlineNode[]) =>
     sanitizeWords(toWords(nodes, data, opts.allowUnresolved ?? false), fonts)
@@ -338,9 +353,45 @@ function layoutBlock(
       L.top += PARAGRAPH_AFTER
       return
     }
+    case "table":
+      layoutTable(L, block, words)
+      L.top += PARAGRAPH_AFTER
+      return
     case "signatureBlock":
       layoutSignatureBlock(L, block, words)
       return
+  }
+}
+
+/**
+ * Equal-width columns with a hairline border per cell. A row never splits: when it doesn't fit,
+ * it moves to the next page (a row taller than a page runs past the bottom margin).
+ */
+function layoutTable(L: Layout, table: Table, words: (n: InlineNode[]) => Word[]) {
+  const columns = table.content[0]?.content.length ?? 1
+  const width = L.contentWidth / columns
+  for (const row of table.content) {
+    const cells = row.content.map((cell) =>
+      cell.content.flatMap((p) => {
+        const w = words(p.content)
+        const styled =
+          cell.type === "tableHeader"
+            ? w.map((word) => word.map((seg) => ({ ...seg, style: { ...seg.style, bold: true } })))
+            : w
+        return L.lines(styled, BODY.size, width - 2 * TABLE_PAD)
+      }),
+    )
+    const height = Math.max(1, ...cells.map((lines) => lines.length)) * BODY.leading + 2 * TABLE_PAD
+    L.ensure(height)
+    const top = L.top
+    cells.forEach((lines, i) => {
+      const x = MARGIN.x + i * width
+      L.page.ops.push({ kind: "box", x, top, width, height })
+      lines.forEach((line, j) => {
+        L.writeLine(line, x + TABLE_PAD, top + TABLE_PAD + j * BODY.leading, BODY.size)
+      })
+    })
+    L.top = top + height
   }
 }
 
@@ -397,8 +448,19 @@ function layoutSignatureBlock(
 }
 
 // ── Drawing ──────────────────────────────────────────────────────────────────
-function draw(page: PDFPage, ops: Op[], fonts: UnicodeFonts, height: number) {
+function draw(page: PDFPage, ops: Op[], fonts: Fonts, height: number) {
   for (const op of ops) {
+    if (op.kind === "box") {
+      page.drawRectangle({
+        x: op.x,
+        y: height - op.top - op.height,
+        width: op.width,
+        height: op.height,
+        borderColor: RULE,
+        borderWidth: 0.5,
+      })
+      continue
+    }
     if (op.kind === "rule") {
       page.drawLine({
         start: { x: op.x, y: height - op.top },
@@ -408,7 +470,7 @@ function draw(page: PDFPage, ops: Op[], fonts: UnicodeFonts, height: number) {
       })
       continue
     }
-    const font = op.style.bold ? fonts.bold : fonts.regular
+    const font = fontFor(fonts, op.style)
     // `top` is the top of the line box; the baseline sits one cap height below.
     const baseline = height - op.top - op.size
     const width = font.widthOfTextAtSize(op.text, op.size)
@@ -444,7 +506,13 @@ export async function composeGeneratedDocument(
   opts: ComposeOptions,
 ): Promise<ComposedDocument> {
   const doc = await PDFDocument.create({ updateMetadata: false })
-  const fonts = await embedUnicodeFonts(doc)
+  // Embedded in a fixed order: the object numbers, and so the bytes, must not vary between runs.
+  const fonts: Fonts = {
+    regular: await embedUnicodeFont(doc, "regular"),
+    bold: await embedUnicodeFont(doc, "bold"),
+    italic: await embedUnicodeFont(doc, "italic"),
+    boldItalic: await embedUnicodeFont(doc, "boldItalic"),
+  }
   const size = PAGE_SIZES[data.pageSize]
   const L = new Layout(fonts, size)
   const numbers = numberSections(data.content)

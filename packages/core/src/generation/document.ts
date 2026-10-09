@@ -25,6 +25,10 @@ function inlineNodes(block: BlockNode): InlineNode[] {
     case "bulletList":
     case "orderedList":
       return block.content.flatMap((item) => item.content[0].content)
+    case "table":
+      return block.content.flatMap((row) =>
+        row.content.flatMap((cell) => cell.content.flatMap((p) => p.content)),
+      )
     case "signatureBlock":
       return block.content.flatMap((c) => (c.type === "paragraph" ? c.content : []))
   }
@@ -69,6 +73,7 @@ export type StructureIssue =
   | { code: "viewer_has_fields"; roleKey: string }
   | { code: "duplicate_id"; id: string }
   | { code: "duplicate_key"; key: string }
+  | { code: "ragged_table"; sectionId: string }
 
 /**
  * References the zod schema can't check: every variable node and signature block points at
@@ -94,7 +99,14 @@ export function structureIssues(data: GeneratedDocumentData): StructureIssue[] {
     if (ids.has(id)) issues.push({ code: "duplicate_id", id })
     ids.add(id)
   }
-  for (const s of data.content.content) seeId(s.attrs.id)
+  for (const s of data.content.content) {
+    seeId(s.attrs.id)
+    for (const b of s.content) {
+      if (b.type !== "table") continue
+      const widths = new Set(b.content.map((row) => row.content.length))
+      if (widths.size > 1) issues.push({ code: "ragged_table", sectionId: s.attrs.id })
+    }
+  }
   const reported = new Set<string>()
   for (const f of documentFields(data.content)) {
     seeId(f.field.id)
@@ -139,6 +151,11 @@ export function sectionForPrompt(section: Section, number: number | null): strin
             ? tokens(c.content)
             : `<${c.attrs.fieldType} field for role ${b.attrs.roleKey}>`,
         )
+      }
+    } else if (b.type === "table") {
+      for (const row of b.content) {
+        const cells = row.content.map((c) => c.content.map((p) => tokens(p.content)).join(" "))
+        lines.push(`| ${cells.join(" | ")} |`)
       }
     } else {
       b.content.forEach((item, i) => {

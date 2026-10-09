@@ -5,10 +5,11 @@ Members draft a document with an AI assistant, fill in every blank, name the sig
 envelope with the signers as recipients and their fields already placed. From there the existing
 flow takes over (Review & send → sign → certificate). See ADR 0042.
 
-What ships today (roadmap P6, first slice): one starter (Mutual NDA), the assistant's questions and
-blank filling, direct blank editing, signer contacts, a PDF preview, finalise. Not yet: editing the
-wording (rich-text editor, assistant edit proposals), the assistant defining signers or placing
-fields, more starters, saving a generated document as a template.
+What ships today (roadmap P6): one starter (Mutual NDA), the assistant's questions and blank
+filling, a rich-text editor for the wording (sections, blanks, lists, tables, bold, italic,
+underline), signer contacts, a PDF preview, finalise. Not yet: assistant edit proposals, the
+assistant defining signers or placing fields, more starters, saving a generated document as a
+template.
 
 ## Availability
 
@@ -33,7 +34,8 @@ The source of a document is structured, never Markdown: a ProseMirror-compatible
 | Part | What |
 |---|---|
 | `section` | A clause with a stable `id` and a `title`. Its number follows from its position (`numberSections`); `numbered: false` skips numbering |
-| `paragraph`, `bulletList`, `orderedList` | Text. Inline nodes are `text` (bold, underline) and `variable` |
+| `paragraph`, `bulletList`, `orderedList` | Text. Inline nodes are `text` (bold, italic, underline) and `variable`. A list item is one paragraph |
+| `table` | A plain grid of `tableRow`s of `tableCell` / `tableHeader` cells holding paragraphs. Every row has the same number of cells; no merged cells |
 | `variable` node | An atomic blank pointing at `variables[key]`. The value never sits in the text |
 | `signatureBlock` | Where one signer role signs: caption paragraphs and `field` nodes (`SIGNATURE`, `INITIALS`, `NAME`, `DATE_SIGNED`, `TEXT`, `CHECKBOX`) |
 | `variables[]` | `key`, `label`, `type`, `hint`, `value` (null until filled), `status` (`unresolved`, `answered`, `skipped`), `source` (`answer`, `chat`, `edit`) |
@@ -41,7 +43,7 @@ The source of a document is structured, never Markdown: a ProseMirror-compatible
 
 Signer identity is data: emails exist only in `roles`, and party names in the body are blanks, so
 the text and the signer list can't disagree. `structureIssues` checks the references the schema
-can't (unknown blank or role, duplicate ids, a viewer with fields).
+can't (unknown blank or role, duplicate ids, a viewer with fields, a ragged table).
 
 **Versions.** `GeneratedDocumentVersion` rows are immutable (a database trigger refuses UPDATE).
 Every change appends version `n + 1` and names the version it started from: a stale base is a 409
@@ -78,6 +80,28 @@ any blank the text uses is empty. The prompt adds: never invent names, amounts, 
 legal terms or jurisdictions; ask with the tool, never in prose; options only for generic choices,
 never a person's details.
 
+## Editing (ADR 0043)
+
+The Editing tab is a TipTap editor whose schema is the document model
+(`components/app/generator/editor/extensions.ts`): sections (an editable title, a number from a
+CSS counter, Discuss), paragraphs, one-level lists, tables, and atomic nodes for blanks and
+signature blocks. Headings, quotes, code, links and hard breaks are switched off, so pasted
+content is reduced to what the model and the renderer support. `lib/generator-editor.ts` converts
+both ways (a signature block's caption and fields ride in an `items` attribute in the editor) and
+validates with `DocContentSchema` before anything is saved.
+
+- **Saving:** debounced (1.2 s) and serialised (`useAutosave`, the field editor's hook);
+  `PUT /api/generated-documents/:id/content { baseVersionId, content, newVariables }` appends a
+  version. Blanks and signers live outside the text, so an edit based on an older version still
+  applies when only they changed since (an answer given while typing); if the text itself changed,
+  it's a 409 and the editor offers to load the latest version.
+- **Blanks:** "Insert a blank" picks one of the document's blanks or names a new one (key from the
+  label, `blankKey`); new blanks are declared in the same save and start unresolved. Clicking a
+  blank fills it, as before.
+- **Signature blocks** can be moved or deleted, not edited inside; adding signers and fields is a
+  later item.
+- Read-only for people who can't edit and once finalised.
+
 ## Finalise
 
 `POST /api/generated-documents/:id/finalize { versionId, acknowledged: true }`:
@@ -101,9 +125,10 @@ first-class document (files list, templates, other envelopes).
 ## Rendering (`packages/pdf/src/compose/document.ts`, ADR 0042)
 
 `composeGeneratedDocument(data, { date, allowUnresolved })` lays the tree out with pdf-lib and the
-bundled Noto Sans: A4 or Letter, 72 pt margins, title, numbered headings kept with their next lines,
-greedy line breaking (long words break between characters), lettered lists, signature blocks never
-split across pages, "Page X of Y". Text goes through `sanitizeForFont` (Latin, Greek, Cyrillic;
+bundled Noto Sans (regular, bold, italic, bold italic): A4 or Letter, 72 pt margins, title,
+numbered headings kept with their next lines, greedy line breaking (long words break between
+characters), lettered lists, tables (equal columns, bordered cells, bold header cells, rows never
+split across pages), signature blocks never split across pages, "Page X of Y". Text goes through `sanitizeForFont` (Latin, Greek, Cyrillic;
 ADR 0009).
 
 - **Fields:** each field is a fixed-size box (`FIELD_SIZES`, e.g. signature 180 × 40 pt) drawn as a
@@ -111,7 +136,8 @@ ADR 0009).
   never covers it. The result lists every field's page and rect in PDF points;
   `envelopeDraftFromGenerated` converts them with `fromPdfRect` (docs/coordinates.md).
 - **Deterministic:** the same version gives the same bytes: fixed fonts and metadata, the version's
-  creation time as the PDF dates, no randomness. Tested by hashing two renders.
+  creation time as the PDF dates, fonts embedded in a fixed order (pdf-lib names subsets from a
+  seeded generator, so the order matters). Tested by hashing two renders.
 - **Preview:** `GET …/preview` renders the latest version with blanks highlighted as `[Label]`. Not
   stored. A final render refuses empty blanks.
 - **Checked:** coordinate snapshots, and a PDFium pass that finds each field's drawn line and label
@@ -129,9 +155,11 @@ ADR 0009).
   `set_variables` as a one-line note. The question card has its own answer field; while it waits,
   the chat input is closed, so a reply can't be mistaken for an answer. Answered cards collapse to
   "question → answer or Skipped".
-- **Document** tab: sections with their numbers and a Discuss button that attaches the section to
-  the next message (one message, then it clears). Blanks are chips: dashed and highlighted while
-  empty ("skipped" when skipped), the value once filled; click to fill.
+- **Editing** tab: the editor above, with its toolbar (coss `Toolbar`: bold, italic, underline,
+  lists, table, insert blank, add section) and a Saved / Saving… / Retry status. Sections have a
+  Discuss button that attaches the section to the next message (one message, then it clears).
+  Blanks are chips: dashed and highlighted while empty ("skipped" when skipped), the value once
+  filled; click to fill.
 - **Signers** tab: name and email per role, with the preflight's problems on the fields.
 - **Preview** tab: the rendered PDF.
 - Finalise: an Arc dialog with the required "I've read the whole document" confirmation.

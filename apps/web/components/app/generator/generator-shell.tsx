@@ -13,17 +13,17 @@ import { Button as IconButton } from "@/components/ui/button"
 import type { GeneratorDetail } from "@/lib/generator"
 import { cn } from "@/lib/utils"
 import { ChatPanel } from "./chat-panel"
-import { DocumentView } from "./document-view"
+import { DocumentEditor } from "./editor/document-editor"
 import { FinalizeDialog } from "./finalize-dialog"
 import { GeneratorProvider, useGenerator } from "./generator-context"
 import { SignersPanel } from "./signers-panel"
 
-type DocumentTab = "preview" | "document" | "signers"
+type DocumentTab = "preview" | "editing" | "signers"
 
 /**
  * The AI document generator (docs/ai-documents.md → Web): a full page with its own top bar, the
  * assistant on the left and the document on the right (Preview: the PDF as it will be signed;
- * Document: the text with its blanks; Signers: who signs). On phones one pane shows at a time; both
+ * Editing: the text in a rich-text editor; Signers: who signs). On phones one pane shows at a time; both
  * stay mounted, so switching never drops the conversation.
  */
 export function GeneratorShell({ initial }: { initial: GeneratorDetail }) {
@@ -37,7 +37,7 @@ export function GeneratorShell({ initial }: { initial: GeneratorDetail }) {
 function Frame() {
   const { detail } = useGenerator()
   const [pane, setPane] = useState<"chat" | "document">("chat")
-  const [tab, setTab] = useState<DocumentTab>("document")
+  const [tab, setTab] = useState<DocumentTab>("editing")
   const [finalizeOpen, setFinalizeOpen] = useState(false)
   const finalized = detail.document.status === "FINALIZED"
   const blocking = detail.issues.length
@@ -118,7 +118,7 @@ function Frame() {
               onValueChange={(v) => setTab(v as DocumentTab)}
               options={[
                 { value: "preview", label: "Preview" },
-                { value: "document", label: "Document" },
+                { value: "editing", label: "Editing" },
                 { value: "signers", label: "Signers" },
               ]}
             />
@@ -135,8 +135,8 @@ function Frame() {
               </div>
             )}
             {/* Kept mounted while hidden: unsaved signer edits survive a tab switch. */}
-            <div hidden={tab !== "document"}>
-              <DocumentView />
+            <div hidden={tab !== "editing"}>
+              <DocumentEditor />
             </div>
             <div hidden={tab !== "signers"}>
               <SignersPanel />

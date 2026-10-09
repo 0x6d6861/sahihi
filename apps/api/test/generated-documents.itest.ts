@@ -439,3 +439,91 @@ describe("finalize", () => {
     expect(await prisma.document.count({ where: { organizationId: alice.organizationId } })).toBe(1)
   })
 })
+
+describe("editing the text", () => {
+  beforeEach(() => enableAssistant(alice))
+
+  const put = (id: string, json: unknown) =>
+    request(alice, `/api/generated-documents/${id}/content`, { method: "PUT", json })
+
+  /** The latest content with one paragraph appended to the Purpose section. */
+  function edited(data: GeneratedDocumentData, ...nodes: unknown[]) {
+    return {
+      ...data.content,
+      content: data.content.content.map((s) =>
+        s.attrs.id === "purpose"
+          ? { ...s, content: [...s.content, { type: "paragraph", content: nodes }] }
+          : s,
+      ),
+    }
+  }
+
+  test("an edit is a new version; inserted blanks start unresolved", async () => {
+    const id = await createNda(alice)
+    const { version } = await detail(alice, id)
+    const res = await put(id, {
+      baseVersionId: version.id,
+      content: edited(
+        version.data,
+        { type: "text", text: "Fees: ", marks: [{ type: "italic" }] },
+        { type: "variable", attrs: { key: "fee" } },
+      ),
+      newVariables: [{ key: "fee", label: "Fee", type: "amount" }],
+    })
+    expect(res.status).toBe(200)
+    const d = await detail(alice, id)
+    expect(d.version.number).toBe(2)
+    expect(d.version.data.variables.find((v) => v.key === "fee")).toMatchObject({
+      label: "Fee",
+      value: null,
+      status: "unresolved",
+    })
+    expect(d.issues.some((i) => i.variableKey === "fee")).toBe(true)
+    expect(JSON.stringify(d.version.data.content)).toContain("Fees: ")
+  })
+
+  test("applies over answers given meanwhile, but not over another text edit", async () => {
+    const id = await createNda(alice)
+    const v1 = (await detail(alice, id)).version
+    await request(alice, `/api/generated-documents/${id}/variables`, {
+      method: "POST",
+      json: {
+        baseVersionId: v1.id,
+        source: "answer",
+        values: [{ key: "governing_law", value: "Kenya" }],
+      },
+    })
+    const res = await put(id, {
+      baseVersionId: v1.id,
+      content: edited(v1.data, { type: "text", text: "First edit." }),
+    })
+    expect(res.status).toBe(200)
+    const d = await detail(alice, id)
+    expect(d.version.number).toBe(3)
+    expect(d.version.data.variables.find((v) => v.key === "governing_law")?.value).toBe("Kenya")
+
+    const stale = await put(id, {
+      baseVersionId: v1.id,
+      content: edited(v1.data, { type: "text", text: "Second edit." }),
+    })
+    expect(stale.status).toBe(409)
+    expect((await json<{ error: string }>(stale)).error).toBe("stale_version")
+  })
+
+  test("refuses text that refers to a blank that doesn't exist, or reuses a key", async () => {
+    const id = await createNda(alice)
+    const { version } = await detail(alice, id)
+    const unknown = await put(id, {
+      baseVersionId: version.id,
+      content: edited(version.data, { type: "variable", attrs: { key: "nowhere" } }),
+    })
+    expect(unknown.status).toBe(400)
+    const reused = await put(id, {
+      baseVersionId: version.id,
+      content: version.data.content,
+      newVariables: [{ key: "term", label: "Again", type: "text" }],
+    })
+    expect(reused.status).toBe(400)
+    expect((await detail(alice, id)).version.number).toBe(1)
+  })
+})

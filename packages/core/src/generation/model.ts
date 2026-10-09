@@ -17,8 +17,7 @@ const Key = z
 const NodeId = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/)
 
 // ── Inline ───────────────────────────────────────────────────────────────────
-/** Italic arrives with the rich-text editor and its font (docs/ai-documents.md → Roadmap). */
-export const MARK_TYPES = ["bold", "underline"] as const
+export const MARK_TYPES = ["bold", "italic", "underline"] as const
 export type MarkType = (typeof MARK_TYPES)[number]
 
 export const TextNodeSchema = z.object({
@@ -26,7 +25,7 @@ export const TextNodeSchema = z.object({
   text: z.string().min(1).max(10_000),
   marks: z
     .array(z.object({ type: z.enum(MARK_TYPES) }))
-    .max(2)
+    .max(3)
     .optional(),
 })
 export type TextNode = z.infer<typeof TextNodeSchema>
@@ -59,6 +58,37 @@ export const ListSchema = z.object({
   content: z.array(ListItemSchema).min(1).max(100),
 })
 export type List = z.infer<typeof ListSchema>
+
+/**
+ * A plain grid: every row has the same number of cells (`structureIssues` checks), no merged cells.
+ * `tableHeader` cells render bold. Rows never split across pages.
+ */
+const TableCellSchema = z.object({
+  type: z.enum(["tableCell", "tableHeader"]),
+  attrs: z
+    .object({
+      colspan: z.literal(1).default(1),
+      rowspan: z.literal(1).default(1),
+      colwidth: z.array(z.number()).nullable().default(null),
+    })
+    .default({ colspan: 1, rowspan: 1, colwidth: null }),
+  content: z.array(ParagraphSchema).min(1).max(20),
+})
+export type TableCell = z.infer<typeof TableCellSchema>
+
+export const TableSchema = z.object({
+  type: z.literal("table"),
+  content: z
+    .array(
+      z.object({
+        type: z.literal("tableRow"),
+        content: z.array(TableCellSchema).min(1).max(12),
+      }),
+    )
+    .min(1)
+    .max(200),
+})
+export type Table = z.infer<typeof TableSchema>
 
 /** Field kinds a generated document can place; each maps 1:1 to the envelope `FieldType`. */
 export const GENERATED_FIELD_TYPES = [
@@ -99,6 +129,7 @@ export type SignatureBlock = z.infer<typeof SignatureBlockSchema>
 export const BlockNodeSchema = z.discriminatedUnion("type", [
   ParagraphSchema,
   ListSchema,
+  TableSchema,
   SignatureBlockSchema,
 ])
 export type BlockNode = z.infer<typeof BlockNodeSchema>
@@ -197,6 +228,8 @@ export const GENERATION_EVENT_TYPES = [
   /** The assistant tried to fill a blank with something the person never said; refused. */
   "variables.rejected",
   "roles.updated",
+  /** The person edited the text in the editor (and maybe added blanks). */
+  "content.updated",
   /** One assistant reply: model and token usage, never the prompt or the text. */
   "assistant.turn",
   "document.finalized",

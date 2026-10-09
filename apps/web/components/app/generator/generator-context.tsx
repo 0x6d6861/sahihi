@@ -1,5 +1,6 @@
 "use client"
 
+import type { DocContent, VariableType } from "@sahihi/core"
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react"
 import { api } from "@/lib/api"
 import type { GeneratorDetail } from "@/lib/generator"
@@ -20,6 +21,12 @@ interface GeneratorState {
     source: "answer" | "edit",
   ) => Promise<void>
   saveRoles: (roles: { key: string; name: string | null; email: string | null }[]) => Promise<void>
+  /** Saves edited text on top of `baseVersionId`; resolves with the new version's id. */
+  saveContent: (input: {
+    baseVersionId: string
+    content: DocContent
+    newVariables: { key: string; label: string; type: VariableType }[]
+  }) => Promise<string>
   selectedSectionId: string | null
   setSelectedSectionId: (id: string | null) => void
   /** Read and clear the selection: it travels with exactly one message. */
@@ -83,6 +90,18 @@ export function GeneratorProvider({
     [base, applySaved],
   )
 
+  const saveContent = useCallback<GeneratorState["saveContent"]>(
+    async (input) => {
+      const saved = await api<Pick<GeneratorDetail, "version" | "issues">>(`${base}/content`, {
+        method: "PUT",
+        json: input,
+      })
+      applySaved(saved)
+      return saved.version.id
+    },
+    [base, applySaved],
+  )
+
   const setSelectedSectionId = useCallback((sectionId: string | null) => {
     selection.current = sectionId
     setSelected(sectionId)
@@ -102,6 +121,7 @@ export function GeneratorProvider({
       refresh,
       saveVariables,
       saveRoles,
+      saveContent,
       selectedSectionId,
       setSelectedSectionId,
       takeSelection,
@@ -114,6 +134,7 @@ export function GeneratorProvider({
       refresh,
       saveVariables,
       saveRoles,
+      saveContent,
       selectedSectionId,
       setSelectedSectionId,
       takeSelection,
