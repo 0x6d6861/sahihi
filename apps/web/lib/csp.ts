@@ -87,6 +87,7 @@ const PROTECTED_PREFIXES = [
   "/envelopes",
   "/templates",
   "/bulk-sends",
+  "/inbox",
   "/settings",
   "/onboarding",
 ]

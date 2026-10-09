@@ -1,6 +1,6 @@
 # 0026: Top bar instead of a sidebar for the app shell
 
-- **Status:** accepted (amends the shell part of ADR 0023)
+- **Status:** accepted (amends the shell part of ADR 0023); tab list and bell changed by ADR 0041
 - **Date:** 2026-10-07
 
 ## Context

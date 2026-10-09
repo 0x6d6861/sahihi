@@ -79,5 +79,5 @@ the storage wipe after workspace deletion. The new routes are in `tenant-isolati
 ## Not in v1
 
 Erasing one person across every envelope in a single action (purge their envelopes one by one),
-exports larger than 2,000 envelopes, and emailing the owner when an export is ready (the bell
+exports larger than 2,000 envelopes, and emailing the owner when an export is ready (the Inbox
 tells them, docs/notifications.md).

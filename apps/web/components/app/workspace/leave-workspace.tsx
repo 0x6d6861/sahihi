@@ -6,6 +6,7 @@ import { ConfirmDialog } from "@/components/app/confirm-dialog"
 import { toastManager } from "@/components/app/toast"
 import { Button } from "@/components/arc/button/button"
 import { organization } from "@/lib/auth-client"
+import { HOME_HREF } from "@/lib/nav"
 
 /**
  * Leave the active workspace (better-auth `organization.leave`). Afterwards the next workspace you
@@ -24,7 +25,7 @@ export function LeaveWorkspace({ id, name }: { id: string; name: string }) {
     const { data: remaining } = await organization.list()
     const next = remaining?.find((o) => o.id !== id)
     if (next) await organization.setActive({ organizationId: next.id })
-    router.push(next ? "/documents" : "/onboarding")
+    router.push(next ? HOME_HREF : "/onboarding")
     router.refresh()
   }
 

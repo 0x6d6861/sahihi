@@ -104,12 +104,25 @@ describe("notification cursor", () => {
 
 describe("requests", () => {
   test("list query", () => {
-    expect(ListNotificationsQuerySchema.parse({})).toEqual({ limit: 20, unread: false })
-    expect(ListNotificationsQuerySchema.parse({ unread: "1", limit: "5", cursor: "abc" })).toEqual({
+    expect(ListNotificationsQuerySchema.parse({})).toMatchObject({
+      limit: 20,
+      unread: false,
+      read: false,
+    })
+    expect(
+      ListNotificationsQuerySchema.parse({ unread: "1", limit: "5", cursor: "abc" }),
+    ).toMatchObject({
       limit: 5,
       unread: true,
+      read: false,
       cursor: "abc",
     })
+    expect(
+      ListNotificationsQuerySchema.parse({ q: "  lease ", type: "recipient.signed", period: "7d" }),
+    ).toMatchObject({ q: "lease", type: "recipient.signed", period: "7d" })
+    expect(ListNotificationsQuerySchema.parse({ q: "   " }).q).toBeUndefined()
+    expect(ListNotificationsQuerySchema.safeParse({ type: "nope" }).success).toBe(false)
+    expect(ListNotificationsQuerySchema.safeParse({ period: "1d" }).success).toBe(false)
     expect(ListNotificationsQuerySchema.safeParse({ limit: "500" }).success).toBe(false)
   })
   test("ids-only actions refuse all", () => {

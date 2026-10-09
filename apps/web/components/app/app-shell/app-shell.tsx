@@ -1,34 +1,26 @@
 "use client"
 
-import {
-  File02Icon,
-  Folder01Icon,
-  LicenseDraftIcon,
-  SentIcon,
-  SignatureIcon,
-} from "@hugeicons/core-free-icons"
+import { Folder01Icon, InboxIcon, SignatureIcon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Separator } from "@/components/ui/separator"
-import { APP_NAV, type AppNavHref, isFullPage, isNavActive } from "@/lib/nav"
-import { NotificationBell } from "../notifications/notification-bell"
+import { APP_NAV, type AppNavHref, HOME_HREF, isFullPage, isNavActive } from "@/lib/nav"
+import { UnreadCountProvider, useUnreadCount } from "../inbox/unread-count"
 import { PillNav } from "../pill-nav"
 import { OrgSwitcher, type ShellOrganization } from "./org-switcher"
 import { type ShellUser, UserMenu } from "./user-menu"
 
 const NAV_ICONS: Record<AppNavHref, IconSvgElement> = {
   "/files": Folder01Icon,
-  "/documents": File02Icon,
-  "/envelopes": SentIcon,
-  "/templates": LicenseDraftIcon,
+  "/inbox": InboxIcon,
 }
 
 /**
  * Authenticated app shell (ADR 0026): one top bar. The logo and the workspace switcher on the left,
  * the primary navigation as a segmented pill in the middle (the active item is a raised pill that
- * glides between items, `PillNav`), and on the right the notification bell and the account menu,
- * which also holds Settings. Below `md` the navigation moves to its own row under the bar.
+ * glides between items, `PillNav`; the Inbox shows its unread count, ADR 0041), and on the right the
+ * account menu, which also holds Settings. Below `md` the navigation moves to its own row under the bar.
  * Full-page tools (`isFullPage`, the draft editor) get no shell at all: they have their own bar.
  */
 export function AppShell({
@@ -49,11 +41,33 @@ export function AppShell({
   }
 
   return (
+    <UnreadCountProvider workspaceId={activeOrganizationId}>
+      <Shell user={user} organizations={organizations} activeOrganizationId={activeOrganizationId}>
+        {children}
+      </Shell>
+    </UnreadCountProvider>
+  )
+}
+
+function Shell({
+  user,
+  organizations,
+  activeOrganizationId,
+  children,
+}: {
+  user: ShellUser
+  organizations: ShellOrganization[]
+  activeOrganizationId: string
+  children: React.ReactNode
+}) {
+  const pathname = usePathname()
+  const { count: unread } = useUnreadCount()
+  return (
     <div className="flex min-h-svh flex-col">
       <header className="sticky top-0 z-30 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b bg-background px-4 py-2.5 md:grid md:grid-cols-[1fr_auto_1fr] md:px-6">
         <div className="flex min-w-0 items-center gap-3">
           <Link
-            href="/documents"
+            href={HOME_HREF}
             aria-label="Sahihi home"
             className="flex shrink-0 items-center gap-2 rounded-md font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
@@ -86,12 +100,11 @@ export function AppShell({
             label: item.label,
             icon: NAV_ICONS[item.href],
             active: isNavActive(pathname, item.href),
+            ...(item.href === "/inbox" ? { badge: unread ?? 0 } : {}),
           }))}
         />
 
         <div className="ml-auto flex items-center gap-3 md:ml-0 md:justify-self-end">
-          {/* Keyed by workspace: switching starts the bell over for the new one. */}
-          <NotificationBell key={activeOrganizationId} />
           <UserMenu user={user} />
         </div>
       </header>

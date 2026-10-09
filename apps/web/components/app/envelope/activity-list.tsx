@@ -54,6 +54,12 @@ const ICON_BY_TYPE: Record<string, ComponentType<{ "aria-hidden"?: boolean }>> =
   "recipient.signed": SignatureIcon,
 }
 
+/** Timeline tone and icon for an audit event; shared with the Inbox's workspace activity. */
+export function auditTimelineStyle(type: string): Pick<TimelineEvent, "tone" | "icon"> {
+  const Icon = ICON_BY_TYPE[type]
+  return { tone: TONE[auditEventTone(type)], icon: Icon ? <Icon aria-hidden /> : undefined }
+}
+
 export interface AuditEventRow {
   seq: number
   type: string
@@ -88,11 +94,7 @@ export function ActivityList({
     at: e.occurredAt,
     title: auditEventLabel(e.type, e.recipientId ? recipientNames[e.recipientId] : null, e.data),
     meta: [`Event ${e.seq}`, e.ipAddress && `IP ${e.ipAddress}`].filter(Boolean).join(" · "),
-    tone: TONE[auditEventTone(e.type)],
-    icon: (() => {
-      const Icon = ICON_BY_TYPE[e.type]
-      return Icon ? <Icon aria-hidden /> : undefined
-    })(),
+    ...auditTimelineStyle(e.type),
   }))
   return (
     <div className="flex flex-col gap-4">

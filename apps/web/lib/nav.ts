@@ -5,12 +5,22 @@
 export const APP_NAV: readonly { href: AppNavHref; label: string }[] = [
   // Home (ADR 0038): documents, envelopes and templates together, in their shared folders.
   { href: "/files", label: "All files" },
-  { href: "/documents", label: "Documents" },
-  { href: "/envelopes", label: "Envelopes" },
-  { href: "/templates", label: "Templates" },
+  // Notifications, workspace activity and bulk sends (ADR 0041).
+  { href: "/inbox", label: "Inbox" },
 ]
 
-export type AppNavHref = "/files" | "/documents" | "/envelopes" | "/templates"
+export type AppNavHref = "/files" | "/inbox"
+
+/**
+ * Pages that have no tab of their own and belong to one that does: documents, envelopes and
+ * templates are listed in All files (ADR 0041), so their pages light up All files.
+ */
+const NAV_SECTION_FOR: readonly { prefix: string; href: AppNavHref }[] = [
+  { prefix: "/documents", href: "/files" },
+  { prefix: "/envelopes", href: "/files" },
+  { prefix: "/templates", href: "/files" },
+  { prefix: "/bulk-sends", href: "/inbox" },
+]
 
 /** Where the app opens after sign-in, onboarding or a workspace switch (ADR 0038). */
 export const HOME_HREF = "/files"
@@ -30,9 +40,15 @@ export const SETTINGS_NAV = [
   { href: "/settings/api", label: "API" },
 ] as const
 
-/** True when `pathname` is `href` itself or a page below it (`/envelopes/abc` → `/envelopes`). */
-export function isNavActive(pathname: string, href: string): boolean {
+/** True when `pathname` is `href` itself or a page below it (`/inbox/x` → `/inbox`). */
+function isAtOrBelow(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`)
+}
+
+/** Whether the tab `href` is the current one for `pathname`, sections without a tab included. */
+export function isNavActive(pathname: string, href: string): boolean {
+  if (isAtOrBelow(pathname, href)) return true
+  return NAV_SECTION_FOR.some((s) => s.href === href && isAtOrBelow(pathname, s.prefix))
 }
 
 /**

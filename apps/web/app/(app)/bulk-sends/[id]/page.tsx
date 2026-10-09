@@ -16,7 +16,9 @@ export default async function BulkSendStatusPage({ params }: { params: Promise<{
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
       <header className="flex flex-col gap-2">
-        <Breadcrumb items={[{ label: "Templates", href: "/templates" }, { label: "Bulk send" }]} />
+        <Breadcrumb
+          items={[{ label: "Inbox", href: "/inbox?tab=bulk-sends" }, { label: "Bulk send" }]}
+        />
         {/* The batch title is a pattern ("…: {{Tenant name}}"), so the template names the page. */}
         <h1 className="truncate font-medium text-2xl tracking-tight">
           {b.template ? `Bulk send: ${b.template.name}` : "Bulk send"}

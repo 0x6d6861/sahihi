@@ -12,7 +12,7 @@ export default function EditorError({
 }) {
   return (
     <div className="flex flex-1 items-center justify-center p-4">
-      <RouteError error={error} retry={retry} homeHref="/envelopes" />
+      <RouteError error={error} retry={retry} homeHref="/files" />
     </div>
   )
 }

@@ -1,6 +1,6 @@
 # In-app notifications
 
-The bell in the top bar tells senders what happened to their envelopes and tells owners and admins
+The **Inbox** (`/inbox`, ADR 0041) tells senders what happened to their envelopes and tells owners and admins
 what happened to the workspace (ADR 0029). It's separate from email: recipients' invites and
 reminders, and the completed / declined / voided emails (`apps/worker/src/jobs/notifications.ts`),
 work as before and these settings don't affect them.
@@ -58,7 +58,7 @@ Every query is scoped to the signed-in user **and** the active workspace.
 
 | Route | |
 |---|---|
-| `GET /` | Newest first. `?limit` (1–50, default 20), `?cursor` (the previous page's `nextCursor`: the last item's position, `createdAt` and id, so paging survives that item being dismissed), `?unread=1`. Returns `{ items, nextCursor, unreadCount }` |
+| `GET /` | Newest first. `?limit` (1–50, default 20), `?cursor` (the previous page's `nextCursor`: the last item's position, `createdAt` and id, so paging survives that item being dismissed), `?unread=1` or `?read=1`, `?type` (a notification type), `?period` (`7d`, `30d`, `90d`, `year`), `?q` (any case, over the names and titles it quotes: `NOTIFICATION_SEARCH_KEYS`). Returns `{ items, nextCursor, unreadCount }`; `unreadCount` ignores the filters |
 | `GET /unread-count` | `{ count }`, for the badge |
 | `POST /read` | `{ ids: [...] }` or `{ all: true }`. Ids that aren't yours are ignored. Returns `{ updated }` |
 | `POST /unread` | `{ ids: [...] }`, back to unread. Returns `{ updated }` |
@@ -66,40 +66,60 @@ Every query is scoped to the signed-in user **and** the active workspace.
 | `GET /preferences` | `{ items: [{ type, enabled }] }`, only the types this member can receive |
 | `PUT /preferences` | `{ settings: { [type]: boolean } }`, merged into what's stored. Returns the same as GET |
 
+**Workspace activity** (`GET /api/activity`, session + active workspace, any member; ADR 0041): audit
+events of every envelope in the workspace, newest first. `?limit` (1–50, default 30), `?cursor`
+(the last event's `occurredAt` and id), `?group=all|signing|sending|system`,
+`?actor` (a member's user id), `?period`, `?q` (envelope title, recipient name or the acting
+member's name, any case). Returns `{ items: [{ id, type, occurredAt, envelopeId, envelopeTitle,
+recipientName, actorName, data }], nextCursor, people }`. `people` (the workspace's members) comes
+with the first page only. `data` is trimmed to what the line quotes (`activityData`), so no IP
+addresses, user agents, hashes, emails or storage keys. Read-only, so it writes no audit event.
+
 ## Preferences
 
 `NotificationPreference` holds one row per user and workspace with only the types they changed
 (`settings` JSON); everything else uses the catalog default. **Settings → Notifications** shows a
 switch per type, saved as soon as it changes. Members don't see workspace types they can't receive.
 
-## The bell (web)
+## The Inbox (web)
 
-Arc's `notification-center` block (`components/arc/notification-center/`, vendored, one local
-patch: ADR 0030),
-wrapped by `components/app/notifications/notification-bell.tsx` in the app shell next to the
-account menu. It's keyed by workspace, so switching workspaces starts it over.
+`/inbox` replaced the bell (ADR 0041). Its tabs are switched with `?tab=`:
+**Notifications**, **Workspace activity** and **Bulk sends**. Each has the All files search section
+(`ListSearch`, without the List / Grid switch): a search box (debounced) and filter chips with
+"Clear filters". The choices live in the component, not the URL; query strings are built in
+`lib/inbox.ts`. An empty result says "No matching …" with "Clear search and filters".
 
-- It loads the 50 newest unread and the 50 newest overall (`BELL_PAGE_SIZE`, `mergeBellPages`;
-  the block has no paging), so old unread ones aren't hidden behind newer read ones, and reloads
-  every 60 s (`NOTIFICATIONS_POLL_MS`) while the tab is visible, and on focus. There's no websocket
-  or SSE (ADR 0029).
-- The block keeps its own copy of the list after mount. The bell keeps the server's list and the
-  changes made in the bell that the server doesn't show yet (`LocalChanges`). It always shows the
-  first with the second on top (`applyLocalChanges`), and forgets a change once a poll shows it
-  (`pendingLocalChanges`), so a poll that raced a change can't undo it. It remounts the block
-  when that list, or a time label ("now" → "5m"), changed (`notificationsSignature`), never
-  while it's open.
-- Rows show the title, a one-line body, a time ("5m", "3h") and a tone icon (`toCenterItems`, text
-  and tone from `describeNotification`). Choosing a row expands it with **Mark read / Mark unread**
-  and **Dismiss**. The header has All / Unread and **Mark all read**, and the footer **Clear read**.
-- The block reports every change one item at a time. `createActionBatcher` sends one request per
-  action on the next tick (`/read`, `/unread`, `/dismiss`). The block's **Mark all read** (several
-  reads at once covering every loaded unread one, `isMarkAll`) goes as `{ all: true }`, so unread
-  notifications too old to be loaded are cleared as well. A failed request shows a toast and drops
-  those changes, so the bell shows the server's state again.
-- An expanded row also has an **Open …** action ("Open envelope", "Open Data settings";
-  `openLabelFor`) through a local patch to the block (ADR 0030). It closes the panel, marks the item
-  read and goes to its page (`describeNotification(...).href`).
+- **Unread badge:** the Inbox pill in the top bar shows how many are unread. `UnreadCountProvider`
+  (`components/app/inbox/unread-count.tsx`) polls `GET /notifications/unread-count` every 60 s
+  (`NOTIFICATIONS_POLL_MS`) while the tab is visible, and on focus, and starts over on a workspace
+  switch. There's no websocket or SSE (ADR 0029).
+- **Notifications** (`components/app/inbox/notification-list.tsx`): the first 50 come with the page,
+  "Load more" follows `nextCursor` (`INBOX_PAGE_SIZE`). Search (envelope, recipient or member
+  name) and the Status (Unread / Read), Type (each notification type) and Date chips go to the
+  API. Rows
+  show a tone dot while unread, the title, body and time ("5m", "3h"), text and tone from
+  `describeNotification`. Each row has **Open …** (`openLabelFor`; marks it read and goes to its
+  page) and a menu with **Mark read / Mark unread** and **Dismiss**. The header has **Mark all
+  read** (`{ all: true }`, so unloaded unread ones are cleared too; with a search or filter set it
+  becomes **Mark these read** and sends only the unread ones shown, `unreadIdsToMark`) and **Clear
+  read** (dismisses the loaded read ones, 100 ids a request, `readIdsToClear`).
+- Changes show at once (`withReadState`), then go to the API, then the badge refreshes. A failed
+  request shows a toast and reloads the list. When the badge goes up while the page is open for
+  any other reason than a change made here (`refresh` resolves to the new count), the first page
+  reloads to show the new ones. Only the newest list request's answer is applied, so a slow page
+  can't land on a newer search. Times count from the server render's clock, then tick each minute.
+- The badge skips a poll while one is in flight (focus and visibilitychange often fire together)
+  and applies only the newest answer.
+- **Workspace activity** (`components/app/inbox/activity-feed.tsx`): `GET /api/activity`, audit
+  events of every envelope in the workspace, newest first, 30 a page, as an Arc `Timeline` with
+  the envelope's title and who did it. Search (envelope title, recipient or member name) and the
+  Type (Signing / Sending / System, `ACTIVITY_GROUPS` in `@sahihi/core`), People (the workspace's
+  members, returned with each page) and Date chips go to the API. Without a Type, link opens, OTP
+  steps and filled fields are left out. Any member may read
+  it; no IP addresses, user agents or hashes. A row expands to a link to its envelope.
+- **Bulk sends:** the 25 most recent (`BulkSendsTable`), linking to `/bulk-sends/:id`, with a search
+  over title and template and a Status chip (In progress / Finished / With failures), filtered in
+  the browser (`filterBulkSends`).
 
 ## Retention
 

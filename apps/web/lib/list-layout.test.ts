@@ -17,11 +17,10 @@ describe("list layout", () => {
     expect(parseListLayout(["grid"])).toBeUndefined()
   })
 
-  test("each page has its own year-long, site-wide cookie", () => {
-    expect(listLayoutCookie("documents", "grid")).toBe(
-      "sahihi-documents-layout=grid; Path=/; Max-Age=31536000; SameSite=Lax",
+  test("a year-long, site-wide cookie", () => {
+    expect(listLayoutCookie("files", "grid")).toBe(
+      "sahihi-files-layout=grid; Path=/; Max-Age=31536000; SameSite=Lax",
     )
-    expect(listLayoutCookie("envelopes", "list")).toStartWith("sahihi-envelopes-layout=list;")
-    expect(listLayoutCookie("templates", "grid")).toStartWith("sahihi-templates-layout=grid;")
+    expect(listLayoutCookie("files", "list")).toStartWith("sahihi-files-layout=list;")
   })
 })

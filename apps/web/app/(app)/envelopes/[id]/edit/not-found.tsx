@@ -4,7 +4,7 @@ import { RouteNotFound } from "@/components/app/route-states"
 export default function EditorNotFound() {
   return (
     <div className="flex flex-1 items-center justify-center p-4">
-      <RouteNotFound homeHref="/envelopes" />
+      <RouteNotFound homeHref="/files" />
     </div>
   )
 }

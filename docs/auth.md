@@ -183,7 +183,7 @@ The better-auth defaults are `owner`, `admin` and `member`. The creator of an or
 | Delete a document | any | any | own only |
 | Use templates / save envelopes as templates | ✓ | ✓ | ✓ |
 | Rename or delete a template | any | any | own only |
-| Create folders (Documents page) | ✓ | ✓ | ✓ |
+| Create folders (All files) | ✓ | ✓ | ✓ |
 | Rename, move or delete a folder | any | any | own only |
 | Move a document between folders | any | any | own only |
 | Webhooks (view, add, edit, rotate, delete) | ✓ | ✓ | – |

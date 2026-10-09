@@ -90,13 +90,18 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
       → Account settings, ADR 0028)
 - [x] In-app notifications: bell in the top bar (envelope and workspace events), per-type preferences
       in Settings → Notifications (`docs/notifications.md`, ADR 0029)
+- [x] Inbox: notifications (paged, unread badge on the tab), workspace activity feed
+      (`GET /api/activity`) and bulk sends in one place; the bell and the Documents, Envelopes and
+      Templates tabs removed (their lists redirect to All files)
+- [x] Inbox search and filters: text search and Status / Type / Date chips on notifications, Type /
+      People / Date on workspace activity, Status on bulk sends (ADR 0041) (`docs/notifications.md`, ADR 0041)
 - [x] Shared folders and labels for documents, envelopes and templates (ADR 0038)
 - [x] All files: one home page for documents, envelopes and templates, with one search and
       Type / Status / People / Added / Tags / Color filters (ADR 0038, `docs/ui.md`)
 - [x] Drag and drop on All files: drag items onto folders and crumbs, multi-select and Move…,
       drop PDFs from the desktop to upload, drop onto a file to make a folder, Undo
       (`POST /files/move`, `POST /files/group`, ADR 0039)
-- [ ] Drag and drop on the Documents, Envelopes and Templates pages (ADR 0039 → Consequences)
+- [x] ~~Drag and drop on the Documents page~~: the Documents page was folded into All files, which has it (ADR 0041)
 - [x] Passkeys, delete account (erase the person, keep the work; ADR 0040), forgot/reset password
       pages (`docs/auth.md`)
 

@@ -106,13 +106,13 @@ export function EditorHeader({
     <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b bg-background px-4 py-2.5 md:grid md:grid-cols-[1fr_auto_1fr] md:px-6">
       {/* Phones: title row, then the buttons (the split button doesn't shrink), then the steps. */}
       <div className="flex min-w-0 items-center gap-2 max-sm:w-full sm:flex-1">
-        <Tooltip content="Back to envelopes" side="bottom">
+        <Tooltip content="Back to all files" side="bottom">
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label="Back to envelopes"
+            aria-label="Back to all files"
             className="shrink-0 text-muted-foreground hover:text-foreground"
-            render={<Link href="/envelopes" />}
+            render={<Link href="/files" />}
           >
             <ArrowLeftIcon aria-hidden />
           </Button>

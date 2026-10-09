@@ -453,3 +453,52 @@ describe("API", () => {
     expect(written).toBe(1)
   })
 })
+
+describe("Inbox search and filters", () => {
+  async function seed() {
+    const write = (type: Parameters<typeof notifyUsers>[1]["type"], data = {}) =>
+      notifyUsers(prisma, {
+        organizationId: alice.organizationId,
+        userIds: [alice.userId],
+        type,
+        data,
+      })
+    await write("recipient.signed", { envelopeTitle: "Office Lease", recipientName: "Amina" })
+    await write("envelope.declined", {
+      envelopeTitle: "NDA",
+      recipientName: "Baraka",
+      reason: "Wrong lease date",
+    })
+    await write("export.ready", { envelopeCount: 3 })
+    const old = await prisma.notification.findFirstOrThrow({ where: { type: "export.ready" } })
+    await prisma.notification.update({
+      where: { id: old.id },
+      data: { createdAt: new Date(Date.now() - 40 * 86_400_000), readAt: new Date() },
+    })
+  }
+
+  test("q searches the quoted names and titles, any case", async () => {
+    await seed()
+    expect((await list(alice, "?q=LEASE")).items.map((i) => i.type).sort()).toEqual([
+      "envelope.declined",
+      "recipient.signed",
+    ])
+    expect((await list(alice, "?q=amina")).items.map((i) => i.type)).toEqual(["recipient.signed"])
+    expect((await list(alice, "?q=nobody")).items).toEqual([])
+  })
+
+  test("type, read state and period", async () => {
+    await seed()
+    expect((await list(alice, "?type=envelope.declined")).items.map((i) => i.type)).toEqual([
+      "envelope.declined",
+    ])
+    expect((await list(alice, "?read=1")).items.map((i) => i.type)).toEqual(["export.ready"])
+    expect((await list(alice, "?unread=1")).items).toHaveLength(2)
+    expect((await list(alice, "?period=30d")).items.map((i) => i.type)).not.toContain(
+      "export.ready",
+    )
+    // The badge's count ignores the filters.
+    expect((await list(alice, "?type=export.ready")).unreadCount).toBe(2)
+    expect((await request(alice, "/api/notifications?type=nope")).status).toBe(400)
+  })
+})
