@@ -27,6 +27,8 @@ interface GeneratorState {
     content: DocContent
     newVariables: { key: string; label: string; type: VariableType }[]
   }) => Promise<string>
+  /** Accept or reject an assistant proposal; then the page reloads the document. */
+  decideProposal: (proposalId: string, action: "accept" | "reject") => Promise<void>
   selectedSectionId: string | null
   setSelectedSectionId: (id: string | null) => void
   /** Read and clear the selection: it travels with exactly one message. */
@@ -102,6 +104,20 @@ export function GeneratorProvider({
     [base, applySaved],
   )
 
+  const decideProposal = useCallback<GeneratorState["decideProposal"]>(
+    async (proposalId, action) => {
+      try {
+        await api(`${base}/proposals/${encodeURIComponent(proposalId)}/${action}`, {
+          method: "POST",
+        })
+      } finally {
+        // Accepted: a new version; out of date: the new status. Either way, show the server's state.
+        await refresh()
+      }
+    },
+    [base, refresh],
+  )
+
   const setSelectedSectionId = useCallback((sectionId: string | null) => {
     selection.current = sectionId
     setSelected(sectionId)
@@ -122,6 +138,7 @@ export function GeneratorProvider({
       saveVariables,
       saveRoles,
       saveContent,
+      decideProposal,
       selectedSectionId,
       setSelectedSectionId,
       takeSelection,
@@ -135,6 +152,7 @@ export function GeneratorProvider({
       saveVariables,
       saveRoles,
       saveContent,
+      decideProposal,
       selectedSectionId,
       setSelectedSectionId,
       takeSelection,

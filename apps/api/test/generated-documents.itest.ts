@@ -24,13 +24,18 @@ const usage = {
 
 /** A model that calls set_variables with `values` once, then replies "Done." */
 function scriptedModel(values: { key: string; value: string }[]) {
+  return toolThenReply("set_variables", { values })
+}
+
+/** A model that calls `toolName` with `input` once, then replies "Done." */
+function toolThenReply(toolName: string, input: unknown) {
   let call = 0
   const toolCall = [
     {
       type: "tool-call" as const,
-      toolCallId: "call-1",
-      toolName: "set_variables",
-      input: JSON.stringify({ values }),
+      toolCallId: `call-${crypto.randomUUID()}`,
+      toolName,
+      input: JSON.stringify(input),
     },
     {
       type: "finish" as const,
@@ -525,5 +530,154 @@ describe("editing the text", () => {
     })
     expect(reused.status).toBe(400)
     expect((await detail(alice, id)).version.number).toBe(1)
+  })
+})
+
+describe("assistant proposals", () => {
+  beforeEach(() => enableAssistant(alice))
+
+  type Proposal = {
+    id: string
+    status: string
+    sectionId: string | null
+    before: string
+    after: string
+    rationale: string
+  }
+
+  const chat = (id: string, text: string) =>
+    request(alice, `/api/generated-documents/${id}/chat`, {
+      method: "POST",
+      json: { messages: [{ id: "m1", role: "user", parts: [{ type: "text", text }] }] },
+    })
+
+  async function propose(id: string, input: Record<string, unknown>, said = "Tighten it up") {
+    setAssistantModelForTests(
+      toolThenReply("propose_section_edit", {
+        operation: "replace",
+        rationale: "Shorter",
+        ...input,
+      }),
+    )
+    const res = await chat(id, said)
+    expect(res.status).toBe(200)
+    return res.text()
+  }
+
+  const proposals = async (id: string) =>
+    (
+      await json<Detail & { proposals: Proposal[] }>(
+        await request(alice, `/api/generated-documents/${id}`),
+      )
+    ).proposals
+
+  const decide = (id: string, pid: string, action: "accept" | "reject") =>
+    request(alice, `/api/generated-documents/${id}/proposals/${pid}/${action}`, { method: "POST" })
+
+  const purposeDraft = {
+    sectionId: "purpose",
+    section: {
+      title: "Purpose",
+      blocks: [
+        { type: "paragraph", text: "The Parties discuss {{purpose}} for {{project_name}}." },
+      ],
+    },
+    newBlanks: [{ key: "project_name", label: "Project name", type: "text" }],
+  }
+
+  test("a proposal waits for the person; accepting makes a version, once", async () => {
+    const id = await createNda(alice)
+    await propose(id, purposeDraft)
+    const [p] = await proposals(id)
+    expect(p).toMatchObject({ status: "PENDING", sectionId: "purpose", rationale: "Shorter" })
+    expect(p?.before).toContain("[Purpose of the disclosure]")
+    expect(p?.after).toContain("[Project name]")
+    expect((await detail(alice, id)).version.number).toBe(1)
+
+    const res = await decide(id, p?.id as string, "accept")
+    expect(res.status).toBe(200)
+    const d = await detail(alice, id)
+    expect(d.version.number).toBe(2)
+    expect(JSON.stringify(d.version.data.content)).toContain("The Parties discuss ")
+    expect(d.version.data.variables.find((v) => v.key === "project_name")?.status).toBe(
+      "unresolved",
+    )
+    const version = await prisma.generatedDocumentVersion.findFirstOrThrow({
+      where: { generatedDocumentId: id, number: 2 },
+    })
+    expect(version.actor).toBe("AI")
+    expect((await proposals(id))[0]?.status).toBe("ACCEPTED")
+
+    expect((await decide(id, p?.id as string, "accept")).status).toBe(409)
+    expect((await decide(id, p?.id as string, "reject")).status).toBe(409)
+  })
+
+  test("rejecting changes nothing", async () => {
+    const id = await createNda(alice)
+    await propose(id, purposeDraft)
+    const [p] = await proposals(id)
+    expect((await decide(id, p?.id as string, "reject")).status).toBe(204)
+    expect((await proposals(id))[0]?.status).toBe("REJECTED")
+    expect((await detail(alice, id)).version.number).toBe(1)
+  })
+
+  test("out of date once its section changed; blanks changing doesn't count", async () => {
+    const id = await createNda(alice)
+    await propose(id, purposeDraft)
+    const [p] = await proposals(id)
+    const v1 = (await detail(alice, id)).version
+    await request(alice, `/api/generated-documents/${id}/variables`, {
+      method: "POST",
+      json: {
+        baseVersionId: v1.id,
+        source: "edit",
+        values: [{ key: "purpose", value: "a pilot" }],
+      },
+    })
+    expect((await proposals(id))[0]?.status).toBe("PENDING")
+
+    const v2 = (await detail(alice, id)).version
+    const content = structuredClone(v2.data.content)
+    const purpose = content.content.find((s) => s.attrs.id === "purpose")
+    if (purpose) purpose.attrs.title = "Why we talk"
+    await request(alice, `/api/generated-documents/${id}/content`, {
+      method: "PUT",
+      json: { baseVersionId: v2.id, content },
+    })
+    expect((await proposals(id))[0]?.status).toBe("STALE")
+    const res = await decide(id, p?.id as string, "accept")
+    expect(res.status).toBe(409)
+    expect((await json<{ error: string }>(res)).error).toBe("stale_proposal")
+    expect((await detail(alice, id)).version.data.content.content[1]?.attrs.title).toBe(
+      "Why we talk",
+    )
+  })
+
+  test("invented specifics never reach the person", async () => {
+    const id = await createNda(alice)
+    const body = await propose(id, {
+      sectionId: "term",
+      section: { title: "Term", blocks: [{ type: "paragraph", text: "It runs for 2 years." }] },
+    })
+    expect(body).toContain("never said")
+    expect(await proposals(id)).toEqual([])
+    const refused = await prisma.generatedDocumentEvent.findFirst({
+      where: { generatedDocumentId: id, type: "proposal.refused" },
+    })
+    expect(refused).not.toBeNull()
+  })
+
+  test("other members can't decide", async () => {
+    const id = await createNda(alice)
+    await propose(id, purposeDraft)
+    const [p] = await proposals(id)
+    const bob = await joinOrganization(alice, "bob", "member")
+    expect(
+      (
+        await request(bob, `/api/generated-documents/${id}/proposals/${p?.id}/accept`, {
+          method: "POST",
+        })
+      ).status,
+    ).toBe(403)
   })
 })

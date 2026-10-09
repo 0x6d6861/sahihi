@@ -112,8 +112,8 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
       finalise into a READY document and a DRAFT envelope; workspace opt-in and `ai:use`
 - [x] Rich-text editing: TipTap with section, blank and signature-block nodes; italics (font) and
       tables, in the editor and the PDF; edits apply over answers given meanwhile (ADR 0043)
-- [ ] Assistant edit proposals (`propose_section_edit`, `propose_sections`) with an inline diff and
-      accept/reject, each accepted change a version
+- [x] Assistant edit proposals (`propose_section_edit`, `propose_sections`) with a diff and
+      accept/reject, each accepted change a version; invented specifics refused (ADR 0044)
 - [ ] Assistant-defined signers and fields (`define_signers`, `place_signature_field`), initials on
       every page, text and checkbox fields
 - [ ] More starters (offer letter, policy, board resolution, invoice cover letter)

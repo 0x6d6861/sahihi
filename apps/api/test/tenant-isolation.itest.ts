@@ -33,6 +33,7 @@ const ids = {
   attachment: "",
   generatedDocument: "",
   generatedVersion: "",
+  proposal: "",
 }
 
 type Case = () => { path: string; init?: RequestInit & { json?: unknown } }
@@ -300,6 +301,14 @@ const TENANT: Record<string, Case> = {
       },
     },
   }),
+  "POST /api/generated-documents/:id/proposals/:pid/accept": () => ({
+    path: `/api/generated-documents/${ids.generatedDocument}/proposals/${ids.proposal}/accept`,
+    init: { method: "POST" },
+  }),
+  "POST /api/generated-documents/:id/proposals/:pid/reject": () => ({
+    path: `/api/generated-documents/${ids.generatedDocument}/proposals/${ids.proposal}/reject`,
+    init: { method: "POST" },
+  }),
   "PUT /api/generated-documents/:id/roles": () => ({
     path: `/api/generated-documents/${ids.generatedDocument}/roles`,
     init: {
@@ -468,7 +477,7 @@ async function snapshot() {
     }),
     prisma.generatedDocument.findMany({
       where: { organizationId: alice.organizationId },
-      include: { versions: true },
+      include: { versions: true, proposals: true },
     }),
   ])
   return {
@@ -590,6 +599,17 @@ beforeAll(async () => {
   ids.generatedVersion = (
     await prisma.generatedDocumentVersion.findFirstOrThrow({
       where: { generatedDocumentId: ids.generatedDocument },
+    })
+  ).id
+  ids.proposal = (
+    await prisma.generatedDocumentProposal.create({
+      data: {
+        generatedDocumentId: ids.generatedDocument,
+        baseVersionId: ids.generatedVersion,
+        sectionId: "return",
+        payload: { change: { kind: "delete_section", sectionId: "return" }, newVariables: [] },
+        rationale: "Not needed",
+      },
     })
   ).id
 })

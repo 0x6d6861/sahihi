@@ -69,6 +69,8 @@ export function DocumentEditor() {
       throw new Error("invalid")
     }
     const newVariables = pendingBlanks.current
+    // The editor reports updates that change nothing (e.g. normalising on load): no version.
+    if (!newVariables.length && JSON.stringify(content) === lastSaved.current) return
     try {
       base.current = await saveContent({ baseVersionId: base.current, content, newVariables })
       lastSaved.current = JSON.stringify(content)
@@ -102,7 +104,12 @@ export function DocumentEditor() {
     if (current !== lastSaved.current && autosave.status === "saved") {
       lastSaved.current = current
       base.current = detail.version.id
-      editor.commands.setContent(toEditorDoc(data.content), { emitUpdate: false })
+      // Outside React's commit: the node views render synchronously (flushSync) when content is set.
+      queueMicrotask(() => {
+        if (!editor.isDestroyed) {
+          editor.commands.setContent(toEditorDoc(data.content), { emitUpdate: false })
+        }
+      })
     }
   }, [editor, stale, data.content, detail.version.id, autosave.status])
 

@@ -19,19 +19,22 @@ import { Textarea } from "@/components/arc/textarea/textarea"
 import { Tooltip } from "@/components/arc/tooltip/tooltip"
 import { Button as IconButton } from "@/components/ui/button"
 import { useGenerator } from "./generator-context"
+import { ProposalCard } from "./proposal-card"
 import { AppliedNote, QuestionCard } from "./question-card"
 import { sectionLabel } from "./section-label"
 
 /**
  * The assistant conversation (docs/ai-documents.md → Web), on assistant-ui's headless primitives
- * styled with Arc. The server declares the tools; this registers how two of them render:
- * `ask_questions` as a question card that supplies its result (human in the loop) and
- * `set_variables` as a one-line note. The document text never travels from here: the server reads
+ * styled with Arc. The server declares the tools; this registers how they render:
+ * `ask_questions` as a question card that supplies its result (human in the loop),
+ * `set_variables` as a one-line note, and the two proposal tools as a diff to accept or reject. The document text never travels from here: the server reads
  * it, and a selected section is sent as its id.
  */
 const toolkit = defineToolkit({
   ask_questions: { type: "backend", render: QuestionCard },
   set_variables: { type: "backend", render: AppliedNote },
+  propose_section_edit: { type: "backend", render: ProposalCard },
+  propose_sections: { type: "backend", render: ProposalCard },
 })
 const config = AuiConfig({ tools: Tools({ toolkit }) })
 

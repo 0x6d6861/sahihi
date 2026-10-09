@@ -20,6 +20,7 @@ describe("prisma enums match @sahihi/core", () => {
     ["RecipientDelivery", core.RECIPIENT_DELIVERIES, $Enums.RecipientDelivery],
     ["GeneratedDocumentStatus", core.GENERATED_DOCUMENT_STATUSES, $Enums.GeneratedDocumentStatus],
     ["GenerationActor", core.GENERATION_ACTORS, $Enums.GenerationActor],
+    ["ProposalStatus", core.PROPOSAL_STATUSES, $Enums.ProposalStatus],
   ]
   for (const [name, coreValues, prismaEnum] of pairs) {
     test(name, () => {

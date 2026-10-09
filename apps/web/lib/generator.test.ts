@@ -1,6 +1,16 @@
 import { describe, expect, test } from "bun:test"
 import type { AskQuestionsInput } from "@sahihi/core"
-import { answeredLines, answerValues, blankState, questionResult, roleIssues } from "./generator"
+import { findStarter, numberSections } from "@sahihi/core"
+import {
+  answeredLines,
+  answerValues,
+  blankState,
+  type ProposalView,
+  pendingSectionIds,
+  proposalTitle,
+  questionResult,
+  roleIssues,
+} from "./generator"
 
 const input: AskQuestionsInput = {
   questions: [
@@ -57,4 +67,40 @@ test("roleIssues keeps one role's problems", () => {
     { code: "unresolved_variable" as const, message: "c", variableKey: "term" },
   ]
   expect(roleIssues(issues, "party_a").map((i) => i.message)).toEqual(["a"])
+})
+
+describe("proposals", () => {
+  const view = (p: Partial<ProposalView>): ProposalView => ({
+    id: "p",
+    kind: "replace_section",
+    sectionId: "purpose",
+    status: "PENDING",
+    rationale: "",
+    before: "",
+    after: "",
+    createdAt: "",
+    ...p,
+  })
+  const content = findStarter("mutual-nda")?.build().content
+  if (!content) throw new Error("missing starter")
+  const numbers = numberSections(content)
+
+  test("titles name the section with its number", () => {
+    expect(proposalTitle(view({}), content, numbers)).toBe("Suggested edit to 2. Purpose")
+    expect(
+      proposalTitle(view({ kind: "delete_section", sectionId: "term" }), content, numbers),
+    ).toBe("Suggested removal of 7. Term")
+    expect(
+      proposalTitle(view({ kind: "insert_sections", sectionId: null }), content, numbers),
+    ).toBe("Suggested new section")
+  })
+
+  test("only pending suggestions mark a section", () => {
+    const ids = pendingSectionIds([
+      view({ sectionId: "purpose" }),
+      view({ sectionId: "term", status: "REJECTED" }),
+      view({ kind: "insert_sections", sectionId: null }),
+    ])
+    expect([...ids]).toEqual(["purpose"])
+  })
 })

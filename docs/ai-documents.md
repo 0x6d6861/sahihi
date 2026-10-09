@@ -7,9 +7,9 @@ flow takes over (Review & send → sign → certificate). See ADR 0042.
 
 What ships today (roadmap P6): one starter (Mutual NDA), the assistant's questions and blank
 filling, a rich-text editor for the wording (sections, blanks, lists, tables, bold, italic,
-underline), signer contacts, a PDF preview, finalise. Not yet: assistant edit proposals, the
-assistant defining signers or placing fields, more starters, saving a generated document as a
-template.
+underline), assistant edit proposals with a diff to accept or reject, signer contacts, a PDF
+preview, finalise. Not yet: the assistant defining signers or placing fields, more starters, saving
+a generated document as a template.
 
 ## Availability
 
@@ -70,6 +70,8 @@ Tools (schemas in `packages/core/src/generation/schemas.ts`):
 | Tool | Runs | Effect |
 |---|---|---|
 | `ask_questions` | Browser (human in the loop) | Up to 3 questions, each about one blank, with up to 4 generic options. The card saves the answers (`POST …/variables`, source `answer`; skipped = blank marked `skipped`), then returns them as the tool result and the assistant continues |
+| `propose_section_edit` | Server | Proposes replacing or deleting one section (see **Proposals**). Nothing changes until the person accepts |
+| `propose_sections` | Server | Proposes new sections after a given one (or at the start) |
 | `set_variables` | Server | Fills blanks with values the person typed in the chat. Each value must appear, word for word (case, spacing and edge punctuation aside), in something the person said or answered (`isValueAttested`); otherwise nothing changes, `variables.rejected` is recorded and the model is told to ask instead |
 
 ### Clarifying questions
@@ -79,6 +81,33 @@ into the blank they're about, skipped blanks stay visibly unresolved, and finali
 any blank the text uses is empty. The prompt adds: never invent names, amounts, dates, durations,
 legal terms or jurisdictions; ask with the tool, never in prose; options only for generic choices,
 never a person's details.
+
+## Proposals (ADR 0044)
+
+The assistant never edits the text itself. `propose_section_edit` (replace or delete a section) and
+`propose_sections` (insert sections) store a `GeneratedDocumentProposal` for the person, who accepts
+or rejects it from a card in the chat (`packages/core/src/generation/proposals.ts`).
+
+- **Format:** the assistant writes sections as paragraphs and lists of plain text, where `{{key}}` is
+  a blank, `**x**` bold and `*x*` italic (`draftSection`). New blanks are declared with the proposal
+  (`newBlanks`) and start unresolved.
+- **Refused before the person sees it** (`buildProposal`; the reason goes back to the model and
+  `proposal.refused` is recorded): an unknown section or blank, a new blank whose key exists, a
+  section holding signature blocks (signers are set elsewhere), and **specifics the person never
+  stated**: emails, phone numbers, amounts, dates, percentages and numeric durations
+  (`unattestedSpecifics`, the same evidence as `set_variables`). Names and jurisdictions can't be
+  recognised by pattern; the instructions and the person's review cover those.
+- **Accept** (`POST …/proposals/:pid/accept`): applies the change to the latest version as a new
+  version (actor AI, `proposal.accepted`), claiming the proposal in the same transaction, so it
+  applies once. If the section it changes was edited since the proposal was made, or a new blank's
+  key now exists, it's **out of date** (`STALE`, 409 `stale_proposal`); changes to blanks or other
+  sections don't count. **Reject** (`…/reject`) records `proposal.rejected`.
+- The detail returns the last 30 proposals with before and after text (blanks by label), pending
+  ones reported `STALE` as soon as their section moves on. The prompt lists the last 10 with their
+  outcome, so the assistant doesn't repeat a rejected change.
+- Web: the card shows the reason, a word diff (`diffWords`: removed struck through, added
+  highlighted), the status and Accept / Reject; a pending suggestion puts a "Suggested edit" badge
+  on its section in the editor, and an accepted one updates the editor.
 
 ## Editing (ADR 0043)
 

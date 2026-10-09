@@ -1,5 +1,6 @@
 import {
   ApiCreateFromDocumentSchema,
+  applyProposal,
   applyRoleContacts,
   applyVariableUpdates,
   CreateGeneratedDocumentSchema,
@@ -9,8 +10,12 @@ import {
   envelopeDraftFromGenerated,
   FinalizeGeneratedDocumentSchema,
   findStarter,
+  type GeneratedDocumentData,
   GeneratedDocumentDataSchema,
   generationPreflight,
+  isProposalStale,
+  ProposalPayloadSchema,
+  proposalTexts,
   sha256Hex,
   structureIssues,
   UpdateContentSchema,
@@ -35,7 +40,7 @@ import {
   loadGeneratedDocument,
   lockGeneratedDocument,
 } from "../lib/generated-documents"
-import { badRequest, clientMeta, conflict, forbidden, parseJson } from "../lib/http"
+import { badRequest, clientMeta, conflict, forbidden, notFound, parseJson } from "../lib/http"
 import { actor } from "../lib/permissions"
 import { queueThumbnail } from "../lib/thumbnails"
 import { rateLimit } from "../middleware/rate-limit"
@@ -179,6 +184,7 @@ export const generatedDocuments = new Hono<AppEnv>()
       version: { id: version.id, number: version.number, data: version.data },
       messages: doc.messages,
       issues: generationPreflight(version.data),
+      proposals: await proposalViews(doc.id, version.data),
     })
   })
 
@@ -325,6 +331,94 @@ export const generatedDocuments = new Hono<AppEnv>()
     return c.json({ version: next, issues: generationPreflight(next.data) })
   })
 
+  /**
+   * Apply an assistant proposal (docs/ai-documents.md → Proposals): a new version made on top of
+   * the latest one, unless the section it changes moved on since (then it's out of date, 409).
+   * Claiming the proposal and appending the version are one transaction, so it applies once.
+   */
+  .post("/:id/proposals/:pid/accept", async (c) => {
+    const { doc, version: latest } = await loadGeneratedDocument(
+      c.get("organizationId"),
+      c.req.param("id"),
+    )
+    assertCanEdit(c, doc)
+    const proposal = await loadProposal(doc.id, c.req.param("pid"))
+    if (proposal.status !== "PENDING")
+      conflict(`This suggestion was already ${proposal.status.toLowerCase()}`)
+    const payload = ProposalPayloadSchema.parse(proposal.payload)
+    const base = await prisma.generatedDocumentVersion.findUniqueOrThrow({
+      where: { id: proposal.baseVersionId },
+      select: { data: true },
+    })
+    const clash = payload.newVariables.some((v) =>
+      latest.data.variables.some((x) => x.key === v.key),
+    )
+    if (
+      clash ||
+      isProposalStale(payload.change, GeneratedDocumentDataSchema.parse(base.data), latest.data)
+    ) {
+      await prisma.generatedDocumentProposal.updateMany({
+        where: { id: proposal.id, status: "PENDING" },
+        data: { status: "STALE" },
+      })
+      throw new HTTPException(409, {
+        res: Response.json(
+          {
+            error: "stale_proposal",
+            message: "The document changed since this was suggested. Ask the assistant again.",
+          },
+          { status: 409 },
+        ),
+      })
+    }
+    const userId = c.get("user").id
+    const next = await appendVersionOrConflict({
+      generatedDocumentId: doc.id,
+      baseVersionId: latest.id,
+      data: applyProposal(latest.data, payload),
+      actor: "AI",
+      userId,
+      reason: "Accepted a suggested edit",
+      event: { type: "proposal.accepted", data: { proposalId: proposal.id } },
+      onAppended: async (tx, versionId) => {
+        const claimed = await tx.generatedDocumentProposal.updateMany({
+          where: { id: proposal.id, status: "PENDING" },
+          data: {
+            status: "ACCEPTED",
+            resultVersionId: versionId,
+            decidedById: userId,
+            decidedAt: new Date(),
+          },
+        })
+        if (claimed.count === 0) conflict("This suggestion was already decided")
+      },
+    })
+    return c.json({ version: next, issues: generationPreflight(next.data) })
+  })
+
+  .post("/:id/proposals/:pid/reject", async (c) => {
+    const { doc } = await loadGeneratedDocument(c.get("organizationId"), c.req.param("id"))
+    assertCanEdit(c, doc)
+    const proposal = await loadProposal(doc.id, c.req.param("pid"))
+    const userId = c.get("user").id
+    await prisma.$transaction(async (tx) => {
+      const decided = await tx.generatedDocumentProposal.updateMany({
+        where: { id: proposal.id, status: "PENDING" },
+        data: { status: "REJECTED", decidedById: userId, decidedAt: new Date() },
+      })
+      if (decided.count === 0)
+        conflict(`This suggestion was already ${proposal.status.toLowerCase()}`)
+      await appendEvent(tx, {
+        generatedDocumentId: doc.id,
+        type: "proposal.rejected",
+        actor: "USER",
+        actorUserId: userId,
+        data: { proposalId: proposal.id },
+      })
+    })
+    return c.body(null, 204)
+  })
+
   .put("/:id/roles", async (c) => {
     const input = await parseJson(c, UpdateRolesSchema)
     const { doc, version } = await loadGeneratedDocument(c.get("organizationId"), c.req.param("id"))
@@ -455,3 +549,42 @@ export const generatedDocuments = new Hono<AppEnv>()
     })
     return c.json({ envelopeId: envelope.id }, 201)
   })
+
+async function loadProposal(generatedDocumentId: string, id: string) {
+  const proposal = await prisma.generatedDocumentProposal.findFirst({
+    where: { id, generatedDocumentId },
+  })
+  if (!proposal) notFound("Suggestion")
+  return proposal
+}
+
+/**
+ * The last proposals for the page: before and after text against the version each was made on,
+ * and pending ones whose section has moved on reported as STALE.
+ */
+async function proposalViews(generatedDocumentId: string, latest: GeneratedDocumentData) {
+  const rows = await prisma.generatedDocumentProposal.findMany({
+    where: { generatedDocumentId },
+    orderBy: { createdAt: "desc" },
+    take: 30,
+  })
+  const bases = await prisma.generatedDocumentVersion.findMany({
+    where: { id: { in: [...new Set(rows.map((r) => r.baseVersionId))] } },
+    select: { id: true, data: true },
+  })
+  const baseData = new Map(bases.map((b) => [b.id, GeneratedDocumentDataSchema.parse(b.data)]))
+  return rows.map((r) => {
+    const payload = ProposalPayloadSchema.parse(r.payload)
+    const base = baseData.get(r.baseVersionId) ?? latest
+    const stale = r.status === "PENDING" && isProposalStale(payload.change, base, latest)
+    return {
+      id: r.id,
+      kind: payload.change.kind,
+      sectionId: r.sectionId,
+      status: stale ? "STALE" : r.status,
+      rationale: r.rationale,
+      ...proposalTexts(payload, base),
+      createdAt: r.createdAt,
+    }
+  })
+}

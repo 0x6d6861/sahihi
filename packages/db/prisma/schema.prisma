@@ -924,6 +924,13 @@ enum GenerationActor {
   AI
 }
 
+enum ProposalStatus {
+  PENDING // waiting for the person
+  ACCEPTED // applied as a new version
+  REJECTED
+  STALE // the section changed before it was accepted
+}
+
 /// A document drafted with the AI assistant. Its content lives in immutable versions; the latest
 /// version (highest `number`) is the current one.
 model GeneratedDocument {
@@ -947,8 +954,9 @@ model GeneratedDocument {
   createdAt          DateTime                @default(now())
   updatedAt          DateTime                @updatedAt
 
-  versions GeneratedDocumentVersion[]
-  events   GeneratedDocumentEvent[]
+  versions  GeneratedDocumentVersion[]
+  events    GeneratedDocumentEvent[]
+  proposals GeneratedDocumentProposal[]
 
   @@index([organizationId, createdAt])
   @@index([documentId])
@@ -989,4 +997,26 @@ model GeneratedDocumentEvent {
   occurredAt          DateTime          @default(now())
 
   @@index([generatedDocumentId, occurredAt])
+}
+
+/// An edit the assistant proposed (`ProposalPayload` from @sahihi/core); the person accepts or
+/// rejects it. Accepting appends a version. Proposals are never rewritten except for their status.
+model GeneratedDocumentProposal {
+  id                  String            @id @default(cuid())
+  generatedDocumentId String
+  generatedDocument   GeneratedDocument @relation(fields: [generatedDocumentId], references: [id], onDelete: Cascade)
+  /// The version the proposal was made on
+  baseVersionId       String
+  /// The section it replaces or deletes; null for inserted sections
+  sectionId           String?
+  payload             Json
+  rationale           String
+  status              ProposalStatus    @default(PENDING)
+  /// The version accepting it created
+  resultVersionId     String?
+  decidedById         String?
+  decidedAt           DateTime?
+  createdAt           DateTime          @default(now())
+
+  @@index([generatedDocumentId, createdAt])
 }

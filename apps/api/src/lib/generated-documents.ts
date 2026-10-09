@@ -97,6 +97,8 @@ export async function appendVersion(input: {
   userId: string
   reason: string
   event: { type: GenerationEventType; data?: Record<string, unknown> }
+  /** Runs in the same transaction once the version exists; throw to undo everything. */
+  onAppended?: (tx: Tx, versionId: string) => Promise<void>
 }): Promise<LoadedVersion> {
   const data = GeneratedDocumentDataSchema.parse(input.data)
   const issues = structureIssues(data)
@@ -129,6 +131,7 @@ export async function appendVersion(input: {
         where: { id: input.generatedDocumentId },
         data: { title: data.title },
       })
+      await input.onAppended?.(tx, row.id)
       return { id: row.id, number: row.number, data, createdAt: row.createdAt }
     })
   } catch (err) {

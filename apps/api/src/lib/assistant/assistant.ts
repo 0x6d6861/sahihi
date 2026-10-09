@@ -2,7 +2,12 @@ import {
   AskQuestionsInputSchema,
   AskQuestionsResultSchema,
   applyVariableUpdates,
+  buildProposal,
   isValueAttested,
+  type ProposeSectionEditInput,
+  ProposeSectionEditInputSchema,
+  type ProposeSectionsInput,
+  ProposeSectionsInputSchema,
   SetVariablesInputSchema,
 } from "@sahihi/core"
 import { prisma } from "@sahihi/db"
@@ -111,7 +116,82 @@ function tools(ctx: { generatedDocumentId: string; userId: string; statements: s
         return { ok: true, applied: values.map((v) => v.key) }
       },
     },
+    propose_section_edit: {
+      description:
+        "Propose replacing or deleting one section. The person sees a diff and accepts or rejects it; nothing changes until they accept.",
+      inputSchema: ProposeSectionEditInputSchema,
+      execute: (input: ProposeSectionEditInput) =>
+        propose(ctx, { tool: "propose_section_edit", ...input }),
+    },
+    propose_sections: {
+      description:
+        "Propose new sections after a given section (null = at the start). The person accepts or rejects them.",
+      inputSchema: ProposeSectionsInputSchema,
+      execute: (input: ProposeSectionsInput) =>
+        propose(ctx, { tool: "propose_sections", ...input }),
+    },
   } satisfies ToolSet
+}
+
+/**
+ * Checks a proposal against the latest version and stores it for the person to review. Refusals
+ * (invented specifics, unknown blanks, signature sections) go back to the model as the tool result.
+ */
+async function propose(
+  ctx: { generatedDocumentId: string; userId: string; statements: string[] },
+  input: Parameters<typeof buildProposal>[0],
+) {
+  const doc = await prisma.generatedDocument.findUnique({
+    where: { id: ctx.generatedDocumentId },
+    select: { status: true },
+  })
+  if (doc?.status !== "DRAFT") return { ok: false, error: "The document is finalised." }
+  const base = await latestVersion(prisma, ctx.generatedDocumentId)
+  const result = buildProposal(
+    input,
+    base.data,
+    ctx.statements,
+    () => `s_${crypto.randomUUID().slice(0, 8)}`,
+  )
+  if (!result.ok) {
+    await prisma.$transaction((tx) =>
+      appendEvent(tx, {
+        generatedDocumentId: ctx.generatedDocumentId,
+        type: "proposal.refused",
+        actor: "AI",
+        actorUserId: ctx.userId,
+        versionId: base.id,
+        data: { tool: input.tool },
+      }),
+    )
+    return { ok: false, error: result.error }
+  }
+  const proposal = await prisma.$transaction(async (tx) => {
+    const created = await tx.generatedDocumentProposal.create({
+      data: {
+        generatedDocumentId: ctx.generatedDocumentId,
+        baseVersionId: base.id,
+        sectionId: result.sectionId,
+        payload: result.payload as unknown as object,
+        rationale: input.rationale,
+      },
+    })
+    await appendEvent(tx, {
+      generatedDocumentId: ctx.generatedDocumentId,
+      type: "proposal.created",
+      actor: "AI",
+      actorUserId: ctx.userId,
+      versionId: base.id,
+      data: { proposalId: created.id, sectionId: result.sectionId },
+    })
+    return created
+  })
+  return {
+    ok: true,
+    proposalId: proposal.id,
+    status: "pending",
+    note: "Shown to the person as a suggested edit; it applies only if they accept it.",
+  }
 }
 
 export async function streamAssistantReply(input: {
@@ -130,6 +210,12 @@ export async function streamAssistantReply(input: {
   const ctx = { ...input, statements: userStatements(messages) }
   const toolSet = tools(ctx)
   const version = await latestVersion(prisma, input.generatedDocumentId)
+  const proposals = await prisma.generatedDocumentProposal.findMany({
+    where: { generatedDocumentId: input.generatedDocumentId },
+    orderBy: { createdAt: "desc" },
+    take: 10,
+    select: { id: true, sectionId: true, status: true, rationale: true },
+  })
 
   const result = streamText({
     model: assistantModel(),
@@ -137,6 +223,7 @@ export async function streamAssistantReply(input: {
       data: version.data,
       versionId: version.id,
       selectedSectionId: input.selectedSectionId,
+      proposals,
       organizationName: input.organizationName,
       today: new Date().toISOString().slice(0, 10),
     }),

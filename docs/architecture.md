@@ -122,6 +122,7 @@ Error body shape: `{ error: string, message?: string, issues?: {path, message}[]
 | GET/POST | `/api/generated-documents` · `/:id` · `/:id/preview` | org + assistant | List / start from a starter / detail / PDF preview (docs/ai-documents.md) |
 | POST | `/api/generated-documents/:id/chat` | org + assistant | One assistant turn (UI message stream) |
 | POST/PUT | `/api/generated-documents/:id/variables` · `/:id/roles` · `/:id/content` | org + assistant | Fill blanks, set signers, save edited text (new version each) |
+| POST | `/api/generated-documents/:id/proposals/:pid/accept` · `/reject` | org + assistant | Apply (new version) or reject an assistant proposal |
 | POST | `/api/generated-documents/:id/finalize` | org + assistant | READY document + DRAFT envelope |
 | * | `/api/v1/*` | API key + scope | Public API, see docs/public-api.md |
 

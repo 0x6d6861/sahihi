@@ -230,6 +230,12 @@ export const GENERATION_EVENT_TYPES = [
   "roles.updated",
   /** The person edited the text in the editor (and maybe added blanks). */
   "content.updated",
+  /** The assistant proposed an edit; the person accepted or rejected it. */
+  "proposal.created",
+  "proposal.accepted",
+  "proposal.rejected",
+  /** A proposal was refused before reaching the person (invented specifics, unknown blank…). */
+  "proposal.refused",
   /** One assistant reply: model and token usage, never the prompt or the text. */
   "assistant.turn",
   "document.finalized",
