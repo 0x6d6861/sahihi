@@ -515,6 +515,9 @@ model Field {
   height             Float
   required           Boolean          @default(true)
   label              String?
+  /// Placed by finalising an AI-generated document, on the line its PDF prints: can't be moved,
+  /// changed or removed in the envelope editor (docs/ai-documents.md → Finalise)
+  locked             Boolean          @default(false)
   // ── completion ──
   value              String?
   /// S3 key of the PNG for SIGNATURE / INITIALS fields
@@ -956,6 +959,10 @@ model GeneratedDocument {
   /// The workspace template it started from, if any (lineage only: the data was copied)
   templateId         String?
   template           GenerationTemplate?     @relation("StartedFromTemplate", fields: [templateId], references: [id], onDelete: SetNull)
+  /// The finalised document this one is a new version of (lineage only: the data was copied)
+  previousId         String?
+  previous           GeneratedDocument?      @relation("NewVersions", fields: [previousId], references: [id], onDelete: SetNull)
+  newVersions        GeneratedDocument[]     @relation("NewVersions")
   createdAt          DateTime                @default(now())
   updatedAt          DateTime                @updatedAt
 
@@ -968,6 +975,7 @@ model GeneratedDocument {
   @@index([documentId])
   @@index([envelopeId])
   @@index([templateId])
+  @@index([previousId])
 }
 
 /// A generated document saved to start others from (docs/ai-documents.md → Templates): its

@@ -216,11 +216,34 @@ validates with `DocContentSchema` before anything is saved.
    rendered. A thumbnail is queued as for any upload.
 4. `createEnvelopeFromDocument` creates the DRAFT envelope (audit `envelope.created`): roles become
    recipients in order, rendered fields become `Field`s.
-5. `document.finalized` is recorded. The web opens the envelope's draft editor.
+5. Those fields are marked `locked` and `document.finalized` is recorded. The web opens the
+   envelope's draft editor.
+
+**Locked fields (ADR 0047).** A finalised document's fields sit on the lines its PDF prints, so the
+envelope editor can't move, resize, change or delete them (a lock icon; selecting one explains
+why). More fields can be added around them. The API holds the line too, with 409 `locked_fields`:
+- `PUT /envelopes/:id/fields` replaces only unlocked fields; locked ones aren't in the payload and
+  stay (one sent back unchanged isn't added twice);
+- `PUT /envelopes/:id/recipients` refuses to remove a recipient who owns locked fields or make them
+  a viewer (names and emails can change);
+- removing the document from the envelope or swapping it ("Prepare document") is refused.
+
+To change the text, signers or fields, start a new version (below).
 
 Resumable: if step 4 fails, calling again re-renders the same version (deterministic, so the fields
 match the stored PDF) and creates only the envelope. A finalised document is locked; its PDF is a
 first-class document (files list, templates, other envelopes).
+
+## New versions (ADR 0047)
+
+A finalised document doesn't change. **Start a new version** (`POST /generated-documents/:id/new-version`,
+its creator, an admin or the owner) creates a new DRAFT with the finalised version's text, answers
+and signers, `previousId` pointing back, and an empty conversation. It's finalised like any draft,
+into a new PDF and a new envelope. The finalised document, its PDF and its envelope stay as they
+are: the dialog says to void the old envelope, or delete it if it's still a draft. One new version
+per document: asking again returns it (`newVersionId` in `GET /:id`, shown as "Open new version").
+Events: `document.new_version` on the old document, `document.created` with `previousId` on the
+new one.
 
 ## Rendering (`packages/pdf/src/compose/document.ts`, ADR 0042)
 
@@ -265,6 +288,8 @@ ADR 0009).
   the fields. A suggested set of signers shows as a line-by-line diff in its card.
 - **Preview** tab: the rendered PDF.
 - Finalise: an Arc dialog with the required "I've read the whole document" confirmation.
+- Finalised: "Start a new version" (or "Open new version") and "Open envelope" in the top bar; a
+  new version links back with "Replaces a finalised version".
 - Save as template: an Arc dialog from the top bar with the name, a description, and a tick box
   per filled answer and per signer contact to keep (all off by default). It confirms in place
   with a link to `/generate`.

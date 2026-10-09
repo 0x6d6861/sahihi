@@ -244,6 +244,8 @@ export const GENERATION_EVENT_TYPES = [
   /** One assistant reply: model and token usage, never the prompt or the text. */
   "assistant.turn",
   "document.finalized",
+  /** A new DRAFT was started from this finalised document (its id in the data). */
+  "document.new_version",
   /** Saved as a workspace template: its id and which values and contacts were kept (keys only). */
   "template.saved",
 ] as const

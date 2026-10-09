@@ -331,6 +331,10 @@ const TENANT: Record<string, Case> = {
     path: `/api/generated-documents/${ids.generatedDocument}/template`,
     init: { method: "POST", json: { versionId: ids.generatedVersion, name: "Stolen" } },
   }),
+  "POST /api/generated-documents/:id/new-version": () => ({
+    path: `/api/generated-documents/${ids.generatedDocument}/new-version`,
+    init: { method: "POST" },
+  }),
   "DELETE /api/generated-documents/templates/:templateId": () => ({
     path: `/api/generated-documents/templates/${ids.generationTemplate}`,
     init: { method: "DELETE" },

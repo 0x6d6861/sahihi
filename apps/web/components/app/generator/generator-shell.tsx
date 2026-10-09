@@ -16,6 +16,7 @@ import { ChatPanel } from "./chat-panel"
 import { DocumentEditor } from "./editor/document-editor"
 import { FinalizeDialog } from "./finalize-dialog"
 import { GeneratorProvider, useGenerator } from "./generator-context"
+import { NewVersionAction } from "./new-version"
 import { SaveTemplateDialog } from "./save-template-dialog"
 import { SignersPanel } from "./signers-panel"
 
@@ -65,11 +66,20 @@ function Frame() {
               {finalized ? "Finalised" : `Draft · version ${detail.version.number}`}
             </Badge>
           </span>
+          {detail.document.previousId && (
+            <Link
+              href={`/generate/${encodeURIComponent(detail.document.previousId)}`}
+              className="shrink-0 text-muted-foreground text-sm underline-offset-4 hover:text-foreground hover:underline max-sm:hidden"
+            >
+              Replaces a finalised version
+            </Link>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Button variant="secondary" onClick={() => setTemplateOpen(true)}>
             Save as template
           </Button>
+          {finalized && <NewVersionAction />}
           {finalized && detail.document.envelopeId ? (
             <ButtonLink variant="primary" href={`/envelopes/${detail.document.envelopeId}`}>
               Open envelope

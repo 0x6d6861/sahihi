@@ -22,3 +22,11 @@ export class EnvelopeError extends Error {
 export const notFound = (what: string): never => {
   throw new EnvelopeError(404, "not_found", `${what} not found`)
 }
+
+/**
+ * A change that would move or remove fields placed by finalising an AI-generated document: they
+ * sit on the lines its PDF prints (docs/ai-documents.md → Finalise).
+ */
+export const lockedFields = (message: string): never => {
+  throw new EnvelopeError(409, "locked_fields", message)
+}

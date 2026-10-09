@@ -251,6 +251,9 @@ export const generatedDocuments = new Hono<AppEnv>()
         envelopeId: doc.envelopeId,
         documentId: doc.documentId,
         canEdit: canEditGeneratedDocument(actor(c), doc),
+        // Lineage (docs/ai-documents.md → New versions)
+        previousId: doc.previousId,
+        newVersionId: await newVersionOf(doc.id),
       },
       version: { id: version.id, number: version.number, data: version.data },
       messages: doc.messages,
@@ -574,6 +577,75 @@ export const generatedDocuments = new Hono<AppEnv>()
     return c.json({ id: template.id }, 201)
   })
 
+  /**
+   * Start a new version of a finalised document: a new DRAFT with the finalised text, blanks and
+   * signers, to change and finalise again. The finalised document, its PDF and its envelope stay as
+   * they are. One new version per document: asking again returns it.
+   */
+  .post("/:id/new-version", async (c) => {
+    const { doc } = await loadGeneratedDocument(c.get("organizationId"), c.req.param("id"))
+    if (!canEditGeneratedDocument(actor(c), doc)) {
+      forbidden("Only its creator, an admin or the owner can start a new version")
+    }
+    if (doc.status !== "FINALIZED" || !doc.finalizedVersionId) {
+      conflict("This document isn't finalised yet: change it directly")
+    }
+    const existing = await newVersionOf(doc.id)
+    if (existing) return c.json({ id: existing })
+    const finalized = await prisma.generatedDocumentVersion.findUniqueOrThrow({
+      where: { id: doc.finalizedVersionId as string },
+    })
+    const data = GeneratedDocumentDataSchema.parse(finalized.data)
+    const userId = c.get("user").id
+    const created = await prisma.$transaction(async (tx) => {
+      // Serialises concurrent requests, so a document gets one new version.
+      await lockGeneratedDocument(tx, doc.id)
+      const raced = await tx.generatedDocument.findFirst({
+        where: { previousId: doc.id },
+        select: { id: true },
+      })
+      if (raced) return { id: raced.id, existing: true }
+      const next = await tx.generatedDocument.create({
+        data: {
+          organizationId: doc.organizationId,
+          createdById: userId,
+          title: data.title,
+          starter: doc.starter,
+          templateId: doc.templateId,
+          previousId: doc.id,
+          versions: {
+            create: {
+              number: 1,
+              data: data as unknown as object,
+              actor: "USER",
+              createdById: userId,
+              reason: "New version of a finalised document",
+            },
+          },
+        },
+        include: { versions: { select: { id: true } } },
+      })
+      await appendEvent(tx, {
+        generatedDocumentId: next.id,
+        type: "document.created",
+        actor: "USER",
+        actorUserId: userId,
+        versionId: next.versions[0]?.id,
+        data: { starter: doc.starter, previousId: doc.id },
+      })
+      await appendEvent(tx, {
+        generatedDocumentId: doc.id,
+        type: "document.new_version",
+        actor: "USER",
+        actorUserId: userId,
+        versionId: finalized.id,
+        data: { generatedDocumentId: next.id },
+      })
+      return { id: next.id, existing: false }
+    })
+    return c.json({ id: created.id }, created.existing ? 200 : 201)
+  })
+
   .post("/:id/finalize", async (c) => {
     const input = await parseJson(c, FinalizeGeneratedDocumentSchema)
     const orgId = c.get("organizationId")
@@ -665,6 +737,8 @@ export const generatedDocuments = new Hono<AppEnv>()
         where: { id: doc.id },
         data: { envelopeId: envelope.id },
       })
+      // They sit on the lines the PDF prints: the envelope editor can't move or remove them.
+      await tx.field.updateMany({ where: { envelopeId: envelope.id }, data: { locked: true } })
       await appendEvent(tx, {
         generatedDocumentId: doc.id,
         type: "document.finalized",
@@ -676,6 +750,16 @@ export const generatedDocuments = new Hono<AppEnv>()
     })
     return c.json({ envelopeId: envelope.id }, 201)
   })
+
+/** The new version started from a finalised document, if any (the latest). */
+async function newVersionOf(id: string): Promise<string | null> {
+  const next = await prisma.generatedDocument.findFirst({
+    where: { previousId: id },
+    orderBy: { createdAt: "desc" },
+    select: { id: true },
+  })
+  return next?.id ?? null
+}
 
 async function loadProposal(generatedDocumentId: string, id: string) {
   const proposal = await prisma.generatedDocumentProposal.findFirst({

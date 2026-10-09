@@ -22,6 +22,11 @@ export interface EditorField extends NormalizedRect {
   page: number
   required: boolean
   label?: string
+  /**
+   * Placed by finalising an AI-generated document, on a line its PDF prints: it can be selected
+   * but not moved, resized, changed or deleted, and isn't sent on save (the API keeps it).
+   */
+  locked?: boolean
 }
 
 export interface EditorState {
@@ -74,7 +79,7 @@ const changed = (s: EditorState, fields: EditorField[], selected = s.selected): 
 })
 
 const mapField = (s: EditorState, key: string, fn: (f: EditorField) => EditorField) =>
-  s.fields.some((f) => f.key === key)
+  s.fields.some((f) => f.key === key && !f.locked)
     ? changed(
         s,
         s.fields.map((f) => (f.key === key ? fn(f) : f)),
@@ -114,7 +119,7 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
     case "update":
       return mapField(s, a.key, (f) => ({ ...f, ...a.patch }))
     case "delete":
-      if (!s.fields.some((f) => f.key === a.key)) return s
+      if (!s.fields.some((f) => f.key === a.key && !f.locked)) return s
       return changed(
         s,
         s.fields.filter((f) => f.key !== a.key),
@@ -133,8 +138,9 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
     }
     case "syncRecipients": {
       // Recipients were removed or turned into viewers: their fields go too (the API does the same).
+      // Locked fields stay: the API refuses to remove their recipients.
       const allowed = new Set(a.allowed)
-      const kept = s.fields.filter((f) => allowed.has(f.recipientId))
+      const kept = s.fields.filter((f) => f.locked || allowed.has(f.recipientId))
       if (kept.length === s.fields.length) return s
       const selected = kept.some((f) => f.key === s.selected) ? s.selected : null
       return changed(s, kept, selected)
@@ -151,6 +157,7 @@ export function fieldsFromSaved(
     page: number
     required: boolean
     label?: string | null
+    locked?: boolean
   })[],
 ): EditorField[] {
   return saved.map((f) => ({
@@ -165,24 +172,27 @@ export function fieldsFromSaved(
     width: f.width,
     height: f.height,
     ...(f.label ? { label: f.label } : {}),
+    ...(f.locked ? { locked: true } : {}),
   }))
 }
 
-/** Body for `PUT /envelopes/:id/fields`. */
+/** Body for `PUT /envelopes/:id/fields`. Locked fields are left out: the API keeps them. */
 export function toFieldsPayload(fields: EditorField[]): { fields: FieldInput[] } {
   return {
-    fields: fields.map((f) => ({
-      recipientId: f.recipientId,
-      envelopeDocumentId: f.envelopeDocumentId,
-      type: f.type,
-      page: f.page,
-      required: f.required,
-      x: f.x,
-      y: f.y,
-      width: f.width,
-      height: f.height,
-      ...(f.label?.trim() ? { label: f.label.trim() } : {}),
-    })),
+    fields: fields
+      .filter((f) => !f.locked)
+      .map((f) => ({
+        recipientId: f.recipientId,
+        envelopeDocumentId: f.envelopeDocumentId,
+        type: f.type,
+        page: f.page,
+        required: f.required,
+        x: f.x,
+        y: f.y,
+        width: f.width,
+        height: f.height,
+        ...(f.label?.trim() ? { label: f.label.trim() } : {}),
+      })),
   }
 }
 

@@ -35,6 +35,8 @@ export interface EnvelopeDetail {
     page: number
     required: boolean
     label: string | null
+    /** Placed by finalising an AI-generated document: fixed in the editor. */
+    locked: boolean
   })[]
   completedAt: string | null
   /** Files and personal data deleted (docs/data-retention.md) */

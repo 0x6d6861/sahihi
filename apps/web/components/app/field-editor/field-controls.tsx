@@ -102,7 +102,22 @@ export function FieldSettingsForm({
   field: EditorField
   recipients: EditorRecipient[]
 }) {
-  const { dispatch } = useFieldEditor()
+  const { dispatch, recipients: byId } = useFieldEditor()
+  if (field.locked) {
+    return (
+      <div className="flex flex-col gap-2 text-sm">
+        <p>
+          {field.label || FIELD_LABELS[field.type]} for{" "}
+          {byId.get(field.recipientId)?.name ?? "a recipient"}
+          {field.required ? ", required" : ""}.
+        </p>
+        <p className="text-muted-foreground">
+          Placed from the AI draft, on the line the document prints, so it can't move or change
+          here. To change it, start a new version of the draft.
+        </p>
+      </div>
+    )
+  }
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">

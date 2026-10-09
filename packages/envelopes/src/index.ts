@@ -6,7 +6,7 @@ export {
   type ReadyDocument,
 } from "./documents"
 export { createEmbeddedSigningLink } from "./embedded"
-export { EnvelopeError, notFound } from "./errors"
+export { EnvelopeError, lockedFields, notFound } from "./errors"
 export { createEnvelopeFromDocument } from "./from-document"
 export { createEnvelopeFromTemplate } from "./from-template"
 export { assertEnvelopeQuota } from "./quota"

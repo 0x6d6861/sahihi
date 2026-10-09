@@ -1056,3 +1056,184 @@ describe("templates", () => {
     expect(list.items).toEqual([])
   })
 })
+
+describe("locked fields in the envelope", () => {
+  beforeEach(() => enableAssistant(alice))
+
+  async function finalized() {
+    const id = await createNda(alice)
+    const versionId = await fillEverything(alice, id)
+    const res = await request(alice, `/api/generated-documents/${id}/finalize`, {
+      method: "POST",
+      json: { versionId, acknowledged: true },
+    })
+    const { envelopeId } = await json<{ envelopeId: string }>(res)
+    const envelope = await prisma.envelope.findUniqueOrThrow({
+      where: { id: envelopeId },
+      include: { recipients: { orderBy: { colorIndex: "asc" } }, fields: true, documents: true },
+    })
+    return { id, envelope }
+  }
+
+  test("finalising locks every field; the editor's saves keep them and add others", async () => {
+    const { envelope } = await finalized()
+    expect(envelope.fields.length).toBeGreaterThan(0)
+    expect(envelope.fields.every((f) => f.locked)).toBe(true)
+    const signer = envelope.recipients[0]
+    const doc = envelope.documents[0]
+    if (!signer || !doc) throw new Error("fixture")
+
+    // A save without them (what the editor sends) leaves them; a new field is added unlocked.
+    const extra = {
+      recipientId: signer.id,
+      envelopeDocumentId: doc.id,
+      type: "TEXT",
+      page: 1,
+      x: 0.1,
+      y: 0.1,
+      width: 0.2,
+      height: 0.03,
+      required: false,
+      label: "Reference",
+    }
+    const saved = await request(alice, `/api/envelopes/${envelope.id}/fields`, {
+      method: "PUT",
+      json: { fields: [extra] },
+    })
+    expect(saved.status).toBe(200)
+    // Sending a locked field back unchanged doesn't duplicate it.
+    const lockedOne = envelope.fields[0]
+    if (!lockedOne) throw new Error("fixture")
+    const again = await request(alice, `/api/envelopes/${envelope.id}/fields`, {
+      method: "PUT",
+      json: {
+        fields: [
+          extra,
+          {
+            recipientId: lockedOne.recipientId,
+            envelopeDocumentId: lockedOne.envelopeDocumentId,
+            type: lockedOne.type,
+            page: lockedOne.page,
+            x: lockedOne.x,
+            y: lockedOne.y,
+            width: lockedOne.width,
+            height: lockedOne.height,
+            required: lockedOne.required,
+          },
+        ],
+      },
+    })
+    expect(again.status).toBe(200)
+    const after = await prisma.field.findMany({ where: { envelopeId: envelope.id } })
+    expect(
+      after
+        .filter((f) => f.locked)
+        .map((f) => f.id)
+        .sort(),
+    ).toEqual(envelope.fields.map((f) => f.id).sort())
+    expect(after.filter((f) => !f.locked).map((f) => f.label)).toEqual(["Reference"])
+
+    // Cleared by a save of nothing, the unlocked one goes and the locked ones stay.
+    await request(alice, `/api/envelopes/${envelope.id}/fields`, {
+      method: "PUT",
+      json: { fields: [] },
+    })
+    expect(await prisma.field.count({ where: { envelopeId: envelope.id } })).toBe(
+      envelope.fields.length,
+    )
+  })
+
+  test("its signers can't be removed or made viewers; contacts can change", async () => {
+    const { envelope } = await finalized()
+    const people = envelope.recipients.map((r) => ({
+      id: r.id,
+      name: r.name,
+      email: r.email,
+      role: r.role,
+    }))
+    const put = (recipients: unknown[]) =>
+      request(alice, `/api/envelopes/${envelope.id}/recipients`, {
+        method: "PUT",
+        json: { recipients },
+      })
+    const removed = await put(people.slice(1))
+    expect(removed.status).toBe(409)
+    expect((await json<{ error: string }>(removed)).error).toBe("locked_fields")
+    expect((await put(people.map((p, i) => (i === 0 ? { ...p, role: "VIEWER" } : p)))).status).toBe(
+      409,
+    )
+    const renamed = await put(
+      people.map((p, i) => (i === 0 ? { ...p, email: "amina@acme.example" } : p)),
+    )
+    expect(renamed.status).toBe(200)
+    expect(await prisma.field.count({ where: { envelopeId: envelope.id, locked: true } })).toBe(
+      envelope.fields.length,
+    )
+  })
+
+  test("its document can't be swapped for another", async () => {
+    const { envelope } = await finalized()
+    const res = await request(alice, `/api/envelopes/${envelope.id}/document`, {
+      method: "PUT",
+      json: { documentId: "another", envelopeDocumentId: envelope.documents[0]?.id },
+    })
+    expect(res.status).toBe(409)
+    expect((await json<{ error: string }>(res)).error).toBe("locked_fields")
+  })
+})
+
+describe("new versions", () => {
+  beforeEach(() => enableAssistant(alice))
+
+  test("a finalised document starts one new draft with its text, blanks and signers", async () => {
+    const id = await createNda(alice)
+    expect(
+      (await request(alice, `/api/generated-documents/${id}/new-version`, { method: "POST" }))
+        .status,
+    ).toBe(409)
+    const versionId = await fillEverything(alice, id)
+    const fin = await request(alice, `/api/generated-documents/${id}/finalize`, {
+      method: "POST",
+      json: { versionId, acknowledged: true },
+    })
+    const { envelopeId } = await json<{ envelopeId: string }>(fin)
+
+    const bob = await joinOrganization(alice, "bob", "member")
+    expect(
+      (await request(bob, `/api/generated-documents/${id}/new-version`, { method: "POST" })).status,
+    ).toBe(403)
+
+    const res = await request(alice, `/api/generated-documents/${id}/new-version`, {
+      method: "POST",
+    })
+    expect(res.status).toBe(201)
+    const { id: nextId } = await json<{ id: string }>(res)
+    const finalized = await detail(alice, id)
+    const next = await json<Detail & { document: { previousId: string | null } }>(
+      await request(alice, `/api/generated-documents/${nextId}`),
+    )
+    expect(next.document.status).toBe("DRAFT")
+    expect(next.document.previousId).toBe(id)
+    expect(next.version.data).toEqual(finalized.version.data)
+    expect(next.issues).toEqual([])
+    expect(
+      (finalized as unknown as { document: { newVersionId: string } }).document.newVersionId,
+    ).toBe(nextId)
+
+    // Asking again returns the same one; the finalised document and envelope are untouched.
+    const again = await request(alice, `/api/generated-documents/${id}/new-version`, {
+      method: "POST",
+    })
+    expect(again.status).toBe(200)
+    expect((await json<{ id: string }>(again)).id).toBe(nextId)
+    expect(await prisma.generatedDocument.findUniqueOrThrow({ where: { id } })).toMatchObject({
+      status: "FINALIZED",
+      envelopeId,
+    })
+    expect(
+      await prisma.generatedDocumentEvent.count({
+        where: { generatedDocumentId: id, type: "document.new_version" },
+      }),
+    ).toBe(1)
+  })
+})

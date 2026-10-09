@@ -22,6 +22,10 @@ export interface GeneratorDetail {
     envelopeId: string | null
     documentId: string | null
     canEdit: boolean
+    /** The finalised document this draft is a new version of. */
+    previousId: string | null
+    /** The new version started from this finalised document, if any. */
+    newVersionId: string | null
   }
   version: { id: string; number: number; data: GeneratedDocumentData }
   messages: unknown[]

@@ -13,6 +13,7 @@ import {
   uprightContentStyle,
 } from "@/lib/field-geometry"
 import { cn } from "@/lib/utils"
+import { LockIcon } from "../icons"
 import { useFieldEditor } from "./context"
 
 type Drag =
@@ -171,7 +172,7 @@ export function FieldLayer({ pageNumber }: { pageNumber: number }) {
       {fields.map((f) => {
         const r = recipients.get(f.recipientId)
         const selected = state.selected === f.key
-        const label = `${FIELD_LABELS[f.type]}${r ? ` for ${r.name}` : ""}`
+        const label = `${FIELD_LABELS[f.type]}${r ? ` for ${r.name}` : ""}${f.locked ? " (locked)" : ""}`
         return (
           <button
             type="button"
@@ -183,7 +184,8 @@ export function FieldLayer({ pageNumber }: { pageNumber: number }) {
             onKeyDown={onKeyDown}
             style={{ ...rectStyle(displayedToLocalRect(f, rot)), containerType: "size" }}
             className={cn(
-              "enter-pop pointer-events-auto absolute cursor-move overflow-hidden rounded-sm border-2 text-left outline-none",
+              "enter-pop pointer-events-auto absolute overflow-hidden rounded-sm border-2 text-left outline-none",
+              f.locked ? "cursor-default" : "cursor-move",
               RECIPIENT_COLORS[(r?.colorIndex ?? 0) % RECIPIENT_COLORS.length],
               selected && "ring-2 ring-ring ring-offset-1",
             )}
@@ -193,11 +195,14 @@ export function FieldLayer({ pageNumber }: { pageNumber: number }) {
               style={uprightContentStyle(rot)}
               className="flex items-center justify-center px-1"
             >
-              <span className={cn("pointer-events-none", FIELD_LABEL_CLASS)}>
+              <span
+                className={cn("pointer-events-none flex items-center gap-0.5", FIELD_LABEL_CLASS)}
+              >
+                {f.locked && <LockIcon aria-hidden className="size-[1em] shrink-0" />}
                 {f.label || FIELD_LABELS[f.type]}
                 {f.required ? " *" : ""}
               </span>
-              {selected && (
+              {selected && !f.locked && (
                 <span
                   data-handle="resize"
                   aria-hidden
