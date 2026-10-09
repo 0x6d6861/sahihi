@@ -94,16 +94,17 @@ export function VerifyChecker() {
 
       {result.state === "no_match" && (
         <Alert tone="warning" title={`No match for ${result.name}`}>
-          <div className="flex flex-col gap-2">
-            <p>
+          {/* Spans: the Alert body is a <p>. */}
+          <span className="flex flex-col gap-2">
+            <span>
               This exact file wasn't signed or certified with Sahihi. If it came from Sahihi, it has
               been changed since signing: even re-saving or printing to PDF creates a new file.
               Download the original from your completion email and check that one.
-            </p>
-            <p className="font-mono text-xs" title={`SHA-256 ${result.sha256}`}>
+            </span>
+            <span className="font-mono text-xs" title={`SHA-256 ${result.sha256}`}>
               SHA-256 {shortHash(result.sha256)}
-            </p>
-          </div>
+            </span>
+          </span>
         </Alert>
       )}
       {result.state === "error" && <Alert tone="danger" title={result.message} />}

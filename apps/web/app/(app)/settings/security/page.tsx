@@ -1,7 +1,7 @@
 import { getAuthenticatorName } from "@better-auth/passkey"
 import { redirect } from "next/navigation"
 import { ChangePasswordForm } from "@/components/app/account/change-password-form"
-import { DeleteAccount } from "@/components/app/account/delete-account"
+import { DeleteAccount, type DeletionBlocker } from "@/components/app/account/delete-account"
 import { type PasskeyRow, PasskeySettings } from "@/components/app/account/passkey-settings"
 import { type SessionRow, SessionsList } from "@/components/app/account/sessions-list"
 import { TwoFactorSettings } from "@/components/app/account/two-factor-settings"
@@ -32,7 +32,7 @@ export default async function SecurityPage() {
     getServerSession(),
     apiServer<SessionRow[]>("/auth/list-sessions"),
     apiServer<StoredPasskey[]>("/auth/passkey/list-user-passkeys"),
-    apiServer<{ blockers: { id: string; name: string }[] }>("/me/deletion"),
+    apiServer<{ blockers: DeletionBlocker[] }>("/me/deletion"),
   ])
   if (!session) redirect("/sign-in")
 

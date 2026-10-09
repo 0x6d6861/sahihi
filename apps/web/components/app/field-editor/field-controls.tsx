@@ -109,6 +109,7 @@ export function FieldSettingsForm({
         <Label>Recipient</Label>
         <RecipientSelect
           className="w-full"
+          size="default"
           recipients={recipients}
           value={field.recipientId}
           onChange={(recipientId) =>

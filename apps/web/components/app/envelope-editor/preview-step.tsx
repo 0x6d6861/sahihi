@@ -6,14 +6,16 @@ import { DocumentSwitcher } from "@/components/app/envelope/document-switcher"
 import type { EditorRecipient } from "@/components/app/field-editor/context"
 import { RecipientDot } from "@/components/app/field-editor/field-controls"
 import {
+  EDITOR_ZOOM,
   type EditorDocument,
+  PdfFrame,
   VIEW_ONLY_FEATURES,
 } from "@/components/app/field-editor/field-editor-surface"
 import { toastManager } from "@/components/app/toast"
 import type { PDFEditorPageOverlayProps } from "@/components/extend/pdf-editor"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
-import { FIELD_LABELS, RECIPIENT_COLORS } from "@/lib/constants"
+import { FIELD_LABEL_CLASS, FIELD_LABELS, RECIPIENT_COLORS } from "@/lib/constants"
 import { fieldSummary } from "@/lib/envelope-editor"
 import type { EditorField } from "@/lib/field-editor"
 import {
@@ -61,8 +63,11 @@ function PreviewLayer({ page }: { page: number }) {
                 RECIPIENT_COLORS[(r?.colorIndex ?? 0) % RECIPIENT_COLORS.length],
               )}
             >
-              <span style={uprightContentStyle(rot)} className="flex items-center px-1">
-                <span className="truncate font-medium text-[10px] leading-none">
+              <span
+                style={uprightContentStyle(rot)}
+                className="flex items-center justify-center px-1"
+              >
+                <span className={FIELD_LABEL_CLASS}>
                   {f.label || FIELD_LABELS[f.type]}
                   {f.required ? " *" : ""}
                 </span>
@@ -95,6 +100,8 @@ export function PreviewStep({
   recipients: EditorRecipient[]
 }) {
   const [activeId, setActiveId] = useState(documents[0]?.id ?? "")
+  // A document whose PDF failed to load (the viewer shows why).
+  const [failedId, setFailedId] = useState<string | null>(null)
   const active = documents.find((d) => d.id === activeId) ?? documents[0]
   const pageRotations = active?.pageRotations ?? []
   const fields = useMemo(
@@ -120,7 +127,7 @@ export function PreviewStep({
   return (
     <PreviewContext.Provider value={ctx}>
       <div className="flex size-full min-h-0 overflow-hidden">
-        <div className="min-w-0 flex-1">
+        <PdfFrame docKey={active?.id ?? ""} failed={!active?.src || failedId === active?.id}>
           {active?.src ? (
             <PDFEditor
               // One viewer per document: switching loads the other PDF fresh.
@@ -128,7 +135,7 @@ export function PreviewStep({
               src={active.src}
               fileName={active.name}
               defaultMode="view"
-              defaultZoom="fit-width"
+              defaultZoom={EDITOR_ZOOM}
               showUpload={false}
               persistSignatures={false}
               features={VIEW_ONLY_FEATURES}
@@ -150,13 +157,14 @@ export function PreviewStep({
                   </span>
                 </div>
               }
+              onDocumentLoadError={() => setFailedId(active.id)}
               onToast={(t) => toastManager.add({ title: t.message, type: t.tone })}
               className="size-full"
             />
           ) : (
             <p className="p-6 text-muted-foreground text-sm">The document could not be loaded.</p>
           )}
-        </div>
+        </PdfFrame>
         <aside
           aria-label="Fields per recipient"
           className="w-72 shrink-0 border-l bg-background max-lg:hidden"

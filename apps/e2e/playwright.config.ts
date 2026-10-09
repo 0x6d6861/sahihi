@@ -24,6 +24,8 @@ export default defineConfig({
   reporter: [
     [CI ? "github" : "list"],
     ["html", { open: "never", outputFolder: "playwright-report" }],
+    // Read by scripts/test-summary.ts for the CI job summary.
+    ["junit", { outputFile: path.join(root, "reports/e2e.xml") }],
   ],
   outputDir: "test-results",
   globalSetup: "./global-setup.ts",

@@ -91,7 +91,7 @@ test("an envelope with two documents and a supporting file is signed and finaliz
   await steps.getByRole("button", { name: "Fields" }).click()
   const tools = page.getByRole("complementary", { name: "Field tools" })
   const placeSignature = async () => {
-    // The tool stays selected after placing; clicking it again would turn it off.
+    // Placing a field goes back to Select, so pick the tool each time (unless it is still on).
     const tool = tools.getByRole("button", { name: "Signature", exact: true })
     if ((await tool.getAttribute("aria-pressed")) !== "true") await tool.click()
     const layer = page.locator("[data-field-layer]").first()

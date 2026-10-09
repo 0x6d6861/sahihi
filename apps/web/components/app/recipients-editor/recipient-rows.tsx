@@ -58,13 +58,16 @@ export function RecipientRows({
                   RECIPIENT_COLORS[i % RECIPIENT_COLORS.length],
                 )}
               />
-              <span className="font-medium text-sm">Recipient {i + 1}</span>
+              {/* Their name once typed, so cards tell who is who; the number until then. */}
+              <span className="min-w-0 truncate font-medium text-sm">
+                {r.name.trim() || `Recipient ${i + 1}`}
+              </span>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
                 className="ml-auto"
-                aria-label={`Remove recipient ${i + 1}`}
+                aria-label={`Remove ${r.name.trim() || `recipient ${i + 1}`}`}
                 disabled={rows.length === 1}
                 onClick={() => onRemove(r.key)}
               >

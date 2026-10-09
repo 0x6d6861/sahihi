@@ -153,7 +153,8 @@ export function FolderCards({
               <DragCard
                 key={f.id}
                 as="div"
-                className="rounded-xl"
+                // `grid` so the card fills the wrapper and every card in a row is as tall.
+                className="grid rounded-xl"
                 selectClassName="start-1.5 top-1/2 -translate-y-1/2"
                 {...folderDrag(f, current, path, searching)}
               >

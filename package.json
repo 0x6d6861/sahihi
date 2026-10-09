@@ -14,7 +14,7 @@
     "dev:web": "bun run --filter @sahihi/web dev",
     "build": "bun run --filter '*' build",
     "typecheck": "bun run --filter '*' typecheck",
-    "test": "bun test packages apps/api/src apps/worker apps/web/lib",
+    "test": "bun test packages apps/api/src apps/worker apps/web/lib scripts",
     "test:integration": "bun test --preload ./apps/api/test/preload.ts --timeout 30000 ./apps/api/test/*.itest.ts ./apps/worker/test/*.itest.ts",
     "fixtures": "bun run --filter @sahihi/pdf fixtures",
     "emails:dev": "bun run --filter @sahihi/emails preview",

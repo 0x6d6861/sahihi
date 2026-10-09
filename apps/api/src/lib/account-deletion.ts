@@ -15,7 +15,11 @@ export const deletionIdentifier = (tokenHash: string) => `delete-account:${token
 export async function deletionBlockersFor(userId: string, db: Prisma.TransactionClient = prisma) {
   const memberships = await db.member.findMany({
     where: { userId },
-    select: { organizationId: true, role: true, organization: { select: { name: true } } },
+    select: {
+      organizationId: true,
+      role: true,
+      organization: { select: { name: true, createdAt: true } },
+    },
   })
   const owners = await db.member.groupBy({
     by: ["organizationId"],
@@ -30,6 +34,7 @@ export async function deletionBlockersFor(userId: string, db: Prisma.Transaction
     memberships.map((m) => ({
       organizationId: m.organizationId,
       organizationName: m.organization.name,
+      organizationCreatedAt: m.organization.createdAt,
       role: m.role,
       ownerCount: ownerCount.get(m.organizationId) ?? 0,
     })),

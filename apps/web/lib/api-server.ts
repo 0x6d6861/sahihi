@@ -1,6 +1,8 @@
 import "server-only"
 import { cookies } from "next/headers"
+import { redirect } from "next/navigation"
 import { API_URL } from "./api-url"
+import { HOME_HREF } from "./nav"
 
 /** Server Component / Route Handler fetch to the API with the user's cookies. */
 export async function apiServer<T>(
@@ -32,4 +34,9 @@ export interface ServerSession {
 export async function getServerSession(): Promise<ServerSession | null> {
   const { data } = await apiServer<ServerSession | null>("/auth/get-session")
   return data ?? null
+}
+
+/** Sign-in and sign-up: someone already signed in goes straight to the app. */
+export async function redirectIfSignedIn() {
+  if (await getServerSession()) redirect(HOME_HREF)
 }

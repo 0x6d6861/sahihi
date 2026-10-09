@@ -3,6 +3,7 @@
 import type { PreflightIssue } from "@sahihi/core"
 import { useRouter } from "next/navigation"
 import { createContext, useContext, useState } from "react"
+import { AlertList, AlertListItem } from "@/components/app/alert-list"
 import { useDraftState } from "@/components/app/envelope/draft-state"
 import { ReviewSendDialog } from "@/components/app/envelope/review-send-dialog"
 import { SendIcon } from "@/components/app/icons"
@@ -214,18 +215,18 @@ export function SendProblems() {
   if (problems.length === 0) return null
   return (
     <Alert tone="warning" title="Before you can send">
-      <ul className="flex flex-col gap-1">
+      <AlertList>
         {problems.map((p) => (
-          <li key={p.message} className="flex flex-wrap items-center gap-2">
+          <AlertListItem key={p.message} className="flex flex-wrap items-center gap-2">
             <span>{p.message}</span>
             {p.step && (
               <Button variant="ghost" size="sm" onClick={() => onFix(p.step as EditorStep)}>
                 Fix
               </Button>
             )}
-          </li>
+          </AlertListItem>
         ))}
-      </ul>
+      </AlertList>
     </Alert>
   )
 }
