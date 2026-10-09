@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test"
-import { generateCertificateCode } from "@sahihi/core"
+import { findStarter, generateCertificateCode } from "@sahihi/core"
 import { appendAuditEvent, prisma } from "@sahihi/db"
 import { getObjectBytes, getQueues, headObject, keys, putObject } from "@sahihi/infra"
 import { unzipSync } from "fflate"
@@ -245,14 +245,14 @@ describe("retention sweep", () => {
   test("keep forever by default; with a period, only envelopes closed before the cutoff", async () => {
     const old = await seedCompleted(new Date(Date.now() - 4 * 365 * 24 * 3600 * 1000))
     const recent = await seedCompleted()
-    expect(await retentionSweep()).toEqual({ queued: 0 })
+    expect(await retentionSweep()).toEqual({ queued: 0, aiDraftsDeleted: 0 })
 
     const set = await request(alice, "/api/data/settings", {
       method: "PUT",
       json: { retentionYears: 3 },
     })
     expect(set.status).toBe(200)
-    expect(await retentionSweep()).toEqual({ queued: 1 })
+    expect(await retentionSweep()).toEqual({ queued: 1, aiDraftsDeleted: 0 })
     expect(await getQueues().maintenance.raw.getJob(`purge-${old.envelopeId}`)).toBeTruthy()
     expect(await getQueues().maintenance.raw.getJob(`purge-${recent.envelopeId}`)).toBeFalsy()
   })
@@ -341,5 +341,95 @@ describe("deleting the workspace", () => {
     expect(deleted).toBeGreaterThanOrEqual(4)
     expect(await headObject(doc.s3Key)).toBeNull()
     expect(await headObject(keys.signed(alice.organizationId, s.envelopeId))).toBeNull()
+  })
+})
+
+describe("AI drafts", () => {
+  const YEAR = 365 * 24 * 3600 * 1000
+
+  /** An AI-generated document with one version and a conversation, last changed at `updatedAt`. */
+  async function seedDraft(updatedAt = new Date(), envelopeId: string | null = null) {
+    const data = findStarter("mutual-nda")?.build()
+    if (!data) throw new Error("missing starter")
+    const doc = await prisma.generatedDocument.create({
+      data: {
+        organizationId: alice.organizationId,
+        createdById: alice.userId,
+        title: data.title,
+        starter: "mutual-nda",
+        status: envelopeId ? "FINALIZED" : "DRAFT",
+        envelopeId,
+        messages: [{ id: "m1", role: "user", parts: [{ type: "text", text: "For Wanjiku" }] }],
+        versions: {
+          create: {
+            number: 1,
+            data: data as unknown as object,
+            actor: "USER",
+            createdById: alice.userId,
+            reason: "Started from Mutual NDA",
+          },
+        },
+        events: { create: { type: "document.created", actor: "USER", actorUserId: alice.userId } },
+      },
+    })
+    await prisma.generatedDocument.update({ where: { id: doc.id }, data: { updatedAt } })
+    return doc.id
+  }
+
+  test("the sweep deletes drafts untouched since the cutoff; finalised ones wait for their envelope", async () => {
+    const old = new Date(Date.now() - 4 * YEAR)
+    const stale = await seedDraft(old)
+    const fresh = await seedDraft()
+    const { envelopeId } = await seedCompleted()
+    const finalised = await seedDraft(old, envelopeId)
+    expect(await retentionSweep()).toEqual({ queued: 0, aiDraftsDeleted: 0 })
+
+    await request(alice, "/api/data/settings", { method: "PUT", json: { retentionYears: 3 } })
+    expect(await retentionSweep()).toEqual({ queued: 0, aiDraftsDeleted: 1 })
+    const left = await prisma.generatedDocument.findMany({ select: { id: true } })
+    expect(left.map((d) => d.id).sort()).toEqual([fresh, finalised].sort())
+    expect(
+      await prisma.generatedDocumentVersion.count({ where: { generatedDocumentId: stale } }),
+    ).toBe(0)
+  })
+
+  test("purging an envelope deletes the AI draft it was finalised from", async () => {
+    const { envelopeId } = await seedCompleted()
+    const draft = await seedDraft(new Date(), envelopeId)
+    const other = await seedDraft()
+    expect(await purgeEnvelope(envelopeId, "manual")).toEqual({ purged: true })
+    expect(await prisma.generatedDocument.findUnique({ where: { id: draft } })).toBeNull()
+    expect(await prisma.generatedDocument.findUnique({ where: { id: other } })).not.toBeNull()
+    const purged = await prisma.auditEvent.findFirstOrThrow({
+      where: { envelopeId, type: "envelope.purged" },
+    })
+    expect(purged.data).toEqual({ reason: "manual", aiDraftsDeleted: 1 })
+  })
+
+  test("the export has a folder per AI draft with its text, history and conversation", async () => {
+    const id = await seedDraft()
+    const res = await request(alice, "/api/data/exports", { method: "POST" })
+    const { export: x } = (await res.json()) as { export: { id: string } }
+    await buildExport(x.id)
+    const row = await prisma.dataExport.findUniqueOrThrow({ where: { id: x.id } })
+    const files = unzipSync(await getObjectBytes(row.s3Key as string))
+    const text = (name: string) => new TextDecoder().decode(files[name])
+    const manifest = JSON.parse(text("manifest.json"))
+    expect(manifest.aiDrafts).toEqual([
+      {
+        folder: expect.stringMatching(/^ai-drafts\/Mutual Non-Disclosure Agreement \(/),
+        id,
+        title: "Mutual Non-Disclosure Agreement",
+        status: "DRAFT",
+      },
+    ])
+    const folder = manifest.aiDrafts[0].folder
+    const doc = JSON.parse(text(`${folder}/document.json`))
+    expect(doc).toMatchObject({ id, status: "DRAFT", starter: "mutual-nda", finalized: null })
+    expect(doc.current.data.title).toBe("Mutual Non-Disclosure Agreement")
+    expect(doc.versions).toHaveLength(1)
+    expect(doc.events.map((e: { type: string }) => e.type)).toEqual(["document.created"])
+    expect(text(`${folder}/conversation.json`)).toContain("For Wanjiku")
+    expect(text("README.txt")).toContain("ai-drafts/")
   })
 })

@@ -122,7 +122,7 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
 - [x] Save a generated document as a template (blanks and roles intact; chosen answers and
       contacts kept), listed on Draft with AI (ADR 0046)
 - [x] Lock a finalised document's fields in the envelope editor; new version after send (ADR 0047)
-- [ ] Plan quota for assistant turns; generated documents in exports and retention
+- [x] Plan quota for assistant turns; generated documents in exports and retention
 
 ## Later
 

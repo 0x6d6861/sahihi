@@ -78,6 +78,8 @@ export type ExportStatus = (typeof EXPORT_STATUSES)[number]
 export const EXPORT_TTL_DAYS = 7
 /** One export at a time per workspace, and at most this many envelopes per archive (v1). */
 export const EXPORT_MAX_ENVELOPES = 2_000
+/** AI-generated documents per archive, most recently changed first (docs/ai-documents.md). */
+export const EXPORT_MAX_GENERATED_DOCUMENTS = 2_000
 
 /** "Lease – Unit 4 / Ngũgĩ" → a safe folder name inside the ZIP (kept unique by the id suffix). */
 export function exportFolderName(title: string, id: string): string {

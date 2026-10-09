@@ -164,3 +164,24 @@ export interface GenerationTemplateItem {
   createdBy: { name: string }
   canManage: boolean
 }
+
+/**
+ * What to show when an assistant reply fails. The API's JSON error (e.g. the plan's monthly
+ * replies used up, 402) arrives as the error's message; anything else gets a generic retry line.
+ */
+export function chatErrorMessage(error: unknown): string {
+  // assistant-ui hands over a plain `{ code, message }` object, not an Error.
+  const text =
+    typeof error === "string"
+      ? error
+      : error && typeof error === "object" && "message" in error
+        ? String(error.message)
+        : ""
+  try {
+    const body = JSON.parse(text) as { message?: unknown }
+    if (typeof body.message === "string" && body.message) return body.message
+  } catch {
+    // not JSON
+  }
+  return "The assistant couldn't reply. Try again in a moment."
+}

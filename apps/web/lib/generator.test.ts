@@ -5,6 +5,7 @@ import {
   answeredLines,
   answerValues,
   blankState,
+  chatErrorMessage,
   type ProposalView,
   pendingSectionIds,
   proposalTitle,
@@ -129,4 +130,15 @@ test("templateChoices offers filled blanks in text order and roles with a contac
       { key: "party_a", label: "First party", contact: "Amina Otieno, amina@example.com" },
     ],
   })
+})
+
+test("chatErrorMessage shows the API's message, or a generic line", () => {
+  const quota = JSON.stringify({ error: "assistant_quota_exceeded", message: "All used." })
+  expect(chatErrorMessage(new Error(quota))).toBe("All used.")
+  expect(chatErrorMessage(quota)).toBe("All used.")
+  expect(chatErrorMessage({ code: "AI_APICallError", message: quota })).toBe("All used.")
+  expect(chatErrorMessage(new Error("Failed to fetch"))).toBe(
+    "The assistant couldn't reply. Try again in a moment.",
+  )
+  expect(chatErrorMessage(undefined)).toContain("couldn't reply")
 })

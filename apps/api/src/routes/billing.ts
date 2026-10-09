@@ -1,5 +1,5 @@
 import { billingPeriod, PLAN_IDS, PLANS, usageLevel } from "@sahihi/core"
-import { countEnvelopesSent, countSeats, getOrgPlan, prisma } from "@sahihi/db"
+import { countAssistantTurns, countEnvelopesSent, countSeats, getOrgPlan, prisma } from "@sahihi/db"
 import { Hono } from "hono"
 import type { AppEnv } from "../lib/env"
 import { requireOrg } from "../middleware/session"
@@ -14,10 +14,11 @@ export const billing = new Hono<AppEnv>()
   .get("/", async (c) => {
     const orgId = c.get("organizationId")
     const period = billingPeriod()
-    const [plan, sent, seats] = await Promise.all([
+    const [plan, sent, seats, turns] = await Promise.all([
       getOrgPlan(prisma, orgId),
       countEnvelopesSent(prisma, orgId, period),
       countSeats(prisma, orgId),
+      countAssistantTurns(prisma, orgId, period),
     ])
     const seatsUsed = seats.members + seats.pendingInvitations
     return c.json({
@@ -34,6 +35,11 @@ export const billing = new Hono<AppEnv>()
         used: seatsUsed,
         limit: plan.seats,
         level: usageLevel(seatsUsed, plan.seats),
+      },
+      assistant: {
+        used: turns,
+        limit: plan.assistantTurnsPerMonth,
+        level: usageLevel(turns, plan.assistantTurnsPerMonth),
       },
       plans: PLAN_IDS.map((id) => PLANS[id]),
     })

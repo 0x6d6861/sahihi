@@ -3,11 +3,14 @@ import {
   applyProposal,
   applySigners,
   applyVariableUpdates,
+  assistantQuotaExceededMessage,
+  billingPeriod,
   CreateGeneratedDocumentSchema,
   canEditGeneratedDocument,
   canEditWorkspace,
   canManageTemplate,
   canUseAssistant,
+  checkAssistantQuota,
   envelopeDraftFromGenerated,
   FinalizeGeneratedDocumentSchema,
   findStarter,
@@ -28,7 +31,7 @@ import {
   UpdateSignersSchema,
   UpdateVariablesSchema,
 } from "@sahihi/core"
-import { forOrganization, prisma } from "@sahihi/db"
+import { countAssistantTurns, forOrganization, getOrgPlan, prisma } from "@sahihi/db"
 import { createEnvelopeFromDocument } from "@sahihi/envelopes"
 import { keys, putObject } from "@sahihi/infra"
 import { composeGeneratedDocument, inspectPdf } from "@sahihi/pdf"
@@ -281,6 +284,7 @@ export const generatedDocuments = new Hono<AppEnv>()
     async (c) => {
       const { doc } = await loadGeneratedDocument(c.get("organizationId"), c.req.param("id"))
       assertCanEdit(c, doc)
+      await assertAssistantQuota(c.get("organizationId"))
       const body = await parseJson(
         c,
         z.object({
@@ -750,6 +754,35 @@ export const generatedDocuments = new Hono<AppEnv>()
     })
     return c.json({ envelopeId: envelope.id }, 201)
   })
+
+/**
+ * The plan's assistant replies this month (docs/billing.md). Counted from recorded turns, so
+ * replies already streaming when the limit is reached can go a few over; never more than the
+ * rate limit allows.
+ */
+async function assertAssistantQuota(organizationId: string) {
+  const period = billingPeriod()
+  const [plan, used] = await Promise.all([
+    getOrgPlan(prisma, organizationId),
+    countAssistantTurns(prisma, organizationId, period),
+  ])
+  const check = checkAssistantQuota(plan, used)
+  if (!check.ok) {
+    throw new HTTPException(402, {
+      res: Response.json(
+        {
+          error: "assistant_quota_exceeded",
+          message: assistantQuotaExceededMessage(plan, period.end),
+          plan: plan.id,
+          limit: check.limit,
+          used: check.used,
+          resetsAt: period.end.toISOString(),
+        },
+        { status: 402 },
+      ),
+    })
+  }
+}
 
 /** The new version started from a finalised document, if any (the latest). */
 async function newVersionOf(id: string): Promise<string | null> {

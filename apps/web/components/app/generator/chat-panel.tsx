@@ -10,6 +10,7 @@ import {
   type TextMessagePartComponent,
   ThreadPrimitive,
   Tools,
+  useAuiState,
 } from "@assistant-ui/react"
 import { lastAssistantMessageIsCompleteWithToolCalls, type UIMessage } from "ai"
 import { useMemo } from "react"
@@ -18,6 +19,7 @@ import { Button } from "@/components/arc/button/button"
 import { Textarea } from "@/components/arc/textarea/textarea"
 import { Tooltip } from "@/components/arc/tooltip/tooltip"
 import { Button as IconButton } from "@/components/ui/button"
+import { chatErrorMessage } from "@/lib/generator"
 import { useGenerator } from "./generator-context"
 import { ProposalCard } from "./proposal-card"
 import { AppliedNote, QuestionCard } from "./question-card"
@@ -99,7 +101,24 @@ function AssistantMessage() {
   return (
     <MessagePrimitive.Root className="flex flex-col gap-3 text-foreground">
       <MessagePrimitive.Parts components={{ Text }} />
+      <MessagePrimitive.Error>
+        <ReplyError />
+      </MessagePrimitive.Error>
     </MessagePrimitive.Root>
+  )
+}
+
+/** A failed reply: the API's reason (e.g. the plan's assistant replies used up), in place. */
+function ReplyError() {
+  const error = useAuiState((s) =>
+    s.message.status?.type === "incomplete" && s.message.status.reason === "error"
+      ? s.message.status.error
+      : undefined,
+  )
+  return (
+    <p className="text-destructive-foreground text-sm" role="alert">
+      {chatErrorMessage(error)}
+    </p>
   )
 }
 

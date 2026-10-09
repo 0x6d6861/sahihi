@@ -297,7 +297,10 @@ ADR 0009).
 ## Data handling
 
 Document text, blanks and the conversation are sent to the configured model provider, which is
-why workspaces opt in. Signer emails are not in the prompt (only whether a contact is set). Logs
+why workspaces opt in. Replies count against the plan's monthly AI replies (docs/billing.md); at
+the limit the chat answers 402 and everything else (editing, signers, finalise) keeps working. Signer emails are not in the prompt (only whether a contact is set). Logs
 and events never hold prompts or model output. Generated documents, versions, events, the
 conversation and workspace templates are workspace data: deleting the workspace deletes them. A
-template holds only the answers and contacts someone chose to keep.
+template holds only the answers and contacts someone chose to keep. Retention (docs/data-retention.md):
+drafts without an envelope are deleted once untouched past the workspace's period; a finalised one
+is deleted when its envelope is purged. Exports include every draft (`ai-drafts/`).

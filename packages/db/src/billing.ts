@@ -23,6 +23,21 @@ export function countEnvelopesSent(
   })
 }
 
+/** AI assistant replies in the workspace this period: its documents' `assistant.turn` events. */
+export function countAssistantTurns(
+  db: Db,
+  organizationId: string,
+  period: BillingPeriod = billingPeriod(),
+): Promise<number> {
+  return db.generatedDocumentEvent.count({
+    where: {
+      type: "assistant.turn",
+      occurredAt: { gte: period.start, lt: period.end },
+      generatedDocument: { organizationId },
+    },
+  })
+}
+
 /**
  * Serialises quota checks per workspace for the rest of the transaction, so two concurrent sends
  * can't both see "one left" and both go out.

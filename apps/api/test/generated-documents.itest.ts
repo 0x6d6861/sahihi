@@ -1237,3 +1237,75 @@ describe("new versions", () => {
     ).toBe(1)
   })
 })
+
+describe("assistant quota", () => {
+  beforeEach(() => enableAssistant(alice))
+
+  const turns = (generatedDocumentId: string, count: number, occurredAt = new Date()) =>
+    prisma.generatedDocumentEvent.createMany({
+      data: Array.from({ length: count }, () => ({
+        generatedDocumentId,
+        type: "assistant.turn",
+        actor: "AI" as const,
+        occurredAt,
+      })),
+    })
+
+  const setPlan = (plan: string) =>
+    prisma.subscription.upsert({
+      where: { organizationId: alice.organizationId },
+      create: { organizationId: alice.organizationId, plan },
+      update: { plan },
+    })
+
+  test("the plan's monthly replies: refused with 402 once used, shown on the plan page", async () => {
+    await setPlan("free")
+    const id = await createNda(alice)
+    // Last month's replies and another workspace's don't count.
+    await turns(id, 40, new Date(Date.now() - 40 * 24 * 3600 * 1000))
+    const mallory = await createSender("mallory")
+    await enableAssistant(mallory)
+    const theirs = await request(mallory, "/api/generated-documents", {
+      method: "POST",
+      json: { starter: "mutual-nda" },
+    })
+    await turns((await json<{ id: string }>(theirs)).id, 40)
+    await turns(id, 29)
+
+    const chat = () =>
+      request(alice, `/api/generated-documents/${id}/chat`, {
+        method: "POST",
+        json: { messages: [{ id: "m1", role: "user", parts: [{ type: "text", text: "Hi" }] }] },
+      })
+    const ok = await chat()
+    expect(ok.status).toBe(200)
+    await ok.text()
+
+    const billing = await json<{ assistant: { used: number; limit: number; level: string } }>(
+      await request(alice, "/api/billing"),
+    )
+    expect(billing.assistant).toEqual({ used: 30, limit: 30, level: "exceeded" })
+
+    const refused = await chat()
+    expect(refused.status).toBe(402)
+    const body = await json<{ error: string; message: string; limit: number; used: number }>(
+      refused,
+    )
+    expect(body).toMatchObject({ error: "assistant_quota_exceeded", limit: 30, used: 30 })
+    expect(body.message).toContain("30 AI assistant replies")
+
+    // Editing by hand still works.
+    const { version } = await detail(alice, id)
+    const edit = await request(alice, `/api/generated-documents/${id}/variables`, {
+      method: "POST",
+      json: { baseVersionId: version.id, source: "edit", values: [{ key: "term", value: "x" }] },
+    })
+    expect(edit.status).toBe(200)
+
+    // A bigger plan lifts it.
+    await setPlan("starter")
+    const after = await chat()
+    expect(after.status).toBe(200)
+    await after.text()
+  })
+})
