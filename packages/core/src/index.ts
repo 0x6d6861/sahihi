@@ -16,6 +16,8 @@ export * from "./field-detection/text-rules"
 
 export * from "./geometry/coordinates"
 
+export * from "./inbox/activity"
+
 export * from "./integrations/api-keys"
 export * from "./integrations/embed"
 export * from "./integrations/public-api"

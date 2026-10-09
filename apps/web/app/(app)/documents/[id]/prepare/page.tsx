@@ -22,7 +22,7 @@ export default async function PrepareDocumentPage({ params }: { params: Promise<
     <div className="flex flex-col gap-4">
       <Breadcrumb
         items={[
-          { label: "Documents", href: "/documents" },
+          { label: "All files", href: "/files" },
           { label: doc.name, href: `/documents/${doc.id}` },
           { label: "Prepare" },
         ]}

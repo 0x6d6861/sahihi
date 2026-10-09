@@ -1,6 +1,6 @@
 # 0030: "Open" action in Arc's notification center (local patch)
 
-- **Status:** accepted
+- **Status:** superseded by 0041 (the bell is gone; the patch stays vendored, unused)
 - **Date:** 2026-10-07
 
 ## Context

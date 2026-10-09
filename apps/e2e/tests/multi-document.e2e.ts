@@ -4,7 +4,7 @@ import { linkFromEmail } from "./mailpit"
 
 /**
  * Multi-document envelopes (ADR 0037), through the real UI: one document uploaded on the
- * Documents page, a second uploaded from the draft editor's "Add document", a supporting CSV,
+ * All files, a second uploaded from the draft editor's "Add document", a supporting CSV,
  * a signature field on each document → send → the signer switches documents with "Next field",
  * sees the supporting file, signs both → the worker finalizes both → downloads and /verify list both.
  */

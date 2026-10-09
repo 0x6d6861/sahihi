@@ -10,6 +10,7 @@ import { ADMIN_QUEUES_PATH, adminDashboard } from "./admin"
 import { auth } from "./auth"
 import { reportRequestError, requestIdOf, requestLog } from "./middleware/request-log"
 import { account } from "./routes/account"
+import { activity } from "./routes/activity"
 import { apiKeys } from "./routes/api-keys"
 import { avatars } from "./routes/avatars"
 import { billing } from "./routes/billing"
@@ -77,6 +78,7 @@ export function createApp() {
     .route("/api/me", me)
     .route("/api/account", account)
     .route("/api/notifications", notifications)
+    .route("/api/activity", activity)
     .route("/api/avatars", avatars)
     .route("/api/workspace", workspace)
     .route("/api/branding", branding)

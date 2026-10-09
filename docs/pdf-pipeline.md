@@ -53,45 +53,13 @@ the full list; names are trimmed, inner spaces collapsed and case-insensitive re
 use and shared: "NDA" and "nda" are one tag and the first spelling stays. Labelling follows the move
 rule for documents and the manage rule for folders.
 
-The web page is the app's home (`/` → `/documents`). Its state lives in the URL
-(`?folder=&q=&tag=&color=&status=&sender=&period=&page=`, `lib/documents-list.ts`): breadcrumb (Home → path),
-folder cards, "Create folder" / "Upload document" into the open folder, search and filters
-(`DocumentsToolbar`), and a table with Extend `FileThumbnail` (PDF glyph, no rendered preview yet),
-a row menu (Open, Create envelope, Move to…) and coss `Pagination`
-(`lib/pagination.ts#pageWindow`, links keep the folder and filters). A page past the end redirects
-to the last page; an invalid query or an unknown folder redirects to `/documents`.
-
-Detail page (`app/(app)/documents/[id]/`): the breadcrumb is Documents › the folders it lives in (root first, from `folderPath` on `GET /documents/:id`) › its name. For a `READY` document it fetches the presigned GET from
-`/documents/:id/file` on the server and renders `components/app/document-viewer.tsx`, which is Extend
-`PDFViewer` loaded with `next/dynamic` (`ssr: false`), `showUpload={false}` and read-only. "Create
-envelope" posts a DRAFT envelope titled after the file (`envelopeTitleFromFileName`) and opens it.
-`UPLOADING` and `FAILED` documents show an `Alert` instead of the viewer.
-
-`inspectPdf` rejects encrypted, invalid, empty and >500-page files. Password-protected PDFs aren't
-supported; the user must remove the protection first.
-
-Abandoned uploads: the `documents.sweep-uploads` maintenance job runs every 15 minutes. It finds
-`UPLOADING` documents older than `UPLOAD_ABANDON_AFTER_MS` (1 hour, `@sahihi/core`), marks them
-`FAILED` ("Upload was not completed") and soft-deletes them (`deletedAt`), then deletes the storage
-object in case the PUT landed but `complete` never ran. The update only matches rows that are still
-`UPLOADING`, so a late `complete` wins and reruns are no-ops.
-
-### Thumbnails (ADR 0033)
-
-Once a document is READY (upload `complete`, `POST /api/v1/documents`), the API queues
-`document.thumbnail` on the `documents` queue, after the write; a Redis outage only logs. The
-worker (`apps/worker/src/jobs/thumbnails.ts`) renders page 1 with PDFium (`renderThumbnail` in
-`@sahihi/pdf`: 480px wide, as displayed with /Rotate applied, on white, annotations included;
-pages taller than 1.5× their width keep their top part), encodes it as PNG (`encodePng`, no
-dependency) and stores `thumbnail.png` next to the original, then sets `Document.thumbnailKey`.
-A file PDFium can't render gets `thumbnailError` and is not retried. The job id is the document id
-and the worker skips documents that are gone or already done, so reruns are no-ops. The hourly
-`documents.sweep-thumbnails` maintenance job queues READY documents with neither a thumbnail nor a
-failure (backfill, lost jobs).
-
+Documents are listed in All files (`/files`, the app's home; ADR 0038, ADR 0041), with folders,
+"Upload document" into the open folder, search and Type / Status / People / Added / Tags / Color
+filters, a list or a grid, and a row menu (Open, Create envelope, Move to…). `/documents` redirects
+there filtered to documents; `/documents/:id` and its Prepare page stay.
 The list returns `thumbnailUrl` per item: `presignCacheable` (signed at the start of a 15-minute
 window, valid 30 minutes, `Cache-Control: private, max-age=900`), so repeat visits hit the browser
-cache. The web grid (List / Grid saved in the `sahihi-documents-layout` cookie, `DocumentCard`) shows it in Extend `FileThumbnail`.
+cache. The web grid (List / Grid saved in the `sahihi-files-layout` cookie, `DocumentCard`) shows it in Extend `FileThumbnail`.
 
 Planned: optional DOCX→PDF conversion (LibreOffice in the worker).
 

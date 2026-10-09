@@ -6,6 +6,7 @@ import { Panel } from "@/components/app/panel"
 import { Alert } from "@/components/arc/alert/alert"
 import { Button } from "@/components/arc/button/button"
 import { organization } from "@/lib/auth-client"
+import { HOME_HREF } from "@/lib/nav"
 
 export default function AcceptInvitationPage() {
   const { id } = useParams<{ id: string }>()
@@ -23,7 +24,7 @@ export default function AcceptInvitationPage() {
       )
     }
     await organization.setActive({ organizationId: data.invitation.organizationId })
-    router.push("/documents")
+    router.push(HOME_HREF)
   }
 
   return (

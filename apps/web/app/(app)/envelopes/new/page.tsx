@@ -52,7 +52,7 @@ export default async function NewEnvelopePage({
             title="No ready documents"
             description="Upload a PDF first, then come back here."
             action={
-              <ButtonLink variant="primary" href="/documents">
+              <ButtonLink variant="primary" href="/files?type=document">
                 Go to documents
               </ButtonLink>
             }

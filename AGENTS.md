@@ -37,16 +37,16 @@ Read this file first, then the doc for the area you're touching (see **Doc map**
 
 ```
 apps/
-  api/        Hono REST API. routes/{documents,envelopes,templates,webhooks,billing,data,signing,verify}.ts, v1.ts (public API,
+  api/        Hono REST API. routes/{documents,envelopes,templates,activity,webhooks,billing,data,signing,verify}.ts, v1.ts (public API,
               API keys), api-keys/embedding/bulk-sends.ts, auth.ts (better-auth)
   worker/     BullMQ consumers: notifications, envelope finalize, webhooks, maintenance (expire/remind/sweeps/retention/exports)
-  web/        Next.js. (auth)/ sign-in/up/onboarding, (app)/ documents+envelopes+templates+bulk-sends+settings,
+  web/        Next.js. (auth)/ sign-in/up/onboarding, (app)/ files+inbox+settings (document, envelope, template and bulk-send pages without tabs),
               sign/[token], verify/[code]
   e2e/        Playwright journey on its own stack (api :4100, web :3100, worker, DB sahihi_e2e; docs/testing.md)
 packages/
   config/     Env schema (zod) + queue names. The ONLY place process.env is parsed.
   core/       Pure domain logic, no I/O, one folder per domain under src/: envelope/ (state machine, routing),
-              field-detection/, geometry/ (coordinates), integrations/ (API keys, webhooks, embed),
+              field-detection/, geometry/ (coordinates), inbox/ (workspace activity feed), integrations/ (API keys, webhooks, embed),
               security/ (crypto, audit chain), shared/ (enums, zod schemas), signing/, templates/,
               workspace/ (billing, members, permissions, retention). Import only from `@sahihi/core`
   db/         Prisma schema + client, tenant scoping, appendAuditEvent, issueSigningLink
@@ -167,7 +167,7 @@ the relevant doc in `docs/` is updated if behaviour changed, and the matching ch
 | Field editor, signing page, stamping maths | `docs/coordinates.md` |
 | Upload, stamping, finalize job | `docs/pdf-pipeline.md` |
 | Send / sign / decline / void / reminders / OTP | `docs/signing-flow.md` |
-| In-app notifications (bell, preferences) | `docs/notifications.md` |
+| Inbox, in-app notifications, preferences | `docs/notifications.md` |
 | Templates (save as / use) | `docs/templates.md` |
 | Webhooks (events, signing, delivery) | `docs/webhooks.md` |
 | Public API `/api/v1`, API keys and scopes | `docs/public-api.md` |

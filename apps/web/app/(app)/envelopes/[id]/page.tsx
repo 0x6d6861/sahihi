@@ -214,7 +214,9 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="flex flex-col gap-6">
-      <Breadcrumb items={[{ label: "Envelopes", href: "/envelopes" }, { label: e.title }]} />
+      <Breadcrumb
+        items={[{ label: "All files", href: "/files?type=envelope" }, { label: e.title }]}
+      />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         {heading}

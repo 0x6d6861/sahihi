@@ -3,6 +3,7 @@
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react"
 import { LayoutGroup, motion, useReducedMotion } from "motion/react"
 import Link from "next/link"
+import { Badge } from "@/components/arc/badge/badge"
 import { motionTokens } from "@/components/arc/lib/motion-tokens"
 import { Tooltip } from "@/components/arc/tooltip/tooltip"
 import { cn } from "@/lib/utils"
@@ -19,6 +20,8 @@ export interface PillNavItem {
   disabled?: boolean
   /** Arc tooltip on hover and focus */
   hint?: string
+  /** A count after the label (the Inbox's unread notifications); hidden at 0 */
+  badge?: number
 }
 
 /**
@@ -64,6 +67,7 @@ function PillNavEntry({
   current: "page" | "step"
 }) {
   const reduced = useReducedMotion()
+  const badge = item.badge ? (item.badge > 99 ? "99+" : String(item.badge)) : null
   const className = cn(
     "relative isolate flex h-9 items-center justify-center gap-2 rounded-full px-2 text-sm whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-4",
     item.active
@@ -85,11 +89,17 @@ function PillNavEntry({
         <HugeiconsIcon icon={item.icon} size={16} strokeWidth={1.75} aria-hidden />
       </span>
       <span>{item.label}</span>
+      {badge && (
+        <Badge tone="info" size="sm" aria-hidden className="tabular-nums">
+          {badge}
+        </Badge>
+      )}
     </>
   )
   const ariaCurrent = item.active ? current : undefined
+  const ariaLabel = badge ? `${item.label}, ${item.badge} unread` : undefined
   const control = item.href ? (
-    <Link href={item.href} aria-current={ariaCurrent} className={className}>
+    <Link href={item.href} aria-current={ariaCurrent} aria-label={ariaLabel} className={className}>
       {content}
     </Link>
   ) : (

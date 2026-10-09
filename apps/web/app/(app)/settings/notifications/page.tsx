@@ -6,7 +6,7 @@ import type { NotificationPreference } from "@/lib/notifications"
 export const metadata = { title: "Notifications" }
 
 /**
- * What the bell in the top bar tells you about, in this workspace (docs/notifications.md). Emails
+ * What the Inbox tells you about, in this workspace (docs/notifications.md). Emails
  * to recipients and the completed/declined emails aren't affected.
  */
 export default async function NotificationsSettingsPage() {

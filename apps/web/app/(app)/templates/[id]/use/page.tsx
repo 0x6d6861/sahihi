@@ -35,7 +35,9 @@ export default async function UseTemplatePage({ params }: { params: Promise<{ id
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-8">
       <header className="flex flex-col gap-2">
-        <Breadcrumb items={[{ label: "Templates", href: "/templates" }, { label: t.name }]} />
+        <Breadcrumb
+          items={[{ label: "All files", href: "/files?type=template" }, { label: t.name }]}
+        />
         <h1 className="font-medium text-2xl tracking-tight">New envelope</h1>
         <p className="text-muted-foreground text-sm">
           From <span className="text-foreground">{t.name}</span>:{" "}

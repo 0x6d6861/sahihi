@@ -16,7 +16,7 @@ export type BulkSendTableRow = {
   startedLabel: string
 }
 
-/** Recent bulk sends in the same Arc table as the templates above. */
+/** Recent bulk sends, in the Inbox (ADR 0041). */
 export function BulkSendsTable({ rows }: { rows: BulkSendTableRow[] }) {
   return (
     <SortableDataTable

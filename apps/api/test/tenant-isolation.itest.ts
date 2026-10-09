@@ -282,6 +282,8 @@ const LISTS = [
   "GET /api/data/exports",
   "GET /api/bulk-sends",
   "GET /api/notifications",
+  // Every envelope's audit events in the caller's workspace only (activity.itest.ts).
+  "GET /api/activity",
 ]
 
 /**

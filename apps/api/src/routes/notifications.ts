@@ -4,10 +4,12 @@ import {
   isNotificationEnabled,
   ListNotificationsQuerySchema,
   MarkNotificationsReadSchema,
+  NOTIFICATION_SEARCH_KEYS,
   NotificationIdsSchema,
   type NotificationSettings,
   notificationTypesFor,
   parseNotificationSettings,
+  periodStart,
   UpdateNotificationPreferencesSchema,
 } from "@sahihi/core"
 import { forOrganization, type Prisma, prisma } from "@sahihi/db"
@@ -17,7 +19,7 @@ import { badRequest, parseJson, parseQuery } from "../lib/http"
 import { requireOrg } from "../middleware/session"
 
 /**
- * The bell in the top bar and Settings → Notifications (docs/notifications.md). Everything here
+ * The Inbox (ADR 0041) and Settings → Notifications (docs/notifications.md). Everything here
  * belongs to the signed-in user in the active workspace: every query is scoped by both.
  */
 const SELECT = {
@@ -43,7 +45,9 @@ export const notifications = new Hono<AppEnv>()
 
   /**
    * Newest first, keyset-paginated by `cursor` (the previous page's `nextCursor`: a position, so it
-   * holds even if that item was dismissed meanwhile).
+   * holds even if that item was dismissed meanwhile). The Inbox's search and chips narrow it:
+   * `unread` or `read`, `type`, `period` and `q` (the names and titles it quotes, any case).
+   * `unreadCount` always counts every unread one.
    */
   .get("/", async (c) => {
     const query = parseQuery(c, ListNotificationsQuerySchema)
@@ -57,9 +61,23 @@ export const notifications = new Hono<AppEnv>()
       const { id, createdAt } = cursor as NonNullable<typeof cursor>
       after = { OR: [{ createdAt: { lt: createdAt } }, { createdAt, id: { lt: id } }] }
     }
+    const filters: Prisma.NotificationWhereInput = {
+      ...(query.unread ? { readAt: null } : query.read ? { readAt: { not: null } } : {}),
+      ...(query.type && { type: query.type }),
+      ...(query.period && { createdAt: { gte: periodStart(query.period, new Date()) } }),
+      ...(query.q && {
+        AND: [
+          {
+            OR: NOTIFICATION_SEARCH_KEYS.map((key) => ({
+              data: { path: [key], string_contains: query.q, mode: "insensitive" as const },
+            })),
+          },
+        ],
+      }),
+    }
     const [rows, unreadCount] = await Promise.all([
       prisma.notification.findMany({
-        where: { ...mine, ...after, ...(query.unread ? { readAt: null } : {}) },
+        where: { ...mine, ...after, ...filters },
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         take: query.limit + 1,
         select: SELECT,
@@ -72,7 +90,7 @@ export const notifications = new Hono<AppEnv>()
     return c.json({ items, nextCursor, unreadCount })
   })
 
-  /** The badge on the bell, polled by the web app. */
+  /** The badge on the Inbox tab, polled by the web app. */
   .get("/unread-count", async (c) => {
     const count = await prisma.notification.count({
       where: forOrganization(c.get("organizationId")).notification({
@@ -97,7 +115,7 @@ export const notifications = new Hono<AppEnv>()
     return c.json({ updated: count })
   })
 
-  /** Back to unread (the bell's "Mark unread"). Ids that aren't yours are ignored. */
+  /** Back to unread (the Inbox's "Mark unread"). Ids that aren't yours are ignored. */
   .post("/unread", async (c) => {
     const { ids } = await parseJson(c, NotificationIdsSchema)
     const { count } = await prisma.notification.updateMany({
@@ -111,7 +129,7 @@ export const notifications = new Hono<AppEnv>()
     return c.json({ updated: count })
   })
 
-  /** Deletes your notifications (the bell's "Dismiss" and "Clear read"). Others' ids are ignored. */
+  /** Deletes your notifications (the Inbox's "Dismiss" and "Clear read"). Others' ids are ignored. */
   .post("/dismiss", async (c) => {
     const { ids } = await parseJson(c, NotificationIdsSchema)
     const { count } = await prisma.notification.deleteMany({

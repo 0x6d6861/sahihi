@@ -142,7 +142,7 @@ export const auth = betterAuth({
             throw new APIError("FORBIDDEN", { message: seatLimitMessage(plan) })
           }
         },
-        // Bell notification for the workspace's owners and admins (docs/notifications.md). The
+        // Inbox notification for the workspace's owners and admins (docs/notifications.md). The
         // membership is already committed by better-auth, so this is best effort: a failure here
         // must not turn a successful acceptance into an error for the new member.
         afterAcceptInvitation: async ({ member, user, organization }) => {

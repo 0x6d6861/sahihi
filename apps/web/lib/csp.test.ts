@@ -100,6 +100,7 @@ describe("helpers", () => {
       "/documents",
       "/envelopes/abc",
       "/templates/t1/use",
+      "/inbox",
       "/settings/members",
       "/onboarding",
     ])

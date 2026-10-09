@@ -8,6 +8,7 @@ import { toastManager } from "@/components/app/toast"
 import { Button } from "@/components/arc/button/button"
 import { Input } from "@/components/arc/input/input"
 import { organization } from "@/lib/auth-client"
+import { HOME_HREF } from "@/lib/nav"
 
 /**
  * Owner-only: delete the workspace with everything in it (docs/data-retention.md → Deleting a
@@ -32,7 +33,7 @@ export function DeleteWorkspace({ id, name }: { id: string; name: string }) {
     const next = others?.[0]
     if (next) await organization.setActive({ organizationId: next.id })
     toastManager.add({ title: `${name} was deleted`, type: "success" })
-    router.push(next ? "/documents" : "/onboarding")
+    router.push(next ? HOME_HREF : "/onboarding")
     router.refresh()
   }
 

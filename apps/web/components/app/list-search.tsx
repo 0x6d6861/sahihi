@@ -139,8 +139,9 @@ const selectedOption = (chip: SearchChip) =>
  * The search section of the Documents, Envelopes and Templates pages, in the manner of Google
  * Drive (ADR 0035, 0036): a wide filled search bar, then one row of filter chips (each an Arc
  * `DropdownMenu` that shows its value and fills once set; the first item clears it), "Clear
- * filters" once any is set, and the List / Grid switch at the end. The page owns the URL: it gets
- * the typed query (debounced), chip changes and layout changes through callbacks.
+ * filters" once any is set, and the List / Grid switch at the end (when the page has one). The
+ * page owns the state: it gets the typed query (debounced), chip changes and layout changes
+ * through callbacks. The Inbox uses it without a layout (ADR 0041).
  */
 export function ListSearch({
   label,
@@ -162,8 +163,9 @@ export function ListSearch({
   chips: SearchChip[]
   onChipChange: (id: string, value: string | undefined) => void
   onClearChips: () => void
-  layout: ListLayout
-  onLayoutChange: (layout: ListLayout) => void
+  /** Omit both for a list without a List / Grid switch. */
+  layout?: ListLayout
+  onLayoutChange?: (layout: ListLayout) => void
   pending?: boolean
 }) {
   const [q, setQ] = useState(query)
@@ -229,17 +231,19 @@ export function ListSearch({
             </Button>
           )}
         </div>
-        <div className="shrink-0">
-          <SegmentedControl
-            label="Show as"
-            value={layout}
-            options={[
-              { value: "list", label: "List" },
-              { value: "grid", label: "Grid" },
-            ]}
-            onValueChange={(v) => onLayoutChange(v === "grid" ? "grid" : "list")}
-          />
-        </div>
+        {layout && onLayoutChange && (
+          <div className="shrink-0">
+            <SegmentedControl
+              label="Show as"
+              value={layout}
+              options={[
+                { value: "list", label: "List" },
+                { value: "grid", label: "Grid" },
+              ]}
+              onValueChange={(v) => onLayoutChange(v === "grid" ? "grid" : "list")}
+            />
+          </div>
+        )}
       </div>
     </search>
   )

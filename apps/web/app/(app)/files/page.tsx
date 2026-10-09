@@ -1,4 +1,4 @@
-import { documentsSummary } from "@sahihi/core"
+import { documentsSummary, type UsageLevel } from "@sahihi/core"
 import { cookies } from "next/headers"
 import Link from "next/link"
 import { redirect } from "next/navigation"
@@ -36,6 +36,7 @@ import { DocumentStatusIcon, EnvelopeStatusIcon } from "@/components/app/status-
 import { TemplateCard, type TemplateItem } from "@/components/app/templates/template-card"
 import { TemplateRowActions } from "@/components/app/templates/template-row-actions"
 import { EnvelopeTypeIcon, TemplateTypeIcon } from "@/components/app/type-icons"
+import { Alert } from "@/components/arc/alert/alert"
 import { EmptyState } from "@/components/arc/empty-state/empty-state"
 import {
   Table,
@@ -46,11 +47,12 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { apiServer } from "@/lib/api-server"
+import { quotaBanner } from "@/lib/billing"
 import { recipientSummary, signingProgress } from "@/lib/envelope-list"
 import type { DropTarget, MovableItem } from "@/lib/file-moves"
 import { filesApiQuery, filesHref, hasFileFilters, parseFilesView } from "@/lib/files-list"
 import { foldersApiQuery, searchesEverywhere } from "@/lib/folder-scope"
-import { formatDate, formatDateTime, pluralize } from "@/lib/format"
+import { formatDate, formatDateTime, formatDayMonth, pluralize } from "@/lib/format"
 import type { TagRef } from "@/lib/labels"
 import { LIST_LAYOUT_COOKIE, resolveListLayout } from "@/lib/list-layout"
 import { totalPages } from "@/lib/pagination"
@@ -104,9 +106,13 @@ export default async function FilesPage({
     (await cookies()).get(LIST_LAYOUT_COOKIE.files)?.value,
   )
   const folderQuery = foldersApiQuery(view)
-  const [files, folders] = await Promise.all([
+  const [files, folders, { data: billing }] = await Promise.all([
     apiServer<FilesPageData>(`/files?${filesApiQuery(view)}`),
     apiServer<FoldersPageData>(`/folders${folderQuery ? `?${folderQuery}` : ""}`),
+    apiServer<{
+      period: { end: string }
+      envelopes: { used: number; limit: number | null; level: UsageLevel }
+    }>("/billing"),
   ])
   // A deleted or foreign folder id, or a query the API refuses: start over at the top level.
   if ([files.status, folders.status].some((s) => s === 400 || s === 404)) redirect("/files")
@@ -168,6 +174,16 @@ export default async function FilesPage({
     })),
   ]
 
+  // Close to or at the plan's envelope quota (docs/billing.md): say so where envelopes are started.
+  const banner = billing
+    ? quotaBanner(
+        billing.envelopes.level,
+        billing.envelopes.used,
+        billing.envelopes.limit,
+        formatDayMonth(new Date(billing.period.end)),
+      )
+    : null
+
   const pagination =
     pageCount > 1 ? (
       <ListPagination
@@ -217,6 +233,15 @@ export default async function FilesPage({
             <UploadDocument folderId={current?.id} />
           </div>
         </header>
+
+        {banner && (
+          <Alert tone={banner.tone} title={banner.title}>
+            {banner.description}{" "}
+            <Link href="/settings/billing" className="underline underline-offset-4">
+              Plan and usage
+            </Link>
+          </Alert>
+        )}
 
         {!blank && (
           <FilesToolbar

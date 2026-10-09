@@ -10,5 +10,5 @@ export default function AppError({
   error: Error & { digest?: string }
   retry: () => void
 }) {
-  return <RouteError error={error} retry={retry} homeHref="/documents" />
+  return <RouteError error={error} retry={retry} homeHref="/files" />
 }

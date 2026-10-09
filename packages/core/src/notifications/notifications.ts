@@ -1,8 +1,9 @@
 import { z } from "zod"
+import { DOCUMENT_PERIODS } from "../workspace/folders"
 import { hasPermission } from "../workspace/permissions"
 
 /**
- * In-app notifications (docs/notifications.md, ADR 0029). The bell in the top bar lists what
+ * In-app notifications (docs/notifications.md, ADR 0029, 0041). The Inbox lists what
  * happened to your envelopes and, for owners and admins, to the workspace. Rows are written in the
  * same transaction as the change they report; email notifications are a separate system
  * (apps/worker/src/jobs/notifications.ts) and aren't affected by these preferences.
@@ -181,7 +182,31 @@ export const ListNotificationsQuerySchema = z.object({
     .enum(["1", "true"])
     .optional()
     .transform((v) => v !== undefined),
+  /** Only read ones (the Inbox's Status chip); ignored with `unread` */
+  read: z
+    .enum(["1", "true"])
+    .optional()
+    .transform((v) => v !== undefined),
+  /** Searches the names and titles the notification quotes (`NOTIFICATION_SEARCH_KEYS`) */
+  q: z
+    .string()
+    .trim()
+    .max(200)
+    .optional()
+    .transform((v) => v || undefined),
+  type: z.enum(NOTIFICATION_TYPES).optional(),
+  period: z.enum(DOCUMENT_PERIODS).optional(),
 })
+
+/** The `NotificationData` fields the Inbox search looks in. */
+export const NOTIFICATION_SEARCH_KEYS = [
+  "envelopeTitle",
+  "recipientName",
+  "actorName",
+  "memberName",
+  "bulkSendTitle",
+  "reason",
+] as const satisfies readonly (keyof NotificationData)[]
 
 const NotificationIds = z.array(z.string().min(1).max(64)).min(1).max(100)
 
