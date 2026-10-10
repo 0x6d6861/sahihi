@@ -11,8 +11,10 @@ import {
   ListIcon,
   ListOrderedIcon,
   PlusIcon,
+  RedoIcon,
   TableIcon,
   UnderlineIcon,
+  UndoIcon,
 } from "@/components/app/icons"
 import { Alert } from "@/components/arc/alert/alert"
 import { Button } from "@/components/arc/button/button"
@@ -23,22 +25,25 @@ import { Button as IconButton } from "@/components/ui/button"
 import { Toggle } from "@/components/ui/toggle"
 import { Toolbar, ToolbarButton, ToolbarGroup, ToolbarSeparator } from "@/components/ui/toolbar"
 import { ApiError } from "@/lib/api"
-import { blankIssues } from "@/lib/generator"
 import { blankKey, fromEditorDoc, toEditorDoc } from "@/lib/generator-editor"
+import { cn } from "@/lib/utils"
 import { useGenerator } from "../generator-context"
+import { type DocMode, DocModeContext } from "./doc-mode"
 import { editorExtensions } from "./extensions"
 
 type NewBlank = { key: string; label: string; type: VariableType }
 
 /**
- * The Editing tab (docs/ai-documents.md → Editing): the document in a rich-text editor whose
- * schema is the document model, so what's typed here is what renders and gets signed. Saves are
- * debounced and serialised (`useAutosave`); each save is a version. Edits apply on top of answers
- * given meanwhile (blanks and signers live outside the text); a 409 means the text changed
- * elsewhere, and the editor offers to reload.
+ * The document on paper (docs/ai-documents.md → Web), in one editor with two modes. Preview is
+ * read-only: clicking a section attaches it to the next chat message. Editing is the rich-text
+ * editor, whose schema is the document model, so what's typed here is what renders and gets
+ * signed. Saves are debounced and serialised (`useAutosave`); each save is a version. Edits apply
+ * on top of answers given meanwhile (blanks and signers live outside the text); a 409 means the
+ * text changed elsewhere, and the editor offers to reload.
  */
-export function DocumentEditor() {
-  const { detail, editable, saveContent, refresh } = useGenerator()
+export function DocumentEditor({ mode }: { mode: DocMode }) {
+  const { detail, editable: canEdit, saveContent, refresh } = useGenerator()
+  const editable = canEdit && mode === "editing"
   const { data } = detail.version
   // The version whose text the editor holds: the base of the next save.
   const base = useRef(detail.version.id)
@@ -113,31 +118,8 @@ export function DocumentEditor() {
     }
   }, [editor, stale, data.content, detail.version.id, autosave.status])
 
-  const blanks = blankIssues(detail.issues)
-
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-6 md:px-8">
-      {stale && (
-        <Alert tone="danger" title="The text changed somewhere else">
-          Your last edit wasn't saved.{" "}
-          <button type="button" className="underline underline-offset-4" onClick={reload}>
-            Load the latest version
-          </button>
-        </Alert>
-      )}
-      {invalid && (
-        <Alert tone="warning" title="This edit can't be saved">
-          Something in the text isn't supported in a document. Undo the last change.
-        </Alert>
-      )}
-      {blanks.length > 0 && (
-        <Alert
-          tone="warning"
-          title={blanks.length === 1 ? "1 blank to fill" : `${blanks.length} blanks to fill`}
-        >
-          Answer the assistant's questions, or click a highlighted blank to fill it.
-        </Alert>
-      )}
+    <DocModeContext.Provider value={mode}>
       {editable && editor && (
         <EditorToolbar
           editor={editor}
@@ -157,14 +139,34 @@ export function DocumentEditor() {
           ]}
         />
       )}
-      <article className="flex flex-col gap-6 rounded-2xl border bg-card px-5 py-6 md:px-10 md:py-10">
-        <h2 className="font-medium text-2xl tracking-tight">{data.title}</h2>
-        <EditorContent
-          editor={editor}
-          className="[counter-reset:section] [&_.ProseMirror]:flex [&_.ProseMirror]:flex-col [&_.ProseMirror]:gap-6 [&_.ProseMirror]:whitespace-pre-wrap [&_.ProseMirror]:text-sm [&_.ProseMirror]:leading-relaxed [&_.ProseMirror]:outline-none [&_.selectedCell]:bg-muted [&_ol]:list-[lower-alpha] [&_ol]:pl-7 [&_table]:w-full [&_table]:table-fixed [&_table]:border-collapse [&_td]:border [&_td]:px-2 [&_td]:py-1.5 [&_td]:align-top [&_th]:border [&_th]:px-2 [&_th]:py-1.5 [&_th]:text-left [&_th]:align-top [&_th]:font-medium [&_ul]:list-disc [&_ul]:pl-7"
-        />
-      </article>
-    </div>
+      <div className="mx-auto flex max-w-[720px] flex-col gap-4 px-6 py-10 sm:px-12">
+        {stale && (
+          <Alert tone="danger" title="The text changed somewhere else">
+            Your last edit wasn't saved.{" "}
+            <button type="button" className="underline underline-offset-4" onClick={reload}>
+              Load the latest version
+            </button>
+          </Alert>
+        )}
+        {invalid && (
+          <Alert tone="warning" title="This edit can't be saved">
+            Something in the text isn't supported in a document. Undo the last change.
+          </Alert>
+        )}
+        <article className="flex flex-col gap-6">
+          <h2 className="font-semibold text-[1.75rem] leading-tight tracking-tight">
+            {data.title}
+          </h2>
+          <EditorContent
+            editor={editor}
+            className={cn(
+              "[counter-reset:section] [&_.ProseMirror]:flex [&_.ProseMirror]:flex-col [&_.ProseMirror]:gap-3 [&_.ProseMirror]:whitespace-pre-wrap [&_.ProseMirror]:text-base [&_.ProseMirror]:leading-7 [&_.ProseMirror]:outline-none [&_.selectedCell]:bg-muted [&_ol]:list-[lower-alpha] [&_ol]:pl-7 [&_table]:w-full [&_table]:table-fixed [&_table]:border-collapse [&_td]:border [&_td]:px-2 [&_td]:py-1.5 [&_td]:align-top [&_th]:border [&_th]:px-2 [&_th]:py-1.5 [&_th]:text-left [&_th]:align-top [&_th]:font-medium [&_ul]:list-disc [&_ul]:pl-7",
+              editable && "[&_.ProseMirror]:min-h-[60vh]",
+            )}
+          />
+        </article>
+      </div>
+    </DocModeContext.Provider>
   )
 }
 
@@ -190,6 +192,8 @@ function EditorToolbar({
       bulletList: e.isActive("bulletList"),
       orderedList: e.isActive("orderedList"),
       inTable: e.isActive("table"),
+      canUndo: e.can().undo(),
+      canRedo: e.can().redo(),
     }),
   })
   const mark = (name: "bold" | "italic" | "underline", label: string, icon: React.ReactNode) => (
@@ -230,7 +234,7 @@ function EditorToolbar({
   )
 
   return (
-    <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 bg-background py-1">
+    <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 border-b bg-background px-5 py-2">
       <Toolbar aria-label="Formatting">
         <ToolbarGroup>
           {mark("bold", "Bold", <BoldIcon />)}
@@ -276,7 +280,31 @@ function EditorToolbar({
             </ToolbarButton>
           </Tooltip>
         </ToolbarGroup>
+        <ToolbarSeparator />
+        <ToolbarGroup>
+          <Tooltip content="Undo">
+            <ToolbarButton
+              render={<IconButton variant="ghost" size="icon-sm" aria-label="Undo" />}
+              disabled={!state.canUndo}
+              onClick={() => editor.chain().focus().undo().run()}
+            >
+              <UndoIcon />
+            </ToolbarButton>
+          </Tooltip>
+          <Tooltip content="Redo">
+            <ToolbarButton
+              render={<IconButton variant="ghost" size="icon-sm" aria-label="Redo" />}
+              disabled={!state.canRedo}
+              onClick={() => editor.chain().focus().redo().run()}
+            >
+              <RedoIcon />
+            </ToolbarButton>
+          </Tooltip>
+        </ToolbarGroup>
       </Toolbar>
+      <span className="ml-auto hidden text-muted-foreground text-xs lg:inline">
+        Blanks are chips: click one to fill it, or answer in the chat.
+      </span>
       <span className="text-muted-foreground text-sm" role="status">
         {status === "saving" || status === "pending" ? "Saving…" : null}
         {status === "saved" ? "Saved" : null}

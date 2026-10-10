@@ -5,12 +5,16 @@ import {
   answeredLines,
   answerValues,
   blankState,
+  blanksStatus,
   chatErrorMessage,
+  messageSectionId,
   type ProposalView,
   pendingSectionIds,
   proposalTitle,
   questionResult,
+  replyParagraphs,
   roleIssues,
+  sectionExcerpt,
   templateChoices,
 } from "./generator"
 
@@ -141,4 +145,53 @@ test("chatErrorMessage shows the API's message, or a generic line", () => {
     "The assistant couldn't reply. Try again in a moment.",
   )
   expect(chatErrorMessage(undefined)).toContain("couldn't reply")
+})
+
+describe("drafting chat helpers", () => {
+  test("messageSectionId reads only a string section id", () => {
+    expect(messageSectionId({ custom: { selection: { sectionId: "term" } } })).toBe("term")
+    expect(messageSectionId({ custom: { selection: { sectionId: 3 } } })).toBeNull()
+    expect(messageSectionId(undefined)).toBeNull()
+    expect(messageSectionId({ custom: {} })).toBeNull()
+  })
+
+  test("sectionExcerpt is the section's text on one line, without the title", () => {
+    const data = findStarter("mutual-nda")?.build()
+    if (!data) throw new Error("missing starter")
+    const filled = applyVariableUpdates(data, [{ key: "term", value: "one year" }], "answer")
+    const excerpt = sectionExcerpt(filled, "term")
+    expect(
+      excerpt?.startsWith(
+        "This Agreement starts on the Effective Date and continues for one year.",
+      ),
+    ).toBe(true)
+    expect(excerpt).not.toContain("\n")
+    expect(sectionExcerpt(filled, "nope")).toBeNull()
+  })
+
+  test("blanksStatus counts open blanks", () => {
+    const issue = (key: string) => ({
+      code: "unresolved_variable" as const,
+      message: "x",
+      variableKey: key,
+    })
+    expect(blanksStatus([issue("a")]).label).toBe("1 blank open")
+    expect(blanksStatus([issue("a"), issue("b")]).label).toBe("2 blanks open")
+    expect(blanksStatus([{ code: "no_signers", message: "x" }])).toEqual({
+      open: 0,
+      label: "All blanks filled",
+    })
+  })
+
+  test("replyParagraphs splits paragraphs and bold runs", () => {
+    expect(replyParagraphs("Drafted a **mutual NDA** today.\n\nNext:")).toEqual([
+      [
+        { text: "Drafted a ", bold: false },
+        { text: "mutual NDA", bold: true },
+        { text: " today.", bold: false },
+      ],
+      [{ text: "Next:", bold: false }],
+    ])
+    expect(replyParagraphs("a * b ** c")).toEqual([[{ text: "a * b ** c", bold: false }]])
+  })
 })

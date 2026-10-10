@@ -9,14 +9,18 @@ import { ApiError } from "@/lib/api"
 import { blankState } from "@/lib/generator"
 import { cn } from "@/lib/utils"
 import { useGenerator } from "../generator-context"
+import { useDocMode } from "./doc-mode"
 
 /**
  * A blank in the text (docs/ai-documents.md → Editing): never bracketed text, always a distinct,
- * non-editable chip. Filled, it shows the value; empty, a dashed chip with the label ("skipped"
- * when the question was skipped). Clicking it fills it; the value is data, not text.
+ * non-editable chip. Filled, it shows the value with a dotted underline; empty, a dashed chip with
+ * the label ("skipped" when the question was skipped). In Editing a click fills it; in Preview a
+ * click belongs to the section (ask about it). The value is data, not text.
  */
 export function BlankView({ node, selected }: NodeViewProps) {
-  const { detail, editable, saveVariables } = useGenerator()
+  const { detail, editable: canEdit, saveVariables } = useGenerator()
+  const mode = useDocMode()
+  const editable = canEdit && mode === "editing"
   const key = String(node.attrs.key)
   const variable = detail.version.data.variables.find((v) => v.key === key)
   const state = blankState(variable)
@@ -28,11 +32,11 @@ export function BlankView({ node, selected }: NodeViewProps) {
 
   const chip =
     state === "filled" ? (
-      <span className={cn("decoration-dotted underline-offset-4", editable && "underline")}>
+      <span className="underline decoration-info decoration-dotted underline-offset-[3px]">
         {variable?.value}
       </span>
     ) : (
-      <span className="mx-0.5 inline-flex items-baseline gap-1 rounded-md border border-warning border-dashed bg-warning/15 px-1.5 text-foreground">
+      <span className="mx-0.5 inline-flex items-baseline gap-1 whitespace-nowrap rounded-sm border border-warning border-dashed bg-warning/15 px-1.5 text-[0.86em] text-foreground">
         {label}
         {state === "skipped" && <span className="text-muted-foreground text-xs">skipped</span>}
       </span>

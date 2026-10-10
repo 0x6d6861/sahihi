@@ -8,14 +8,15 @@ import {
   AskQuestionsResultSchema,
 } from "@sahihi/core"
 import { useEffect, useRef, useState } from "react"
-import { XIcon } from "@/components/app/icons"
+import { CheckIcon, ChevronRightIcon, XIcon } from "@/components/app/icons"
 import { Button } from "@/components/arc/button/button"
-import { Textarea } from "@/components/arc/textarea/textarea"
+import { Input } from "@/components/arc/input/input"
 import { Tooltip } from "@/components/arc/tooltip/tooltip"
-import { Button as IconButton } from "@/components/ui/button"
+import { Button as CossButton } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ApiError } from "@/lib/api"
 import { answeredLines, answerValues, questionResult } from "@/lib/generator"
+import { cn } from "@/lib/utils"
 import { useGenerator } from "./generator-context"
 
 /**
@@ -55,9 +56,19 @@ function AnsweredQuestions({
   return (
     <ul className="flex flex-col gap-2">
       {answeredLines(input, result).map((line) => (
-        <li key={line.question} className="flex flex-col gap-0.5 rounded-xl border px-3.5 py-2.5">
-          <span className="text-sm">{line.question}</span>
-          <span className="text-muted-foreground text-sm">{line.answer ?? "Skipped"}</span>
+        <li
+          key={line.question}
+          className="flex flex-col gap-0.5 rounded-2xl border bg-card px-4 py-3"
+        >
+          <span className="text-[13px] text-muted-foreground">{line.question}</span>
+          <span
+            className={cn(
+              "text-sm",
+              line.answer ? "font-medium text-foreground" : "text-muted-foreground italic",
+            )}
+          >
+            {line.answer ?? "Skipped"}
+          </span>
         </li>
       ))}
     </ul>
@@ -73,13 +84,13 @@ function ActiveQuestions({
   input: AskQuestionsInput
   onDone: (result: AskQuestionsResult) => void
 }) {
-  const { editable, saveVariables, refresh, setPendingQuestion } = useGenerator()
+  const { detail, editable, saveVariables, refresh, setPendingQuestion } = useGenerator()
   const [index, setIndex] = useState(0)
   const [answers, setAnswers] = useState<Record<string, string | null>>({})
   const [draft, setDraft] = useState("")
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const textarea = useRef<HTMLTextAreaElement>(null)
+  const field = useRef<HTMLInputElement>(null)
 
   // While this card waits, the chat input stays closed.
   useEffect(() => {
@@ -117,75 +128,89 @@ function ActiveQuestions({
     setDraft("")
     if (index + 1 < input.questions.length) {
       setIndex(index + 1)
-      textarea.current?.focus()
+      field.current?.focus()
     } else void finish(next)
   }
+
+  const fills = detail.version.data.variables.find((v) => v.key === question.variableKey)?.label
 
   return (
     <section
       aria-label="Questions from the assistant"
-      className="flex flex-col gap-3 rounded-2xl border bg-card p-4"
+      className="overflow-hidden rounded-2xl border border-info/50 bg-card shadow-sm"
     >
-      <header className="flex items-start justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <span className="text-muted-foreground text-sm tabular-nums">
+      <header className="flex flex-col gap-1.5 px-4 pt-3.5 pb-3">
+        <div className="flex items-center justify-between gap-3">
+          <span className="font-mono text-[11px] text-muted-foreground uppercase tabular-nums tracking-wider">
             Question {index + 1} of {input.questions.length}
           </span>
-          <h3 className="font-medium text-base">{question.question}</h3>
+          <Tooltip content="Dismiss questions">
+            <CossButton
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Dismiss questions"
+              disabled={saving}
+              onClick={() => onDone({ dismissed: true, answers: [] })}
+            >
+              <XIcon aria-hidden />
+            </CossButton>
+          </Tooltip>
         </div>
-        <Tooltip content="Dismiss questions">
-          <IconButton
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Dismiss questions"
-            disabled={saving}
-            onClick={() => onDone({ dismissed: true, answers: [] })}
-          >
-            <XIcon aria-hidden />
-          </IconButton>
-        </Tooltip>
+        <h3 className="font-medium text-[15px] leading-snug">{question.question}</h3>
+        {fills && <p className="text-muted-foreground text-xs">Fills: {fills}</p>}
       </header>
 
       {question.options.length > 0 && (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1.5 px-3 pb-3">
           {question.options.map((option) => (
-            <Button
+            // coss, not Arc: Arc's button sizes its label for the morph animation and can't
+            // stretch into a left-aligned row with the chevron on the right.
+            <CossButton
               key={option}
-              variant="secondary"
-              className="justify-start"
+              variant="outline"
+              className="h-auto min-h-10 w-full justify-between whitespace-normal py-2 text-left"
               disabled={saving}
               onClick={() => answer(option)}
             >
-              {option}
-            </Button>
+              <span className="min-w-0 flex-1">{option}</span>
+              <ChevronRightIcon aria-hidden className="text-muted-foreground" />
+            </CossButton>
           ))}
         </div>
       )}
 
-      <Textarea
-        ref={textarea}
-        label={question.options.length > 0 ? "Or type your answer" : "Your answer"}
-        rows={2}
-        value={draft}
-        disabled={saving}
-        error={error ?? undefined}
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey && draft.trim()) {
-            e.preventDefault()
-            answer(draft)
-          }
+      <form
+        className="flex flex-col gap-2.5 border-t bg-muted/40 px-3 py-3"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (draft.trim()) answer(draft)
         }}
-      />
-
-      <div className="flex items-center justify-between gap-2">
-        <Button variant="ghost" disabled={saving} onClick={() => answer(null)}>
-          Skip
-        </Button>
-        <Button loading={saving} disabled={!draft.trim() || saving} onClick={() => answer(draft)}>
-          Answer
-        </Button>
-      </div>
+      >
+        <Input
+          ref={field}
+          label={question.options.length > 0 ? "Or type your own answer" : "Your answer"}
+          value={draft}
+          disabled={saving}
+          error={error ?? undefined}
+          autoComplete="off"
+          onChange={(e) => setDraft(e.target.value)}
+        />
+        <div className="flex items-center justify-between gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={saving}
+            onClick={() => answer(null)}
+          >
+            Skip
+          </Button>
+          <Button type="submit" size="sm" loading={saving} disabled={!draft.trim() || saving}>
+            Answer
+            <ChevronRightIcon aria-hidden />
+          </Button>
+        </div>
+      </form>
     </section>
   )
 }
@@ -220,5 +245,10 @@ export const AppliedNote: ToolCallMessagePartComponent<
   const labels = (args.values ?? []).map(
     (v) => detail.version.data.variables.find((x) => x.key === v.key)?.label ?? v.key,
   )
-  return <p className="text-muted-foreground text-sm">Filled {labels.join(", ")}.</p>
+  return (
+    <p className="flex items-center gap-2 text-muted-foreground text-xs">
+      <CheckIcon aria-hidden className="size-3.5 text-success-foreground" />
+      Updated {labels.join(", ")}
+    </p>
+  )
 }
