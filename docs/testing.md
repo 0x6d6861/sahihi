@@ -47,6 +47,14 @@ Integration tests are named `*.itest.ts`, so neither it nor a bare `bun test` pi
   simplicity first, surgical changes, goal-driven execution), posts findings inline as
   `blocking:` or `nit:`, and finishes with a summary comment. Edit the skill to change what it
   checks.
+- **`fix`:** runs after `review` when the review left `blocking:` findings on the PR's head
+  commit. A second Claude run checks each finding against the code and makes the smallest fix,
+  with a test where one is missing. It runs `bun test`, typecheck and lint, then commits with a
+  `Claude-Autofix: yes` trailer and pushes to the PR branch. Last, it replies on each thread with
+  what changed, or why it left a finding to a person. The push uses the Claude GitHub App's token,
+  so CI and a new review run on it. It stops after 2 rounds per PR (counted from the trailers) and
+  never touches `nit:` comments, forks or drafts. Add the `no-autofix` label to a PR to turn it
+  off.
 - **`mention`:** answers `@claude …` in PR and issue comments from owners, members and
   collaborators.
 
