@@ -4,11 +4,13 @@ import {
   type FieldNode,
   GENERATED_FIELD_TYPES,
   type GeneratedDocumentData,
+  type InlineNode,
   type Section,
   type SignatureBlock,
   type SignerRole,
   SignerRoleSchema,
 } from "./model"
+import { rolePartyKeys } from "./parties"
 
 /**
  * Who signs a generated document and where (docs/ai-documents.md → Signers): the roles with their
@@ -33,6 +35,11 @@ export const SignersDefinitionSchema = z.object({
   roles: z.array(SignerRoleSchema).min(1).max(20),
   /** Fields by role key, in the order they appear. Viewers have none. */
   fields: z.record(z.string(), z.array(SignerFieldSchema).max(12)).default({}),
+  /**
+   * Role key → the party blank it signs for (ADR 0048). Read from the signature blocks' captions;
+   * on save it only captions a new role's block ("For {party}"). Existing captions stay as written.
+   */
+  parties: z.record(z.string(), z.string().max(64)).default({}),
 })
 export type SignersDefinition = z.infer<typeof SignersDefinitionSchema>
 
@@ -60,7 +67,13 @@ export function currentSigners(data: GeneratedDocumentData): SignersDefinition {
     }
     fields[block.attrs.roleKey] = list
   }
-  return { roles: data.roles, fields }
+  const links = rolePartyKeys(data)
+  const parties: Record<string, string> = {}
+  for (const role of data.roles) {
+    const key = links[role.key]
+    if (key) parties[role.key] = key
+  }
+  return { roles: data.roles, fields, parties }
 }
 
 export class SignersError extends Error {}
@@ -68,8 +81,9 @@ export class SignersError extends Error {}
 /**
  * Applies a definition: roles replace the document's roles; each role's fields become its
  * signature block (the first one, caption kept; any others are merged into it). A role without
- * fields loses its block; a new role with fields gets a "For <label>" block in the section that
- * holds the other blocks, or a new "Signatures" section at the end. Throws `SignersError` for a
+ * fields loses its block; a new role with fields gets a "For <party>" block (its party blank, or
+ * else its label) in the section that holds the other blocks, or a new "Signatures" section at the
+ * end. Throws `SignersError` for a
  * definition that can't be applied (duplicate keys, fields for unknown roles or viewers).
  */
 export function applySigners(
@@ -89,6 +103,13 @@ export function applySigners(
     if (!role) throw new SignersError(`Fields for an unknown signer "${key}"`)
     if (role.recipientRole === "VIEWER") {
       throw new SignersError(`${role.label} gets a copy and can't have fields`)
+    }
+  }
+
+  const variables = new Set(data.variables.map((v) => v.key))
+  for (const [roleKey, key] of Object.entries(def.parties)) {
+    if (roles.has(roleKey) && !variables.has(key)) {
+      throw new SignersError(`There is no blank "${key}" for ${roles.get(roleKey)?.label}`)
     }
   }
 
@@ -135,7 +156,10 @@ export function applySigners(
       type: "signatureBlock",
       attrs: { roleKey: r.key },
       content: [
-        { type: "paragraph", content: [{ type: "text", text: `For ${r.label}` }] },
+        {
+          type: "paragraph",
+          content: caption(r.label, def.parties[r.key]),
+        },
         ...(def.fields[r.key] ?? []).map(toNode),
       ],
     }))
@@ -165,6 +189,15 @@ export function applySigners(
     })),
     content: { ...data.content, content: sections },
   }
+}
+
+/** "For {party}" when the role signs for a party blank, else "For <label>". */
+function caption(label: string, partyKey: string | undefined): InlineNode[] {
+  if (!partyKey) return [{ type: "text", text: `For ${label}` }]
+  return [
+    { type: "text", text: "For " },
+    { type: "variable", attrs: { key: partyKey }, marks: [{ type: "bold" }] },
+  ]
 }
 
 const FIELD_NAMES: Record<SignerField["fieldType"], string> = {

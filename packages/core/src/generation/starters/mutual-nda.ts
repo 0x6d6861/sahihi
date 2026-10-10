@@ -1,5 +1,5 @@
 import type { GeneratedDocumentData } from "../model"
-import { blank, ol, p, role, section, signatureBlock, t, v } from "./build"
+import { blank, ol, p, party, role, section, signatureBlock, t, v } from "./build"
 
 export function mutualNda(): GeneratedDocumentData {
   return {
@@ -7,19 +7,9 @@ export function mutualNda(): GeneratedDocumentData {
     pageSize: "A4",
     variables: [
       blank("effective_date", "Effective date", "date"),
-      blank(
-        "party_a_name",
-        "First party's name",
-        "text",
-        "Full legal name of the person or company",
-      ),
+      party("party_a_name", "First party's name", "Full legal name of the person or company"),
       blank("party_a_address", "First party's address", "address", "Address for notices"),
-      blank(
-        "party_b_name",
-        "Second party's name",
-        "text",
-        "Full legal name of the person or company",
-      ),
+      party("party_b_name", "Second party's name", "Full legal name of the person or company"),
       blank("party_b_address", "Second party's address", "address", "Address for notices"),
       blank("purpose", "Purpose of the disclosure", "text", "What the parties are discussing"),
       blank("term", "Term of the agreement", "duration", "How long the agreement runs"),

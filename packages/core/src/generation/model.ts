@@ -185,6 +185,8 @@ export const VariableSchema = z.object({
   value: VariableValueSchema.nullable().default(null),
   status: z.enum(VARIABLE_STATUSES).default("unresolved"),
   source: z.enum(VALUE_SOURCES).optional(),
+  /** The blank names a party to the document, a person or an organisation (ADR 0048). */
+  party: z.boolean().optional(),
 })
 export type Variable = z.infer<typeof VariableSchema>
 

@@ -698,6 +698,27 @@ describe("assistant proposals", () => {
 describe("signers", () => {
   beforeEach(() => enableAssistant(alice))
 
+  test("a new signer's block names the party it signs for; an unknown party is refused", async () => {
+    const id = await createNda(alice)
+    const addGuarantor = (party: string) =>
+      putSigners(alice, id, (def) => {
+        def.roles.push({
+          key: "guarantor",
+          label: "Guarantor",
+          recipientRole: "SIGNER",
+          name: null,
+          email: null,
+          initialsOnEveryPage: false,
+        })
+        def.fields.guarantor = [{ fieldType: "SIGNATURE", required: true }]
+        def.parties.guarantor = party
+      })
+    expect((await addGuarantor("nope")).status).toBe(400)
+    expect((await addGuarantor("party_b_name")).status).toBe(200)
+    const { version } = await detail(alice, id)
+    expect(currentSigners(version.data).parties.guarantor).toBe("party_b_name")
+  })
+
   test("a witness who initials every page, a copy for legal, and extra fields reach the envelope", async () => {
     const id = await createNda(alice)
     await fillEverything(alice, id)

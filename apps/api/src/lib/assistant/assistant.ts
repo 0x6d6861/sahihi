@@ -134,7 +134,7 @@ function tools(ctx: { generatedDocumentId: string; userId: string; statements: s
     },
     define_signers: {
       description:
-        "Propose who signs and where: every signer role (label, SIGNER or VIEWER for a copy, initials on every page) and each role's fields (SIGNATURE, INITIALS, NAME, DATE_SIGNED, TEXT, CHECKBOX). Replaces the current signers. The person accepts or rejects it.",
+        "Propose who signs and where: every signer role (label, SIGNER or VIEWER for a copy, initials on every page) each role's fields (SIGNATURE, INITIALS, NAME, DATE_SIGNED, TEXT, CHECKBOX), and the party blank each role signs for (party). Replaces the current signers. The person accepts or rejects it.",
       inputSchema: DefineSignersInputSchema,
       execute: (input: DefineSignersInput) => propose(ctx, { tool: "define_signers", ...input }),
     },

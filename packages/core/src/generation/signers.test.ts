@@ -26,6 +26,13 @@ describe("currentSigners", () => {
     expect(def.fields.party_a?.[0]?.id).toBe("party_a_signature")
   })
 
+  test("reads the party each signer signs for from its block's caption", () => {
+    expect(currentSigners(nda()).parties).toEqual({
+      party_a: "party_a_name",
+      party_b: "party_b_name",
+    })
+  })
+
   test("applying the current definition changes nothing", () => {
     const data = nda()
     expect(applySigners(data, currentSigners(data), newId)).toEqual(data)
@@ -194,6 +201,73 @@ describe("define_signers proposals", () => {
     expect(result.ok ? "" : result.error).not.toContain("Peter Kamau")
   })
 
+  test("a party's answered name may be a signer's name", () => {
+    const data = nda()
+    const b = data.variables.find((v) => v.key === "party_b_name")
+    if (b) b.value = "Jane Doe"
+    const result = buildProposal(
+      {
+        ...input,
+        roles: [input.roles[0], { ...input.roles[1], name: "Jane Doe" }],
+      } as typeof input,
+      data,
+      [],
+      newId,
+    )
+    if (!result.ok) throw new Error(result.error)
+    expect(applyProposal(data, result.payload, newId).roles[1]?.name).toBe("Jane Doe")
+  })
+
+  test("a new signer can sign for a party; existing links are kept", () => {
+    const data = nda()
+    data.variables.push({
+      key: "party_c_name",
+      label: "Third party's name",
+      type: "text",
+      value: null,
+      status: "unresolved",
+      party: true,
+    })
+    const result = buildProposal(
+      {
+        ...input,
+        roles: [
+          ...input.roles,
+          {
+            key: "party_c",
+            label: "Third party",
+            recipientRole: "SIGNER" as const,
+            initialsOnEveryPage: false,
+            party: "party_c_name",
+          },
+        ],
+        fields: { ...input.fields, party_c: [{ fieldType: "SIGNATURE" as const, required: true }] },
+      },
+      data,
+      [],
+      newId,
+    )
+    if (!result.ok) throw new Error(result.error)
+    expect(currentSigners(applyProposal(data, result.payload, newId)).parties).toEqual({
+      party_a: "party_a_name",
+      party_b: "party_b_name",
+      party_c: "party_c_name",
+    })
+  })
+
+  test("refuses an unknown party blank", () => {
+    const result = buildProposal(
+      {
+        ...input,
+        roles: [{ ...input.roles[0], party: "nope" }, input.roles[1]],
+      } as typeof input,
+      nda(),
+      [],
+      newId,
+    )
+    expect(result.ok ? "" : result.error).toContain("nope")
+  })
+
   test("refuses fields for a viewer", () => {
     const result = buildProposal(
       {
@@ -215,5 +289,50 @@ describe("define_signers proposals", () => {
     if (role) role.label = "Someone else"
     expect(isProposalStale(result.payload.change, nda(), changed)).toBe(true)
     expect(isProposalStale(result.payload.change, nda(), nda())).toBe(false)
+  })
+})
+
+describe("applySigners with parties", () => {
+  const thirdParty = () => {
+    const data = nda()
+    data.variables.push({
+      key: "party_c_name",
+      label: "Third party's name",
+      type: "text",
+      value: null,
+      status: "unresolved",
+      party: true,
+    })
+    const def = currentSigners(data)
+    def.roles.push({
+      key: "party_c",
+      label: "Third party",
+      recipientRole: "SIGNER",
+      name: null,
+      email: null,
+      initialsOnEveryPage: false,
+    })
+    def.fields.party_c = [{ fieldType: "SIGNATURE", required: true }]
+    return { data, def }
+  }
+
+  test("a new signer's block names its party, so the link survives", () => {
+    const { data, def } = thirdParty()
+    def.parties.party_c = "party_c_name"
+    const next = applySigners(data, def, newId)
+    expect(currentSigners(next).parties.party_c).toBe("party_c_name")
+    expect(structureIssues(next)).toEqual([])
+  })
+
+  test("without a party the block is captioned with the role", () => {
+    const { data, def } = thirdParty()
+    const next = applySigners(data, def, newId)
+    expect(currentSigners(next).parties.party_c).toBeUndefined()
+  })
+
+  test("an unknown party blank is refused", () => {
+    const { data, def } = thirdParty()
+    def.parties.party_c = "nope"
+    expect(() => applySigners(data, def, newId)).toThrow(SignersError)
   })
 })

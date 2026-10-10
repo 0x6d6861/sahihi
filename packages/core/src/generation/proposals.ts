@@ -55,7 +55,13 @@ export const DraftSectionSchema = z.object({
 export type DraftSection = z.infer<typeof DraftSectionSchema>
 
 /** Blanks a proposal introduces: the person fills them later, like any other. */
-const NewBlankSchema = VariableSchema.pick({ key: true, label: true, type: true, hint: true })
+const NewBlankSchema = VariableSchema.pick({
+  key: true,
+  label: true,
+  type: true,
+  hint: true,
+  party: true,
+})
 
 const Rationale = z.string().trim().min(1).max(500)
 const SectionIdRef = z.string().min(1).max(64)
@@ -95,6 +101,8 @@ export const DefineSignersInputSchema = z.object({
         initialsOnEveryPage: z.boolean().default(false),
         name: z.string().trim().min(1).max(120).optional(),
         email: z.string().trim().toLowerCase().max(254).optional(),
+        /** The party blank this role signs for (ADR 0048). */
+        party: z.string().max(64).optional(),
       }),
     )
     .min(1)
@@ -306,9 +314,14 @@ function buildSignersProposal(
   userTexts: readonly string[],
   newId: () => string,
 ): BuildProposalResult {
+  // A party's filled value counts as said: the person answered it ("Jane Doe" signs as Candidate).
+  const said = [
+    ...userTexts,
+    ...data.variables.filter((v) => v.party && v.value).map((v) => v.value as string),
+  ]
   const unsaid = input.roles
     .flatMap((r) => [r.name, r.email])
-    .filter((v): v is string => Boolean(v) && !isValueAttested(v as string, userTexts))
+    .filter((v): v is string => Boolean(v) && !isValueAttested(v as string, said))
   if (unsaid.length) {
     return {
       ok: false,
@@ -316,13 +329,20 @@ function buildSignersProposal(
     }
   }
   const existing = new Map(data.roles.map((r) => [r.key, r]))
+  const linked = currentSigners(data).parties
   const signers = SignersDefinitionSchema.parse({
-    roles: input.roles.map((r) => ({
+    roles: input.roles.map(({ party: _party, ...r }) => ({
       ...r,
       name: r.name ?? existing.get(r.key)?.name ?? null,
       email: r.email ?? existing.get(r.key)?.email ?? null,
     })),
     fields: input.fields,
+    parties: Object.fromEntries(
+      input.roles.flatMap((r) => {
+        const key = r.party ?? linked[r.key]
+        return key ? [[r.key, key]] : []
+      }),
+    ),
   })
   const payload: ProposalPayload = { change: { kind: "set_signers", signers }, newVariables: [] }
   try {

@@ -1,5 +1,5 @@
 import type { GeneratedDocumentData } from "../model"
-import { blank, p, role, section, signatureBlock, t, table, unnumbered, v } from "./build"
+import { blank, p, party, role, section, signatureBlock, t, table, unnumbered, v } from "./build"
 
 export function offerLetter(): GeneratedDocumentData {
   return {
@@ -7,14 +7,9 @@ export function offerLetter(): GeneratedDocumentData {
     pageSize: "A4",
     variables: [
       blank("letter_date", "Date of the letter", "date"),
-      blank("employer_name", "Employer's name", "text", "Registered name of the company"),
+      party("employer_name", "Employer's name", "Registered name of the company"),
       blank("employer_address", "Employer's address", "address"),
-      blank(
-        "candidate_name",
-        "Candidate's name",
-        "text",
-        "Full name of the person offered the job",
-      ),
+      party("candidate_name", "Candidate's name", "Full name of the person offered the job"),
       blank("candidate_address", "Candidate's address", "address"),
       blank("job_title", "Job title", "text"),
       blank("reports_to", "Reports to", "text", "Job title of the candidate's manager"),

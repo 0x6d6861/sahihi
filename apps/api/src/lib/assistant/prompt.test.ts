@@ -36,6 +36,21 @@ describe("systemPrompt", () => {
     expect(prompt).not.toContain("# Selected section")
   })
 
+  test("says which party each signer signs for, and which parties nobody signs for", () => {
+    const data = nda()
+    data.variables.push({
+      key: "party_c_name",
+      label: "Third party's name",
+      type: "text",
+      value: null,
+      status: "unresolved",
+      party: true,
+    })
+    const prompt = systemPrompt({ ...base, data })
+    expect(prompt).toMatch(/- party_a "First party" .*signs for \{\{party_a_name\}\}/)
+    expect(prompt).toContain("Parties without a signer: {{party_c_name}}")
+  })
+
   test("adds the selected section when it exists, and ignores unknown ids", () => {
     const withSection = systemPrompt({ ...base, data: nda(), selectedSectionId: "term" })
     expect(withSection).toContain("# Selected section")
