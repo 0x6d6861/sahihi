@@ -1,7 +1,8 @@
 name: Claude review
 
-# Claude reviews every pull request (opened, new commits, ready for review) and answers
-# "@claude …" in PR and issue comments. Needs the Claude GitHub App
+# Claude reviews every pull request (opened, new commits, ready for review), then a second run
+# fixes the review's "blocking:" findings and pushes (at most 2 rounds per PR; the `no-autofix`
+# label turns it off), and answers "@claude …" in PR and issue comments. Needs the Claude GitHub App
 # (https://github.com/apps/claude) and the CLAUDE_CODE_OAUTH_TOKEN repository secret
 # (`claude setup-token`). Each job first checks the OAuth token with a one-line Claude call; when
 # it's missing, expired or over its plan limits, the job uses the ANTHROPIC_API_KEY secret.
@@ -107,6 +108,127 @@ jobs:
           track_progress: true
           prompt: ${{ env.REVIEW_PROMPT }}
           claude_args: ${{ env.REVIEW_ARGS }}
+
+  fix:
+    # After a review, fix its blocking findings on this commit and push them to the PR branch.
+    # The push uses the Claude GitHub App's token, so CI and a new review run on it. Rounds are
+    # counted from "Claude-Autofix:" commit trailers; after 2, a person takes over. Nits are left
+    # alone. Add the `no-autofix` label to a PR to turn this off.
+    needs: review
+    if: >-
+      github.event_name == 'pull_request' &&
+      !github.event.pull_request.draft &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      !contains(github.event.pull_request.labels.*.name, 'no-autofix')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # A new push makes this commit's findings stale.
+    concurrency:
+      group: claude-fix-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+    env:
+      FIX_PROMPT: |
+        REPO: ${{ github.repository }}
+        PR NUMBER: ${{ github.event.pull_request.number }}
+        HEAD SHA: ${{ github.event.pull_request.head.sha }}
+
+        The Claude review left "blocking:" findings on this pull request's head commit. Fix them.
+        Read AGENTS.md first, then the docs/*.md files for the areas you touch.
+
+        1. List the findings: `gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments --paginate`,
+           keeping comments from claude[bot] whose body starts with "blocking:" and whose
+           commit_id is the head SHA above. Ignore "nit:" comments.
+        2. For each finding, check it against the code. Make the smallest change that fixes it,
+           following the golden rules in AGENTS.md, and add or adjust a test where the finding
+           asks for one or the bug was untested. Don't change anything the findings don't need.
+        3. Run `bun test`, `bun run typecheck` and `bun run lint` and fix what fails. (Integration
+           and E2E tests need services; CI runs them on your push.)
+        4. Commit once, with a message that names the findings and ends with the line
+           "Claude-Autofix: yes", and `git push` to the PR branch. Never force-push or rewrite history.
+        5. Reply on each finding's thread (`gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments/<id>/replies -f body=…`) with
+           the commit and what changed. If a finding is wrong, or too large or risky to fix here,
+           don't change code for it: reply explaining why so a person can decide.
+      FIX_ARGS: >-
+        --allowedTools "Read,Edit,Write,Grep,Glob,Bash(bun test:*),Bash(bun run typecheck:*),Bash(bun run lint:*),Bash(bunx biome:*),Bash(git status:*),Bash(git diff:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(git log:*),Bash(gh api:*)"
+    steps:
+      # Only for blocking findings on this exact commit, and at most 2 rounds per PR.
+      - id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          blocking=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/comments" --paginate \
+            --jq "[.[] | select(.user.login == \"claude[bot]\" and .commit_id == \"$SHA\" and (.body | startswith(\"blocking:\")))] | length" \
+            | awk '{ n += $1 } END { print n + 0 }')
+          rounds=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/commits" --paginate \
+            --jq '[.[] | select(.commit.message | test("(?m)^Claude-Autofix:"))] | length' \
+            | awk '{ n += $1 } END { print n + 0 }')
+          echo "Blocking findings on $SHA: $blocking. Autofix rounds so far: $rounds."
+          if [ "$blocking" -eq 0 ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          elif [ "$rounds" -ge 2 ]; then
+            echo "::warning::Claude has already tried to fix this PR twice; leaving the findings to a person."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.gate.outputs.run == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 1
+
+      - if: steps.gate.outputs.run == 'true'
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.13
+
+      - if: steps.gate.outputs.run == 'true'
+        run: bun install --frozen-lockfile && bun run db:generate
+
+      # Pick the credential before the real run, so only a token problem switches to the API key
+      # (a run that fails for another reason is not repeated): one tiny call proves the OAuth
+      # token is set, valid and within its plan limits.
+      - id: auth
+        if: steps.gate.outputs.run == 'true'
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          HAS_API_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+        run: |
+          if [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ] &&
+            timeout 120 npx -y @anthropic-ai/claude-code@2.1.294 -p "Reply with OK" --max-turns 1 < /dev/null > /dev/null 2>&1; then
+            echo "mode=oauth" >> "$GITHUB_OUTPUT"
+          elif [ "$HAS_API_KEY" = "true" ]; then
+            echo "::warning::The Claude OAuth token is missing or not working; using ANTHROPIC_API_KEY."
+            echo "mode=api" >> "$GITHUB_OUTPUT"
+          elif [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            echo "::warning::Claude autofix is off: set CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY."
+            echo "mode=none" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::The Claude OAuth token doesn't work and ANTHROPIC_API_KEY isn't set."
+            exit 1
+          fi
+
+      - if: steps.auth.outputs.mode == 'oauth'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: ${{ env.FIX_PROMPT }}
+          claude_args: ${{ env.FIX_ARGS }}
+
+      - if: steps.auth.outputs.mode == 'api'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: ${{ env.FIX_PROMPT }}
+          claude_args: ${{ env.FIX_ARGS }}
 
   mention:
     # "@claude …" from people with write access to the repository.
