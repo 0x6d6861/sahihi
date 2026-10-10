@@ -32,6 +32,10 @@ describe("isFullPage", () => {
     expect(isFullPage("/envelopes/abc/edit")).toBe(true)
     expect(isFullPage("/envelopes/abc/edit/")).toBe(true)
   })
+  test("the AI document generator, not its list", () => {
+    expect(isFullPage("/generate/abc")).toBe(true)
+    expect(isFullPage("/generate")).toBe(false)
+  })
   test("not the other app pages", () => {
     expect(isFullPage("/envelopes")).toBe(false)
     expect(isFullPage("/envelopes/abc")).toBe(false)

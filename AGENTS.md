@@ -169,6 +169,7 @@ the relevant doc in `docs/` is updated if behaviour changed, and the matching ch
 | Send / sign / decline / void / reminders / OTP | `docs/signing-flow.md` |
 | Inbox, in-app notifications, preferences | `docs/notifications.md` |
 | Templates (save as / use) | `docs/templates.md` |
+| AI document generator (assistant, starters, rendering) | `docs/ai-documents.md` |
 | Webhooks (events, signing, delivery) | `docs/webhooks.md` |
 | Public API `/api/v1`, API keys and scopes | `docs/public-api.md` |
 | Bulk send (CSV / API, worker job) | `docs/bulk-send.md` |

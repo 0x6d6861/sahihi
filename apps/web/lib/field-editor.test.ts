@@ -203,3 +203,43 @@ describe("localPoint", () => {
     expect(localPoint(-10, 900, 600, 800)).toEqual({ x: 0, y: 1 })
   })
 })
+
+describe("locked fields", () => {
+  const saved = fieldsFromSaved([
+    {
+      recipientId: "r1",
+      envelopeDocumentId: "d1",
+      type: "SIGNATURE",
+      page: 1,
+      required: true,
+      x: 0.1,
+      y: 0.8,
+      width: 0.3,
+      height: 0.05,
+      locked: true,
+    },
+  ])
+  const state = initialState(saved)
+  const key = only(state).key
+
+  test("can be selected but not moved, resized, changed or deleted", () => {
+    const selected = editorReducer(state, { type: "select", key })
+    expect(selected.selected).toBe(key)
+    for (const action of [
+      { type: "move", key, dx: 0.1, dy: 0 },
+      { type: "nudge", key, dirX: 1, dirY: 0, big: true },
+      { type: "setRect", key, rect: { x: 0, y: 0, width: 0.5, height: 0.5 } },
+      { type: "update", key, patch: { required: false, recipientId: "r2" } },
+      { type: "delete", key },
+    ] as const) {
+      expect(editorReducer(selected, action)).toBe(selected)
+    }
+  })
+
+  test("stay when their recipient leaves the list, and aren't sent on save", () => {
+    expect(editorReducer(state, { type: "syncRecipients", allowed: [] }).fields).toEqual(saved)
+    const withNew = place(state, { x: 0.5, y: 0.5 })
+    expect(toFieldsPayload(withNew.fields).fields).toHaveLength(1)
+    expect(toFieldsPayload(withNew.fields).fields[0]?.y).not.toBe(0.8)
+  })
+})

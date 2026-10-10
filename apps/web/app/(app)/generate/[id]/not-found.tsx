@@ -1,0 +1,10 @@
+import { RouteNotFound } from "@/components/app/route-states"
+
+/** `notFound()` from the AI document generator (unknown or other-workspace ids), centred in the shell. */
+export default function EditorNotFound() {
+  return (
+    <div className="flex flex-1 items-center justify-center p-4">
+      <RouteNotFound homeHref="/files" />
+    </div>
+  )
+}

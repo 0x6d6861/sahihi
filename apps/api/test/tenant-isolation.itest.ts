@@ -1,6 +1,8 @@
-import { beforeAll, describe, expect, test } from "bun:test"
+import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { prisma } from "@sahihi/db"
 import { putObject } from "@sahihi/infra"
+import { MockLanguageModelV4 } from "ai/test"
+import { setAssistantModelForTests } from "../src/lib/assistant/model"
 import { app, createSender, request, resetDb, type Sender, uploadDocument } from "./helpers"
 
 /**
@@ -29,6 +31,10 @@ const ids = {
   folder: "",
   envelopeDocument: "",
   attachment: "",
+  generatedDocument: "",
+  generatedVersion: "",
+  proposal: "",
+  generationTemplate: "",
 }
 
 type Case = () => { path: string; init?: RequestInit & { json?: unknown } }
@@ -259,6 +265,84 @@ const TENANT: Record<string, Case> = {
       },
     },
   }),
+  "GET /api/generated-documents/:id": () => ({
+    path: `/api/generated-documents/${ids.generatedDocument}`,
+  }),
+  "GET /api/generated-documents/:id/preview": () => ({
+    path: `/api/generated-documents/${ids.generatedDocument}/preview`,
+  }),
+  "POST /api/generated-documents/:id/chat": () => ({
+    path: `/api/generated-documents/${ids.generatedDocument}/chat`,
+    init: {
+      method: "POST",
+      json: { messages: [{ id: "m", role: "user", parts: [{ type: "text", text: "hi" }] }] },
+    },
+  }),
+  "POST /api/generated-documents/:id/variables": () => ({
+    path: `/api/generated-documents/${ids.generatedDocument}/variables`,
+    init: {
+      method: "POST",
+      json: {
+        baseVersionId: ids.generatedVersion,
+        source: "edit",
+        values: [{ key: "term", value: "forever" }],
+      },
+    },
+  }),
+  "PUT /api/generated-documents/:id/content": () => ({
+    path: `/api/generated-documents/${ids.generatedDocument}/content`,
+    init: {
+      method: "PUT",
+      json: {
+        baseVersionId: ids.generatedVersion,
+        content: {
+          type: "doc",
+          content: [{ type: "section", attrs: { id: "x", title: "Mine now" }, content: [] }],
+        },
+      },
+    },
+  }),
+  "POST /api/generated-documents/:id/proposals/:pid/accept": () => ({
+    path: `/api/generated-documents/${ids.generatedDocument}/proposals/${ids.proposal}/accept`,
+    init: { method: "POST" },
+  }),
+  "POST /api/generated-documents/:id/proposals/:pid/reject": () => ({
+    path: `/api/generated-documents/${ids.generatedDocument}/proposals/${ids.proposal}/reject`,
+    init: { method: "POST" },
+  }),
+  "PUT /api/generated-documents/:id/signers": () => ({
+    path: `/api/generated-documents/${ids.generatedDocument}/signers`,
+    init: {
+      method: "PUT",
+      json: {
+        baseVersionId: ids.generatedVersion,
+        signers: {
+          roles: [{ key: "party_a", label: "Mallory", name: "Mallory", email: "m@example.test" }],
+        },
+      },
+    },
+  }),
+  // Starting from a template takes its id: another workspace's is a 404.
+  "POST /api/generated-documents": () => ({
+    path: "/api/generated-documents",
+    init: { method: "POST", json: { templateId: ids.generationTemplate } },
+  }),
+  "POST /api/generated-documents/:id/template": () => ({
+    path: `/api/generated-documents/${ids.generatedDocument}/template`,
+    init: { method: "POST", json: { versionId: ids.generatedVersion, name: "Stolen" } },
+  }),
+  "POST /api/generated-documents/:id/new-version": () => ({
+    path: `/api/generated-documents/${ids.generatedDocument}/new-version`,
+    init: { method: "POST" },
+  }),
+  "DELETE /api/generated-documents/templates/:templateId": () => ({
+    path: `/api/generated-documents/templates/${ids.generationTemplate}`,
+    init: { method: "DELETE" },
+  }),
+  "POST /api/generated-documents/:id/finalize": () => ({
+    path: `/api/generated-documents/${ids.generatedDocument}/finalize`,
+    init: { method: "POST", json: { versionId: ids.generatedVersion, acknowledged: true } },
+  }),
   "POST /api/templates/:id/envelopes": () => ({
     path: `/api/templates/${ids.template}/envelopes`,
     init: {
@@ -284,6 +368,8 @@ const LISTS = [
   "GET /api/notifications",
   // Every envelope's audit events in the caller's workspace only (activity.itest.ts).
   "GET /api/activity",
+  "GET /api/generated-documents",
+  "GET /api/generated-documents/templates",
 ]
 
 /**
@@ -307,6 +393,9 @@ const isStaffDashboard = (route: string) =>
 const NOT_TENANT = [
   // Creates in the caller's own org and takes no ids from the request.
   "POST /api/webhooks",
+  // The caller's own workspace AI switch; no ids.
+  "GET /api/generated-documents/settings",
+  "PUT /api/generated-documents/settings",
   // The caller's own workspace plan and usage; takes no ids.
   "GET /api/billing",
   // The caller's own embedding origins (docs/embedded-signing.md); no ids.
@@ -374,6 +463,8 @@ async function snapshot() {
     folders,
     envelopeDocuments,
     attachments,
+    generatedDocuments,
+    generationTemplates,
   ] = await Promise.all([
     prisma.document.findMany({
       where: { organizationId: alice.organizationId },
@@ -404,6 +495,11 @@ async function snapshot() {
       where: { envelopeId: ids.envelope },
       orderBy: { id: "asc" },
     }),
+    prisma.generatedDocument.findMany({
+      where: { organizationId: alice.organizationId },
+      include: { versions: true, proposals: true },
+    }),
+    prisma.generationTemplate.findMany({ where: { organizationId: alice.organizationId } }),
   ])
   return {
     documents,
@@ -417,6 +513,8 @@ async function snapshot() {
     folders,
     envelopeDocuments,
     attachments,
+    generatedDocuments,
+    generationTemplates,
   }
 }
 
@@ -507,7 +605,47 @@ beforeAll(async () => {
   ids.folder = ((await folder.json()) as { folder: { id: string } }).folder.id
   // A failed delivery, so "retry" would otherwise be allowed.
   await prisma.webhookDelivery.update({ where: { id: ids.delivery }, data: { status: "FAILED" } })
+  // The AI assistant on in both workspaces, so a 404 is the scope and not "assistant off".
+  setAssistantModelForTests(new MockLanguageModelV4())
+  for (const sender of [alice, mallory]) {
+    await request(sender, "/api/generated-documents/settings", {
+      method: "PUT",
+      json: { enabled: true },
+    })
+  }
+  const generated = await request(alice, "/api/generated-documents", {
+    method: "POST",
+    json: { starter: "mutual-nda" },
+  })
+  ids.generatedDocument = ((await generated.json()) as { id: string }).id
+  ids.generatedVersion = (
+    await prisma.generatedDocumentVersion.findFirstOrThrow({
+      where: { generatedDocumentId: ids.generatedDocument },
+    })
+  ).id
+  ids.proposal = (
+    await prisma.generatedDocumentProposal.create({
+      data: {
+        generatedDocumentId: ids.generatedDocument,
+        baseVersionId: ids.generatedVersion,
+        sectionId: "return",
+        payload: { change: { kind: "delete_section", sectionId: "return" }, newVariables: [] },
+        rationale: "Not needed",
+      },
+    })
+  ).id
+  const template = await request(
+    alice,
+    `/api/generated-documents/${ids.generatedDocument}/template`,
+    {
+      method: "POST",
+      json: { versionId: ids.generatedVersion, name: "Our NDA" },
+    },
+  )
+  ids.generationTemplate = ((await template.json()) as { id: string }).id
 })
+
+afterAll(() => setAssistantModelForTests(null))
 
 describe("tenant isolation", () => {
   test("every route is classified (tenant, list or not tenant-scoped)", () => {
@@ -564,6 +702,8 @@ describe("tenant isolation", () => {
       "/api/webhooks",
       "/api/data/exports",
       "/api/bulk-sends",
+      "/api/generated-documents",
+      "/api/generated-documents/templates",
     ]) {
       const mine = (await (await request(alice, path)).json()) as { items: unknown[] }
       const theirs = (await (await request(mallory, path)).json()) as { items: unknown[] }
@@ -583,6 +723,7 @@ describe("tenant isolation", () => {
       `/api/envelopes/${ids.envelope}/preflight`,
       `/api/envelopes/${ids.envelope}/audit`,
       `/api/templates/${ids.template}`,
+      `/api/generated-documents/${ids.generatedDocument}`,
     ]) {
       expect({ path, status: (await request(alice, path)).status }).toEqual({ path, status: 200 })
     }

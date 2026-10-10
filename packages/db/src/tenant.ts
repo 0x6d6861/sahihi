@@ -47,5 +47,11 @@ export function forOrganization(organizationId: string) {
     webhookDelivery: (
       where: Prisma.WebhookDeliveryWhereInput = {},
     ): Prisma.WebhookDeliveryWhereInput => ({ ...where, organizationId }),
+    generatedDocument: (
+      where: Prisma.GeneratedDocumentWhereInput = {},
+    ): Prisma.GeneratedDocumentWhereInput => ({ ...where, organizationId }),
+    generationTemplate: (
+      where: Prisma.GenerationTemplateWhereInput = {},
+    ): Prisma.GenerationTemplateWhereInput => ({ ...where, organizationId }),
   }
 }

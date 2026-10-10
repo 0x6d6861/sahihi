@@ -12,7 +12,8 @@ admins manage this under **Settings → Data** (`data:manage`).
 | The original PDF and its thumbnail, once no other live envelope and no template uses it (the `Document` row is renamed "Deleted document" and soft-deleted; its `sha256` stays). Deleting a document from the Documents page removes its thumbnail at once (ADR 0033) | Each document's hash and `signedSha256`, supporting files' hashes, the `Certificate` row (code, hash) so `/verify/<code>` still answers |
 | Recipients' names, emails (→ `deleted-<id>@redacted.invalid`), phones, signing IPs and user agents, decline reasons, OTP rows, link tokens | Recipient roles, order, statuses and `signedAt`/`viewedAt`/`declinedAt` |
 | Field values and labels; envelope title and message; void reason | Field positions and types |
-| Webhook delivery payloads for that envelope (→ `{ redacted: true }`); in-app notifications about it (deleted, docs/notifications.md) | The hash-chained **audit trail**, append-only (ADR 0010), plus an `envelope.purged` event with the reason |
+| Webhook delivery payloads for that envelope (→ `{ redacted: true }`); in-app notifications about it (deleted, docs/notifications.md) | The hash-chained **audit trail**, append-only (ADR 0010), plus an `envelope.purged` event with the reason (and `aiDraftsDeleted`) |
+| The AI-generated document it was finalised from (docs/ai-documents.md): every version, its answers and contacts, events, suggestions and the conversation, deleted outright | A new version started from it, which is separate work with its own retention |
 
 The audit trail is kept as it is under the lawful-basis exception: it's the evidence that a
 signature happened. Its rows can't be edited (ADR 0010), so personal data inside older audit
@@ -31,6 +32,12 @@ transaction with the audit event, then removes the original if it's unused. It's
   (COMPLETED, DECLINED, VOIDED, EXPIRED) that closed before the cutoff. "Closed" = `completedAt`,
   else `voidedAt`, else `updatedAt` for declined/expired (`closedAt`). Drafts and open envelopes
   are never purged.
+- The same sweep deletes **AI drafts** (generated documents still in DRAFT) that haven't changed
+  since the cutoff (`updatedAt`), with their versions, events and conversation. These deletions
+  leave no audit record: an AI draft has no envelope, and so no audit trail, to attach one to. A
+  finalised one goes when its envelope is purged; one whose finalise stopped before the envelope
+  owns a READY document and is kept. Workspace templates saved from drafts are kept:
+  they hold only what someone chose to keep (docs/ai-documents.md → Templates).
 
 ## On request
 
@@ -45,6 +52,10 @@ e.g. for a data subject's erasure request. It's the "Delete data" button on the 
   - per sent, non-purged envelope (up to `EXPORT_MAX_ENVELOPES` = 2,000): `envelope.json`
     (details, recipients), `audit.json` (events + chain verification), `original.pdf`, and when
     completed `signed.pdf` and `certificate.pdf`
+  - `ai-drafts/<title> (<id>)/` per AI-generated document (newest first, up to
+    `EXPORT_MAX_GENERATED_DOCUMENTS` = 2,000): `document.json` (details, the current and the
+    finalised text with blanks and signers, the version list and the activity trail) and
+    `conversation.json`; `manifest.json` lists them under `aiDrafts`
 - Folders and labels (ADR 0022, 0025, 0038) are not exported; they only organise the lists. Purging
   an envelope keeps its folder and labels, and deleting a folder moves its documents, envelopes and
   templates up a level.
@@ -57,7 +68,8 @@ e.g. for a data subject's erasure request. It's the "Delete data" button on the 
 The owner uses **Settings → Data → Delete workspace** and types the name to confirm. That calls
 better-auth's `organization.delete`:
 - DB rows cascade: documents, envelopes, recipients, fields, audit trails, certificates,
-  templates, webhooks, exports, settings, notifications.
+  templates, webhooks, exports, settings, notifications, AI-generated documents and their
+  templates.
 - The `afterDeleteOrganization` hook queues `organization.purge-storage`, which deletes everything
   under `org/<id>/` in storage (`deletePrefix`, which refuses any prefix that isn't a workspace
   folder).

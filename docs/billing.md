@@ -1,16 +1,17 @@
 # Billing: plans and quotas
 
-Every workspace is on a **plan** that limits **envelopes sent per month** and **seats**. There's
+Every workspace is on a **plan** that limits **envelopes sent per month**, **seats** and **AI
+assistant replies per month**. There's
 no payment provider yet: the Sahihi team sets plans (ADR 0014).
 
 ## Plans (`packages/core/src/workspace/billing.ts`)
 
-| Plan | Envelopes / month | Seats |
-|---|---|---|
-| Free (default) | 5 | 2 |
-| Starter | 50 | 5 |
-| Business | 300 | 20 |
-| Enterprise | unlimited | unlimited |
+| Plan | Envelopes / month | Seats | AI replies / month |
+|---|---|---|---|
+| Free (default) | 5 | 2 | 30 |
+| Starter | 50 | 5 | 300 |
+| Business | 300 | 20 | 1,500 |
+| Enterprise | unlimited | unlimited | unlimited |
 
 A workspace's plan is in `Subscription.plan` (a `PlanId` string). No row means Free, and an
 unknown value also falls back to Free (`planFor`), never to unlimited. `provider*` columns are
@@ -38,6 +39,20 @@ bun run billing:set-plan <organization-slug> <free|starter|business|enterprise>
   ```
   Nothing is changed, and the envelope stays a draft.
 
+## AI assistant replies per month
+
+- **Usage is derived:** the workspace's `assistant.turn` events in the period
+  (`countAssistantTurns`), one per reply of the assistant in Draft with AI (docs/ai-documents.md),
+  including the replies that continue on their own after a question card is answered. Editing,
+  filling in blanks, signers and finalising don't count.
+- **Enforcement:** `POST /generated-documents/:id/chat` checks `checkAssistantQuota` before calling
+  the model. At the limit it returns **402** `assistant_quota_exceeded` (`message`, `plan`, `limit`,
+  `used`, `resetsAt`), and the chat shows the message in place of the reply. A turn is recorded
+  when it ends, so replies already streaming can take the count a few over; the per-user rate limit
+  (20 a minute) bounds that. No lock: the cost of a few extra replies is lower than serialising
+  every chat request.
+- Same period as envelopes (calendar month, Nairobi).
+
 ## Seats
 
 Seats = members + pending, unexpired invitations (`countSeats`, `canAddSeat`). better-auth enforces
@@ -52,7 +67,8 @@ Downgrades don't remove anyone: an over-limit workspace just can't add more peop
 ## API
 
 `GET /api/billing` (any member of the workspace): `{ plan, period, envelopes: { used, limit, level },
-seats: { members, pendingInvitations, used, limit, level }, plans }`. `level` is `ok`, `warning`
+seats: { members, pendingInvitations, used, limit, level }, assistant: { used, limit, level },
+plans }`. `level` is `ok`, `warning`
 (≥ 80 %) or `exceeded` (`usageLevel`).
 
 ## Web

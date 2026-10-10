@@ -51,6 +51,9 @@ Envelope 1─* Recipient 1─* Field            fields are owned by one recipien
 Envelope 1─* AuditEvent                     append-only, hash-chained
 Envelope 1─1 Certificate                    issued on completion
 Recipient 1─* RecipientOtp                  email/SMS codes (hashed)
+Organization 1─* GeneratedDocument          drafted with the AI assistant (docs/ai-documents.md)
+GeneratedDocument 1─* GeneratedDocumentVersion   immutable content versions
+GeneratedDocument 0..1─1 Document, Envelope set when finalised
 ```
 
 See `packages/db/prisma/schema.prisma`. The schema comments are part of the spec.
@@ -115,6 +118,12 @@ Error body shape: `{ error: string, message?: string, issues?: {path, message}[]
 | POST | `/api/templates/:id/bulk-sends` | org | Start a bulk send (docs/bulk-send.md) |
 | GET | `/api/bulk-sends` · `/:id` | org | Batches / progress per row |
 | GET | `/api/sign/:token/embed` | token | Frame policy for `?embed=1` (read by `proxy.ts`) |
+| GET/PUT | `/api/generated-documents/settings` | org | AI assistant availability; owners and admins switch it |
+| GET/POST | `/api/generated-documents` · `/:id` · `/:id/preview` | org + assistant | List / start from a starter / detail / PDF preview (docs/ai-documents.md) |
+| POST | `/api/generated-documents/:id/chat` | org + assistant | One assistant turn (UI message stream) |
+| POST/PUT | `/api/generated-documents/:id/variables` · `/:id/roles` · `/:id/content` | org + assistant | Fill blanks, set signers, save edited text (new version each) |
+| POST | `/api/generated-documents/:id/proposals/:pid/accept` · `/reject` | org + assistant | Apply (new version) or reject an assistant proposal |
+| POST | `/api/generated-documents/:id/finalize` | org + assistant | READY document + DRAFT envelope |
 | * | `/api/v1/*` | API key + scope | Public API, see docs/public-api.md |
 
 ## Queues & jobs

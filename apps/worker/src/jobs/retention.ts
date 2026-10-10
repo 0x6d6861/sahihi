@@ -5,6 +5,7 @@ import { join } from "node:path"
 import {
   CLOSED_STATUSES,
   EXPORT_MAX_ENVELOPES,
+  EXPORT_MAX_GENERATED_DOCUMENTS,
   EXPORT_TTL_DAYS,
   exportFolderName,
   isClosed,
@@ -108,10 +109,13 @@ export async function purgeEnvelope(envelopeId: string, reason: PurgeReason) {
       where: { payload: { path: ["envelope", "id"], equals: e.id } },
       data: { payload: { redacted: true, envelopeId: e.id } },
     })
+    // The AI draft it was finalised from holds the same names, contacts and answers, plus the
+    // conversation (docs/ai-documents.md → Data handling): it goes with the envelope's data.
+    const drafts = await tx.generatedDocument.deleteMany({ where: { envelopeId: e.id } })
     await appendAuditEvent(tx, {
       envelopeId: e.id,
       type: "envelope.purged",
-      data: { reason },
+      data: drafts.count ? { reason, aiDraftsDeleted: drafts.count } : { reason },
     })
   })
 
@@ -146,6 +150,7 @@ export async function retentionSweep(now: Date = new Date()) {
     select: { organizationId: true, retentionYears: true },
   })
   let queued = 0
+  let aiDraftsDeleted = 0
   for (const s of settings) {
     const cutoff = retentionCutoff(s.retentionYears as RetentionYears, now)
     if (!cutoff) continue
@@ -174,8 +179,15 @@ export async function retentionSweep(now: Date = new Date()) {
       ),
     )
     queued += due.length
+    // AI drafts (still DRAFT) untouched since the cutoff. Finalised ones go when their envelope
+    // is purged (purgeEnvelope); one whose finalise stopped before the envelope owns a READY
+    // Document and stays until it's resumed or its document is deleted.
+    const drafts = await prisma.generatedDocument.deleteMany({
+      where: { organizationId: s.organizationId, status: "DRAFT", updatedAt: { lt: cutoff } },
+    })
+    aiDraftsDeleted += drafts.count
   }
-  return { queued }
+  return { queued, aiDraftsDeleted }
 }
 
 // ── Export ───────────────────────────────────────────────────────────────────
@@ -210,6 +222,20 @@ export async function buildExport(exportId: string) {
       },
     })
 
+    const generated = await prisma.generatedDocument.findMany({
+      where: { organizationId: job.organizationId },
+      orderBy: { updatedAt: "desc" },
+      take: EXPORT_MAX_GENERATED_DOCUMENTS,
+      include: {
+        createdBy: { select: { name: true } },
+        versions: {
+          orderBy: { number: "asc" },
+          select: { id: true, number: true, actor: true, reason: true, createdAt: true },
+        },
+        events: { orderBy: { occurredAt: "asc" } },
+      },
+    })
+
     const writer = Bun.file(path).writer()
     let failed: unknown = null
     const done = new Promise<void>((resolve, reject) => {
@@ -234,7 +260,9 @@ export async function buildExport(exportId: string) {
             "Sahihi workspace export.\n\nEach folder is one envelope: envelope.json (details and recipients), " +
               "audit.json (the hash-chained audit trail and its verification), documents/ (each original and, " +
               "for completed envelopes, its signed copy), supporting-files/, and certificate.pdf. " +
-              "manifest.json lists every envelope.\n",
+              "manifest.json lists every envelope.\n\nai-drafts/ has one folder per AI-generated document: " +
+              "document.json (details, the current and finalised text with its blanks and signers, the " +
+              "version history and the activity trail) and conversation.json (the chat with the assistant).\n",
           ),
         )
         const manifest = []
@@ -311,7 +339,58 @@ export async function buildExport(exportId: string) {
           }
           manifest.push({ folder, id: e.id, title: e.title, status: e.status })
         }
-        add("manifest.json", json({ exportedAt: new Date(), envelopes: manifest }))
+        const drafts = []
+        for (const g of generated) {
+          const folder = `ai-drafts/${exportFolderName(g.title, g.id)}`
+          const current = g.versions.at(-1)
+          const wanted = [current?.id, g.finalizedVersionId].filter((v): v is string => !!v)
+          const data = new Map(
+            (
+              await prisma.generatedDocumentVersion.findMany({
+                where: { id: { in: wanted } },
+                select: { id: true, data: true },
+              })
+            ).map((v) => [v.id, v.data]),
+          )
+          add(
+            `${folder}/document.json`,
+            json({
+              id: g.id,
+              title: g.title,
+              status: g.status,
+              starter: g.starter,
+              createdBy: g.createdBy.name,
+              createdAt: g.createdAt,
+              updatedAt: g.updatedAt,
+              envelopeId: g.envelopeId,
+              previousId: g.previousId,
+              current: current
+                ? {
+                    number: current.number,
+                    createdAt: current.createdAt,
+                    data: data.get(current.id),
+                  }
+                : null,
+              finalized: g.finalizedVersionId
+                ? { versionId: g.finalizedVersionId, data: data.get(g.finalizedVersionId) }
+                : null,
+              versions: g.versions,
+              events: g.events.map((ev) => ({
+                type: ev.type,
+                actor: ev.actor,
+                versionId: ev.versionId,
+                data: ev.data,
+                occurredAt: ev.occurredAt,
+              })),
+            }),
+          )
+          add(`${folder}/conversation.json`, json(g.messages))
+          drafts.push({ folder, id: g.id, title: g.title, status: g.status })
+        }
+        add(
+          "manifest.json",
+          json({ exportedAt: new Date(), envelopes: manifest, aiDrafts: drafts }),
+        )
         zip.end()
       })().catch((err) => {
         failed = err

@@ -52,6 +52,8 @@ model User {
   avatar                  UserAvatar?
   notifications           Notification[]
   notificationPreferences NotificationPreference[]
+  generatedDocuments      GeneratedDocument[]
+  generationTemplates     GenerationTemplate[]
 
   @@map("user")
 }
@@ -163,6 +165,8 @@ model Organization {
   bulkSends               BulkSend[]
   notifications           Notification[]
   notificationPreferences NotificationPreference[]
+  generatedDocuments      GeneratedDocument[]
+  generationTemplates     GenerationTemplate[]
 
   @@map("organization")
 }
@@ -258,34 +262,36 @@ enum SigningProviderKind {
 
 /// An uploaded source PDF. Immutable once READY — never overwrite `s3Key`.
 model Document {
-  id                String             @id @default(cuid())
+  id                String              @id @default(cuid())
   organizationId    String
-  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   uploadedById      String
-  uploadedBy        User               @relation(fields: [uploadedById], references: [id])
+  uploadedBy        User                @relation(fields: [uploadedById], references: [id])
   name              String
-  s3Key             String             @unique
-  status            DocumentStatus     @default(UPLOADING)
+  s3Key             String              @unique
+  status            DocumentStatus      @default(UPLOADING)
   sizeBytes         Int?
   sha256            String?
   pageCount         Int?
   /// PageBox[] from @sahihi/core — unrotated crop box + rotation per page
   pages             Json?
   failureReason     String?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
   deletedAt         DateTime?
   /// Envelopes and templates that use this document (ADR 0037: an envelope can hold several).
   envelopeDocuments EnvelopeDocument[]
+  /// The AI-generated document this PDF was rendered from, if any (docs/ai-documents.md).
+  generatedFrom     GeneratedDocument[]
   templateDocuments TemplateDocument[]
   /// Set when this document was produced by "Prepare document" from another one (same org).
   /// The source is never modified; this is lineage only.
   sourceDocumentId  String?
-  source            Document?          @relation("DocumentLineage", fields: [sourceDocumentId], references: [id], onDelete: SetNull)
-  derived           Document[]         @relation("DocumentLineage")
+  source            Document?           @relation("DocumentLineage", fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  derived           Document[]          @relation("DocumentLineage")
   /// Folder on the Documents page (null = workspace root). Organisation only, no effect on signing.
   folderId          String?
-  folder            Folder?            @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  folder            Folder?             @relation(fields: [folderId], references: [id], onDelete: SetNull)
   /// Label colour (`#RRGGBB`, `LabelColorSchema`) and tags on the Documents page (ADR 0025).
   /// Organisation only, like folders.
   color             String?
@@ -381,6 +387,8 @@ model Envelope {
   auditEvents   AuditEvent[]
   certificate   Certificate?
   notifications Notification[]
+  /// Set when this draft was created by finalising an AI-generated document.
+  generatedFrom GeneratedDocument[]
 
   @@index([organizationId, status])
   @@index([organizationId, createdAt])
@@ -507,6 +515,9 @@ model Field {
   height             Float
   required           Boolean          @default(true)
   label              String?
+  /// Placed by finalising an AI-generated document, on the line its PDF prints: can't be moved,
+  /// changed or removed in the envelope editor (docs/ai-documents.md → Finalise)
+  locked             Boolean          @default(false)
   // ── completion ──
   value              String?
   /// S3 key of the PNG for SIGNATURE / INITIALS fields
@@ -737,6 +748,9 @@ model WorkspaceSettings {
   embedOrigins   String[]     @default([])
   /// Workspace logo (PNG) in storage; Organization.logo holds its public /api/branding URL
   logoKey        String?
+  /// Admins turn the AI document assistant on (docs/ai-documents.md). Off by default: document
+  /// text goes to an external model provider.
+  aiEnabled      Boolean      @default(false)
   updatedAt      DateTime     @updatedAt
 }
 
@@ -901,4 +915,147 @@ model NotificationPreference {
   updatedAt      DateTime     @updatedAt
 
   @@id([userId, organizationId])
+}
+
+// ═══ 3. AI-generated documents (docs/ai-documents.md) ═══════════════════════════
+
+enum GeneratedDocumentStatus {
+  DRAFT // being drafted with the assistant; editable
+  FINALIZED // rendered to a PDF and handed to a DRAFT envelope; locked
+}
+
+enum GenerationActor {
+  USER
+  AI
+}
+
+enum ProposalStatus {
+  PENDING // waiting for the person
+  ACCEPTED // applied as a new version
+  REJECTED
+  STALE // the section changed before it was accepted
+}
+
+/// A document drafted with the AI assistant. Its content lives in immutable versions; the latest
+/// version (highest `number`) is the current one.
+model GeneratedDocument {
+  id                 String                  @id @default(cuid())
+  organizationId     String
+  organization       Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdById        String
+  createdBy          User                    @relation(fields: [createdById], references: [id])
+  title              String
+  /// Starter it began from (`STARTERS` in @sahihi/core)
+  starter            String
+  status             GeneratedDocumentStatus @default(DRAFT)
+  /// The conversation with the assistant: AI SDK UI messages, rewritten after every turn
+  messages           Json                    @default("[]")
+  /// Set by finalising: the version that was rendered, the READY PDF and its DRAFT envelope
+  finalizedVersionId String?
+  documentId         String?
+  document           Document?               @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  envelopeId         String?
+  envelope           Envelope?               @relation(fields: [envelopeId], references: [id], onDelete: SetNull)
+  /// The workspace template it started from, if any (lineage only: the data was copied)
+  templateId         String?
+  template           GenerationTemplate?     @relation("StartedFromTemplate", fields: [templateId], references: [id], onDelete: SetNull)
+  /// The finalised document this one is a new version of (lineage only: the data was copied)
+  previousId         String?
+  previous           GeneratedDocument?      @relation("NewVersions", fields: [previousId], references: [id], onDelete: SetNull)
+  newVersions        GeneratedDocument[]     @relation("NewVersions")
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+
+  versions  GeneratedDocumentVersion[]
+  savedAsTemplates GenerationTemplate[] @relation("SavedFrom")
+  events    GeneratedDocumentEvent[]
+  proposals GeneratedDocumentProposal[]
+
+  @@index([organizationId, createdAt])
+  @@index([documentId])
+  @@index([envelopeId])
+  @@index([templateId])
+  @@index([previousId])
+}
+
+/// A generated document saved to start others from (docs/ai-documents.md → Templates): its
+/// `GeneratedDocumentData` with values and contacts cleared except the ones the person kept.
+model GenerationTemplate {
+  id                        String              @id @default(cuid())
+  organizationId            String
+  organization              Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdById               String
+  createdBy                 User                @relation(fields: [createdById], references: [id])
+  name                      String
+  description               String?
+  /// Starter of the document it was saved from (`STARTERS` in @sahihi/core)
+  starter                   String
+  data                      Json
+  sourceGeneratedDocumentId String?
+  sourceGeneratedDocument   GeneratedDocument?  @relation("SavedFrom", fields: [sourceGeneratedDocumentId], references: [id], onDelete: SetNull)
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
+
+  documents GeneratedDocument[] @relation("StartedFromTemplate")
+
+  @@index([organizationId, createdAt])
+  @@index([sourceGeneratedDocumentId])
+}
+
+/// One state of a generated document: `GeneratedDocumentData` from @sahihi/core (title, content
+/// tree, variables, signer roles). Never updated (database trigger); every change appends a version.
+model GeneratedDocumentVersion {
+  id                  String            @id @default(cuid())
+  generatedDocumentId String
+  generatedDocument   GeneratedDocument @relation(fields: [generatedDocumentId], references: [id], onDelete: Cascade)
+  /// 1, 2, 3… per document
+  number              Int
+  data                Json
+  actor               GenerationActor
+  /// The person who made the change, or whose conversation the assistant acted in
+  createdById         String?
+  /// Short description of the change ("Answered 2 questions")
+  reason              String
+  createdAt           DateTime          @default(now())
+
+  @@unique([generatedDocumentId, number])
+}
+
+/// Append-only trail of assistant actions and edits on a generated document (no UPDATE: database
+/// trigger). Holds what changed, never prompts or model output.
+model GeneratedDocumentEvent {
+  id                  String            @id @default(cuid())
+  generatedDocumentId String
+  generatedDocument   GeneratedDocument @relation(fields: [generatedDocumentId], references: [id], onDelete: Cascade)
+  /// GenerationEventType from @sahihi/core
+  type                String
+  actor               GenerationActor
+  actorUserId         String?
+  versionId           String?
+  data                Json?
+  occurredAt          DateTime          @default(now())
+
+  @@index([generatedDocumentId, occurredAt])
+}
+
+/// An edit the assistant proposed (`ProposalPayload` from @sahihi/core); the person accepts or
+/// rejects it. Accepting appends a version. Proposals are never rewritten except for their status.
+model GeneratedDocumentProposal {
+  id                  String            @id @default(cuid())
+  generatedDocumentId String
+  generatedDocument   GeneratedDocument @relation(fields: [generatedDocumentId], references: [id], onDelete: Cascade)
+  /// The version the proposal was made on
+  baseVersionId       String
+  /// The section it replaces or deletes; null for inserted sections
+  sectionId           String?
+  payload             Json
+  rationale           String
+  status              ProposalStatus    @default(PENDING)
+  /// The version accepting it created
+  resultVersionId     String?
+  decidedById         String?
+  decidedAt           DateTime?
+  createdAt           DateTime          @default(now())
+
+  @@index([generatedDocumentId, createdAt])
 }

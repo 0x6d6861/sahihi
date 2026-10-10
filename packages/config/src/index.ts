@@ -63,15 +63,38 @@ const EnvSchema = z.object({
 
   SIGNING_LINK_TTL_DAYS: z.coerce.number().int().positive().default(14),
   SIGNING_PROVIDER: z.enum(["internal", "ca"]).default("internal"),
+
+  // ── AI document assistant (docs/ai-documents.md) ──
+  /**
+   * `provider:model`, e.g. `anthropic:claude-sonnet-5-5` or `openai:<model>`. Unset = the
+   * assistant is off everywhere; workspaces also have to turn it on.
+   */
+  AI_MODEL: z
+    .string()
+    .regex(/^(anthropic|openai):[\w.-]+$/, "Use provider:model, e.g. anthropic:claude-sonnet-5-5")
+    .optional(),
+  ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  OPENAI_API_KEY: z.string().min(1).optional(),
 })
 
 export type Env = z.infer<typeof EnvSchema>
+
+/** The key AI_MODEL's provider needs must be set too, so a typo fails at boot, not on first use. */
+const CheckedEnvSchema = EnvSchema.superRefine((env, ctx) => {
+  const provider = env.AI_MODEL?.split(":")[0]
+  if (provider === "anthropic" && !env.ANTHROPIC_API_KEY) {
+    ctx.addIssue({ code: "custom", path: ["ANTHROPIC_API_KEY"], message: "Required by AI_MODEL" })
+  }
+  if (provider === "openai" && !env.OPENAI_API_KEY) {
+    ctx.addIssue({ code: "custom", path: ["OPENAI_API_KEY"], message: "Required by AI_MODEL" })
+  }
+})
 
 let cached: Env | undefined
 
 export function getEnv(source: Record<string, string | undefined> = process.env): Env {
   if (cached) return cached
-  const parsed = EnvSchema.safeParse(source)
+  const parsed = CheckedEnvSchema.safeParse(source)
   if (!parsed.success) {
     const issues = parsed.error.issues
       .map((i) => `  - ${i.path.join(".")}: ${i.message}`)

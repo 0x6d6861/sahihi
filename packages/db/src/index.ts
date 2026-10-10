@@ -3,7 +3,13 @@ import { PrismaClient } from "./generated/prisma/client"
 import { createSerializedPool } from "./pg-pool"
 
 export { type AppendAuditInput, appendAuditEvent, toChainedEvent } from "./audit"
-export { countEnvelopesSent, countSeats, getOrgPlan, lockOrgQuota } from "./billing"
+export {
+  countAssistantTurns,
+  countEnvelopesSent,
+  countSeats,
+  getOrgPlan,
+  lockOrgQuota,
+} from "./billing"
 export * from "./generated/prisma/client"
 export { notifyEnvelopeOwner, notifyUsers, notifyWorkspaceAdmins } from "./notifications"
 export { issueSigningLink } from "./signing-links"
