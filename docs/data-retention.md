@@ -32,9 +32,11 @@ transaction with the audit event, then removes the original if it's unused. It's
   (COMPLETED, DECLINED, VOIDED, EXPIRED) that closed before the cutoff. "Closed" = `completedAt`,
   else `voidedAt`, else `updatedAt` for declined/expired (`closedAt`). Drafts and open envelopes
   are never purged.
-- The same sweep deletes **AI drafts** (generated documents) that have no envelope and haven't
-  changed since the cutoff (`updatedAt`), with their versions, events and conversation. A
-  finalised one goes when its envelope is purged. Workspace templates saved from drafts are kept:
+- The same sweep deletes **AI drafts** (generated documents still in DRAFT) that haven't changed
+  since the cutoff (`updatedAt`), with their versions, events and conversation. These deletions
+  leave no audit record: an AI draft has no envelope, and so no audit trail, to attach one to. A
+  finalised one goes when its envelope is purged; one whose finalise stopped before the envelope
+  owns a READY document and is kept. Workspace templates saved from drafts are kept:
   they hold only what someone chose to keep (docs/ai-documents.md → Templates).
 
 ## On request

@@ -1057,6 +1057,43 @@ describe("templates", () => {
   })
 })
 
+describe("finalize, resumed", () => {
+  beforeEach(() => enableAssistant(alice))
+
+  test("concurrent calls after the PDF is stored create one envelope, its fields locked", async () => {
+    const id = await createNda(alice)
+    const versionId = await fillEverything(alice, id)
+    const first = await request(alice, `/api/generated-documents/${id}/finalize`, {
+      method: "POST",
+      json: { versionId, acknowledged: true },
+    })
+    expect(first.status).toBe(201)
+    // A call that stored the PDF and then failed before linking an envelope.
+    await prisma.generatedDocument.update({ where: { id }, data: { envelopeId: null } })
+    const before = await prisma.envelope.count({ where: { organizationId: alice.organizationId } })
+
+    const call = () =>
+      request(alice, `/api/generated-documents/${id}/finalize`, {
+        method: "POST",
+        json: { versionId, acknowledged: true },
+      })
+    const results = await Promise.all([call(), call()])
+    const ids = await Promise.all(results.map((r) => json<{ envelopeId: string }>(r)))
+    expect(results.map((r) => r.status).sort()).toEqual([200, 201])
+    expect(ids[0]?.envelopeId).toBe(ids[1]?.envelopeId as string)
+    expect(await prisma.envelope.count({ where: { organizationId: alice.organizationId } })).toBe(
+      before + 1,
+    )
+    const linked = await prisma.generatedDocument.findUniqueOrThrow({ where: { id } })
+    expect(linked.envelopeId).toBe(ids[0]?.envelopeId as string)
+    const fields = await prisma.field.findMany({
+      where: { envelopeId: linked.envelopeId as string },
+    })
+    expect(fields.length).toBeGreaterThan(0)
+    expect(fields.every((f) => f.locked)).toBe(true)
+  })
+})
+
 describe("locked fields in the envelope", () => {
   beforeEach(() => enableAssistant(alice))
 

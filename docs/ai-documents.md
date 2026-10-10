@@ -216,7 +216,7 @@ validates with `DocContentSchema` before anything is saved.
    rendered. A thumbnail is queued as for any upload.
 4. `createEnvelopeFromDocument` creates the DRAFT envelope (audit `envelope.created`): roles become
    recipients in order, rendered fields become `Field`s.
-5. Those fields are marked `locked` and `document.finalized` is recorded. The web opens the
+5. The fields are created `locked`, and `document.finalized` is recorded with the envelope. The web opens the
    envelope's draft editor.
 
 **Locked fields (ADR 0047).** A finalised document's fields sit on the lines its PDF prints, so the
@@ -231,7 +231,9 @@ why). More fields can be added around them. The API holds the line too, with 409
 To change the text, signers or fields, start a new version (below).
 
 Resumable: if step 4 fails, calling again re-renders the same version (deterministic, so the fields
-match the stored PDF) and creates only the envelope. A finalised document is locked; its PDF is a
+match the stored PDF) and creates only the envelope. Steps 4 and 5 run in one transaction that
+first locks the document row and checks for an envelope, so concurrent calls or a retry create one
+envelope and the others answer with it (200); the fields are created locked. A finalised document is locked; its PDF is a
 first-class document (files list, templates, other envelopes).
 
 ## New versions (ADR 0047)

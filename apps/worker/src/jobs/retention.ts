@@ -179,10 +179,11 @@ export async function retentionSweep(now: Date = new Date()) {
       ),
     )
     queued += due.length
-    // AI drafts that never became an envelope (or whose envelope is gone), untouched since the
-    // cutoff. Finalised ones go when their envelope is purged (purgeEnvelope).
+    // AI drafts (still DRAFT) untouched since the cutoff. Finalised ones go when their envelope
+    // is purged (purgeEnvelope); one whose finalise stopped before the envelope owns a READY
+    // Document and stays until it's resumed or its document is deleted.
     const drafts = await prisma.generatedDocument.deleteMany({
-      where: { organizationId: s.organizationId, envelopeId: null, updatedAt: { lt: cutoff } },
+      where: { organizationId: s.organizationId, status: "DRAFT", updatedAt: { lt: cutoff } },
     })
     aiDraftsDeleted += drafts.count
   }

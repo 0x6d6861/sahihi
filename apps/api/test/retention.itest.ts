@@ -382,12 +382,17 @@ describe("AI drafts", () => {
     const fresh = await seedDraft()
     const { envelopeId } = await seedCompleted()
     const finalised = await seedDraft(old, envelopeId)
+    // Finalised, but the envelope was never created (finalise stopped halfway): it owns a READY
+    // Document, so the sweep leaves it.
+    const halfway = await seedDraft(old)
+    await prisma.generatedDocument.update({ where: { id: halfway }, data: { status: "FINALIZED" } })
+    await prisma.generatedDocument.update({ where: { id: halfway }, data: { updatedAt: old } })
     expect(await retentionSweep()).toEqual({ queued: 0, aiDraftsDeleted: 0 })
 
     await request(alice, "/api/data/settings", { method: "PUT", json: { retentionYears: 3 } })
     expect(await retentionSweep()).toEqual({ queued: 0, aiDraftsDeleted: 1 })
     const left = await prisma.generatedDocument.findMany({ select: { id: true } })
-    expect(left.map((d) => d.id).sort()).toEqual([fresh, finalised].sort())
+    expect(left.map((d) => d.id).sort()).toEqual([fresh, finalised, halfway].sort())
     expect(
       await prisma.generatedDocumentVersion.count({ where: { generatedDocumentId: stale } }),
     ).toBe(0)

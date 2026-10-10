@@ -266,17 +266,27 @@ export const generatedDocuments = new Hono<AppEnv>()
   })
 
   /** The latest version as a PDF, blanks highlighted. Not stored: rendering is deterministic. */
-  .get("/:id/preview", async (c) => {
-    const { version } = await loadGeneratedDocument(c.get("organizationId"), c.req.param("id"))
-    const { bytes } = await composeGeneratedDocument(version.data, {
-      date: version.createdAt,
-      allowUnresolved: true,
-    })
-    return c.body(bytes as Uint8Array<ArrayBuffer>, 200, {
-      "Content-Type": "application/pdf",
-      "Cache-Control": "private, no-store",
-    })
-  })
+  .get(
+    "/:id/preview",
+    // Each call renders the whole PDF; reloading is fine, polling isn't.
+    rateLimit({
+      bucket: "generated-preview",
+      limit: 30,
+      windowSec: 60,
+      key: (c) => c.get("user").id,
+    }),
+    async (c) => {
+      const { version } = await loadGeneratedDocument(c.get("organizationId"), c.req.param("id"))
+      const { bytes } = await composeGeneratedDocument(version.data, {
+        date: version.createdAt,
+        allowUnresolved: true,
+      })
+      return c.body(bytes as Uint8Array<ArrayBuffer>, 200, {
+        "Content-Type": "application/pdf",
+        "Cache-Control": "private, no-store",
+      })
+    },
+  )
 
   .post(
     "/:id/chat",
@@ -524,12 +534,6 @@ export const generatedDocuments = new Hono<AppEnv>()
   })
 
   /**
-   * Render the reviewed version to a READY Document and create its DRAFT envelope, with the
-   * signers as recipients and the rendered fields in place. Resumable: if a previous call stored
-   * the PDF but failed before the envelope, calling again creates only the envelope (the render is
-   * deterministic, so the fields still match the stored PDF).
-   */
-  /**
    * Save a version as a workspace template. Anyone who can open the document may, finalised or
    * not; values and contacts are cleared unless listed in `keepValues` / `keepContacts`.
    */
@@ -650,6 +654,12 @@ export const generatedDocuments = new Hono<AppEnv>()
     return c.json({ id: created.id }, created.existing ? 200 : 201)
   })
 
+  /**
+   * Render the reviewed version to a READY Document and create its DRAFT envelope, with the
+   * signers as recipients and the rendered fields in place. Resumable: if a previous call stored
+   * the PDF but failed before the envelope, calling again creates only the envelope (the render is
+   * deterministic, so the fields still match the stored PDF).
+   */
   .post("/:id/finalize", async (c) => {
     const input = await parseJson(c, FinalizeGeneratedDocumentSchema)
     const orgId = c.get("organizationId")
@@ -726,32 +736,45 @@ export const generatedDocuments = new Hono<AppEnv>()
     }
 
     const draft = envelopeDraftFromGenerated(latest.data, composed.fields, composed.pages)
-    const envelope = await createEnvelopeFromDocument({
-      organizationId: orgId,
-      actor: { userId, ...clientMeta(c) },
-      data: ApiCreateFromDocumentSchema.parse({
-        title: latest.data.title,
-        documentIds: [documentId],
-        signingOrder: "PARALLEL",
-        ...draft,
-      }),
-    })
-    await prisma.$transaction(async (tx) => {
-      await tx.generatedDocument.update({
-        where: { id: doc.id },
-        data: { envelopeId: envelope.id },
+    let envelope: { id: string }
+    try {
+      envelope = await createEnvelopeFromDocument({
+        organizationId: orgId,
+        actor: { userId, ...clientMeta(c) },
+        data: ApiCreateFromDocumentSchema.parse({
+          title: latest.data.title,
+          documentIds: [documentId],
+          signingOrder: "PARALLEL",
+          ...draft,
+        }),
+        // They sit on the lines the PDF prints: the envelope editor can't move or remove them.
+        lockFields: true,
+        // One envelope per document, even for concurrent calls or a retry: claim the row first,
+        // and link the envelope in the same transaction.
+        beforeCreate: async (tx) => {
+          await lockGeneratedDocument(tx, doc.id)
+          const current = await tx.generatedDocument.findUnique({
+            where: { id: doc.id },
+            select: { envelopeId: true },
+          })
+          if (current?.envelopeId) throw new EnvelopeAlreadyCreated(current.envelopeId)
+        },
+        afterCreate: async (tx, envelopeId) => {
+          await tx.generatedDocument.update({ where: { id: doc.id }, data: { envelopeId } })
+          await appendEvent(tx, {
+            generatedDocumentId: doc.id,
+            type: "document.finalized",
+            actor: "USER",
+            actorUserId: userId,
+            versionId: latest.id,
+            data: { documentId, envelopeId, acknowledged: true },
+          })
+        },
       })
-      // They sit on the lines the PDF prints: the envelope editor can't move or remove them.
-      await tx.field.updateMany({ where: { envelopeId: envelope.id }, data: { locked: true } })
-      await appendEvent(tx, {
-        generatedDocumentId: doc.id,
-        type: "document.finalized",
-        actor: "USER",
-        actorUserId: userId,
-        versionId: latest.id,
-        data: { documentId, envelopeId: envelope.id, acknowledged: true },
-      })
-    })
+    } catch (err) {
+      if (err instanceof EnvelopeAlreadyCreated) return c.json({ envelopeId: err.envelopeId })
+      throw err
+    }
     return c.json({ envelopeId: envelope.id }, 201)
   })
 
@@ -792,6 +815,13 @@ async function newVersionOf(id: string): Promise<string | null> {
     select: { id: true },
   })
   return next?.id ?? null
+}
+
+/** Another call linked an envelope to this document first; answer with that one. */
+class EnvelopeAlreadyCreated extends Error {
+  constructor(readonly envelopeId: string) {
+    super("envelope already created")
+  }
 }
 
 async function loadProposal(generatedDocumentId: string, id: string) {
