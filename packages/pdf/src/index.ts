@@ -1,3 +1,5 @@
+export * from "./compose/document"
+
 export * from "./parse/form"
 export * from "./parse/inspect"
 export * from "./parse/page-text"

@@ -178,7 +178,8 @@ Each step checks what already exists, so BullMQ retries are safe.
 
 Stamped text and certificates use **Noto Sans** (SIL OFL 1.1, `packages/pdf/fonts/` with
 `OFL.txt`), embedded with `@pdf-lib/fontkit` (`src/fonts.ts`). Stamping embeds only Regular; the
-certificate embeds Regular and Bold. Fonts are **subset**, so a stamped PDF grows by a few KB, not
+certificate embeds Regular and Bold; AI-generated documents (docs/ai-documents.md) embed all four,
+Italic and Bold Italic being the hinted build of the same 2.015 release. Fonts are **subset**, so a stamped PDF grows by a few KB, not
 600 KB, and each subset has a ToUnicode map, so the text stays searchable and copyable.
 
 - **Coverage:** Latin with all extensions (Swahili, Kikuyu ũ/ĩ, Polish, Turkish, Vietnamese…), Greek

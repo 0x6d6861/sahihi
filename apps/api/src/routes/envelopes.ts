@@ -28,6 +28,7 @@ import {
   documentsAuditData,
   EnvelopeError,
   loadReadyDocuments,
+  lockedFields,
   replaceEnvelopeDocument,
   rotateRecipientLink,
   sendEnvelope,
@@ -389,6 +390,11 @@ export const envelopes = new Hono<AppEnv>()
     if (!target) notFound("Envelope document")
     const doc = target as NonNullable<typeof target>
     if (envelope.documents.length === 1) conflict("An envelope needs at least one document")
+    if (await prisma.field.count({ where: { envelopeDocumentId: doc.id, locked: true } })) {
+      lockedFields(
+        "This document was drafted with AI and its fields sit on the lines it prints. Start a new version of it in the AI draft instead.",
+      )
+    }
     await prisma.$transaction(async (tx) => {
       const { count } = await tx.field.deleteMany({ where: { envelopeDocumentId: doc.id } })
       await tx.envelopeDocument.delete({ where: { id: doc.id } })
@@ -563,6 +569,20 @@ export const envelopes = new Hono<AppEnv>()
     const emails = recipients.map((r) => r.email)
     if (new Set(emails).size !== emails.length) badRequest("Duplicate recipient emails")
     const existingIds = new Set(envelope.recipients.map((r) => r.id))
+    // Signers of an AI-drafted document keep their place: their fields sit on printed lines.
+    const lockedOwners = await prisma.field.findMany({
+      where: { envelopeId: envelope.id, locked: true },
+      select: { recipientId: true },
+      distinct: ["recipientId"],
+    })
+    for (const { recipientId } of lockedOwners) {
+      const next = recipients.find((r) => r.id === recipientId)
+      if (!next || next.role === "VIEWER") {
+        lockedFields(
+          "A signer of the AI-drafted document can't be removed or made a viewer here. Change the signers in the AI draft and start a new version.",
+        )
+      }
+    }
 
     const saved = await prisma.$transaction(async (tx) => {
       const keep = recipients
@@ -592,7 +612,7 @@ export const envelopes = new Hono<AppEnv>()
     return c.json({ recipients: saved })
   })
 
-  /** Replace all fields (editor autosave). Draft only. */
+  /** Replace all fields (editor autosave) except locked ones, which stay. Draft only. */
   .put("/:id/fields", async (c) => {
     const { fields } = await parseJson(c, ReplaceFieldsSchema)
     const scope = forOrganization(c.get("organizationId"))
@@ -623,10 +643,29 @@ export const envelopes = new Hono<AppEnv>()
       if (f.page > (pages ?? 0)) badRequest(`Page ${f.page} does not exist`)
     }
 
+    // Locked fields (finalised AI documents) aren't part of the payload and stay as they are; one
+    // sent back unchanged, e.g. by an older tab, is not added twice.
+    const locked = await prisma.field.findMany({
+      where: { envelopeId: envelope.id, locked: true },
+    })
+    const isLocked = (f: (typeof placed)[number]) =>
+      locked.some(
+        (l) =>
+          l.recipientId === f.recipientId &&
+          l.envelopeDocumentId === f.envelopeDocumentId &&
+          l.type === f.type &&
+          l.page === f.page &&
+          Math.abs(l.x - f.x) < 1e-6 &&
+          Math.abs(l.y - f.y) < 1e-6 &&
+          Math.abs(l.width - f.width) < 1e-6 &&
+          Math.abs(l.height - f.height) < 1e-6,
+      )
+    const unlocked = placed.filter((f) => !isLocked(f))
+
     const saved = await prisma.$transaction(async (tx) => {
-      await tx.field.deleteMany({ where: { envelopeId: envelope.id } })
+      await tx.field.deleteMany({ where: { envelopeId: envelope.id, locked: false } })
       await tx.field.createMany({
-        data: placed.map(({ id: _id, ...f }) => ({
+        data: unlocked.map(({ id: _id, ...f }) => ({
           ...f,
           envelopeDocumentId: f.envelopeDocumentId as string,
           envelopeId: envelope.id,

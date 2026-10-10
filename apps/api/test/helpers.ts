@@ -48,7 +48,13 @@ export async function createSender(
   }: { withOrganization?: boolean; plan?: "free" | "starter" | "business" | "enterprise" } = {},
 ): Promise<Sender> {
   seq += 1
-  const email = `${label}-${seq}-${crypto.randomUUID().slice(0, 8)}@example.test`
+  // `label` is also the display name ("zz zoe"); the email and slug use a safe form of it.
+  const handle =
+    label
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "user"
+  const email = `${handle}-${seq}-${crypto.randomUUID().slice(0, 8)}@example.test`
   const password = `pw-${crypto.randomUUID()}`
   const { user } = await auth.api.signUpEmail({ body: { email, password, name: label } })
   await prisma.user.update({ where: { id: user.id }, data: { emailVerified: true } })
@@ -63,7 +69,7 @@ export async function createSender(
   let organizationId = ""
   if (withOrganization) {
     const org = await auth.api.createOrganization({
-      body: { name: `${label} Ltd`, slug: `${label}-${seq}-${crypto.randomUUID().slice(0, 6)}` },
+      body: { name: `${label} Ltd`, slug: `${handle}-${seq}-${crypto.randomUUID().slice(0, 6)}` },
       headers: new Headers({ cookie }),
     })
     if (!org) throw new Error("createOrganization returned nothing")

@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import {
+  assistantQuotaExceededMessage,
   billingPeriod,
   canAddSeat,
+  checkAssistantQuota,
   checkEnvelopeQuota,
   PLANS,
   planFor,
@@ -49,6 +51,15 @@ describe("quotas", () => {
     expect(checkEnvelopeQuota(PLANS.free, 4)).toEqual({ ok: true, remaining: 0 })
     expect(checkEnvelopeQuota(PLANS.free, 5)).toEqual({ ok: false, limit: 5, used: 5 })
     expect(checkEnvelopeQuota(PLANS.enterprise, 10_000)).toEqual({ ok: true, remaining: null })
+  })
+
+  test("assistant quota: refused at the plan's replies, unlimited on Enterprise", () => {
+    expect(checkAssistantQuota(PLANS.free, 29)).toEqual({ ok: true, remaining: 0 })
+    expect(checkAssistantQuota(PLANS.free, 30)).toEqual({ ok: false, limit: 30, used: 30 })
+    expect(checkAssistantQuota(PLANS.enterprise, 1e6)).toEqual({ ok: true, remaining: null })
+    const message = assistantQuotaExceededMessage(PLANS.free, new Date("2026-10-31T21:00:00Z"))
+    expect(message).toContain("30 AI assistant replies")
+    expect(message).toContain("1 November")
   })
 
   test("usage level: warning from 80 %, exceeded at the limit", () => {

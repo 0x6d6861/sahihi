@@ -1,5 +1,5 @@
 import { type ApiCreateFromDocumentInput, documentIdsOf } from "@sahihi/core"
-import { appendAuditEvent, prisma } from "@sahihi/db"
+import { appendAuditEvent, type Prisma, prisma } from "@sahihi/db"
 import { attachDocuments, documentsAuditData, loadReadyDocuments } from "./documents"
 import { EnvelopeError } from "./errors"
 import { type Actor, actorData } from "./send"
@@ -8,11 +8,18 @@ import { type Actor, actorData } from "./send"
  * Documents + recipients + fields → DRAFT envelope in one transaction (public API). Recipients and
  * fields are validated by ApiCreateFromDocumentSchema; this checks the documents (READY, this
  * workspace, within limits) and each field's page in its own document (ADR 0037).
+ *
+ * `lockFields` creates the fields locked (finalised AI documents, ADR 0047). `beforeCreate` and
+ * `afterCreate` run inside the same transaction, so a caller can claim a row first (and throw to
+ * stop) and link the envelope atomically.
  */
 export async function createEnvelopeFromDocument(input: {
   organizationId: string
   actor: Actor
   data: ApiCreateFromDocumentInput
+  lockFields?: boolean
+  beforeCreate?: (tx: Prisma.TransactionClient) => Promise<void>
+  afterCreate?: (tx: Prisma.TransactionClient, envelopeId: string) => Promise<void>
 }) {
   const d = input.data
   const documents = await loadReadyDocuments(input.organizationId, documentIdsOf(d))
@@ -29,6 +36,7 @@ export async function createEnvelopeFromDocument(input: {
   }
 
   return prisma.$transaction(async (tx) => {
+    await input.beforeCreate?.(tx)
     const envelope = await tx.envelope.create({
       data: {
         organizationId: input.organizationId,
@@ -70,6 +78,7 @@ export async function createEnvelopeFromDocument(input: {
         height: f.height,
         required: f.required,
         label: f.label ?? null,
+        locked: input.lockFields ?? false,
       })),
     })
     await appendAuditEvent(tx, {
@@ -80,6 +89,7 @@ export async function createEnvelopeFromDocument(input: {
       ipAddress: input.actor.ipAddress ?? null,
       userAgent: input.actor.userAgent ?? null,
     })
+    await input.afterCreate?.(tx, envelope.id)
     return envelope
   })
 }

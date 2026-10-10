@@ -193,6 +193,9 @@ The better-auth defaults are `owner`, `admin` and `member`. The creator of an or
 | Invite / remove members, change roles | ✓ | ✓ | – |
 | Billing (`billing:manage`, reserved for self-serve plan changes), delete org | ✓ | – | – |
 | See the plan and usage (Settings → Plan & usage) | ✓ | ✓ | ✓ |
+| Draft with the AI assistant (`ai:use`, once the workspace turned it on) | ✓ | ✓ | ✓ |
+| Edit or finalise an AI-generated document | any | any | own only |
+| Turn the AI assistant on or off for the workspace | ✓ | ✓ | – |
 
 "Own" means `Envelope.createdById` / `Document.uploadedById` / `Folder.createdById` is the caller.
 Owners and admins get "any" from the `envelope:manage-any`, `document:delete-any` and
@@ -200,7 +203,7 @@ Owners and admins get "any" from the `envelope:manage-any`, `document:delete-any
 
 **One definition:** `packages/core/src/workspace/permissions.ts` builds the access control with better-auth's
 `createAccessControl`: the default org statements plus `document`, `envelope`, `template`,
-`folder`, `webhook`, `data`, `api` and `billing`. It exports `orgAc` and `orgRoles`, which are passed to `organization()` in `auth.ts` and to
+`folder`, `webhook`, `data`, `api`, `billing` and `ai` (docs/ai-documents.md). It exports `orgAc` and `orgRoles`, which are passed to `organization()` in `auth.ts` and to
 `organizationClient()` in `auth-client.ts`. better-auth enforces its own resources (members,
 invitations, org delete) with them. Our routes use the pure helpers from the same file:
 

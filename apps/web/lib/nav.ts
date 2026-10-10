@@ -19,6 +19,7 @@ const NAV_SECTION_FOR: readonly { prefix: string; href: AppNavHref }[] = [
   { prefix: "/documents", href: "/files" },
   { prefix: "/envelopes", href: "/files" },
   { prefix: "/templates", href: "/files" },
+  { prefix: "/generate", href: "/files" },
   { prefix: "/bulk-sends", href: "/inbox" },
 ]
 
@@ -53,11 +54,11 @@ export function isNavActive(pathname: string, href: string): boolean {
 
 /**
  * Full-page tools: the app shell hides its top bar and column, and the page fills the window with
- * its own bar and scroll areas. Today only the draft envelope editor (`/envelopes/:id/edit`,
- * ADR 0021, ADR 0031).
+ * its own bar and scroll areas: the draft envelope editor (`/envelopes/:id/edit`, ADR 0021,
+ * ADR 0031) and the AI document generator (`/generate/:id`, docs/ai-documents.md).
  */
 export function isFullPage(pathname: string): boolean {
-  return /^\/envelopes\/[^/]+\/edit\/?$/.test(pathname)
+  return /^\/envelopes\/[^/]+\/edit\/?$/.test(pathname) || /^\/generate\/[^/]+\/?$/.test(pathname)
 }
 
 /** Up to two initials for an avatar fallback, from the name or else the email. */

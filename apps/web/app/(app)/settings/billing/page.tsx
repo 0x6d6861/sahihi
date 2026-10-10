@@ -26,6 +26,7 @@ interface BillingResponse {
     limit: number | null
     level: UsageLevel
   }
+  assistant: { used: number; limit: number | null; level: UsageLevel }
   plans: Plan[]
 }
 
@@ -72,6 +73,13 @@ export default async function BillingPage() {
             ]}
             hint={`${data.seats.members} ${data.seats.members === 1 ? "member" : "members"}, ${data.seats.pendingInvitations} pending ${data.seats.pendingInvitations === 1 ? "invitation" : "invitations"}.`}
           />
+          <Allowance
+            label="AI assistant replies this month"
+            unit="replies"
+            limit={data.assistant.limit}
+            segments={[{ id: "replies", label: "Replies", value: data.assistant.used }]}
+            hint={`Resets on ${resetsOn}. Each reply of the assistant in Draft with AI counts; editing and finalising don't.`}
+          />
         </div>
       </Panel>
 
@@ -85,6 +93,7 @@ export default async function BillingPage() {
               <TableHead>Plan</TableHead>
               <TableHead>Envelopes a month</TableHead>
               <TableHead>Seats</TableHead>
+              <TableHead>AI replies a month</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -103,6 +112,7 @@ export default async function BillingPage() {
                 </TableCell>
                 <TableCell>{limitLabel(p.envelopesPerMonth, "envelopes")}</TableCell>
                 <TableCell>{limitLabel(p.seats, "seats")}</TableCell>
+                <TableCell>{limitLabel(p.assistantTurnsPerMonth, "replies")}</TableCell>
               </TableRow>
             ))}
           </TableBody>

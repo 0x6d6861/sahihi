@@ -3,7 +3,8 @@ import { z } from "zod"
 /**
  * Plans and quotas (docs/billing.md, ADR 0014). No payment provider yet: a workspace's plan is
  * set by the Sahihi team (`bun run billing:set-plan`). Limits are enforced by the API:
- * envelopes sent per month (Send → 402) and seats (members + pending invitations).
+ * envelopes sent per month (Send → 402), seats (members + pending invitations) and AI assistant
+ * replies per month (chat → 402).
  */
 
 export const PLAN_IDS = ["free", "starter", "business", "enterprise"] as const
@@ -17,6 +18,8 @@ export interface Plan {
   envelopesPerMonth: number | null
   /** Members + pending invitations; null = unlimited. */
   seats: number | null
+  /** AI assistant replies per billing period (docs/ai-documents.md); null = unlimited. */
+  assistantTurnsPerMonth: number | null
   description: string
 }
 
@@ -26,6 +29,7 @@ export const PLANS: Record<PlanId, Plan> = {
     name: "Free",
     envelopesPerMonth: 5,
     seats: 2,
+    assistantTurnsPerMonth: 30,
     description: "Try Sahihi with a few envelopes a month.",
   },
   starter: {
@@ -33,6 +37,7 @@ export const PLANS: Record<PlanId, Plan> = {
     name: "Starter",
     envelopesPerMonth: 50,
     seats: 5,
+    assistantTurnsPerMonth: 300,
     description: "For small teams sending agreements every week.",
   },
   business: {
@@ -40,6 +45,7 @@ export const PLANS: Record<PlanId, Plan> = {
     name: "Business",
     envelopesPerMonth: 300,
     seats: 20,
+    assistantTurnsPerMonth: 1500,
     description: "For busy teams, with templates and webhooks at volume.",
   },
   enterprise: {
@@ -47,6 +53,7 @@ export const PLANS: Record<PlanId, Plan> = {
     name: "Enterprise",
     envelopesPerMonth: null,
     seats: null,
+    assistantTurnsPerMonth: null,
     description: "Unlimited envelopes and seats, agreed terms.",
   },
 }
@@ -100,6 +107,14 @@ export function checkEnvelopeQuota(plan: Plan, sentThisPeriod: number): QuotaChe
   return { ok: true, remaining: limit - sentThisPeriod - 1 }
 }
 
+/** May the assistant reply once more this period? */
+export function checkAssistantQuota(plan: Plan, turnsThisPeriod: number): QuotaCheck {
+  const limit = plan.assistantTurnsPerMonth
+  if (limit === null) return { ok: true, remaining: null }
+  if (turnsThisPeriod >= limit) return { ok: false, limit, used: turnsThisPeriod }
+  return { ok: true, remaining: limit - turnsThisPeriod - 1 }
+}
+
 /** May another person be invited/added? Pending invitations hold a seat. */
 export function canAddSeat(plan: Plan, members: number, pendingInvitations: number): boolean {
   return plan.seats === null || members + pendingInvitations < plan.seats
@@ -111,3 +126,7 @@ export const quotaExceededMessage = (plan: Plan, resetsAt: Date) =>
 
 export const seatLimitMessage = (plan: Plan) =>
   `Your ${plan.name} plan includes ${plan.seats} seats (members and pending invitations). Remove someone or ask the Sahihi team for a bigger plan.`
+
+export const assistantQuotaExceededMessage = (plan: Plan, resetsAt: Date) =>
+  `Your ${plan.name} plan includes ${plan.assistantTurnsPerMonth} AI assistant replies a month, and they've all been used. ` +
+  `The assistant is back on ${resetsAt.toLocaleDateString("en-GB", { day: "numeric", month: "long", timeZone: "Africa/Nairobi" })}; until then you can still edit, fill in and finalise documents yourself, or ask the Sahihi team for a bigger plan.`

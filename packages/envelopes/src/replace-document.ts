@@ -1,7 +1,7 @@
 import { isEditable } from "@sahihi/core"
 import { appendAuditEvent, prisma } from "@sahihi/db"
 import { loadReadyDocuments } from "./documents"
-import { EnvelopeError, notFound } from "./errors"
+import { EnvelopeError, lockedFields, notFound } from "./errors"
 import { type Actor, actorData } from "./send"
 
 /**
@@ -43,6 +43,14 @@ export async function replaceEnvelopeDocument(input: {
     : e.documents[0]
   if (!slot) notFound("Envelope document")
   const current = slot as NonNullable<typeof slot>
+  const locked = await prisma.field.count({
+    where: { envelopeDocumentId: current.id, locked: true },
+  })
+  if (locked > 0) {
+    lockedFields(
+      "This document was drafted with AI and its fields sit on the lines it prints. Change it in the AI draft instead.",
+    )
+  }
   if (current.documentId === input.documentId) {
     return { documentId: input.documentId, envelopeDocumentId: current.id, fieldsRemoved: 0 }
   }

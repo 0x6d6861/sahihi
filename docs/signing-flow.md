@@ -55,6 +55,8 @@ Implementation (`components/app/field-editor/`):
 - `field-editor.tsx`: the PDFEditor shell (dynamic import, `VIEW_ONLY_FEATURES`), a stable
   `renderPageOverlay`, and state from `useReducer(editorReducer)` (`lib/field-editor.ts`, pure and
   tested). A `syncRecipients` action drops fields when recipients are removed or turned into viewers.
+  Fields with `locked` (placed by finalising an AI-generated document, `docs/ai-documents.md`) can
+  be selected but every other action ignores them, and they're left out of the save payload.
 - `field-layer.tsx`: one layer per page. Pointer handling uses React **capture** handlers that stop
   propagation, because EmbedPDF's page listeners are native bubble listeners and would otherwise see
   the event first. Positions are measured in the layer's **local** box (`offsetX` plus the
