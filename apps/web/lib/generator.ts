@@ -95,7 +95,6 @@ export function answeredLines(
   }))
 }
 
-/** Problems that belong to one signer role, for the Signers tab. */
 /** The party a signer signs for in the Signers form (its draft link), if any. */
 export function partyForRole(
   parties: readonly DocumentParty[],
@@ -120,6 +119,7 @@ export function unsignedParties(
   return parties.filter((p) => !linked.has(p.variableKey))
 }
 
+/** Problems that belong to one signer role, for the Signers tab. */
 export function roleIssues(issues: readonly GenerationPreflightIssue[], roleKey: string) {
   return issues.filter((i) => i.roleKey === roleKey)
 }

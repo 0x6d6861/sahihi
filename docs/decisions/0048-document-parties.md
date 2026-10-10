@@ -31,5 +31,8 @@ stood for which party.
 - The Signers tab says who each signer signs for, offers the party's name as the signer's name,
   and offers "Add signer for …" for parties nobody signs for.
 - Editing a caption by hand changes the link; that is the intended behaviour.
+- Only a role with a signature block can carry a link: one who gets a copy, or a signer left
+  without fields, has no block, so its link is dropped on save and the party shows as unsigned.
+  The Signers tab clears the link when a signer becomes a copy.
 - Blanks inserted in the editor aren't flagged; their party status comes from a caption, or the
   assistant flags them.

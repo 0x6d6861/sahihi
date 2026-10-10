@@ -155,7 +155,11 @@ export function SignersPanel() {
                       recipientRole: v as "SIGNER" | "VIEWER",
                       ...(v === "VIEWER" ? { initialsOnEveryPage: false } : {}),
                     })
-                    if (v === "VIEWER") d.fields[role.key] = []
+                    // A copy has no signature block, so it can't carry a party link (ADR 0048).
+                    if (v === "VIEWER") {
+                      d.fields[role.key] = []
+                      delete d.parties[role.key]
+                    }
                   })
                 }
               />
@@ -283,9 +287,9 @@ export function SignersPanel() {
 }
 
 function roleDescription(signer: boolean, party: DocumentParty | null): string {
-  if (!party) return signer ? "Signs this document" : "Gets a copy when it's signed"
-  const who = party.value ?? `${party.label} (not filled yet)`
-  return signer ? `Signs for ${who}` : `Gets a copy for ${who}`
+  if (!signer) return "Gets a copy when it's signed"
+  if (!party) return "Signs this document"
+  return `Signs for ${party.value ?? `${party.label} (not filled yet)`}`
 }
 
 function newRole(key: string, label: string): SignersDefinition["roles"][number] {
