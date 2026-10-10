@@ -42,7 +42,7 @@ bun run billing:set-plan <organization-slug> <free|starter|business|enterprise>
 ## AI assistant replies per month
 
 - **Usage is derived:** the workspace's `assistant.turn` events in the period
-  (`countAssistantTurns`), one per reply of the assistant in Draft with AI (docs/ai-documents.md),
+  (`countAssistantTurns`), one per reply of the assistant in Drafting (docs/ai-documents.md),
   including the replies that continue on their own after a question card is answered. Editing,
   filling in blanks, signers and finalising don't count.
 - **Enforcement:** `POST /generated-documents/:id/chat` checks `checkAssistantQuota` before calling

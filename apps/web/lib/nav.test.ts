@@ -18,11 +18,16 @@ describe("isNavActive", () => {
     expect(isNavActive("/envelopes/abc", "/inbox")).toBe(false)
     expect(isNavActive("/envelopes-archive", "/files")).toBe(false)
   })
+  test("Drafting is its own tab, the generator pages included", () => {
+    expect(isNavActive("/generate", "/generate")).toBe(true)
+    expect(isNavActive("/generate/abc", "/generate")).toBe(true)
+    expect(isNavActive("/generate", "/files")).toBe(false)
+  })
 })
 
 describe("APP_NAV", () => {
   test("All files comes first and is home (ADR 0038)", () => {
-    expect(APP_NAV.map((n) => n.href)).toEqual(["/files", "/inbox"])
+    expect(APP_NAV.map((n) => n.href)).toEqual(["/files", "/generate", "/inbox"])
     expect(HOME_HREF).toBe("/files")
   })
 })

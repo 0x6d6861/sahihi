@@ -10,7 +10,7 @@ import { Button } from "@/components/arc/button/button"
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control"
 import { Tooltip } from "@/components/arc/tooltip/tooltip"
 import { Button as IconButton } from "@/components/ui/button"
-import type { GeneratorDetail } from "@/lib/generator"
+import { blanksStatus, type GeneratorDetail } from "@/lib/generator"
 import { cn } from "@/lib/utils"
 import { ChatPanel } from "./chat-panel"
 import { DocumentEditor } from "./editor/document-editor"
@@ -20,13 +20,14 @@ import { NewVersionAction } from "./new-version"
 import { SaveTemplateDialog } from "./save-template-dialog"
 import { SignersPanel } from "./signers-panel"
 
-type DocumentTab = "preview" | "editing" | "signers"
+type DocumentTab = "preview" | "editing" | "signers" | "pdf"
 
 /**
  * The AI document generator (docs/ai-documents.md → Web): a full page with its own top bar, the
- * assistant on the left and the document on the right (Preview: the PDF as it will be signed;
- * Editing: the text in a rich-text editor; Signers: who signs). On phones one pane shows at a time; both
- * stay mounted, so switching never drops the conversation.
+ * assistant on the left and the document on the right. Preview: the document on paper, read-only,
+ * a click on a section attaches it to the next message; Editing: the same document in the
+ * rich-text editor; Signers: who signs; PDF: the file as it will be signed. On phones one pane
+ * shows at a time; both stay mounted, so switching never drops the conversation.
  */
 export function GeneratorShell({ initial }: { initial: GeneratorDetail }) {
   return (
@@ -39,11 +40,12 @@ export function GeneratorShell({ initial }: { initial: GeneratorDetail }) {
 function Frame() {
   const { detail } = useGenerator()
   const [pane, setPane] = useState<"chat" | "document">("chat")
-  const [tab, setTab] = useState<DocumentTab>("editing")
+  const [tab, setTab] = useState<DocumentTab>("preview")
   const [finalizeOpen, setFinalizeOpen] = useState(false)
   const [templateOpen, setTemplateOpen] = useState(false)
   const finalized = detail.document.status === "FINALIZED"
   const blocking = detail.issues.length
+  const blanks = blanksStatus(detail.issues)
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -126,7 +128,7 @@ function Frame() {
           <ChatPanel />
         </div>
         <div className={cn("min-h-0 flex-col md:flex", pane === "document" ? "flex" : "hidden")}>
-          <div className="shrink-0 px-4 pt-3 md:px-8">
+          <div className="flex shrink-0 flex-wrap items-center gap-3 border-b px-4 py-3 md:px-5">
             <SegmentedControl
               label="Document view"
               value={tab}
@@ -135,11 +137,17 @@ function Frame() {
                 { value: "preview", label: "Preview" },
                 { value: "editing", label: "Editing" },
                 { value: "signers", label: "Signers" },
+                { value: "pdf", label: "PDF" },
               ]}
             />
+            <span className="ml-auto">
+              <Badge tone={blanks.open > 0 ? "warning" : "success"} size="sm">
+                {blanks.label}
+              </Badge>
+            </span>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            {tab === "preview" && (
+          <div className="min-h-0 flex-1 overflow-y-auto bg-muted/30">
+            {tab === "pdf" && (
               <div className="h-full p-4 md:px-8">
                 <DocumentViewer
                   // A new version is a new URL, so the viewer reloads it.
@@ -149,10 +157,11 @@ function Frame() {
                 />
               </div>
             )}
-            {/* Kept mounted while hidden: unsaved signer edits survive a tab switch. */}
-            <div hidden={tab !== "editing"}>
-              <DocumentEditor />
+            {/* One editor for Preview and Editing, kept mounted: switching keeps unsaved edits. */}
+            <div hidden={tab !== "preview" && tab !== "editing"}>
+              <DocumentEditor mode={tab === "editing" ? "editing" : "preview"} />
             </div>
+            {/* Kept mounted while hidden: unsaved signer edits survive a tab switch. */}
             <div hidden={tab !== "signers"}>
               <SignersPanel />
             </div>

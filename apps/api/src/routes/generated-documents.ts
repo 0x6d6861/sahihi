@@ -299,7 +299,7 @@ export const generatedDocuments = new Hono<AppEnv>()
         c,
         z.object({
           messages: z.array(z.unknown()).min(1).max(200),
-          /** "Selected section" chip: an id only; the server reads the section itself. */
+          /** Older clients: the "Selected section" chip as a body field (now message metadata). */
           selection: z.object({ sectionId: z.string().min(1).max(64) }).nullish(),
         }),
       )
@@ -313,7 +313,7 @@ export const generatedDocuments = new Hono<AppEnv>()
           organizationName: organization?.name ?? "the workspace",
           userId: c.get("user").id,
           messages: body.messages,
-          selectedSectionId: body.selection?.sectionId ?? null,
+          selectedSectionId: selectedSection(body.messages) ?? body.selection?.sectionId ?? null,
           abortSignal: c.req.raw.signal,
         })
       } catch (err) {
@@ -815,6 +815,21 @@ async function newVersionOf(id: string): Promise<string | null> {
     select: { id: true },
   })
   return next?.id ?? null
+}
+
+/**
+ * The section the person attached to their latest message: `metadata.custom.selection.sectionId`
+ * on the last user message (kept with the conversation, so it shows again on reload). Only an id;
+ * the assistant reads the section from the document itself.
+ */
+function selectedSection(messages: unknown[]): string | null {
+  const last = [...messages]
+    .reverse()
+    .find((m) => (m as { role?: unknown } | null)?.role === "user") as
+    | { metadata?: { custom?: { selection?: { sectionId?: unknown } } } }
+    | undefined
+  const id = last?.metadata?.custom?.selection?.sectionId
+  return typeof id === "string" && id.length > 0 && id.length <= 64 ? id : null
 }
 
 /** Another call linked an envelope to this document first; answer with that one. */

@@ -1346,3 +1346,50 @@ describe("assistant quota", () => {
     await after.text()
   })
 })
+
+describe("selected section", () => {
+  beforeEach(() => enableAssistant(alice))
+
+  test("travels as message metadata; the assistant gets that section from the document", async () => {
+    const id = await createNda(alice)
+    const prompts: string[] = []
+    const reply = [
+      { type: "text-start" as const, id: "t" },
+      { type: "text-delta" as const, id: "t", delta: "Sure." },
+      { type: "text-end" as const, id: "t" },
+      {
+        type: "finish" as const,
+        finishReason: { unified: "stop" as const, raw: undefined },
+        usage,
+      },
+    ]
+    setAssistantModelForTests(
+      new MockLanguageModelV4({
+        doStream: async (options) => {
+          prompts.push(JSON.stringify(options.prompt))
+          return { stream: simulateReadableStream({ chunks: reply }) }
+        },
+      }),
+    )
+    const res = await request(alice, `/api/generated-documents/${id}/chat`, {
+      method: "POST",
+      json: {
+        messages: [
+          {
+            id: "m1",
+            role: "user",
+            parts: [{ type: "text", text: "Is this long enough?" }],
+            metadata: { custom: { selection: { sectionId: "term" } } },
+          },
+        ],
+      },
+    })
+    expect(res.status).toBe(200)
+    await res.text()
+    expect(prompts[0]).toContain("# Selected section")
+    expect(prompts[0]).toContain("Term")
+    // Kept with the conversation, so the chip shows again on reload.
+    const d = await detail(alice, id)
+    expect(JSON.stringify(d.messages)).toContain('"sectionId":"term"')
+  })
+})

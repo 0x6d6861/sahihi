@@ -1,6 +1,6 @@
 "use client"
 
-import { Folder01Icon, InboxIcon, SignatureIcon } from "@hugeicons/core-free-icons"
+import { AiMagicIcon, Folder01Icon, InboxIcon, SignatureIcon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -13,6 +13,7 @@ import { type ShellUser, UserMenu } from "./user-menu"
 
 const NAV_ICONS: Record<AppNavHref, IconSvgElement> = {
   "/files": Folder01Icon,
+  "/generate": AiMagicIcon,
   "/inbox": InboxIcon,
 }
 

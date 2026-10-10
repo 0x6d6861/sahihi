@@ -2,7 +2,7 @@
 
 A template is a **document + recipient roles + a field layout**, saved from an envelope and used to
 start new envelopes without placing fields again (ADR 0012). AI-generated documents have their
-own templates, a document tree rather than a PDF, listed on Draft with AI (`docs/ai-documents.md` →
+own templates, a document tree rather than a PDF, listed on Drafting (`docs/ai-documents.md` →
 Templates, ADR 0046).
 
 ## Model (`schema.prisma`)

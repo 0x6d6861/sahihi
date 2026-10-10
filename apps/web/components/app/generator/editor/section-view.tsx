@@ -2,47 +2,68 @@
 
 import { NodeViewContent, type NodeViewProps, NodeViewWrapper } from "@tiptap/react"
 import { Badge } from "@/components/arc/badge/badge"
-import { Button } from "@/components/arc/button/button"
 import { pendingSectionIds } from "@/lib/generator"
 import { cn } from "@/lib/utils"
 import { useGenerator } from "../generator-context"
+import { useDocMode } from "./doc-mode"
 
 /**
  * A numbered clause. The number comes from a CSS counter, so it follows the order of sections as
- * they move; the title is an attribute edited in its own field; Discuss attaches the section to
- * the next chat message (beside the heading, never over the text). A badge marks a section the
- * assistant has suggested an edit to, until it's accepted or rejected in the chat.
+ * they move. In Preview the whole section is the target: hovering shows "Ask about this" in the
+ * corner (never over the text), and a click attaches it to the next chat message (again to let
+ * go). In Editing the title is its own field. A badge marks a section the assistant has suggested
+ * an edit to, until it's accepted or rejected in the chat.
  */
 export function SectionView({ node, updateAttributes }: NodeViewProps) {
   const { detail, editable, selectedSectionId, setSelectedSectionId } = useGenerator()
+  const mode = useDocMode()
   const id = String(node.attrs.id)
+  const title = String(node.attrs.title)
   const suggested = pendingSectionIds(detail.proposals).has(id)
   const selected = selectedSectionId === id
+  // Only people who can change the document chat about it.
+  const askable = mode === "preview" && editable
+  const toggle = () => setSelectedSectionId(selected ? null : id)
   return (
     <NodeViewWrapper
       as="section"
-      aria-label={String(node.attrs.title)}
+      aria-label={title}
       className={cn(
         // Numbers come from the editor's CSS counter, so they follow the sections' order.
         node.attrs.numbered && "[counter-increment:section]",
-        "-mx-3 flex flex-col gap-3 rounded-xl border-l-2 border-transparent px-3 py-1",
-        selected && "border-info bg-muted/40",
+        "group relative -mx-3.5 flex flex-col gap-3 rounded-xl px-3.5 pt-1.5 pb-1 transition-colors",
+        askable && "cursor-pointer hover:bg-muted/60",
+        selected && "bg-info/10 ring-1 ring-info",
       )}
+      {...(askable
+        ? {
+            role: "button",
+            tabIndex: 0,
+            "aria-pressed": selected,
+            onClick: toggle,
+            onKeyDown: (e: React.KeyboardEvent) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault()
+                toggle()
+              }
+            },
+          }
+        : {})}
     >
       <div className="flex items-baseline justify-between gap-3" contentEditable={false}>
-        <h3 className="flex min-w-0 flex-1 items-baseline font-medium text-base">
+        <h3 className="flex min-w-0 flex-1 items-baseline font-semibold text-lg">
           {node.attrs.numbered && (
             <span className="mr-1 before:content-[counter(section)'.']" aria-hidden />
           )}
-          {editable ? (
+          {editable && mode === "editing" ? (
             <input
               aria-label="Section title"
-              className="min-w-0 flex-1 bg-transparent font-medium outline-none"
-              value={String(node.attrs.title)}
+              className="min-w-0 flex-1 bg-transparent font-semibold outline-none"
+              value={title}
               onChange={(e) => updateAttributes({ title: e.target.value })}
             />
           ) : (
-            <span>{String(node.attrs.title)}</span>
+            <span>{title}</span>
           )}
         </h3>
         {suggested && (
@@ -52,15 +73,16 @@ export function SectionView({ node, updateAttributes }: NodeViewProps) {
             </Badge>
           </span>
         )}
-        {editable && (
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-pressed={selected}
-            onClick={() => setSelectedSectionId(selected ? null : id)}
+        {askable && (
+          <span
+            aria-hidden
+            className={cn(
+              "pointer-events-none shrink-0 rounded-full border bg-background px-2 py-1 font-medium text-[11px] text-muted-foreground leading-none opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100",
+              selected && "opacity-100",
+            )}
           >
-            {selected ? "Selected" : "Discuss"}
-          </Button>
+            {selected ? "Selected" : "Ask about this"}
+          </span>
         )}
       </div>
       <NodeViewContent className="flex flex-col gap-3" />

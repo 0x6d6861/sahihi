@@ -62,7 +62,7 @@ export default async function GeneratePage() {
   return (
     <div className="flex flex-col gap-8">
       <header className="flex flex-col gap-2">
-        <h1 className="font-medium text-2xl tracking-tight">Draft with AI</h1>
+        <h1 className="font-medium text-2xl tracking-tight">Drafting</h1>
         <p className="text-muted-foreground text-sm">
           Pick a starter or one of your workspace's templates. The assistant asks for every detail
           it needs and never fills in what it doesn't know. Review the result before you send it.

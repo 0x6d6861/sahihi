@@ -7,7 +7,7 @@ import type {
   ProposalStatus,
   Variable,
 } from "@sahihi/core"
-import { referencedVariableKeys } from "@sahihi/core"
+import { referencedVariableKeys, sectionText } from "@sahihi/core"
 
 /**
  * Pure helpers for the AI document generator (docs/ai-documents.md → Web). DOM-free so they're
@@ -184,4 +184,59 @@ export function chatErrorMessage(error: unknown): string {
     // not JSON
   }
   return "The assistant couldn't reply. Try again in a moment."
+}
+
+/**
+ * The selected section a chat message is about, from the message's metadata
+ * (`metadata.custom.selection.sectionId`). Only the id is stored: the label and excerpt are
+ * always read from the current document.
+ */
+export function messageSectionId(metadata: unknown): string | null {
+  const custom = (metadata as { custom?: { selection?: { sectionId?: unknown } } } | undefined)
+    ?.custom
+  const id = custom?.selection?.sectionId
+  return typeof id === "string" && id ? id : null
+}
+
+/** A section's text on one line, without its title: the excerpt under a selected-section chip. */
+export function sectionExcerpt(data: GeneratedDocumentData, sectionId: string): string | null {
+  const section = data.content.content.find((s) => s.attrs.id === sectionId)
+  if (!section) return null
+  return sectionText(section, data.variables)
+    .split("\n")
+    .slice(1)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+/** "6 blanks open" or "All blanks filled": the pill beside the document tabs. */
+export function blanksStatus(issues: readonly GenerationPreflightIssue[]): {
+  open: number
+  label: string
+} {
+  const open = blankIssues(issues).length
+  if (open === 0) return { open, label: "All blanks filled" }
+  return { open, label: `${open} ${open === 1 ? "blank" : "blanks"} open` }
+}
+
+/**
+ * The assistant's reply as paragraphs of plain and **bold** runs. Replies are plain text (the
+ * prompt asks for no Markdown headings); bold is the one emphasis worth showing.
+ */
+export function replyParagraphs(text: string): { text: string; bold: boolean }[][] {
+  return text
+    .split(/\n{2,}/)
+    .map((para) => para.trim())
+    .filter(Boolean)
+    .map((para) =>
+      para
+        .split(/(\*\*[^*\n]+\*\*)/)
+        .filter(Boolean)
+        .map((run) =>
+          run.startsWith("**") && run.endsWith("**") && run.length > 4
+            ? { text: run.slice(2, -2), bold: true }
+            : { text: run, bold: false },
+        ),
+    )
 }

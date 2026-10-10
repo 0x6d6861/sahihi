@@ -5,11 +5,13 @@
 export const APP_NAV: readonly { href: AppNavHref; label: string }[] = [
   // Home (ADR 0038): documents, envelopes and templates together, in their shared folders.
   { href: "/files", label: "All files" },
+  // AI document drafting: starters, workspace templates and drafts (docs/ai-documents.md).
+  { href: "/generate", label: "Drafting" },
   // Notifications, workspace activity and bulk sends (ADR 0041).
   { href: "/inbox", label: "Inbox" },
 ]
 
-export type AppNavHref = "/files" | "/inbox"
+export type AppNavHref = "/files" | "/generate" | "/inbox"
 
 /**
  * Pages that have no tab of their own and belong to one that does: documents, envelopes and
@@ -19,7 +21,6 @@ const NAV_SECTION_FOR: readonly { prefix: string; href: AppNavHref }[] = [
   { prefix: "/documents", href: "/files" },
   { prefix: "/envelopes", href: "/files" },
   { prefix: "/templates", href: "/files" },
-  { prefix: "/generate", href: "/files" },
   { prefix: "/bulk-sends", href: "/inbox" },
 ]
 

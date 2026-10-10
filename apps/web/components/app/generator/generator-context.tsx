@@ -32,8 +32,6 @@ interface GeneratorState {
   decideProposal: (proposalId: string, action: "accept" | "reject") => Promise<void>
   selectedSectionId: string | null
   setSelectedSectionId: (id: string | null) => void
-  /** Read and clear the selection: it travels with exactly one message. */
-  takeSelection: () => string | null
   pendingQuestion: string | null
   setPendingQuestion: (toolCallId: string | null) => void
   editable: boolean
@@ -49,8 +47,7 @@ export function GeneratorProvider({
   children: React.ReactNode
 }) {
   const [detail, setDetail] = useState(initial)
-  const [selectedSectionId, setSelected] = useState<string | null>(null)
-  const selection = useRef<string | null>(null)
+  const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null)
   const [pendingQuestion, setPendingQuestion] = useState<string | null>(null)
   const id = initial.document.id
   const base = `/generated-documents/${encodeURIComponent(id)}`
@@ -119,18 +116,6 @@ export function GeneratorProvider({
     [base, refresh],
   )
 
-  const setSelectedSectionId = useCallback((sectionId: string | null) => {
-    selection.current = sectionId
-    setSelected(sectionId)
-  }, [])
-
-  const takeSelection = useCallback(() => {
-    const current = selection.current
-    selection.current = null
-    setSelected(null)
-    return current
-  }, [])
-
   const editable = detail.document.status === "DRAFT" && detail.document.canEdit
   const value = useMemo(
     () => ({
@@ -142,7 +127,6 @@ export function GeneratorProvider({
       decideProposal,
       selectedSectionId,
       setSelectedSectionId,
-      takeSelection,
       pendingQuestion,
       setPendingQuestion,
       editable,
@@ -155,8 +139,6 @@ export function GeneratorProvider({
       saveContent,
       decideProposal,
       selectedSectionId,
-      setSelectedSectionId,
-      takeSelection,
       pendingQuestion,
       editable,
     ],

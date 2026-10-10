@@ -104,8 +104,10 @@ There's no editing a template in place: start a document from it, change it, and
 `POST /api/generated-documents/:id/chat` streams one turn (Vercel AI SDK `streamText`, UI message
 stream). The server builds the instructions from the **latest version** every turn: the browser
 never sends the document text or the system prompt, and anything it sends as `system` or `tools`
-is ignored. A "Selected section" chip travels as `selection: { sectionId }` and the server reads
-that section itself. Rate limit: 20 turns a minute per user. Each turn records `assistant.turn`
+is ignored. A section picked in the Preview tab travels with the user message as
+`metadata.custom.selection.sectionId` (so it's stored with the message and survives a reload); the
+server reads that section itself from the latest version. Older clients may still send a body
+`selection: { sectionId }`. Rate limit: 20 turns a minute per user. Each turn records `assistant.turn`
 (model, token counts).
 
 Tools (schemas in `packages/core/src/generation/schemas.ts`):
@@ -184,7 +186,7 @@ or rejects it from a card in the chat (`packages/core/src/generation/proposals.t
 
 The Editing tab is a TipTap editor whose schema is the document model
 (`components/app/generator/editor/extensions.ts`): sections (an editable title, a number from a
-CSS counter, Discuss), paragraphs, one-level lists, tables, and atomic nodes for blanks and
+CSS counter), paragraphs, one-level lists, tables, and atomic nodes for blanks and
 signature blocks. Headings, quotes, code, links and hard breaks are switched off, so pasted
 content is reduced to what the model and the renderer support. `lib/generator-editor.ts` converts
 both ways (a signature block's caption and fields ride in an `items` attribute in the editor) and
@@ -270,25 +272,35 @@ ADR 0009).
 
 ## Web (`/generate`, `components/app/generator/`)
 
-- `/generate`: starters, workspace templates (with delete for those who may) and your drafts; the switch for owners and admins while it's off. "Draft
+- `/generate` (**Drafting**, its own tab in the top bar): starters, workspace templates (with delete for those who may) and your drafts; the switch for owners and admins while it's off. "Draft
   with AI" on All files links here.
 - `/generate/:id`: a full page (`isFullPage`) with its own bar (back, title, version, Finalise or
   Open envelope). Assistant on the left, document on the right; on phones one pane at a time, both
   mounted.
 - **Chat:** assistant-ui primitives (`useChatRuntime` + `AssistantChatTransport`), styled with Arc.
-  The toolkit (`defineToolkit`, `Tools`) renders `ask_questions` as the question card and
-  `set_variables` as a one-line note. The question card has its own answer field; while it waits,
-  the chat input is closed, so a reply can't be mistaken for an answer. Answered cards collapse to
-  "question → answer or Skipped".
-- **Editing** tab: the editor above, with its toolbar (coss `Toolbar`: bold, italic, underline,
-  lists, table, insert blank, add section) and a Saved / Saving… / Retry status. Sections have a
-  Discuss button that attaches the section to the next message (one message, then it clears).
-  Blanks are chips: dashed and highlighted while empty ("skipped" when skipped), the value once
-  filled; click to fill.
+  An empty thread shows a "Start drafting" card that sends the first message. The toolkit
+  (`defineToolkit`, `Tools`) renders `ask_questions` as a one-question-at-a-time wizard ("Question
+  n of m", the blank it fills, full-width option rows, then "type your own answer", Skip and
+  Answer) and `set_variables` as "Updated …" with a tick. While a question waits the chat input is
+  closed, so a reply can't be mistaken for an answer. Answered cards show the question and the
+  answer (or Skipped). Replies render paragraphs and `**bold**`.
+- **Composer:** one card. With a section selected it shows "Selected section · 3. Title", a
+  two-line excerpt and a clear button; Enter sends, Shift+Enter breaks a line, and the send button
+  turns into Stop while the assistant replies. The selection rides on that one message (above) and
+  then clears; the sent message shows it as a quote above the bubble.
+- **Document pane:** Preview · Editing · Signers · PDF, and a pill with the open blanks ("3 blanks
+  open" in amber, "All blanks filled" in green). The document sits on a muted background as a
+  centred page.
+- **Preview** tab (the default): the document read-only. Hovering a section shows "Ask about
+  this"; clicking (or Enter / Space) selects it for the next message, clicking again clears it.
+- **Editing** tab: the same editor, editable, with a sticky toolbar (coss `Toolbar`: bold, italic,
+  underline, lists, table, insert blank, add section, undo, redo) and a Saved / Saving… / Retry
+  status. Blanks are chips: dashed and amber while empty ("skipped" when skipped), the value with a
+  dotted underline once filled; click one to fill it.
 - **Signers** tab: a `Panel` per role (role, signer or copy, name, email, initials on every page,
   the role's fields with "Add field"), "Add signer", "Save signers"; the preflight's problems show on
   the fields. A suggested set of signers shows as a line-by-line diff in its card.
-- **Preview** tab: the rendered PDF.
+- **PDF** tab: the rendered PDF.
 - Finalise: an Arc dialog with the required "I've read the whole document" confirmation.
 - Finalised: "Start a new version" (or "Open new version") and "Open envelope" in the top bar; a
   new version links back with "Replaces a finalised version".

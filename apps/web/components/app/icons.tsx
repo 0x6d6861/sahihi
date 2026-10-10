@@ -2,6 +2,7 @@ import {
   Activity01Icon as HugeActivityIcon,
   ArrowDown01Icon as HugeArrowDownIcon,
   ArrowLeft01Icon as HugeArrowLeftIcon,
+  ArrowUp02Icon as HugeArrowUpIcon,
   AtIcon as HugeAtSignIcon,
   UnavailableIcon as HugeBanIcon,
   Notification01Icon as HugeBellIcon,
@@ -10,6 +11,7 @@ import {
   Calendar03Icon as HugeCalendarIcon,
   Tick02Icon as HugeCheckIcon,
   CheckmarkSquare01Icon as HugeCheckSquareIcon,
+  ArrowRight01Icon as HugeChevronRightIcon,
   AlertCircleIcon as HugeCircleAlertIcon,
   CheckmarkCircle02Icon as HugeCircleCheckIcon,
   CancelCircleIcon as HugeCircleXIcon,
@@ -46,6 +48,7 @@ import {
   PencilEdit02Icon as HugePencilIcon,
   Pen01Icon as HugePenLineIcon,
   PlusSignIcon as HugePlusIcon,
+  Redo02Icon as HugeRedoIcon,
   RotateClockwiseIcon as HugeRotateCwIcon,
   FloppyDiskIcon as HugeSaveIcon,
   Search01Icon as HugeSearchIcon,
@@ -54,12 +57,14 @@ import {
   SecurityCheckIcon as HugeShieldCheckIcon,
   SignatureIcon as HugeSignatureIcon,
   AiMagicIcon as HugeSparklesIcon,
+  StopIcon as HugeStopIcon,
   TableIcon as HugeTableIcon,
   Tag01Icon as HugeTagIcon,
   Delete02Icon as HugeTrash2Icon,
   Alert02Icon as HugeTriangleAlertIcon,
   TextIcon as HugeTypeIcon,
   TextUnderlineIcon as HugeUnderlineIcon,
+  Undo02Icon as HugeUndoIcon,
   Upload01Icon as HugeUploadIcon,
   UserIcon as HugeUserIcon,
   UserRemove01Icon as HugeUserMinusIcon,
@@ -88,6 +93,11 @@ function icon(glyph: IconSvgElement) {
 
 export const ActivityIcon = icon(HugeActivityIcon)
 export const ArrowDownIcon = icon(HugeArrowDownIcon)
+export const ArrowUpIcon = icon(HugeArrowUpIcon)
+export const ChevronRightIcon = icon(HugeChevronRightIcon)
+export const UndoIcon = icon(HugeUndoIcon)
+export const RedoIcon = icon(HugeRedoIcon)
+export const StopIcon = icon(HugeStopIcon)
 export const ArrowLeftIcon = icon(HugeArrowLeftIcon)
 export const AtSignIcon = icon(HugeAtSignIcon)
 export const BanIcon = icon(HugeBanIcon)
