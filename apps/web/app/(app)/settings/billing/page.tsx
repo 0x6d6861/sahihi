@@ -78,7 +78,7 @@ export default async function BillingPage() {
             unit="replies"
             limit={data.assistant.limit}
             segments={[{ id: "replies", label: "Replies", value: data.assistant.used }]}
-            hint={`Resets on ${resetsOn}. Each reply of the assistant in Draft with AI counts; editing and finalising don't.`}
+            hint={`Resets on ${resetsOn}. Each reply of the assistant in Drafting counts; editing and finalising don't.`}
           />
         </div>
       </Panel>

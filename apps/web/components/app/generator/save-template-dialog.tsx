@@ -86,14 +86,14 @@ export function SaveTemplateDialog({
       {saved ? (
         <DialogContent
           title="Template saved"
-          description={`Anyone in the workspace can start a document from “${name.trim()}” on the Draft with AI page.`}
+          description={`Anyone in the workspace can start a document from “${name.trim()}” on the Drafting page.`}
         >
           <DialogActions>
             <Button variant="ghost" onClick={close}>
               Close
             </Button>
             <ButtonLink variant="primary" href="/generate">
-              Go to Draft with AI
+              Go to Drafting
             </ButtonLink>
           </DialogActions>
         </DialogContent>

@@ -270,7 +270,7 @@ ADR 0009).
 
 ## Web (`/generate`, `components/app/generator/`)
 
-- `/generate`: starters, workspace templates (with delete for those who may) and your drafts; the switch for owners and admins while it's off. "Draft
+- `/generate` (**Drafting**, its own tab in the top bar): starters, workspace templates (with delete for those who may) and your drafts; the switch for owners and admins while it's off. "Draft
   with AI" on All files links here.
 - `/generate/:id`: a full page (`isFullPage`) with its own bar (back, title, version, Finalise or
   Open envelope). Assistant on the left, document on the right; on phones one pane at a time, both
