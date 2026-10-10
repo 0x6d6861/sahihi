@@ -2,9 +2,11 @@ import type {
   AskQuestionsInput,
   AskQuestionsResult,
   DocContent,
+  DocumentParty,
   GeneratedDocumentData,
   GenerationPreflightIssue,
   ProposalStatus,
+  SignersDefinition,
   Variable,
 } from "@sahihi/core"
 import { referencedVariableKeys, sectionText } from "@sahihi/core"
@@ -91,6 +93,30 @@ export function answeredLines(
     question: q.question,
     answer: result.answers.find((a) => a.questionId === q.id)?.value ?? null,
   }))
+}
+
+/** The party a signer signs for in the Signers form (its draft link), if any. */
+export function partyForRole(
+  parties: readonly DocumentParty[],
+  draft: SignersDefinition,
+  roleKey: string,
+): DocumentParty | null {
+  const key = draft.parties[roleKey]
+  return (key && parties.find((p) => p.variableKey === key)) || null
+}
+
+/** Parties in the document that no signer in the form signs for. */
+export function unsignedParties(
+  parties: readonly DocumentParty[],
+  draft: SignersDefinition,
+): DocumentParty[] {
+  const roles = new Set(draft.roles.map((r) => r.key))
+  const linked = new Set(
+    Object.entries(draft.parties)
+      .filter(([role]) => roles.has(role))
+      .map(([, key]) => key),
+  )
+  return parties.filter((p) => !linked.has(p.variableKey))
 }
 
 /** Problems that belong to one signer role, for the Signers tab. */

@@ -1,12 +1,24 @@
 import type { GeneratedDocumentData } from "../model"
-import { blank, field, p, role, section, signatureBlock, standardFields, t, ul, v } from "./build"
+import {
+  blank,
+  field,
+  p,
+  party,
+  role,
+  section,
+  signatureBlock,
+  standardFields,
+  t,
+  ul,
+  v,
+} from "./build"
 
 export function acceptableUsePolicy(): GeneratedDocumentData {
   return {
     title: "IT Acceptable Use Policy",
     pageSize: "A4",
     variables: [
-      blank("organisation_name", "Organisation's name", "text"),
+      party("organisation_name", "Organisation's name"),
       blank("effective_date", "Effective date", "date"),
       blank("policy_owner", "Policy owner", "text", "Job title of the person responsible"),
       blank("security_contact", "Who to report incidents to", "text", "Team, role or address"),

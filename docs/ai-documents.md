@@ -117,7 +117,7 @@ Tools (schemas in `packages/core/src/generation/schemas.ts`):
 | `ask_questions` | Browser (human in the loop) | Up to 3 questions, each about one blank, with up to 4 generic options. The card saves the answers (`POST …/variables`, source `answer`; skipped = blank marked `skipped`), then returns them as the tool result and the assistant continues |
 | `propose_section_edit` | Server | Proposes replacing or deleting one section (see **Proposals**). Nothing changes until the person accepts |
 | `propose_sections` | Server | Proposes new sections after a given one (or at the start) |
-| `define_signers` | Server | Proposes the signers (see **Signers**): every role and its fields. Contacts only if the person stated them |
+| `define_signers` | Server | Proposes the signers (see **Signers**): every role, its fields and the party it signs for. Contacts only if the person stated them (or a filled party value) |
 | `set_variables` | Server | Fills blanks with values the person typed in the chat. Each value must appear, word for word (case, spacing and edge punctuation aside), in something the person said or answered (`isValueAttested`); otherwise nothing changes, `variables.rejected` is recorded and the model is told to ask instead |
 
 ### Clarifying questions
@@ -148,6 +148,16 @@ every page, fields) and saves it with `PUT /api/generated-documents/:id/signers`
 `roles.updated`). The assistant proposes one with `define_signers`; it goes through the proposal
 flow, is out of date if the signers changed since, and may only include names or emails the person
 said (otherwise contacts are kept or left empty). Signer contacts never go in the body text.
+
+**Parties (ADR 0048).** Blanks that name a party carry `party: true` (the starters' name blanks;
+the assistant flags the ones it adds). A blank named in a signature block's caption counts too.
+A signer signs for the party its block's caption names ("For {party_a_name}"):
+`documentParties` (`packages/core/src/generation/parties.ts`) lists the parties with their signer,
+and the definition's `parties` (role → party blank) carries the link. On save it only captions a
+new role's block ("For {party}"); existing captions stay as written. In `define_signers` a role
+may set `party`, and a filled party value counts as said for a signer's name. The prompt shows
+which party each signer signs for and lists "Parties without a signer". A party nobody signs for
+doesn't block finalising.
 
 **Initials on every page:** for each signer with the option on, the renderer puts an initials box
 in the bottom margin of every page (right-aligned in role order; the page number moves left), with
@@ -299,7 +309,10 @@ ADR 0009).
   dotted underline once filled; click one to fill it.
 - **Signers** tab: a `Panel` per role (role, signer or copy, name, email, initials on every page,
   the role's fields with "Add field"), "Add signer", "Save signers"; the preflight's problems show on
-  the fields. A suggested set of signers shows as a line-by-line diff in its card.
+  the fields. Each card says who it signs for ("Signs for Acme Ltd", or the party's label while
+  it's empty) and, while the name is empty, offers `Use "Acme Ltd"` for someone signing in person.
+  Parties nobody signs for get an info alert with "Add signer for …", which adds a signer linked
+  to that party. A suggested set of signers shows as a line-by-line diff in its card.
 - **PDF** tab: the rendered PDF.
 - Finalise: an Arc dialog with the required "I've read the whole document" confirmation.
 - Finalised: "Start a new version" (or "Open new version") and "Open envelope" in the top bar; a

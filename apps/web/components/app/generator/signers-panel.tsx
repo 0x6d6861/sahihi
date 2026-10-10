@@ -2,6 +2,8 @@
 
 import {
   currentSigners,
+  type DocumentParty,
+  documentParties,
   type GeneratedFieldType,
   type SignerField,
   type SignersDefinition,
@@ -9,6 +11,7 @@ import {
 import { useState } from "react"
 import { XIcon } from "@/components/app/icons"
 import { Panel } from "@/components/app/panel"
+import { Alert } from "@/components/arc/alert/alert"
 import { Button } from "@/components/arc/button/button"
 import { Checkbox } from "@/components/arc/checkbox/checkbox"
 import { DropdownMenu } from "@/components/arc/dropdown-menu/dropdown-menu"
@@ -18,7 +21,7 @@ import { Switch } from "@/components/arc/switch/switch"
 import { Tooltip } from "@/components/arc/tooltip/tooltip"
 import { Button as IconButton } from "@/components/ui/button"
 import { ApiError } from "@/lib/api"
-import { roleIssues } from "@/lib/generator"
+import { partyForRole, roleIssues, unsignedParties } from "@/lib/generator"
 import { blankKey } from "@/lib/generator-editor"
 import { useGenerator } from "./generator-context"
 
@@ -37,11 +40,15 @@ const FIELD_TYPES = Object.keys(FIELD_NAMES) as GeneratedFieldType[]
  * contacts here become the envelope's recipients, each signer's fields become their signature block
  * in the document, and the text never holds an email. Saved as one definition
  * (`PUT …/signers`, `applySigners`); finalising checks names and distinct, valid emails.
+ *
+ * Signers know the parties of the document (ADR 0048): each card says who it signs for, offers the
+ * party's name as the signer's, and parties nobody signs for get an "Add signer for …" button.
  */
 export function SignersPanel() {
   const { detail, editable, saveSigners } = useGenerator()
   const saved = currentSigners(detail.version.data)
   const savedJson = JSON.stringify(saved)
+  const parties = documentParties(detail.version.data)
   const [draft, setDraft] = useState<SignersDefinition>(saved)
   // The server state the form last loaded: unsaved edits are differences from it, not from the
   // latest server state (which can change underneath, e.g. an accepted suggestion).
@@ -102,11 +109,12 @@ export function SignersPanel() {
           dirty ? undefined : issues.find((x) => x.code === code)?.message
         const signer = role.recipientRole === "SIGNER"
         const fields = draft.fields[role.key] ?? []
+        const party = partyForRole(parties, draft, role.key)
         return (
           <Panel
             key={role.key}
             title={role.label || "Untitled signer"}
-            description={signer ? "Signs this document" : "Gets a copy when it's signed"}
+            description={roleDescription(signer, party)}
             actions={
               editable && draft.roles.length > 1 ? (
                 <Button
@@ -117,6 +125,7 @@ export function SignersPanel() {
                     update((d) => {
                       d.roles.splice(i, 1)
                       delete d.fields[role.key]
+                      delete d.parties[role.key]
                     })
                   }
                 >
@@ -146,7 +155,11 @@ export function SignersPanel() {
                       recipientRole: v as "SIGNER" | "VIEWER",
                       ...(v === "VIEWER" ? { initialsOnEveryPage: false } : {}),
                     })
-                    if (v === "VIEWER") d.fields[role.key] = []
+                    // A copy has no signature block, so it can't carry a party link (ADR 0048).
+                    if (v === "VIEWER") {
+                      d.fields[role.key] = []
+                      delete d.parties[role.key]
+                    }
                   })
                 }
               />
@@ -168,6 +181,20 @@ export function SignersPanel() {
                 onChange={(e) => update((d) => setRole(d, i, { email: e.target.value || null }))}
               />
             </div>
+            {editable && party?.value && !role.name && (
+              <p className="flex flex-wrap items-center gap-x-2 text-muted-foreground text-sm">
+                Signing in person?
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={saving}
+                  onClick={() => update((d) => setRole(d, i, { name: party.value }))}
+                >
+                  Use “{party.value}”
+                </Button>
+                For a company, enter who signs on its behalf.
+              </p>
+            )}
             {signer && (
               <>
                 <Switch
@@ -197,6 +224,33 @@ export function SignersPanel() {
           </Panel>
         )
       })}
+      {editable && unsignedParties(parties, draft).length > 0 && (
+        <Alert tone="info" title="Nobody signs for these parties yet">
+          <span className="flex flex-wrap gap-2 pt-1">
+            {unsignedParties(parties, draft).map((p) => (
+              <Button
+                key={p.variableKey}
+                variant="secondary"
+                size="sm"
+                disabled={saving}
+                onClick={() =>
+                  update((d) => {
+                    const key = blankKey(
+                      p.roleLabel,
+                      d.roles.map((r) => r.key),
+                    )
+                    d.roles.push(newRole(key, p.roleLabel))
+                    d.fields[key] = standardFields()
+                    d.parties[key] = p.variableKey
+                  })
+                }
+              >
+                Add signer for {p.value ?? p.roleLabel}
+              </Button>
+            ))}
+          </span>
+        </Alert>
+      )}
       {editable && (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Button
@@ -208,19 +262,8 @@ export function SignersPanel() {
                   `signer ${d.roles.length + 1}`,
                   d.roles.map((r) => r.key),
                 )
-                d.roles.push({
-                  key,
-                  label: `Signer ${d.roles.length + 1}`,
-                  recipientRole: "SIGNER",
-                  name: null,
-                  email: null,
-                  initialsOnEveryPage: false,
-                })
-                d.fields[key] = [
-                  { fieldType: "SIGNATURE", required: true },
-                  { fieldType: "NAME", required: true },
-                  { fieldType: "DATE_SIGNED", required: true },
-                ]
+                d.roles.push(newRole(key, `Signer ${d.roles.length + 1}`))
+                d.fields[key] = standardFields()
               })
             }
           >
@@ -242,6 +285,29 @@ export function SignersPanel() {
     </form>
   )
 }
+
+function roleDescription(signer: boolean, party: DocumentParty | null): string {
+  if (!signer) return "Gets a copy when it's signed"
+  if (!party) return "Signs this document"
+  return `Signs for ${party.value ?? `${party.label} (not filled yet)`}`
+}
+
+function newRole(key: string, label: string): SignersDefinition["roles"][number] {
+  return {
+    key,
+    label,
+    recipientRole: "SIGNER",
+    name: null,
+    email: null,
+    initialsOnEveryPage: false,
+  }
+}
+
+const standardFields = (): SignerField[] => [
+  { fieldType: "SIGNATURE", required: true },
+  { fieldType: "NAME", required: true },
+  { fieldType: "DATE_SIGNED", required: true },
+]
 
 function setRole(
   d: SignersDefinition,

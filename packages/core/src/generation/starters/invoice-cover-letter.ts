@@ -1,5 +1,5 @@
 import type { GeneratedDocumentData } from "../model"
-import { blank, p, role, signatureBlock, t, table, unnumbered, v } from "./build"
+import { blank, p, party, role, signatureBlock, t, table, unnumbered, v } from "./build"
 
 export function invoiceCoverLetter(): GeneratedDocumentData {
   return {
@@ -7,9 +7,9 @@ export function invoiceCoverLetter(): GeneratedDocumentData {
     pageSize: "A4",
     variables: [
       blank("letter_date", "Date of the letter", "date"),
-      blank("sender_name", "Your company's name", "text"),
+      party("sender_name", "Your company's name"),
       blank("sender_address", "Your company's address", "address"),
-      blank("client_name", "Client's name", "text", "Person or company being invoiced"),
+      party("client_name", "Client's name", "Person or company being invoiced"),
       blank("client_address", "Client's address", "address"),
       blank("invoice_number", "Invoice number", "text"),
       blank("invoice_date", "Invoice date", "date"),

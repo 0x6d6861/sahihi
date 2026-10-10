@@ -86,6 +86,12 @@ export const blank = (
   status: "unresolved",
 })
 
+/** A blank that names a party: the Signers tab and the assistant match signers to it (ADR 0048). */
+export const party = (key: string, label: string, hint?: string): Variable => ({
+  ...blank(key, label, "text", hint),
+  party: true,
+})
+
 export const role = (
   key: string,
   label: string,

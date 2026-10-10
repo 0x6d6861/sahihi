@@ -1,6 +1,13 @@
 import { describe, expect, test } from "bun:test"
 import type { AskQuestionsInput } from "@sahihi/core"
-import { applyRoleContacts, applyVariableUpdates, findStarter, numberSections } from "@sahihi/core"
+import {
+  applyRoleContacts,
+  applyVariableUpdates,
+  currentSigners,
+  documentParties,
+  findStarter,
+  numberSections,
+} from "@sahihi/core"
 import {
   answeredLines,
   answerValues,
@@ -9,6 +16,7 @@ import {
   chatErrorMessage,
   messageSectionId,
   type ProposalView,
+  partyForRole,
   pendingSectionIds,
   proposalTitle,
   questionResult,
@@ -16,6 +24,7 @@ import {
   roleIssues,
   sectionExcerpt,
   templateChoices,
+  unsignedParties,
 } from "./generator"
 
 const input: AskQuestionsInput = {
@@ -193,5 +202,41 @@ describe("drafting chat helpers", () => {
       [{ text: "Next:", bold: false }],
     ])
     expect(replyParagraphs("a * b ** c")).toEqual([[{ text: "a * b ** c", bold: false }]])
+  })
+})
+
+describe("signers and parties", () => {
+  const nda = () => {
+    const data = findStarter("mutual-nda")?.build()
+    if (!data) throw new Error("missing starter")
+    data.variables.push({
+      key: "party_c_name",
+      label: "Third party's name",
+      type: "text",
+      value: null,
+      status: "unresolved",
+      party: true,
+    })
+    return data
+  }
+
+  test("finds each signer's party from the form's links", () => {
+    const data = nda()
+    const draft = currentSigners(data)
+    expect(partyForRole(documentParties(data), draft, "party_a")?.label).toBe("First party's name")
+    expect(partyForRole(documentParties(data), draft, "nobody")).toBeNull()
+  })
+
+  test("lists parties nobody in the form signs for, including a removed signer's", () => {
+    const data = nda()
+    const draft = currentSigners(data)
+    expect(unsignedParties(documentParties(data), draft).map((p) => p.variableKey)).toEqual([
+      "party_c_name",
+    ])
+    draft.roles = draft.roles.filter((r) => r.key !== "party_b")
+    expect(unsignedParties(documentParties(data), draft).map((p) => p.variableKey)).toEqual([
+      "party_b_name",
+      "party_c_name",
+    ])
   })
 })
