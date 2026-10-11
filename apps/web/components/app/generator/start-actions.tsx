@@ -20,37 +20,51 @@ export function StartGroup({ children }: { children: React.ReactNode }) {
   return <Starting.Provider value={{ starting, setStarting }}>{children}</Starting.Provider>
 }
 
+/** What a new document starts from (`POST /generated-documents`). */
+export type StartFrom =
+  | { starter: string }
+  | { templateId: string }
+  | { blank: true }
+  | { documentId: string }
+
+/** Creates a document and opens it in the generator; throws ApiError. */
+export async function startDocument(router: ReturnType<typeof useRouter>, from: StartFrom) {
+  const { id } = await api<{ id: string }>("/generated-documents", { method: "POST", json: from })
+  router.push(`/generate/${id}`)
+}
+
 /**
- * A starter or workspace template as one pressable card: the whole card creates a document from
- * it and opens it in the generator. `actions` (e.g. delete) sit above the card's press surface.
+ * A way to start a document as one pressable card: the whole card creates a document from `from`
+ * and opens it in the generator, or calls `onPress` (to open a dialog first). `actions` (e.g.
+ * delete) sit above the card's press surface.
  */
 export function StartCard({
   from,
+  onPress,
   name,
   description,
   meta,
   actions,
 }: {
-  from: { starter: string } | { templateId: string }
   name: string
   description?: string | null
   meta?: string
   actions?: React.ReactNode
-}) {
+} & ({ from: StartFrom; onPress?: never } | { from?: never; onPress: () => void })) {
   const router = useRouter()
   const group = useContext(Starting)
-  const key = "starter" in from ? `starter:${from.starter}` : `template:${from.templateId}`
+  const key = from ? JSON.stringify(from) : `press:${name}`
   const [error, setError] = useState<string | null>(null)
   const busy = group?.starting === key
   const start = async () => {
+    if (!from) {
+      onPress?.()
+      return
+    }
     group?.setStarting(key)
     setError(null)
     try {
-      const { id } = await api<{ id: string }>("/generated-documents", {
-        method: "POST",
-        json: from,
-      })
-      router.push(`/generate/${id}`)
+      await startDocument(router, from)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't start. Try again.")
       group?.setStarting(null)
@@ -83,7 +97,7 @@ export function StartCard({
       {/* The card's press surface: one button stretched over it. */}
       <button
         type="button"
-        aria-label={`Start “${name}”`}
+        aria-label={from ? `Start “${name}”` : name}
         aria-busy={busy}
         disabled={group?.starting != null}
         onClick={() => void start()}

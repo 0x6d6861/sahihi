@@ -168,10 +168,11 @@ export const VARIABLE_STATUSES = ["unresolved", "answered", "skipped"] as const
 export type VariableStatus = (typeof VARIABLE_STATUSES)[number]
 
 /**
- * Where a value came from: a question answer, the user's chat message, a direct edit, or the
- * workspace template the document started from (kept on purpose when the template was saved).
+ * Where a value came from: a question answer, the user's chat message, a direct edit, the
+ * workspace template the document started from (kept on purpose when the template was saved), or
+ * the imported document's own text, moved into a blank (ADR 0049).
  */
-export const VALUE_SOURCES = ["answer", "chat", "edit", "template"] as const
+export const VALUE_SOURCES = ["answer", "chat", "edit", "template", "import"] as const
 export type ValueSource = (typeof VALUE_SOURCES)[number]
 
 export const VariableValueSchema = z.string().trim().min(1).max(500)

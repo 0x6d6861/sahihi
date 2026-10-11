@@ -4,7 +4,9 @@ import {
   applySigners,
   applyVariableUpdates,
   assistantQuotaExceededMessage,
+  BLANK_STARTER,
   billingPeriod,
+  blankDocument,
   CreateGeneratedDocumentSchema,
   canEditGeneratedDocument,
   canEditWorkspace,
@@ -18,7 +20,11 @@ import {
   GeneratedDocumentDataSchema,
   generationPreflight,
   hasPermission,
+  IMPORT_STARTER,
+  ImportError,
+  importContent,
   isProposalStale,
+  MAX_IMPORT_BYTES,
   ProposalPayloadSchema,
   proposalTexts,
   SaveGenerationTemplateSchema,
@@ -33,8 +39,8 @@ import {
 } from "@sahihi/core"
 import { countAssistantTurns, forOrganization, getOrgPlan, prisma } from "@sahihi/db"
 import { createEnvelopeFromDocument } from "@sahihi/envelopes"
-import { keys, putObject } from "@sahihi/infra"
-import { composeGeneratedDocument, inspectPdf } from "@sahihi/pdf"
+import { getObjectBytes, keys, putObject } from "@sahihi/infra"
+import { composeGeneratedDocument, inspectPdf, readForImport } from "@sahihi/pdf"
 import { Hono } from "hono"
 import { createMiddleware } from "hono/factory"
 import { HTTPException } from "hono/http-exception"
@@ -94,6 +100,83 @@ function assertCanEdit(
   if (doc.status !== "DRAFT") conflict("This document is finalised and can't change")
 }
 
+/** Where a new draft comes from: its first version, and what its creation event records. */
+interface Origin {
+  starter: string
+  data: GeneratedDocumentData
+  reason: string
+  templateId?: string
+  /** Lineage only, never the text. */
+  event: Record<string, string | number>
+}
+
+/** An import that can't go ahead, as an error the dialog can explain (ADR 0049). */
+function importFailed(err: ImportError): never {
+  throw new HTTPException(err.code === "too_large" ? 413 : 422, {
+    res: Response.json(
+      { error: err.code, message: err.message },
+      { status: err.code === "too_large" ? 413 : 422 },
+    ),
+  })
+}
+
+/** A file's content as a new draft's first version, word for word (docs/ai-documents.md → Import). */
+async function imported(bytes: Uint8Array, name: string, documentId?: string): Promise<Origin> {
+  try {
+    const { format, blocks } = await readForImport(bytes)
+    const data = importContent(blocks, name)
+    return {
+      starter: IMPORT_STARTER,
+      data,
+      reason: `Imported from ${format === "pdf" ? "a PDF" : "a Word file"}`,
+      event: {
+        source: format,
+        ...(documentId ? { documentId } : {}),
+        sections: data.content.content.length,
+      },
+    }
+  } catch (err) {
+    if (err instanceof ImportError) importFailed(err)
+    throw err
+  }
+}
+
+/** The draft and its first version, with the `document.created` event, in one transaction. */
+async function createDraft(organizationId: string, userId: string, origin: Origin) {
+  const { data } = origin
+  const doc = await prisma.$transaction(async (tx) => {
+    const created = await tx.generatedDocument.create({
+      data: {
+        organizationId,
+        createdById: userId,
+        title: data.title,
+        starter: origin.starter,
+        templateId: origin.templateId ?? null,
+        versions: {
+          create: {
+            number: 1,
+            data: data as unknown as object,
+            actor: "USER",
+            createdById: userId,
+            reason: origin.reason,
+          },
+        },
+      },
+      include: { versions: { select: { id: true } } },
+    })
+    await appendEvent(tx, {
+      generatedDocumentId: created.id,
+      type: "document.created",
+      actor: "USER",
+      actorUserId: userId,
+      versionId: created.versions[0]?.id,
+      data: origin.event,
+    })
+    return created
+  })
+  return doc.id
+}
+
 export const generatedDocuments = new Hono<AppEnv>()
   .use(requireOrg)
 
@@ -144,19 +227,29 @@ export const generatedDocuments = new Hono<AppEnv>()
   .post("/", async (c) => {
     const input = await parseJson(c, CreateGeneratedDocumentSchema)
     const organizationId = c.get("organizationId")
-    let origin: {
-      starter: string
-      data: GeneratedDocumentData
-      reason: string
-      templateId?: string
-    }
-    if ("starter" in input) {
+    let origin: Origin
+    if ("blank" in input) {
+      origin = {
+        starter: BLANK_STARTER,
+        data: blankDocument(),
+        reason: "Started blank",
+        event: { source: "blank" },
+      }
+    } else if ("documentId" in input) {
+      const document = await prisma.document.findFirst({
+        where: forOrganization(organizationId).document({ id: input.documentId, status: "READY" }),
+        select: { id: true, name: true, s3Key: true },
+      })
+      if (!document) notFound("Document")
+      origin = await imported(await getObjectBytes(document.s3Key), document.name, document.id)
+    } else if ("starter" in input) {
       const starter = findStarter(input.starter)
       if (!starter) badRequest("Unknown starter")
       origin = {
         starter: starter.key,
         data: starter.build(),
         reason: `Started from ${starter.name}`,
+        event: { starter: starter.key },
       }
     } else {
       const template = await prisma.generationTemplate.findFirst({
@@ -168,44 +261,39 @@ export const generatedDocuments = new Hono<AppEnv>()
         data: GeneratedDocumentDataSchema.parse(template.data),
         reason: `Started from template "${template.name}"`,
         templateId: template.id,
+        event: { starter: template.starter, templateId: template.id },
       }
     }
-    const { data } = origin
-    const userId = c.get("user").id
-    const doc = await prisma.$transaction(async (tx) => {
-      const created = await tx.generatedDocument.create({
-        data: {
-          organizationId,
-          createdById: userId,
-          title: data.title,
-          starter: origin.starter,
-          templateId: origin.templateId ?? null,
-          versions: {
-            create: {
-              number: 1,
-              data: data as unknown as object,
-              actor: "USER",
-              createdById: userId,
-              reason: origin.reason,
-            },
-          },
-        },
-        include: { versions: { select: { id: true } } },
-      })
-      await appendEvent(tx, {
-        generatedDocumentId: created.id,
-        type: "document.created",
-        actor: "USER",
-        actorUserId: userId,
-        versionId: created.versions[0]?.id,
-        data: origin.templateId
-          ? { starter: origin.starter, templateId: origin.templateId }
-          : { starter: origin.starter },
-      })
-      return created
-    })
-    return c.json({ id: doc.id }, 201)
+    return c.json({ id: await createDraft(organizationId, c.get("user").id, origin) }, 201)
   })
+
+  /**
+   * A file from the person's computer, imported word for word (ADR 0049): a PDF or a Word (.docx)
+   * file, as a multipart form with one `file`. Its type comes from its bytes, never its name. The
+   * file isn't stored: the draft is the source, and finalising renders a new PDF.
+   */
+  .post(
+    "/import",
+    // Reading a long file is real work: a few a minute is plenty for a person.
+    rateLimit({
+      bucket: "generated-import",
+      limit: 10,
+      windowSec: 60,
+      key: (c) => c.get("user").id,
+    }),
+    async (c) => {
+      const length = Number(c.req.header("content-length") ?? 0)
+      if (length > MAX_IMPORT_BYTES + 64 * 1024) importFailed(new ImportError("too_large"))
+      const body = await c.req.parseBody().catch(() => null)
+      const file = body?.file
+      if (!(file instanceof File)) badRequest("Attach the file to import as `file`")
+      const origin = await imported(new Uint8Array(await file.arrayBuffer()), file.name)
+      return c.json(
+        { id: await createDraft(c.get("organizationId"), c.get("user").id, origin) },
+        201,
+      )
+    },
+  )
 
   /** The workspace's templates, newest first (docs/ai-documents.md → Templates). */
   .get("/templates", async (c) => {
@@ -254,6 +342,8 @@ export const generatedDocuments = new Hono<AppEnv>()
         envelopeId: doc.envelopeId,
         documentId: doc.documentId,
         canEdit: canEditGeneratedDocument(actor(c), doc),
+        // How it started: a starter's key, "blank" or "import" (ADR 0049)
+        starter: doc.starter,
         // Lineage (docs/ai-documents.md → New versions)
         previousId: doc.previousId,
         newVersionId: await newVersionOf(doc.id),

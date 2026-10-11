@@ -105,8 +105,8 @@ function Proposal({ view }: { view: ProposalView }) {
       <p className="text-muted-foreground text-sm">{view.rationale}</p>
       <Diff
         parts={
-          // One line per signer: compare whole lines, or the diff reads as noise.
-          view.kind === "set_signers"
+          // One line per signer or blank: compare whole lines, or the diff reads as noise.
+          view.kind === "set_signers" || view.kind === "make_blanks"
             ? diffLines(view.before, view.after)
             : diffWords(view.before, view.after)
         }

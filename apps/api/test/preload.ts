@@ -38,6 +38,9 @@ Object.assign(process.env, {
   ADMIN_DASHBOARD_USER: "ops",
   ADMIN_DASHBOARD_PASSWORD: "test-dashboard-password-1234",
 })
+// No real model, whatever the local .env holds: tests script the assistant
+// (setAssistantModelForTests) and must never reach a provider or spend its quota.
+for (const key of ["AI_MODEL", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"]) delete process.env[key]
 
 async function ensureDatabase() {
   const admin = new URL(databaseUrl)

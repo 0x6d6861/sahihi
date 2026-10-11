@@ -2,10 +2,14 @@ import {
   AskQuestionsInputSchema,
   AskQuestionsResultSchema,
   applyVariableUpdates,
+  BLANK_STARTER,
   buildProposal,
   type DefineSignersInput,
   DefineSignersInputSchema,
+  IMPORT_STARTER,
   isValueAttested,
+  type ProposeBlanksInput,
+  ProposeBlanksInputSchema,
   type ProposeSectionEditInput,
   ProposeSectionEditInputSchema,
   type ProposeSectionsInput,
@@ -138,6 +142,12 @@ function tools(ctx: { generatedDocumentId: string; userId: string; statements: s
       inputSchema: DefineSignersInputSchema,
       execute: (input: DefineSignersInput) => propose(ctx, { tool: "define_signers", ...input }),
     },
+    propose_blanks: {
+      description:
+        "Propose turning text that is written into the document (a party's name, an address, a date, an amount, a duration) into blanks, each prefilled with that same text. Copy each text exactly as it appears; every occurrence becomes the blank. The wording doesn't change. The person accepts or rejects it.",
+      inputSchema: ProposeBlanksInputSchema,
+      execute: (input: ProposeBlanksInput) => propose(ctx, { tool: "propose_blanks", ...input }),
+    },
   } satisfies ToolSet
 }
 
@@ -218,6 +228,12 @@ export async function streamAssistantReply(input: {
   const ctx = { ...input, statements: userStatements(messages) }
   const toolSet = tools(ctx)
   const version = await latestVersion(prisma, input.generatedDocumentId)
+  const doc = await prisma.generatedDocument.findUnique({
+    where: { id: input.generatedDocumentId },
+    select: { starter: true },
+  })
+  const origin =
+    doc?.starter === BLANK_STARTER ? "blank" : doc?.starter === IMPORT_STARTER ? "import" : null
   const proposals = await prisma.generatedDocumentProposal.findMany({
     where: { generatedDocumentId: input.generatedDocumentId },
     orderBy: { createdAt: "desc" },
@@ -231,6 +247,7 @@ export async function streamAssistantReply(input: {
       data: version.data,
       versionId: version.id,
       selectedSectionId: input.selectedSectionId,
+      origin,
       proposals,
       organizationName: input.organizationName,
       today: new Date().toISOString().slice(0, 10),

@@ -9,16 +9,18 @@ import {
   FolderInputIcon,
   PencilIcon,
   SendIcon,
+  SparklesIcon,
 } from "@/components/app/icons"
 import { EditItemDialog } from "@/components/app/labels/edit-item-dialog"
 import { toastManager } from "@/components/app/toast"
 import { type DropdownItem, DropdownMenu } from "@/components/arc/dropdown-menu/dropdown-menu"
 import { api } from "@/lib/api"
+import { importErrorMessage } from "@/lib/generator"
 import type { TagRef } from "@/lib/labels"
 
 /**
- * Row menu on the Documents list: open, send, and "Edit…" (name, color, tags) / "Move to…" when the
- * caller may change the document.
+ * Row menu on the Documents list: open, send, draft from it with the assistant (ADR 0049), and
+ * "Edit…" (name, color, tags) / "Move to…" when the caller may change the document.
  */
 export function DocumentRowActions({
   document,
@@ -44,6 +46,23 @@ export function DocumentRowActions({
   const [moving, setMoving] = useState(false)
   const [editing, setEditing] = useState(false)
 
+  // Its text, word for word, as a new draft in Drafting; the PDF itself doesn't change.
+  async function draftFrom() {
+    const toast = toastManager.add({ title: `Importing “${document.name}”…`, type: "loading" })
+    try {
+      const { id } = await api<{ id: string }>("/generated-documents", {
+        method: "POST",
+        json: { documentId: document.id },
+      })
+      if (toast) toastManager.close(toast)
+      router.push(`/generate/${id}`)
+    } catch (err) {
+      const failed = { title: "Not imported", description: importErrorMessage(err) } as const
+      if (toast) toastManager.update(toast, { ...failed, type: "error" })
+      else toastManager.add({ ...failed, type: "error" })
+    }
+  }
+
   return (
     <>
       <DropdownMenu
@@ -63,6 +82,11 @@ export function DocumentRowActions({
                   icon: <SendIcon />,
                   onSelect: () =>
                     router.push(`/envelopes/new?documentId=${encodeURIComponent(document.id)}`),
+                } satisfies DropdownItem,
+                {
+                  label: "Draft from this document",
+                  icon: <SparklesIcon />,
+                  onSelect: () => void draftFrom(),
                 } satisfies DropdownItem,
               ]
             : []),

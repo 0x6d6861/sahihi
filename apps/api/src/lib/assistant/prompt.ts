@@ -20,6 +20,11 @@ export function systemPrompt(input: {
   selectedSectionId: string | null
   organizationName: string
   today: string
+  /**
+   * How the document started, when it didn't come from a reviewed starter (ADR 0049): blank, or
+   * imported word for word from the person's own file.
+   */
+  origin?: "blank" | "import" | null
   /** Recent proposals, newest first, so the assistant knows what was accepted or rejected. */
   proposals?: { id: string; sectionId: string | null; status: string; rationale: string }[]
 }): string {
@@ -78,7 +83,7 @@ You are a drafting assistant, not a lawyer, and you don't give legal advice. The
 7. Who signs is data, never text. To change signers or their fields, propose it with define_signers: the full list of roles (keep existing keys), each SIGNER or VIEWER (a copy), whether they initial every page, and each role's fields (a signer needs at least a SIGNATURE; TEXT and CHECKBOX need a label saying what to fill or agree to). Ask who signs before proposing if it isn't clear. Set party on a role to the party blank it signs for (a blank marked "party"), and when the text names a party nobody signs for, propose a signer for it. Mark a blank that names a party with party: true in newBlanks. Names and emails are entered in the Signers tab: include one only if the person said it in the chat or it is the filled value of a party who is a person signing for themselves (for a company, ask who signs on its behalf), and never ask for emails.
 8. After the person answers, reply with one short sentence summarising what was applied (e.g. "Applied Kenyan law and a one-year term."), then ask the next batch if blanks remain.
 9. Keep replies short and plain. No Markdown headings.
-
+${origin(input.origin)}
 # Document (version ${input.versionId})
 Blanks appear in the text as {{key}}.
 
@@ -89,4 +94,21 @@ ${blanks || "(none)"}
 
 # Signer roles
 ${roles}${unsigned ? `\nParties without a signer: ${unsigned}` : ""}${proposals ? `\n\n# Your recent proposals\n${proposals}` : ""}${selected ? `\n\n# Selected section\nThe person attached this section to their latest message; their question is about it.\n\n${selected}` : ""}`
+}
+
+/** What to do first for a document that didn't start from a starter (ADR 0049). */
+function origin(kind: "blank" | "import" | null | undefined): string {
+  if (kind === "blank") {
+    return `
+# This document started blank
+It has a placeholder section and no wording yet. Find out what the person needs (they may describe it in their first message; otherwise ask with ask_questions what kind of document it is and who the parties are). Then draft it with propose_sections, replacing the placeholder section with propose_section_edit (operation delete) once there are real sections. Every specific is a blank, as in rule 6.
+`
+  }
+  if (kind === "import") {
+    return `
+# This document was imported
+The person brought their own document; its wording was imported exactly as written, so it already contains names, dates and amounts. Don't reword it unless they ask. First, propose blanks for the values that change from one signing to the next (the parties' names and addresses, dates, amounts, durations, reference numbers) with propose_blanks: copy each text exactly as it appears, set party: true on parties' names, and give each blank a clear label. Proposed blanks don't exist until the person accepts them, so don't refer to them yet: propose who signs (define_signers, linking each signer to the party blank they sign for) only once the blanks are accepted, and until then say that signers come next.
+`
+  }
+  return ""
 }
