@@ -13,6 +13,7 @@ import { HTTPException } from "hono/http-exception"
 import { secureHeaders } from "hono/secure-headers"
 import { ADMIN_QUEUES_PATH, adminDashboard } from "./admin"
 import { auth } from "./auth"
+import { MAX_ATTACHMENTS_PER_MESSAGE, MAX_IMAGE_BYTES } from "./lib/assistant/attachments"
 import { reportRequestError, requestIdOf, requestLog } from "./middleware/request-log"
 import { account } from "./routes/account"
 import { activity } from "./routes/activity"
@@ -47,6 +48,33 @@ const importLimit = bodyLimit({
     return c.json({ error: err.code, message: err.message }, 413)
   },
 })
+// One drafting chat turn: the conversation plus at most three images of 5 MB, base64 in JSON
+// (ADR 0050; the browser drops earlier messages' images, which aren't kept anyway).
+const chatLimit = bodyLimit({
+  maxSize: MAX_ATTACHMENTS_PER_MESSAGE * Math.ceil((MAX_IMAGE_BYTES * 4) / 3) + 4 * 1024 * 1024,
+  onError: (c) =>
+    c.json(
+      {
+        error: "too_large",
+        message: "This message is too large. Attach fewer or smaller images.",
+      },
+      413,
+    ),
+})
+/** Routes with their own body limit; everything else under /api gets `jsonLimit`. */
+function limitFor(path: string) {
+  // Direct PDF upload through the public API takes the same 25 MB as the web upload.
+  if (path === "/api/v1/documents") return uploadLimit
+  // A file to read for Drafting: to import (ADR 0049) or attached in the chat (ADR 0050).
+  if (
+    path === "/api/generated-documents/import" ||
+    /^\/api\/generated-documents\/[^/]+\/attachments$/.test(path)
+  ) {
+    return importLimit
+  }
+  if (/^\/api\/generated-documents\/[^/]+\/chat$/.test(path)) return chatLimit
+  return jsonLimit
+}
 const defaultHeaders = secureHeaders()
 // Logos are embedded by mail clients on other origins, so they may be loaded cross-origin.
 const brandingHeaders = secureHeaders({ crossOriginResourcePolicy: "cross-origin" })
@@ -68,14 +96,7 @@ export function createApp() {
       }),
     )
     // Signature PNGs are the largest bodies (~500 KB each)
-    .use("/api/*", (c, next) =>
-      // Direct PDF upload through the public API takes the same 25 MB as the web upload.
-      c.req.path === "/api/v1/documents"
-        ? uploadLimit(c, next)
-        : c.req.path === "/api/generated-documents/import"
-          ? importLimit(c, next)
-          : jsonLimit(c, next),
-    )
+    .use("/api/*", (c, next) => limitFor(c.req.path)(c, next))
     // Responses carry PII, presigned URLs and session data: no browser, proxy or CDN may store them.
     .use("/api/*", async (c, next) => {
       await next()

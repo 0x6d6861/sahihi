@@ -365,3 +365,28 @@ export function textDataUrl(text: string): string {
   }
   return `data:text/plain;charset=utf-8;base64,${btoa(binary)}`
 }
+
+type ChatPart = { type: string; mediaType?: string; filename?: string }
+
+/**
+ * The conversation as the browser sends it: images only on the last message of the person's.
+ * Earlier images aren't kept by the server anyway (they're a note once saved), and resending them
+ * on every turn would make each request carry all of them. The note matches the server's.
+ */
+export function withoutEarlierImages<M extends { role: string; parts: ChatPart[] }>(
+  messages: M[],
+): M[] {
+  const last = messages.findLastIndex((m) => m.role === "user")
+  return messages.map((m, i) => {
+    if (i === last || m.role !== "user") return m
+    if (!m.parts.some((p) => p.type === "file" && p.mediaType?.startsWith("image/"))) return m
+    return {
+      ...m,
+      parts: m.parts.map((p) =>
+        p.type === "file" && p.mediaType?.startsWith("image/")
+          ? { type: "text", text: `[Image “${p.filename ?? "image"}” attached, not kept]` }
+          : p,
+      ),
+    }
+  })
+}

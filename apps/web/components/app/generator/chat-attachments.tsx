@@ -32,7 +32,34 @@ export interface PendingFile {
   attachment?: CompleteAttachment
 }
 
-const readDataUrl = (file: File) =>
+/** Longest side, in pixels, an attached photo is sent at: plenty to read a document from. */
+const MAX_IMAGE_SIDE = 2048
+
+/**
+ * A photo as it's sent: scaled down to 2048 px and re-encoded as JPEG when it's bigger than that or
+ * over 1.5 MB, so a phone photo costs a fraction of the request and the model's tokens. GIFs and
+ * small images go as they are.
+ */
+async function shrinkImage(file: File): Promise<Blob> {
+  if (file.type === "image/gif") return file
+  const bitmap = await createImageBitmap(file)
+  const scale = Math.min(1, MAX_IMAGE_SIDE / Math.max(bitmap.width, bitmap.height))
+  if (scale === 1 && file.size <= 1.5 * 1024 * 1024) {
+    bitmap.close()
+    return file
+  }
+  const canvas = document.createElement("canvas")
+  canvas.width = Math.round(bitmap.width * scale)
+  canvas.height = Math.round(bitmap.height * scale)
+  canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  bitmap.close()
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, "image/jpeg", 0.85),
+  )
+  return blob ?? file
+}
+
+const readDataUrl = (file: Blob) =>
   new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve(String(reader.result))
@@ -67,14 +94,15 @@ export function useChatAttachments(documentId: string) {
         void (async () => {
           try {
             if (kind === "image") {
-              const image = await readDataUrl(file)
+              const blob = await shrinkImage(file)
+              const image = await readDataUrl(blob)
               patch(id, {
                 status: "ready",
                 attachment: {
                   id,
                   type: "image",
                   name: file.name,
-                  contentType: file.type,
+                  contentType: blob.type || file.type,
                   status: { type: "complete" },
                   content: [{ type: "image", image, filename: file.name }],
                 },

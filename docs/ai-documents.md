@@ -178,8 +178,12 @@ prepared as soon as it's picked so problems show before sending:
   isn't kept. The message carries the text as a `text/plain` file part; the model reads it as
   `<attached_file name="…">`, and it counts as something the person said (`attachedStatements`),
   so `set_variables` and proposals may use values written in it.
-- **An image** (PNG, JPEG, WebP, GIF, up to 5 MB) goes to the model as it is, for reference: values
-  read from it aren't evidence, and the prompt tells the assistant to confirm them first.
+- **An image** (PNG, JPEG, WebP, GIF, up to 5 MB) goes to the model for reference: values read
+  from it aren't evidence, and the prompt tells the assistant to confirm them first. The browser
+  scales a photo down to 2048 px (JPEG) before attaching it, and sends an image only with its own
+  message (`withoutEarlierImages`); earlier ones go as the note the server saves.
+- **Body limits** (`app.ts` → `limitFor`): the attachments route takes the import limit (10 MB +
+  64 KB, 413 `too_large`), the chat route three base64 images plus 4 MB; everything else 8 MB.
 - **Checked every turn** (`assertAttachments`, `apps/api/src/lib/assistant/attachments.ts`): file
   parts only on the person's messages, data URLs only, those types and sizes, three per message;
   otherwise 400.

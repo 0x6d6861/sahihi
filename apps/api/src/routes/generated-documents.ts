@@ -25,6 +25,7 @@ import {
   ImportError,
   importContent,
   isProposalStale,
+  MAX_IMPORT_BYTES,
   ProposalPayloadSchema,
   proposalTexts,
   SaveGenerationTemplateSchema,
@@ -431,8 +432,7 @@ export const generatedDocuments = new Hono<AppEnv>()
     async (c) => {
       const { doc } = await loadGeneratedDocument(c.get("organizationId"), c.req.param("id"))
       assertCanEdit(c, doc)
-      const length = Number(c.req.header("content-length") ?? 0)
-      if (length > MAX_IMPORT_BYTES + 64 * 1024) importFailed(new ImportError("too_large"))
+      // The body's size is capped in app.ts (importLimit, 413 too_large), as for /import.
       const body = await c.req.parseBody().catch(() => null)
       const file = body?.file
       if (!(file instanceof File)) badRequest("Attach the file as `file`")

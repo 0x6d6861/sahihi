@@ -1640,6 +1640,32 @@ describe("chat attachments (ADR 0050)", () => {
     expect(saved).not.toContain("iVBORw0KGgo")
   })
 
+  test("takes files and images over the 8 MB JSON limit; refuses a file over 10 MB", async () => {
+    const id = await createNda(alice)
+    const nine = await attach(id, new Uint8Array(9 * 1024 * 1024).fill(0x61), "long.txt")
+    expect(nine.status).toBe(200)
+    expect(await json<{ truncated: boolean }>(nine)).toMatchObject({ truncated: true })
+    const eleven = await attach(id, new Uint8Array(11 * 1024 * 1024).fill(0x61), "huge.txt")
+    expect(eleven.status).toBe(413)
+    expect(await json<{ error: string }>(eleven)).toMatchObject({ error: "too_large" })
+
+    // Two 4 MB images: about 11 MB of JSON, over the 8 MB limit other routes have.
+    const image = (name: string) => ({
+      type: "file",
+      mediaType: "image/png",
+      url: `data:image/png;base64,${Buffer.alloc(4 * 1024 * 1024).toString("base64")}`,
+      filename: name,
+    })
+    setAssistantModelForTests(scriptedModel([]))
+    const res = await chatWith(id, [
+      { type: "text", text: "Photos" },
+      image("a.png"),
+      image("b.png"),
+    ])
+    expect(res.status).toBe(200)
+    await res.text()
+  })
+
   test("refuses a file type the assistant can't take", async () => {
     const id = await createNda(alice)
     const res = await chatWith(id, [

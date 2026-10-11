@@ -26,6 +26,11 @@ the person said), so they had to retype it.
 - **Limits:** three files per message; documents up to 10 MB, images up to 5 MB (PNG, JPEG, WebP,
   GIF). The server checks every file part of every turn (data URLs only, allowed types and sizes,
   only on the person's messages), since the browser sends the conversation.
+- **Request size:** the API caps bodies at 8 MB, too little for a turn with images in base64. The
+  attachments route takes the import limit (10 MB + the multipart envelope, 413 `too_large`), and
+  the chat route three 5 MB images in base64 plus 4 MB of conversation. To keep turns small, the
+  browser scales photos down to 2048 px (JPEG) before attaching them, and sends an image only with
+  the message it's attached to: earlier ones go as the same note the server saves.
 - **Trail:** `attachment.read` records the kind and length of a document read, never its name or
   text.
 

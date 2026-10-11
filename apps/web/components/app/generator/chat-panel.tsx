@@ -27,6 +27,7 @@ import {
   messageSectionId,
   replyParagraphs,
   sectionExcerpt,
+  withoutEarlierImages,
 } from "@/lib/generator"
 import { cn } from "@/lib/utils"
 import { AttachButton, PendingFiles, SentFiles, useChatAttachments } from "./chat-attachments"
@@ -60,6 +61,17 @@ export function ChatPanel() {
     () =>
       new AssistantChatTransport({
         api: `/api/generated-documents/${encodeURIComponent(id)}/chat`,
+        // Images go once, with the message they're attached to (ADR 0050).
+        prepareSendMessagesRequest: ({ body, messages, trigger, messageId, requestMetadata }) => ({
+          body: {
+            ...body,
+            id,
+            messages: withoutEarlierImages(messages),
+            trigger,
+            messageId,
+            metadata: requestMetadata,
+          },
+        }),
       }),
     [id],
   )

@@ -33,6 +33,7 @@ import {
   templateChoices,
   textDataUrl,
   unsignedParties,
+  withoutEarlierImages,
 } from "./generator"
 
 const input: AskQuestionsInput = {
@@ -333,4 +334,23 @@ describe("chat attachments", () => {
     const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
     expect(new TextDecoder().decode(bytes)).toBe("Fee: KES 5,000 — Nairobi ✓")
   })
+})
+
+test("withoutEarlierImages keeps images only on the person's last message", () => {
+  const img = (name: string) => ({
+    type: "file",
+    mediaType: "image/png",
+    url: "data:x",
+    filename: name,
+  })
+  const doc = { type: "file", mediaType: "text/plain", url: "data:y", filename: "t.txt" }
+  type Part = { type: string; mediaType?: string; url?: string; filename?: string; text?: string }
+  const messages: { role: string; parts: Part[] }[] = [
+    { role: "user", parts: [img("a.png"), doc] },
+    { role: "assistant", parts: [{ type: "text", text: "ok" }] },
+    { role: "user", parts: [img("b.png")] },
+  ]
+  const out = withoutEarlierImages(messages)
+  expect(out[0]?.parts).toEqual([{ type: "text", text: "[Image “a.png” attached, not kept]" }, doc])
+  expect(out[2]?.parts).toEqual([img("b.png")])
 })
