@@ -13,6 +13,8 @@ import {
   answerValues,
   blankState,
   blanksStatus,
+  CHAT_ATTACHMENT_LIMITS,
+  chatAttachmentKind,
   chatErrorMessage,
   draftOrigin,
   importErrorMessage,
@@ -29,6 +31,7 @@ import {
   roleIssues,
   sectionExcerpt,
   templateChoices,
+  textDataUrl,
   unsignedParties,
 } from "./generator"
 
@@ -302,5 +305,32 @@ describe("starting points", () => {
     ).toBe("No text here.")
     expect(importErrorMessage({ status: 413, body: null })).toContain("10 MB")
     expect(importErrorMessage(new Error("network"))).toContain("couldn't be imported")
+  })
+})
+
+describe("chat attachments", () => {
+  test("images go as they are, documents as text; anything else is refused with a reason", () => {
+    expect(chatAttachmentKind({ name: "id.png", type: "image/png", size: 10 })).toBe("image")
+    expect(chatAttachmentKind({ name: "Terms.PDF", type: "application/pdf", size: 10 })).toBe(
+      "document",
+    )
+    expect(chatAttachmentKind({ name: "a.docx", type: "", size: 10 })).toBe("document")
+    expect(
+      chatAttachmentKind({
+        name: "big.png",
+        type: "image/png",
+        size: CHAT_ATTACHMENT_LIMITS.imageBytes + 1,
+      }),
+    ).toContain("5 MB")
+    expect(
+      chatAttachmentKind({ name: "a.exe", type: "application/x-msdownload", size: 1 }),
+    ).toContain("attach a PDF")
+  })
+
+  test("textDataUrl keeps non-ASCII text intact", () => {
+    const url = textDataUrl("Fee: KES 5,000 — Nairobi ✓")
+    const base64 = url.split(",")[1] ?? ""
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
+    expect(new TextDecoder().decode(bytes)).toBe("Fee: KES 5,000 — Nairobi ✓")
   })
 })

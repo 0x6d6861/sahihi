@@ -16,7 +16,7 @@ import {
   useAuiState,
 } from "@assistant-ui/react"
 import { lastAssistantMessageIsCompleteWithToolCalls, type UIMessage } from "ai"
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { ArrowUpIcon, LoaderIcon, StopIcon, XIcon } from "@/components/app/icons"
 import { Button } from "@/components/arc/button/button"
 import { Tooltip } from "@/components/arc/tooltip/tooltip"
@@ -28,6 +28,8 @@ import {
   replyParagraphs,
   sectionExcerpt,
 } from "@/lib/generator"
+import { cn } from "@/lib/utils"
+import { AttachButton, PendingFiles, SentFiles, useChatAttachments } from "./chat-attachments"
 import { useGenerator } from "./generator-context"
 import { ProposalCard } from "./proposal-card"
 import { AppliedNote, QuestionCard } from "./question-card"
@@ -186,6 +188,7 @@ const UserText: TextMessagePartComponent = ({ text }) => (
 function UserMessage() {
   const { detail } = useGenerator()
   const sectionId = useAuiState((s) => messageSectionId(s.message.metadata))
+  const attachments = useAuiState((s) => s.message.attachments ?? [])
   const section = sectionId
     ? detail.version.data.content.content.find((s) => s.attrs.id === sectionId)
     : undefined
@@ -200,6 +203,7 @@ function UserMessage() {
           {excerpt ? ` · ${excerpt.slice(0, 90)}${excerpt.length > 90 ? "…" : ""}` : null}
         </div>
       )}
+      <SentFiles attachments={attachments} />
       <div className="max-w-[85%] rounded-2xl bg-muted px-4 py-2.5 text-foreground">
         <MessagePrimitive.Parts components={{ Text: UserText }} />
       </div>
@@ -272,6 +276,8 @@ function Composer() {
   const aui = useAui()
   const running = useAuiState((s) => s.thread.isRunning)
   const empty = useAuiState((s) => s.composer.text.trim().length === 0)
+  const files = useChatAttachments(detail.document.id)
+  const [dragging, setDragging] = useState(false)
   if (!editable) {
     return (
       <p className="shrink-0 border-t px-4 py-3 text-muted-foreground text-sm md:px-5">
@@ -291,21 +297,50 @@ function Composer() {
   const section = detail.version.data.content.content.find((s) => s.attrs.id === selectedSectionId)
   const excerpt = section ? sectionExcerpt(detail.version.data, section.attrs.id) : null
 
+  // Files still being read hold the message back; a message can be just files.
+  const canSend = (!empty || files.ready.length > 0) && !files.reading
   const send = () => {
     const text = aui.composer().getState().text.trim()
-    if (!text || running) return
+    if (!canSend || running) return
     aui.thread().append({
       role: "user",
-      content: [{ type: "text", text }],
+      content: [
+        {
+          type: "text",
+          text: text || (files.ready.length === 1 ? "Here's a file." : "Here are some files."),
+        },
+      ],
+      attachments: files.ready,
       metadata: { custom: section ? { selection: { sectionId: section.attrs.id } } : {} },
     })
     aui.composer().setText("")
+    files.clear()
     setSelectedSectionId(null)
   }
 
   return (
     <div className="shrink-0 border-t p-3">
-      <div className="overflow-hidden rounded-2xl border bg-card focus-within:border-foreground/30">
+      {/* Files can also be dropped on the card or pasted into the message. */}
+      <fieldset
+        aria-label="New message"
+        className={cn(
+          "min-w-0 overflow-hidden rounded-2xl border bg-card transition-colors focus-within:border-foreground/30",
+          dragging && "border-info bg-info/5",
+        )}
+        onDragOver={(e) => {
+          if (!e.dataTransfer.types.includes("Files")) return
+          e.preventDefault()
+          setDragging(true)
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          if (!e.dataTransfer.files.length) return
+          e.preventDefault()
+          setDragging(false)
+          files.add(e.dataTransfer.files)
+        }}
+      >
+        <PendingFiles files={files.files} onRemove={files.remove} />
         {section && (
           <div className="flex items-start gap-2 border-b bg-info/10 py-2.5 pr-2 pl-3.5">
             <div className="min-w-0 flex-1">
@@ -336,6 +371,12 @@ function Composer() {
           aria-label="Message the assistant"
           placeholder={section ? "Ask about this section…" : "Message the assistant…"}
           className="block w-full resize-none bg-transparent px-3.5 py-3 text-sm outline-none placeholder:text-muted-foreground"
+          onPaste={(e) => {
+            if (e.clipboardData.files.length) {
+              e.preventDefault()
+              files.add(e.clipboardData.files)
+            }
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault()
@@ -343,7 +384,8 @@ function Composer() {
             }
           }}
         />
-        <div className="flex justify-end px-2.5 pb-2.5">
+        <div className="flex items-center justify-between px-2.5 pb-2.5">
+          <AttachButton disabled={files.full} onFiles={files.add} />
           {running ? (
             <Tooltip content="Stop">
               <IconButton
@@ -361,7 +403,7 @@ function Composer() {
                 size="icon-sm"
                 className="rounded-full"
                 aria-label="Send"
-                disabled={empty}
+                disabled={!canSend}
                 onClick={send}
               >
                 <ArrowUpIcon aria-hidden />
@@ -369,7 +411,7 @@ function Composer() {
             </Tooltip>
           )}
         </div>
-      </div>
+      </fieldset>
     </div>
   )
 }

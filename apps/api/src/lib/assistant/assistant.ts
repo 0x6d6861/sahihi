@@ -35,6 +35,7 @@ import {
   latestVersion,
   StaleVersionError,
 } from "../generated-documents"
+import { assertAttachments, attachedStatements, forModel, forStorage } from "./attachments"
 import { assistantModel, assistantModelId } from "./model"
 import { systemPrompt } from "./prompt"
 
@@ -225,7 +226,13 @@ export async function streamAssistantReply(input: {
     messages: input.messages as UIMessage[],
     tools: placeholderTools,
   })
-  const ctx = { ...input, statements: userStatements(messages) }
+  // Throws AttachmentError for a file the assistant can't take (the route answers 400).
+  assertAttachments(messages)
+  // What the person typed or answered, and the text of files they attached: their own words.
+  const ctx = {
+    ...input,
+    statements: [...userStatements(messages), ...attachedStatements(messages)],
+  }
   const toolSet = tools(ctx)
   const version = await latestVersion(prisma, input.generatedDocumentId)
   const doc = await prisma.generatedDocument.findUnique({
@@ -252,7 +259,7 @@ export async function streamAssistantReply(input: {
       organizationName: input.organizationName,
       today: new Date().toISOString().slice(0, 10),
     }),
-    messages: await convertToModelMessages(messages, { tools: toolSet }),
+    messages: await convertToModelMessages(forModel(messages), { tools: toolSet }),
     tools: toolSet,
     stopWhen: isStepCount(5),
     abortSignal: input.abortSignal,
@@ -288,7 +295,8 @@ export async function streamAssistantReply(input: {
         await prisma.generatedDocument
           .update({
             where: { id: input.generatedDocumentId },
-            data: { messages: all as unknown as object },
+            // Only text is kept: attached images become a note.
+            data: { messages: forStorage(all) as unknown as object },
           })
           .catch((err) => log.error("conversation not saved", { err }))
       },

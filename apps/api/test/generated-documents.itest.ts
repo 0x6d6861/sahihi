@@ -1564,3 +1564,88 @@ describe("starting points (ADR 0049)", () => {
     expect(d.issues.some((i) => i.code === "unresolved_variable")).toBe(false)
   })
 })
+
+describe("chat attachments (ADR 0050)", () => {
+  beforeEach(() => enableAssistant(alice))
+
+  const attach = (id: string, bytes: Uint8Array, name: string) => {
+    const form = new FormData()
+    form.set("file", new File([bytes as Uint8Array<ArrayBuffer>], name))
+    return request(alice, `/api/generated-documents/${id}/attachments`, {
+      method: "POST",
+      body: form,
+    })
+  }
+  const textUrl = (text: string) =>
+    `data:text/plain;charset=utf-8;base64,${Buffer.from(text).toString("base64")}`
+  const chatWith = (id: string, parts: unknown[]) =>
+    request(alice, `/api/generated-documents/${id}/chat`, {
+      method: "POST",
+      json: { messages: [{ id: "m1", role: "user", parts }] },
+    })
+
+  test("reads a PDF, a Word or a text file as text; refuses anything else", async () => {
+    const id = await createNda(alice)
+    const pdf = await attach(id, textPdf("Term sheet", "Client: Acme Ltd"), "terms.pdf")
+    expect(pdf.status).toBe(200)
+    expect(await json<{ text: string }>(pdf)).toMatchObject({ name: "terms.pdf", truncated: false })
+
+    const w = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+    const docx = zipSync({
+      "word/document.xml": strToU8(
+        `<w:document ${w}><w:body><w:p><w:r><w:t>Term: two years</w:t></w:r></w:p></w:body></w:document>`,
+      ),
+    })
+    expect(await json<{ text: string }>(await attach(id, docx, "t.docx"))).toMatchObject({
+      text: "Term: two years",
+    })
+    expect(
+      await json<{ text: string }>(await attach(id, strToU8("Fee: KES 5,000\n"), "n.txt")),
+    ).toMatchObject({ text: "Fee: KES 5,000" })
+
+    const exe = await attach(id, new Uint8Array([0x4d, 0x5a, 0, 0xff, 0xfe]), "a.txt")
+    expect(exe.status).toBe(422)
+    const event = await prisma.generatedDocumentEvent.findFirst({
+      where: { generatedDocumentId: id, type: "attachment.read" },
+    })
+    expect(JSON.stringify(event?.data)).not.toContain("Acme")
+  })
+
+  test("an attached document's text counts as said; an image is sent but not kept", async () => {
+    const id = await createNda(alice)
+    setAssistantModelForTests(scriptedModel([{ key: "party_a_name", value: "Acme Ltd" }]))
+    const res = await chatWith(id, [
+      { type: "text", text: "Use these" },
+      {
+        type: "file",
+        mediaType: "text/plain",
+        url: textUrl("Client: Acme Ltd"),
+        filename: "t.pdf",
+      },
+      {
+        type: "file",
+        mediaType: "image/png",
+        url: "data:image/png;base64,iVBORw0KGgo=",
+        filename: "id.png",
+      },
+    ])
+    expect(res.status).toBe(200)
+    await res.text()
+    const d = await detail(alice, id)
+    expect(d.version.data.variables.find((v) => v.key === "party_a_name")?.value).toBe("Acme Ltd")
+    const saved = JSON.stringify(d.messages)
+    // The document's text is kept (base64 in its data URL), the image isn't.
+    expect(saved).toContain(Buffer.from("Client: Acme Ltd").toString("base64"))
+    expect(saved).toContain("not kept")
+    expect(saved).not.toContain("iVBORw0KGgo")
+  })
+
+  test("refuses a file type the assistant can't take", async () => {
+    const id = await createNda(alice)
+    const res = await chatWith(id, [
+      { type: "text", text: "Here" },
+      { type: "file", mediaType: "application/zip", url: "data:application/zip;base64,UEs=" },
+    ])
+    expect(res.status).toBe(400)
+  })
+})

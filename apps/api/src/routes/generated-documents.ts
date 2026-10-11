@@ -7,6 +7,7 @@ import {
   BLANK_STARTER,
   billingPeriod,
   blankDocument,
+  blocksToText,
   CreateGeneratedDocumentSchema,
   canEditGeneratedDocument,
   canEditWorkspace,
@@ -39,12 +40,13 @@ import {
 import { countAssistantTurns, forOrganization, getOrgPlan, prisma } from "@sahihi/db"
 import { createEnvelopeFromDocument } from "@sahihi/envelopes"
 import { getObjectBytes, keys, putObject } from "@sahihi/infra"
-import { composeGeneratedDocument, inspectPdf, readForImport } from "@sahihi/pdf"
+import { composeGeneratedDocument, inspectPdf, readForImport, sniffImportFormat } from "@sahihi/pdf"
 import { Hono } from "hono"
 import { createMiddleware } from "hono/factory"
 import { HTTPException } from "hono/http-exception"
 import { z } from "zod"
 import { streamAssistantReply } from "../lib/assistant/assistant"
+import { AttachmentError, MAX_ATTACHMENT_CHARS } from "../lib/assistant/attachments"
 import { assistantConfigured } from "../lib/assistant/model"
 import type { AppEnv } from "../lib/env"
 import {
@@ -407,8 +409,76 @@ export const generatedDocuments = new Hono<AppEnv>()
         if (err instanceof Error && err.name === "AI_TypeValidationError") {
           badRequest("The conversation is not in the expected format")
         }
+        if (err instanceof AttachmentError) badRequest(err.message)
         throw err
       }
+    },
+  )
+
+  /**
+   * A file for the chat (docs/ai-documents.md → Attachments, ADR 0050): a PDF, Word or text file,
+   * read and returned as text for the browser to attach to the next message. The file isn't kept;
+   * the text travels with the conversation. Images don't come here: they're attached as they are.
+   */
+  .post(
+    "/:id/attachments",
+    rateLimit({
+      bucket: "generated-attachment",
+      limit: 20,
+      windowSec: 60,
+      key: (c) => c.get("user").id,
+    }),
+    async (c) => {
+      const { doc } = await loadGeneratedDocument(c.get("organizationId"), c.req.param("id"))
+      assertCanEdit(c, doc)
+      const length = Number(c.req.header("content-length") ?? 0)
+      if (length > MAX_IMPORT_BYTES + 64 * 1024) importFailed(new ImportError("too_large"))
+      const body = await c.req.parseBody().catch(() => null)
+      const file = body?.file
+      if (!(file instanceof File)) badRequest("Attach the file as `file`")
+      const bytes = new Uint8Array(await file.arrayBuffer())
+      let text: string
+      let kind: "pdf" | "docx" | "text"
+      if (sniffImportFormat(bytes)) {
+        try {
+          const read = await readForImport(bytes)
+          text = blocksToText(read.blocks)
+          kind = read.format
+        } catch (err) {
+          if (err instanceof ImportError) importFailed(err)
+          throw err
+        }
+      } else {
+        // Plain text (.txt, .md, .csv): valid UTF-8 with no NUL bytes, or it's not text.
+        try {
+          text = new TextDecoder("utf-8", { fatal: true }).decode(bytes)
+        } catch {
+          importFailed(new ImportError("unsupported"))
+        }
+        if (text.includes("\u0000") || bytes.byteLength > MAX_IMPORT_BYTES) {
+          importFailed(
+            new ImportError(bytes.byteLength > MAX_IMPORT_BYTES ? "too_large" : "unsupported"),
+          )
+        }
+        kind = "text"
+      }
+      text = text.trim()
+      if (!text) importFailed(new ImportError("no_text"))
+      const truncated = text.length > MAX_ATTACHMENT_CHARS
+      await prisma.$transaction((tx) =>
+        appendEvent(tx, {
+          generatedDocumentId: doc.id,
+          type: "attachment.read",
+          actor: "USER",
+          actorUserId: c.get("user").id,
+          data: { kind, chars: Math.min(text.length, MAX_ATTACHMENT_CHARS), truncated },
+        }),
+      )
+      return c.json({
+        name: file.name.slice(0, 200) || "document",
+        text: text.slice(0, MAX_ATTACHMENT_CHARS),
+        truncated,
+      })
     },
   )
 
