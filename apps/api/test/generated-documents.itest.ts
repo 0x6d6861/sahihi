@@ -1503,6 +1503,15 @@ describe("starting points (ADR 0049)", () => {
     expect(await prisma.document.count()).toBe(before)
   })
 
+  test("takes a file over the 8 MB JSON limit, refuses one over 10 MB with too_large", async () => {
+    const pad = (mb: number) => new Uint8Array(mb * 1024 * 1024)
+    const big = await upload(pad(9), "big.pdf")
+    expect(big.status).toBe(422) // reached the handler: not a PDF, but no body-limit 413
+    const huge = await upload(pad(11), "huge.pdf")
+    expect(huge.status).toBe(413)
+    expect(await json<{ error: string }>(huge)).toMatchObject({ error: "too_large" })
+  })
+
   test("refuses a scan, another kind of file and no file at all", async () => {
     const scan = await upload(minimalPdf(), "scan.pdf")
     expect(scan.status).toBe(422)

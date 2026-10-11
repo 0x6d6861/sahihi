@@ -1,5 +1,10 @@
 import { getEnv } from "@sahihi/config"
-import { InvalidTransitionError, MAX_UPLOAD_BYTES } from "@sahihi/core"
+import {
+  ImportError,
+  InvalidTransitionError,
+  MAX_IMPORT_BYTES,
+  MAX_UPLOAD_BYTES,
+} from "@sahihi/core"
 import { EnvelopeError } from "@sahihi/envelopes"
 import { Hono } from "hono"
 import { bodyLimit } from "hono/body-limit"
@@ -34,6 +39,14 @@ import { workspace } from "./routes/workspace"
 
 const jsonLimit = bodyLimit({ maxSize: 8 * 1024 * 1024 })
 const uploadLimit = bodyLimit({ maxSize: MAX_UPLOAD_BYTES })
+// A file to import (10 MB) plus the multipart envelope; refused with the code the dialog explains.
+const importLimit = bodyLimit({
+  maxSize: MAX_IMPORT_BYTES + 64 * 1024,
+  onError: (c) => {
+    const err = new ImportError("too_large")
+    return c.json({ error: err.code, message: err.message }, 413)
+  },
+})
 const defaultHeaders = secureHeaders()
 // Logos are embedded by mail clients on other origins, so they may be loaded cross-origin.
 const brandingHeaders = secureHeaders({ crossOriginResourcePolicy: "cross-origin" })
@@ -57,7 +70,11 @@ export function createApp() {
     // Signature PNGs are the largest bodies (~500 KB each)
     .use("/api/*", (c, next) =>
       // Direct PDF upload through the public API takes the same 25 MB as the web upload.
-      c.req.path === "/api/v1/documents" ? uploadLimit(c, next) : jsonLimit(c, next),
+      c.req.path === "/api/v1/documents"
+        ? uploadLimit(c, next)
+        : c.req.path === "/api/generated-documents/import"
+          ? importLimit(c, next)
+          : jsonLimit(c, next),
     )
     // Responses carry PII, presigned URLs and session data: no browser, proxy or CDN may store them.
     .use("/api/*", async (c, next) => {

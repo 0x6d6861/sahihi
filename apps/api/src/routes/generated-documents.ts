@@ -24,7 +24,6 @@ import {
   ImportError,
   importContent,
   isProposalStale,
-  MAX_IMPORT_BYTES,
   ProposalPayloadSchema,
   proposalTexts,
   SaveGenerationTemplateSchema,
@@ -282,8 +281,6 @@ export const generatedDocuments = new Hono<AppEnv>()
       key: (c) => c.get("user").id,
     }),
     async (c) => {
-      const length = Number(c.req.header("content-length") ?? 0)
-      if (length > MAX_IMPORT_BYTES + 64 * 1024) importFailed(new ImportError("too_large"))
       const body = await c.req.parseBody().catch(() => null)
       const file = body?.file
       if (!(file instanceof File)) badRequest("Attach the file to import as `file`")
