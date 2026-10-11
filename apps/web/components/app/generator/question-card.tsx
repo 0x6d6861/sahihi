@@ -108,7 +108,8 @@ function ActiveQuestions({
     setSaving(true)
     setError(null)
     try {
-      await saveVariables(answerValues(input, all), "answer")
+      const values = answerValues(input, all, detail.version.data.variables)
+      if (values.length) await saveVariables(values, "answer")
       onDone(questionResult(input, all))
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) await refresh().catch(() => {})

@@ -60,9 +60,13 @@ export function blankState(v: Variable | undefined): BlankState {
 export function answerValues(
   input: AskQuestionsInput,
   answers: Readonly<Record<string, string | null>>,
+  variables: readonly Pick<Variable, "key">[],
 ): { key: string; value: string | null }[] {
   const byKey = new Map<string, string | null>()
   for (const q of input.questions) {
+    // A question about something that isn't a blank (who signs for a company) changes nothing in
+    // the document: its answer only goes back to the assistant in the tool result.
+    if (!variables.some((v) => v.key === q.variableKey)) continue
     const raw = answers[q.id]
     const value = raw == null ? null : raw.trim() || null
     byKey.set(q.variableKey, value)

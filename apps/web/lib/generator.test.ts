@@ -46,14 +46,22 @@ describe("blankState", () => {
 
 describe("question cards", () => {
   test("answers become values; blank or missing answers are skips", () => {
-    expect(answerValues(input, { q1: " one year ", q2: "  " })).toEqual([
+    const blanks = [{ key: "term" }, { key: "purpose" }]
+    expect(answerValues(input, { q1: " one year ", q2: "  " }, blanks)).toEqual([
       { key: "term", value: "one year" },
       { key: "purpose", value: null },
     ])
-    expect(answerValues(input, {})).toEqual([
+    expect(answerValues(input, {}, blanks)).toEqual([
       { key: "term", value: null },
       { key: "purpose", value: null },
     ])
+  })
+
+  test("answers about keys that aren't blanks aren't saved", () => {
+    expect(answerValues(input, { q1: "one year", q2: "Jane Doe" }, [{ key: "term" }])).toEqual([
+      { key: "term", value: "one year" },
+    ])
+    expect(answerValues(input, { q1: "one year" }, [])).toEqual([])
   })
 
   test("the tool result names every question", () => {

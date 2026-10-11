@@ -124,7 +124,9 @@ Tools (schemas in `packages/core/src/generation/schemas.ts`):
 
 Enforced, not just prompted: a batch has at most three questions (schema), answers go straight
 into the blank they're about, skipped blanks stay visibly unresolved, and finalising refuses while
-any blank the text uses is empty. The prompt adds: never invent names, amounts, dates, durations,
+any blank the text uses is empty. A question whose `variableKey` isn't a blank (who signs on a
+company's behalf) changes nothing in the document: its answer only reaches the assistant in the
+tool result, where it still counts as something the person said. The prompt adds: never invent names, amounts, dates, durations,
 legal terms or jurisdictions; ask with the tool, never in prose; options only for generic choices,
 never a person's details.
 
