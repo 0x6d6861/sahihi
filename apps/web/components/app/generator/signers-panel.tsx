@@ -7,8 +7,10 @@ import {
   type GeneratedFieldType,
   type SignerField,
   type SignersDefinition,
+  SignersDefinitionSchema,
 } from "@sahihi/core"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import { useAutosave } from "@/components/app/field-editor/use-autosave"
 import { XIcon } from "@/components/app/icons"
 import { Panel } from "@/components/app/panel"
 import { Alert } from "@/components/arc/alert/alert"
@@ -39,189 +41,223 @@ const FIELD_TYPES = Object.keys(FIELD_NAMES) as GeneratedFieldType[]
  * Who signs and where (docs/ai-documents.md → Signers). Signer identity is data: the roles and
  * contacts here become the envelope's recipients, each signer's fields become their signature block
  * in the document, and the text never holds an email. Saved as one definition
- * (`PUT …/signers`, `applySigners`); finalising checks names and distinct, valid emails.
+ * (`PUT …/signers`, `applySigners`), on its own like the text (debounced, serialised, flushed
+ * before finalising); finalising checks names and distinct, valid emails. A field's preflight
+ * problem hides while that field differs from what's saved.
  *
  * Signers know the parties of the document (ADR 0048): each card says who it signs for, offers the
  * party's name as the signer's, and parties nobody signs for get an "Add signer for …" button.
  */
 export function SignersPanel() {
-  const { detail, editable, saveSigners } = useGenerator()
+  const { detail, editable, saveSigners, refresh, nav, registerFlush } = useGenerator()
   const saved = currentSigners(detail.version.data)
   const savedJson = JSON.stringify(saved)
   const parties = documentParties(detail.version.data)
   const [draft, setDraft] = useState<SignersDefinition>(saved)
+  const draftRef = useRef(draft)
+  draftRef.current = draft
   // The server state the form last loaded: unsaved edits are differences from it, not from the
   // latest server state (which can change underneath, e.g. an accepted suggestion).
   const [baseline, setBaseline] = useState(savedJson)
-  const [saving, setSaving] = useState(false)
-  const [status, setStatus] = useState<"idle" | "saved" | "error" | "stale" | "invalid">("idle")
-  const [message, setMessage] = useState<string | null>(null)
+  const [revision, setRevision] = useState(0)
+  const [problem, setProblem] = useState<string | null>(null)
   const dirty = JSON.stringify(draft) !== baseline
-  // After a save, take the server's version (new fields get their ids there).
-  const [resync, setResync] = useState(false)
+  const root = useRef<HTMLDivElement>(null)
 
   // Pick up changes made elsewhere (an accepted suggestion, the editor) unless mid-edit.
-  if (savedJson !== baseline && (!dirty || resync)) {
-    setResync(false)
+  if (savedJson !== baseline && !dirty) {
     setBaseline(savedJson)
     setDraft(JSON.parse(savedJson) as SignersDefinition)
   }
 
   const update = (change: (d: SignersDefinition) => void) => {
-    setStatus("idle")
     setDraft((d) => {
       const next = structuredClone(d)
       change(next)
       return next
     })
+    setRevision((r) => r + 1)
   }
 
   const save = async () => {
-    setSaving(true)
-    setStatus("idle")
+    const sent = JSON.stringify(draftRef.current)
+    if (sent === baseline) return
+    const parsed = SignersDefinitionSchema.safeParse(JSON.parse(sent))
+    if (!parsed.success) {
+      setProblem(
+        draftRef.current.roles.some((r) => !r.label.trim())
+          ? "Give every signer a role to save."
+          : "These signers can't be saved yet. Check the fields.",
+      )
+      throw new Error("invalid")
+    }
     try {
-      setResync(true)
-      await saveSigners(draft)
-      setStatus("saved")
+      const version = await saveSigners(parsed.data)
+      setProblem(null)
+      // Take the server's definition (new fields get their ids there), unless the person kept
+      // typing meanwhile: then the queued save sends the newer form.
+      const server = JSON.stringify(currentSigners(version.data))
+      setBaseline(server)
+      setDraft((d) => (JSON.stringify(d) === sent ? (JSON.parse(server) as SignersDefinition) : d))
     } catch (err) {
-      setResync(false)
-      if (err instanceof ApiError && err.status === 409) setStatus("stale")
-      else if (err instanceof ApiError && err.status === 400) {
-        setStatus("invalid")
-        setMessage(err.message)
-      } else setStatus("error")
-    } finally {
-      setSaving(false)
+      // Pick up the current version so the retry saves on top of it; the draft stays dirty.
+      if (err instanceof ApiError && err.status === 409) await refresh().catch(() => {})
+      setProblem(
+        err instanceof ApiError && err.status === 409
+          ? "The document changed meanwhile. Retry to save on top of it."
+          : err instanceof ApiError && err.status === 400
+            ? err.message
+            : "Not saved.",
+      )
+      throw err
     }
   }
 
+  const autosave = useAutosave(revision, save, 1200)
+  const { flush } = autosave
+  useEffect(() => registerFlush(flush), [registerFlush, flush])
+
+  // A jump from the finalise list: the signer's card, with the focus on its first problem.
+  useEffect(() => {
+    if (nav?.target.kind !== "signers") return
+    const roleKey = nav.target.roleKey
+    const frame = requestAnimationFrame(() => {
+      const card = roleKey
+        ? root.current?.querySelector<HTMLElement>(`[data-role-key="${CSS.escape(roleKey)}"]`)
+        : root.current
+      if (!card) return
+      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      card.scrollIntoView({ block: "start", behavior: reduced ? "auto" : "smooth" })
+      card.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus({ preventScroll: true })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [nav])
+
   return (
-    <form
-      className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-6 md:px-8"
-      onSubmit={(e) => {
-        e.preventDefault()
-        void save()
-      }}
-    >
+    <div ref={root} className="mx-auto flex max-w-2xl scroll-mt-4 flex-col gap-4 px-4 py-6 md:px-8">
       {draft.roles.map((role, i) => {
         const issues = roleIssues(detail.issues, role.key)
-        const issue = (code: string) =>
-          dirty ? undefined : issues.find((x) => x.code === code)?.message
+        const savedRole = saved.roles.find((r) => r.key === role.key)
+        // A field being edited hides only its own problem, until it's saved.
+        const issue = (code: string, unchanged: boolean) =>
+          unchanged ? issues.find((x) => x.code === code)?.message : undefined
+        const nameSaved = (role.name ?? null) === (savedRole?.name ?? null)
+        const emailSaved = (role.email ?? null) === (savedRole?.email ?? null)
         const signer = role.recipientRole === "SIGNER"
         const fields = draft.fields[role.key] ?? []
+        const fieldsSaved = JSON.stringify(fields) === JSON.stringify(saved.fields[role.key] ?? [])
         const party = partyForRole(parties, draft, role.key)
         return (
-          <Panel
-            key={role.key}
-            title={role.label || "Untitled signer"}
-            description={roleDescription(signer, party)}
-            actions={
-              editable && draft.roles.length > 1 ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={saving}
-                  onClick={() =>
-                    update((d) => {
-                      d.roles.splice(i, 1)
-                      delete d.fields[role.key]
-                      delete d.parties[role.key]
-                    })
-                  }
-                >
-                  Remove
-                </Button>
-              ) : null
-            }
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Input
-                label="Role"
-                value={role.label}
-                disabled={!editable || saving}
-                onChange={(e) => update((d) => setRole(d, i, { label: e.target.value }))}
-              />
-              <Select
-                label="Takes part as"
-                value={role.recipientRole}
-                disabled={!editable || saving}
-                options={[
-                  { value: "SIGNER", label: "Signer" },
-                  { value: "VIEWER", label: "Gets a copy" },
-                ]}
-                onValueChange={(v) =>
-                  update((d) => {
-                    setRole(d, i, {
-                      recipientRole: v as "SIGNER" | "VIEWER",
-                      ...(v === "VIEWER" ? { initialsOnEveryPage: false } : {}),
-                    })
-                    // A copy has no signature block, so it can't carry a party link (ADR 0048).
-                    if (v === "VIEWER") {
-                      d.fields[role.key] = []
-                      delete d.parties[role.key]
+          <div key={role.key} data-role-key={role.key} className="scroll-mt-4">
+            <Panel
+              title={role.label || "Untitled signer"}
+              description={roleDescription(signer, party)}
+              actions={
+                editable && draft.roles.length > 1 ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      update((d) => {
+                        d.roles.splice(i, 1)
+                        delete d.fields[role.key]
+                        delete d.parties[role.key]
+                      })
                     }
-                  })
-                }
-              />
-              <Input
-                label="Full name"
-                autoComplete="off"
-                value={role.name ?? ""}
-                disabled={!editable || saving}
-                error={issue("missing_name")}
-                onChange={(e) => update((d) => setRole(d, i, { name: e.target.value || null }))}
-              />
-              <Input
-                label="Email"
-                type="email"
-                autoComplete="off"
-                value={role.email ?? ""}
-                disabled={!editable || saving}
-                error={issue("invalid_email") ?? issue("duplicate_email")}
-                onChange={(e) => update((d) => setRole(d, i, { email: e.target.value || null }))}
-              />
-            </div>
-            {editable && party?.value && !role.name && (
-              <p className="flex flex-wrap items-center gap-x-2 text-muted-foreground text-sm">
-                Signing in person?
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={saving}
-                  onClick={() => update((d) => setRole(d, i, { name: party.value }))}
-                >
-                  Use “{party.value}”
-                </Button>
-                For a company, enter who signs on its behalf.
-              </p>
-            )}
-            {signer && (
-              <>
-                <Switch
-                  label="Initials on every page"
-                  checked={role.initialsOnEveryPage}
-                  disabled={!editable || saving}
-                  onCheckedChange={(checked) =>
-                    update((d) => setRole(d, i, { initialsOnEveryPage: checked }))
-                  }
+                  >
+                    Remove
+                  </Button>
+                ) : null
+              }
+            >
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Input
+                  label="Role"
+                  value={role.label}
+                  disabled={!editable}
+                  onChange={(e) => update((d) => setRole(d, i, { label: e.target.value }))}
                 />
-                <FieldList
-                  fields={fields}
-                  disabled={!editable || saving}
-                  onChange={(next) =>
+                <Select
+                  label="Takes part as"
+                  value={role.recipientRole}
+                  disabled={!editable}
+                  options={[
+                    { value: "SIGNER", label: "Signer" },
+                    { value: "VIEWER", label: "Gets a copy" },
+                  ]}
+                  onValueChange={(v) =>
                     update((d) => {
-                      d.fields[role.key] = next
+                      setRole(d, i, {
+                        recipientRole: v as "SIGNER" | "VIEWER",
+                        ...(v === "VIEWER" ? { initialsOnEveryPage: false } : {}),
+                      })
+                      // A copy has no signature block, so it can't carry a party link (ADR 0048).
+                      if (v === "VIEWER") {
+                        d.fields[role.key] = []
+                        delete d.parties[role.key]
+                      }
                     })
                   }
                 />
-                {issue("missing_signature_field") && (
-                  <p className="text-destructive-foreground text-sm">
-                    {issue("missing_signature_field")}
-                  </p>
-                )}
-              </>
-            )}
-          </Panel>
+                <Input
+                  label="Full name"
+                  autoComplete="off"
+                  value={role.name ?? ""}
+                  disabled={!editable}
+                  error={issue("missing_name", nameSaved)}
+                  onChange={(e) => update((d) => setRole(d, i, { name: e.target.value || null }))}
+                />
+                <Input
+                  label="Email"
+                  type="email"
+                  autoComplete="off"
+                  value={role.email ?? ""}
+                  disabled={!editable}
+                  error={issue("invalid_email", emailSaved) ?? issue("duplicate_email", emailSaved)}
+                  onChange={(e) => update((d) => setRole(d, i, { email: e.target.value || null }))}
+                />
+              </div>
+              {editable && party?.value && !role.name && (
+                <p className="flex flex-wrap items-center gap-x-2 text-muted-foreground text-sm">
+                  Signing in person?
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => update((d) => setRole(d, i, { name: party.value }))}
+                  >
+                    Use “{party.value}”
+                  </Button>
+                  For a company, enter who signs on its behalf.
+                </p>
+              )}
+              {signer && (
+                <>
+                  <Switch
+                    label="Initials on every page"
+                    checked={role.initialsOnEveryPage}
+                    disabled={!editable}
+                    onCheckedChange={(checked) =>
+                      update((d) => setRole(d, i, { initialsOnEveryPage: checked }))
+                    }
+                  />
+                  <FieldList
+                    fields={fields}
+                    disabled={!editable}
+                    onChange={(next) =>
+                      update((d) => {
+                        d.fields[role.key] = next
+                      })
+                    }
+                  />
+                  {issue("missing_signature_field", fieldsSaved) && (
+                    <p className="text-destructive-foreground text-sm">
+                      {issue("missing_signature_field", fieldsSaved)}
+                    </p>
+                  )}
+                </>
+              )}
+            </Panel>
+          </div>
         )
       })}
       {editable && unsignedParties(parties, draft).length > 0 && (
@@ -232,7 +268,6 @@ export function SignersPanel() {
                 key={p.variableKey}
                 variant="secondary"
                 size="sm"
-                disabled={saving}
                 onClick={() =>
                   update((d) => {
                     const key = blankKey(
@@ -255,7 +290,6 @@ export function SignersPanel() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Button
             variant="secondary"
-            disabled={saving}
             onClick={() =>
               update((d) => {
                 const key = blankKey(
@@ -269,20 +303,25 @@ export function SignersPanel() {
           >
             Add signer
           </Button>
-          <span className="flex items-center gap-3">
-            <span className="text-muted-foreground text-sm" role="status">
-              {status === "saved" && !dirty && "Saved"}
-              {status === "error" && "Not saved. Try again."}
-              {status === "stale" && "The document changed meanwhile. Reload and try again."}
-              {status === "invalid" && message}
-            </span>
-            <Button type="submit" loading={saving} disabled={!dirty || saving}>
-              Save signers
-            </Button>
+          <span className="text-muted-foreground text-sm" role="status">
+            {autosave.status === "saving" || autosave.status === "pending" ? "Saving…" : null}
+            {autosave.status === "saved" && revision > 0 ? "Saved" : null}
+            {autosave.status === "error" ? (
+              <>
+                {problem ?? "Not saved."}{" "}
+                <button
+                  type="button"
+                  className="underline underline-offset-4"
+                  onClick={() => void autosave.retry()}
+                >
+                  Retry
+                </button>
+              </>
+            ) : null}
           </span>
         </div>
       )}
-    </form>
+    </div>
   )
 }
 

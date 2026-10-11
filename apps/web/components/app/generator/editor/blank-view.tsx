@@ -6,21 +6,19 @@ import { Button } from "@/components/arc/button/button"
 import { Input } from "@/components/arc/input/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/arc/popover/popover"
 import { ApiError } from "@/lib/api"
-import { blankState } from "@/lib/generator"
+import { blankState, nextOpenBlank } from "@/lib/generator"
 import { cn } from "@/lib/utils"
 import { useGenerator } from "../generator-context"
-import { useDocMode } from "./doc-mode"
 
 /**
  * A blank in the text (docs/ai-documents.md → Editing): never bracketed text, always a distinct,
  * non-editable chip. Filled, it shows the value with a dotted underline; empty, a dashed chip with
- * the label ("skipped" when the question was skipped). In Editing a click fills it; in Preview a
- * click belongs to the section (ask about it). The value is data, not text.
+ * the label ("skipped" when the question was skipped). A click fills it, in Preview as in Editing
+ * (the rest of a section's surface still selects it for the chat); "Save and next" moves on to the
+ * next open blank. The value is data, not text.
  */
 export function BlankView({ node, selected }: NodeViewProps) {
-  const { detail, editable: canEdit, saveVariables } = useGenerator()
-  const mode = useDocMode()
-  const editable = canEdit && mode === "editing"
+  const { detail, editable, saveVariables, navigate } = useGenerator()
   const key = String(node.attrs.key)
   const variable = detail.version.data.variables.find((v) => v.key === key)
   const state = blankState(variable)
@@ -42,12 +40,16 @@ export function BlankView({ node, selected }: NodeViewProps) {
       </span>
     )
 
-  const save = async () => {
+  // Read before saving: the other blanks don't change, and this one is never its own next.
+  const next = nextOpenBlank(detail.version.data, key)
+
+  const save = async (then?: string | null) => {
     setSaving(true)
     setError(null)
     try {
       await saveVariables([{ key, value: value.trim() }], "edit")
       setOpen(false)
+      if (then) navigate({ kind: "blank", key: then })
     } catch (err) {
       setError(
         err instanceof ApiError && err.status === 409
@@ -62,8 +64,12 @@ export function BlankView({ node, selected }: NodeViewProps) {
   return (
     <NodeViewWrapper
       as="span"
+      data-blank={key}
       className={cn("rounded-md", selected && "ring-2 ring-ring")}
       contentEditable={false}
+      // In Preview the section around it is a button: filling a blank mustn't also select it.
+      onClick={(e: React.MouseEvent) => e.stopPropagation()}
+      onKeyDown={(e: React.KeyboardEvent) => e.stopPropagation()}
     >
       {editable ? (
         <Popover
@@ -86,7 +92,7 @@ export function BlankView({ node, selected }: NodeViewProps) {
               className="flex flex-col gap-3"
               onSubmit={(e) => {
                 e.preventDefault()
-                if (value.trim()) void save()
+                if (value.trim()) void save(next)
               }}
             >
               <Input
@@ -97,9 +103,19 @@ export function BlankView({ node, selected }: NodeViewProps) {
                 onChange={(e) => setValue(e.target.value)}
                 autoFocus
               />
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-2">
+                {next && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={!value.trim() || saving}
+                    onClick={() => void save()}
+                  >
+                    Save
+                  </Button>
+                )}
                 <Button type="submit" size="sm" loading={saving} disabled={!value.trim() || saving}>
-                  Save
+                  {next ? "Save and next" : "Save"}
                 </Button>
               </div>
             </form>

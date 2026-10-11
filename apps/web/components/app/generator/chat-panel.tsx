@@ -2,8 +2,10 @@
 
 import { AssistantChatTransport, useChatRuntime } from "@assistant-ui/ai-sdk"
 import {
+  ActionBarPrimitive,
   AssistantRuntimeProvider,
   AuiConfig,
+  AuiIf,
   ComposerPrimitive,
   defineToolkit,
   MessagePrimitive,
@@ -15,7 +17,7 @@ import {
 } from "@assistant-ui/react"
 import { lastAssistantMessageIsCompleteWithToolCalls, type UIMessage } from "ai"
 import { useMemo } from "react"
-import { ArrowUpIcon, StopIcon, XIcon } from "@/components/app/icons"
+import { ArrowUpIcon, LoaderIcon, StopIcon, XIcon } from "@/components/app/icons"
 import { Button } from "@/components/arc/button/button"
 import { Tooltip } from "@/components/arc/tooltip/tooltip"
 import { Button as IconButton } from "@/components/ui/button"
@@ -73,6 +75,10 @@ export function ChatPanel() {
             <EmptyState />
           </ThreadPrimitive.Empty>
           <ThreadPrimitive.Messages components={{ UserMessage, AssistantMessage }} />
+          {/* Sent, and no assistant message yet. */}
+          <AuiIf condition={(s) => s.thread.isRunning && s.thread.messages.at(-1)?.role === "user"}>
+            <Thinking />
+          </AuiIf>
         </ThreadPrimitive.Viewport>
         <Composer />
       </ThreadPrimitive.Root>
@@ -91,8 +97,8 @@ function EmptyState() {
         <p className="font-medium text-foreground">Draft “{title}” with the assistant</p>
         <p className="text-muted-foreground">
           It asks for missing details as questions and fills the document as you answer. It only
-          uses what you tell it, and leaves anything you skip visibly blank. Click any section on
-          the right to ask about it.
+          uses what you tell it, and leaves anything you skip visibly blank. Click any section of
+          the document to ask about it.
         </p>
       </div>
       {editable && (
@@ -141,7 +147,7 @@ function UserMessage() {
   return (
     <MessagePrimitive.Root className="flex flex-col items-end gap-1.5">
       {section && (
-        <div className="max-w-[85%] rounded-lg border-info border-l-2 bg-muted/60 px-3 py-1.5 text-muted-foreground text-xs">
+        <div className="max-w-[85%] rounded-lg border border-dashed border-info/30 bg-info/10 px-3 py-1.5 text-muted-foreground text-xs">
           <span className="font-medium text-foreground">
             {sectionLabel(detail.version.data.content, section)}
           </span>
@@ -156,9 +162,20 @@ function UserMessage() {
 }
 
 function AssistantMessage() {
+  // Running with nothing new to show yet: before the first words, or after a tool finished and
+  // the assistant carries on (a tool still being written shows its own placeholder).
+  const thinking = useAuiState((s) => {
+    if (s.message.status?.type !== "running") return false
+    const last = s.message.content.at(-1)
+    if (!last) return true
+    if (last.type === "text") return last.text.trim() === ""
+    if (last.type === "tool-call") return last.result !== undefined
+    return last.type === "reasoning"
+  })
   return (
     <MessagePrimitive.Root className="flex flex-col gap-3 text-foreground">
       <MessagePrimitive.Parts components={{ Text }} />
+      {thinking && <Thinking />}
       <MessagePrimitive.Error>
         <ReplyError />
       </MessagePrimitive.Error>
@@ -166,7 +183,20 @@ function AssistantMessage() {
   )
 }
 
-/** A failed reply: the API's reason (e.g. the plan's assistant replies used up), in place. */
+/** The assistant is working: shown at once, so a sent message never meets an empty pane. */
+function Thinking() {
+  return (
+    <p className="flex items-center gap-2 text-muted-foreground text-sm" role="status">
+      <LoaderIcon aria-hidden className="size-3.5 animate-spin motion-reduce:animate-none" />
+      Thinking…
+    </p>
+  )
+}
+
+/**
+ * A failed reply: the API's reason (e.g. the plan's assistant replies used up), in place, and a
+ * retry that asks for the reply again.
+ */
 function ReplyError() {
   const error = useAuiState((s) =>
     s.message.status?.type === "incomplete" && s.message.status.reason === "error"
@@ -174,9 +204,14 @@ function ReplyError() {
       : undefined,
   )
   return (
-    <p className="text-destructive-foreground text-sm" role="alert">
-      {chatErrorMessage(error)}
-    </p>
+    <div className="flex flex-col items-start gap-2" role="alert">
+      <p className="text-destructive-foreground text-sm">{chatErrorMessage(error)}</p>
+      <ActionBarPrimitive.Reload asChild>
+        <Button variant="secondary" size="sm">
+          Try again
+        </Button>
+      </ActionBarPrimitive.Reload>
+    </div>
   )
 }
 

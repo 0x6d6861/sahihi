@@ -18,6 +18,7 @@ import {
 } from "@/components/app/icons"
 import { Alert } from "@/components/arc/alert/alert"
 import { Button } from "@/components/arc/button/button"
+import { DropdownMenu } from "@/components/arc/dropdown-menu/dropdown-menu"
 import { Input } from "@/components/arc/input/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/arc/popover/popover"
 import { Tooltip } from "@/components/arc/tooltip/tooltip"
@@ -42,7 +43,8 @@ type NewBlank = { key: string; label: string; type: VariableType }
  * text changed elsewhere, and the editor offers to reload.
  */
 export function DocumentEditor({ mode }: { mode: DocMode }) {
-  const { detail, editable: canEdit, saveContent, refresh } = useGenerator()
+  const { detail, editable: canEdit, saveContent, refresh, nav, registerFlush } = useGenerator()
+  const surface = useRef<HTMLDivElement>(null)
   const editable = canEdit && mode === "editing"
   const { data } = detail.version
   // The version whose text the editor holds: the base of the next save.
@@ -87,6 +89,30 @@ export function DocumentEditor({ mode }: { mode: DocMode }) {
   }, [editor, saveContent])
 
   const autosave = useAutosave(revision, save, 1200)
+  const { flush } = autosave
+  useEffect(() => registerFlush(flush), [registerFlush, flush])
+
+  // A jump from the blanks pill, the finalise list or a suggestion: bring it into view once the
+  // tab shows (the next frame), open a blank to fill it, flash a section that just changed.
+  useEffect(() => {
+    if (!nav || nav.target.kind === "signers") return
+    const target = nav.target
+    const frame = requestAnimationFrame(() => {
+      const root = surface.current
+      if (!root) return
+      const selector =
+        target.kind === "blank"
+          ? `[data-blank="${CSS.escape(target.key)}"]`
+          : `[data-section-id="${CSS.escape(target.id)}"]`
+      const el = root.querySelector<HTMLElement>(selector)
+      if (!el) return
+      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      el.scrollIntoView({ block: "center", behavior: reduced ? "auto" : "smooth" })
+      if (target.kind === "blank") el.querySelector("button")?.click()
+      else if (target.flash) flash(el)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [nav])
 
   // Keep the base current when other saves (answers, signers) add versions: they don't touch the
   // text, so the editor's text is still that of the latest version.
@@ -139,12 +165,12 @@ export function DocumentEditor({ mode }: { mode: DocMode }) {
           ]}
         />
       )}
-      <div className="mx-auto flex max-w-[720px] flex-col gap-4 px-6 py-10 sm:px-12">
+      <div ref={surface} className="mx-auto flex max-w-[720px] flex-col gap-4 px-6 py-10 sm:px-12">
         {stale && (
           <Alert tone="danger" title="The text changed somewhere else">
             Your last edit wasn't saved.{" "}
             <button type="button" className="underline underline-offset-4" onClick={reload}>
-              Load the latest version
+              Load the latest version (discards your last edit)
             </button>
           </Alert>
         )}
@@ -245,28 +271,54 @@ function EditorToolbar({
         <ToolbarGroup>
           {list("bulletList", "Bulleted list", <ListIcon />)}
           {list("orderedList", "Lettered list", <ListOrderedIcon />)}
-          <Tooltip content={state.inTable ? "Add a row" : "Insert a table"}>
-            <ToolbarButton
-              render={
-                <IconButton
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={state.inTable ? "Add a row" : "Insert a table"}
-                />
-              }
-              onClick={() =>
-                state.inTable
-                  ? editor.chain().focus().addRowAfter().run()
-                  : editor
-                      .chain()
-                      .focus()
-                      .insertTable({ rows: 3, cols: 2, withHeaderRow: true })
-                      .run()
-              }
-            >
-              <TableIcon />
-            </ToolbarButton>
-          </Tooltip>
+          {state.inTable ? (
+            <DropdownMenu
+              label="Table"
+              iconOnly
+              icon={<TableIcon />}
+              align="start"
+              items={[
+                {
+                  label: "Add a row below",
+                  onSelect: () => editor.chain().focus().addRowAfter().run(),
+                },
+                {
+                  label: "Add a column to the right",
+                  onSelect: () => editor.chain().focus().addColumnAfter().run(),
+                },
+                {
+                  label: "Delete this row",
+                  separatorBefore: true,
+                  onSelect: () => editor.chain().focus().deleteRow().run(),
+                },
+                {
+                  label: "Delete this column",
+                  onSelect: () => editor.chain().focus().deleteColumn().run(),
+                },
+                {
+                  label: "Delete the table",
+                  destructive: true,
+                  separatorBefore: true,
+                  onSelect: () => editor.chain().focus().deleteTable().run(),
+                },
+              ]}
+            />
+          ) : (
+            <Tooltip content="Insert a table">
+              <ToolbarButton
+                render={<IconButton variant="ghost" size="icon-sm" aria-label="Insert a table" />}
+                onClick={() =>
+                  editor
+                    .chain()
+                    .focus()
+                    .insertTable({ rows: 3, cols: 2, withHeaderRow: true })
+                    .run()
+                }
+              >
+                <TableIcon />
+              </ToolbarButton>
+            </Tooltip>
+          )}
         </ToolbarGroup>
         <ToolbarSeparator />
         <ToolbarGroup>
@@ -386,18 +438,41 @@ function InsertBlank({
   )
 }
 
-/** A new, empty section after the one holding the cursor, with a fresh stable id. */
+/**
+ * A new, empty section after the one holding the cursor, with a fresh stable id. Its title field
+ * takes the focus with the placeholder title selected, so typing names it.
+ */
 function addSectionAfterCursor(editor: Editor) {
   const { $from } = editor.state.selection
   const end = $from.depth >= 1 ? $from.after(1) : editor.state.doc.content.size
+  const id = `s_${crypto.randomUUID().slice(0, 8)}`
   editor
     .chain()
     .focus()
     .insertContentAt(end, {
       type: "section",
-      attrs: { id: `s_${crypto.randomUUID().slice(0, 8)}`, title: "New section", numbered: true },
+      attrs: { id, title: "New section", numbered: true },
       content: [{ type: "paragraph" }],
     })
     .setTextSelection(end + 2)
     .run()
+  requestAnimationFrame(() => {
+    const title = editor.view.dom.querySelector<HTMLInputElement>(
+      `[data-section-id="${CSS.escape(id)}"] input`,
+    )
+    title?.focus()
+    title?.select()
+  })
+}
+
+/**
+ * A short highlight on a section that just changed (an accepted suggestion): on at once, then
+ * fading out (colour only, so it stays under reduced motion too).
+ */
+function flash(el: HTMLElement) {
+  el.dataset.flash = "on"
+  window.setTimeout(() => {
+    el.dataset.flash = "off"
+    window.setTimeout(() => delete el.dataset.flash, 700)
+  }, 900)
 }

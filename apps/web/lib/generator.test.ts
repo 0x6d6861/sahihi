@@ -14,7 +14,10 @@ import {
   blankState,
   blanksStatus,
   chatErrorMessage,
+  issueTarget,
   messageSectionId,
+  nextOpenBlank,
+  openBlankKeys,
   type ProposalView,
   partyForRole,
   pendingSectionIds,
@@ -198,6 +201,41 @@ describe("drafting chat helpers", () => {
       open: 0,
       label: "All blanks filled",
     })
+  })
+
+  test("openBlankKeys and nextOpenBlank follow the text's order", () => {
+    const data = findStarter("mutual-nda")?.build()
+    if (!data) throw new Error("missing starter")
+    const open = openBlankKeys(data)
+    expect(open.length).toBeGreaterThan(2)
+    const [first, second, third] = open as [string, string, string]
+    expect(nextOpenBlank(data)).toBe(first)
+    expect(nextOpenBlank(data, first)).toBe(second)
+    // A filled blank is skipped; after the last, it wraps to the first.
+    const filled = applyVariableUpdates(data, [{ key: second, value: "x" }], "answer")
+    expect(openBlankKeys(filled)).not.toContain(second)
+    expect(nextOpenBlank(filled, first)).toBe(third)
+    expect(nextOpenBlank(filled, open[open.length - 1])).toBe(first)
+    // The only open blank is never its own next.
+    const one = applyVariableUpdates(
+      data,
+      open.slice(1).map((key) => ({ key, value: "x" })),
+      "answer",
+    )
+    expect(nextOpenBlank(one, first)).toBeNull()
+    expect(nextOpenBlank(one)).toBe(first)
+  })
+
+  test("issueTarget sends blanks to the text and signer problems to the Signers tab", () => {
+    expect(issueTarget({ code: "unresolved_variable", message: "x", variableKey: "term" })).toEqual(
+      { kind: "blank", key: "term" },
+    )
+    expect(issueTarget({ code: "missing_name", message: "x", roleKey: "party_a" })).toEqual({
+      kind: "signers",
+      roleKey: "party_a",
+    })
+    expect(issueTarget({ code: "no_signers", message: "x" })).toEqual({ kind: "signers" })
+    expect(issueTarget({ code: "invalid_structure", message: "x" })).toBeNull()
   })
 
   test("replyParagraphs splits paragraphs and bold runs", () => {

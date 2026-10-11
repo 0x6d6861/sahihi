@@ -3,13 +3,15 @@ import Link from "next/link"
 import {
   DeleteTemplate,
   EnableAssistant,
-  StartDocument,
+  StartCard,
+  StartGroup,
 } from "@/components/app/generator/start-actions"
 import { Panel } from "@/components/app/panel"
 import { Badge } from "@/components/arc/badge/badge"
 import { EmptyState } from "@/components/arc/empty-state/empty-state"
 import { apiServer } from "@/lib/api-server"
 import type { GenerationTemplateItem } from "@/lib/generator"
+import { timeAgo } from "@/lib/notifications"
 
 interface Settings {
   configured: boolean
@@ -59,6 +61,35 @@ export default async function GeneratePage() {
   ])
   const drafts = data?.items ?? []
   const templates = templateData?.items ?? []
+  const now = new Date()
+  const draftList = (
+    <Panel title="Your drafts">
+      {drafts.length === 0 ? (
+        <p className="text-muted-foreground text-sm">
+          Nothing drafted yet. Pick a starter above to begin.
+        </p>
+      ) : (
+        <ul className="flex flex-col divide-y">
+          {drafts.map((d) => (
+            <li key={d.id} className="flex items-center justify-between gap-3 py-3">
+              <Link href={`/generate/${d.id}`} className="min-w-0 truncate font-medium">
+                {d.title}
+              </Link>
+              <span className="flex shrink-0 items-center gap-3 text-muted-foreground text-sm">
+                <span className="max-sm:hidden">{d.createdBy.name}</span>
+                <time dateTime={d.updatedAt} className="tabular-nums">
+                  {edited(timeAgo(d.updatedAt, now))}
+                </time>
+                <Badge tone={d.status === "FINALIZED" ? "success" : "neutral"} size="sm">
+                  {d.status === "FINALIZED" ? "Finalised" : "Draft"}
+                </Badge>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
+  )
   return (
     <div className="flex flex-col gap-8">
       <header className="flex flex-col gap-2">
@@ -69,72 +100,51 @@ export default async function GeneratePage() {
         </p>
       </header>
 
-      <Panel title="Start a document">
-        <ul className="grid gap-3 sm:grid-cols-2">
-          {STARTERS.map((s) => (
-            <li key={s.key} className="flex flex-col gap-3 rounded-xl border p-4">
-              <div className="flex flex-col gap-1">
-                <span className="font-medium">{s.name}</span>
-                <span className="text-muted-foreground text-sm">{s.description}</span>
-              </div>
-              <div>
-                <StartDocument from={{ starter: s.key }} />
-              </div>
-            </li>
-          ))}
-        </ul>
-      </Panel>
+      {/* Coming back is mostly to carry on: drafts first once there are some. */}
+      {drafts.length > 0 && draftList}
 
-      {templates.length > 0 && (
-        <Panel
-          title="Workspace templates"
-          description="Saved from documents drafted here, with their wording, blanks and signers."
-        >
+      <StartGroup>
+        <Panel title="Start a document">
           <ul className="grid gap-3 sm:grid-cols-2">
-            {templates.map((t) => (
-              <li key={t.id} className="flex flex-col gap-3 rounded-xl border p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex min-w-0 flex-col gap-1">
-                    <span className="truncate font-medium">{t.name}</span>
-                    {t.description && (
-                      <span className="text-muted-foreground text-sm">{t.description}</span>
-                    )}
-                    <span className="text-muted-foreground text-xs">
-                      Saved by {t.createdBy.name}
-                    </span>
-                  </div>
-                  {t.canManage && <DeleteTemplate id={t.id} name={t.name} />}
-                </div>
-                <div>
-                  <StartDocument from={{ templateId: t.id }} />
-                </div>
-              </li>
+            {STARTERS.map((s) => (
+              <StartCard
+                key={s.key}
+                from={{ starter: s.key }}
+                name={s.name}
+                description={s.description}
+              />
             ))}
           </ul>
         </Panel>
-      )}
 
-      <Panel title="Your drafts">
-        {drafts.length === 0 ? (
-          <p className="text-muted-foreground text-sm">Nothing drafted yet.</p>
-        ) : (
-          <ul className="flex flex-col divide-y">
-            {drafts.map((d) => (
-              <li key={d.id} className="flex items-center justify-between gap-3 py-3">
-                <Link href={`/generate/${d.id}`} className="min-w-0 truncate font-medium">
-                  {d.title}
-                </Link>
-                <span className="flex shrink-0 items-center gap-3 text-muted-foreground text-sm">
-                  <span className="max-sm:hidden">{d.createdBy.name}</span>
-                  <Badge tone={d.status === "FINALIZED" ? "success" : "neutral"} size="sm">
-                    {d.status === "FINALIZED" ? "Finalised" : "Draft"}
-                  </Badge>
-                </span>
-              </li>
-            ))}
-          </ul>
+        {templates.length > 0 && (
+          <Panel
+            title="Workspace templates"
+            description="Saved from documents drafted here, with their wording, blanks and signers."
+          >
+            <ul className="grid gap-3 sm:grid-cols-2">
+              {templates.map((t) => (
+                <StartCard
+                  key={t.id}
+                  from={{ templateId: t.id }}
+                  name={t.name}
+                  description={t.description}
+                  meta={`Saved by ${t.createdBy.name}`}
+                  actions={t.canManage ? <DeleteTemplate id={t.id} name={t.name} /> : undefined}
+                />
+              ))}
+            </ul>
+          </Panel>
         )}
-      </Panel>
+      </StartGroup>
+
+      {drafts.length === 0 && draftList}
     </div>
   )
+}
+
+/** "Edited 3h ago", or "Edited 4 Mar 2026" past a week (`timeAgo` gives the date then). */
+function edited(age: string): string {
+  if (age === "now") return "Edited just now"
+  return /^\d+[mhd]$/.test(age) ? `Edited ${age} ago` : `Edited ${age}`
 }
