@@ -24,6 +24,8 @@ export interface GeneratorDetail {
     envelopeId: string | null
     documentId: string | null
     canEdit: boolean
+    /** How it started: a starter's key, "blank" or "import" (ADR 0049). */
+    starter: string
     /** The finalised document this draft is a new version of. */
     previousId: string | null
     /** The new version started from this finalised document, if any. */
@@ -38,7 +40,7 @@ export interface GeneratorDetail {
 /** An assistant proposal as the page shows it (`GET /generated-documents/:id`). */
 export interface ProposalView {
   id: string
-  kind: "replace_section" | "delete_section" | "insert_sections" | "set_signers"
+  kind: "replace_section" | "delete_section" | "insert_sections" | "set_signers" | "make_blanks"
   sectionId: string | null
   /** STALE also for pending proposals whose section has changed since. */
   status: ProposalStatus
@@ -145,6 +147,7 @@ export function proposalTitle(
     : "a section"
   if (view.kind === "insert_sections") return "Suggested new section"
   if (view.kind === "set_signers") return "Suggested signers"
+  if (view.kind === "make_blanks") return "Suggested blanks"
   if (view.kind === "delete_section") return `Suggested removal of ${name}`
   return `Suggested edit to ${name}`
 }
@@ -300,4 +303,19 @@ export function replyParagraphs(text: string): { text: string; bold: boolean }[]
             : { text: run, bold: false },
         ),
     )
+}
+
+/** Why an import was refused (`POST /generated-documents/import`, ADR 0049), for the dialog. */
+export function importErrorMessage(error: unknown): string {
+  const body = (error as { body?: { error?: string; message?: string } | null })?.body
+  if (body?.message && body.error && body.error !== "validation_error") return body.message
+  const status = (error as { status?: number })?.status
+  if (status === 413) return "This file is too large to import (10 MB at most)."
+  if (status === 429) return "Too many imports in a row. Try again in a minute."
+  return "The file couldn't be imported. Try again."
+}
+
+/** How a draft started, for the assistant's first card: a blank page, an import, or a starter. */
+export function draftOrigin(starter: string): "blank" | "import" | "starter" {
+  return starter === "blank" ? "blank" : starter === "import" ? "import" : "starter"
 }

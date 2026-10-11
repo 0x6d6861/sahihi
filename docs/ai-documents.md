@@ -9,7 +9,7 @@ What ships today (roadmap P6): five starters (see Starters), the assistant's que
 filling, a rich-text editor for the wording (sections, blanks, lists, tables, bold, italic,
 underline), assistant edit proposals with a diff to accept or reject, signers and their fields
 (signature, initials, full name, date signed, text, checkbox; initials on every page), set by the
-person or proposed by the assistant, a PDF preview, finalise, and workspace templates saved from a document (see Templates).
+person or proposed by the assistant, a PDF preview, finalise, workspace templates saved from a document (see Templates), and drafts started blank or imported from the person's own PDF or Word file (see Starting points).
 
 ## Availability
 
@@ -73,6 +73,52 @@ filled in and with contacts, a starter passes the finalise preflight and becomes
 can be sent. Its wording holds no amount, date, duration, percentage, email or phone number: the
 same check the assistant's proposals get (`unattestedSpecifics`).
 
+## Starting points (ADR 0049)
+
+`POST /generated-documents` takes one of `{ starter }`, `{ templateId }`, `{ blank: true }` or
+`{ documentId }`; a file from the computer goes to `POST /generated-documents/import`. The
+`starter` column records the starter's key, or `blank` / `import`, and `GET /:id` returns it.
+
+- **Blank** (`blankDocument()`, not one of `STARTERS`): "Untitled document" with one placeholder
+  section and one signer with the usual fields. The assistant asks what the document is for and
+  drafts it with `propose_sections`.
+- **A PDF from the library:** a READY `Document` of the workspace (`forOrganization`), imported
+  word for word. The PDF itself doesn't change.
+- **An uploaded file:** a multipart form with one `file`, a PDF or a Word (.docx) file up to 10
+  MB, rate-limited to 10 a minute per user. Its type comes from its bytes (`sniffImportFormat`).
+  The file is read in memory and **not stored**: the draft is the source, and finalising renders
+  a new PDF.
+
+`document.created` records the source (`blank`, `pdf`, `docx`), the library document's id and the
+number of sections, never the text.
+
+### Import
+
+Readers (`packages/pdf/src/import/`) turn a file into neutral blocks; `importContent`
+(`packages/core/src/generation/import/`) turns the blocks into a document. Nothing is reworded.
+
+- **Word** (`readDocxBlocks`, unzipped with fflate): heading and title styles (or an outline
+  level) are headings; Word numbering makes list items (bullets vs numbered); bold, italic and
+  underline are kept; tables come cell by cell. Tracked deletions, text boxes, field codes,
+  headers, footers, footnotes and images are left out.
+- **PDF** (`readPageText`, then `pdfTextToBlocks`): headers and footers repeated on most pages and
+  page numbers are dropped; lines that run on are joined and words hyphenated across a line break
+  mended; short numbered lines ("3. Payment"), "Article 4" / "Clause 2" lines and short
+  all-capitals lines are headings, and a title-like first line is the title; sub-clauses ("3.1 …")
+  stay paragraphs with their number; bullets and lettered items are list items. Tables come in as
+  paragraphs.
+- **Both:** fill-in lines ("Signature: ______") and bare signing captions ("Signature", "Date")
+  are dropped, since signature blocks come from the Signers tab. The first short heading is the
+  title (otherwise the file's name); each heading starts a section, numbered only if the source
+  numbered it; text before the first heading goes in an unnumbered "Introduction". The document
+  starts with no blanks and one signer, `Signer 1`, without fields.
+- **Refused** (422 with a code, 413 for size): `no_text` (a scan or an empty file), `encrypted`,
+  `unsupported` (anything but a PDF or .docx), `too_large` (over 10 MB or 60,000 characters of
+  text, since the whole text goes into every assistant turn).
+
+The assistant is told an imported document came in as written: it proposes blanks for the values
+that change between signings with `propose_blanks` (see Proposals), then the signers.
+
 ## Templates (ADR 0046)
 
 A document can be saved as a **workspace template** to start others from: its wording, blanks,
@@ -118,6 +164,7 @@ Tools (schemas in `packages/core/src/generation/schemas.ts`):
 | `propose_section_edit` | Server | Proposes replacing or deleting one section (see **Proposals**). Nothing changes until the person accepts |
 | `propose_sections` | Server | Proposes new sections after a given one (or at the start) |
 | `define_signers` | Server | Proposes the signers (see **Signers**): every role, its fields and the party it signs for. Contacts only if the person stated them (or a filled party value) |
+| `propose_blanks` | Server | Proposes turning text written in the document (a name, a date, an amount) into blanks prefilled with that text (see **Proposals**). Meant for imported documents |
 | `set_variables` | Server | Fills blanks with values the person typed in the chat. Each value must appear, word for word (case, spacing and edge punctuation aside), in something the person said or answered (`isValueAttested`); otherwise nothing changes, `variables.rejected` is recorded and the model is told to ask instead |
 
 ### Clarifying questions
@@ -187,6 +234,13 @@ or rejects it from a card in the chat (`packages/core/src/generation/proposals.t
   applies once. If the section it changes was edited since the proposal was made, or a new blank's
   key now exists, it's **out of date** (`STALE`, 409 `stale_proposal`); changes to blanks or other
   sections don't count. **Reject** (`…/reject`) records `proposal.rejected`.
+- **Blanks from the text** (`propose_blanks`, `make_blanks`; `packages/core/src/generation/make-blanks.ts`):
+  up to 30 items, each an exact text in the document and the blank it becomes. Refused when a text
+  isn't in the body as a whole word or phrase (signature blocks don't count), a key exists, or one
+  text holds another. Accepting replaces every occurrence, keeping its bold or italic, with a blank
+  whose value is that text (`status: answered`, `source: "import"`); the value comes from the
+  document, so it needs no evidence from the chat. Out of date once a text no longer occurs or a key
+  was taken. The card lists `"Acme Ltd" → [Client's name]`, one line per blank.
 - The detail returns the last 30 proposals with before and after text (blanks by label), pending
   ones reported `STALE` as soon as their section moves on. The prompt lists the last 10 with their
   outcome, so the assistant doesn't repeat a rejected change.
@@ -285,16 +339,22 @@ ADR 0009).
 ## Web (`/generate`, `components/app/generator/`)
 
 - `/generate` (**Drafting**, its own tab in the top bar): your drafts (first once there are any,
-  with when each was last edited), then starters and workspace templates as pressable cards (the
-  whole card starts a document; one at a time; delete for those who may); the switch for owners
-  and admins while it's off. "Draft with AI" on All files links here.
+  with when each was last edited), then "Blank document", "Import a document", the starters and
+  workspace templates as pressable cards (the whole card starts a document; one at a time; delete
+  for those who may); the switch for owners and admins while it's off. "Draft with AI" on All
+  files links here, and a READY document's row menu in Files has "Draft from this document".
+- **Import a document:** an Arc dialog with "Your documents" (the library search shared with the
+  envelope editor's Add document, `LibraryDocumentPicker`) or "Upload a file" (a drop zone for a
+  PDF or .docx). A refusal shows its reason in the dialog; otherwise the new draft opens.
 - `/generate/:id`: a full page (`isFullPage`) with its own bar (back, title, version, Finalise or
   Open envelope as an Arc split button whose menu holds Save as template; just "Save as template"
   for people who can't finalise). Assistant on the left, document
   on the right; on phones one pane at a time, both mounted, and a section picked in the document
   shows an "Ask about it" bar that switches to the assistant.
 - **Chat:** assistant-ui primitives (`useChatRuntime` + `AssistantChatTransport`), styled with Arc.
-  An empty thread shows a "Start drafting" card that sends the first message. While a reply runs
+  An empty thread shows a "Start drafting" card that sends the first message; for a blank
+  document it asks for a description instead (the composer has the focus), and for an imported one
+  it says how many sections came in and offers "Find blanks and signers". While a reply runs
   with nothing to show yet (before the first words, or after a tool finished), a "Thinking…" line
   shows; a failed reply shows the reason and "Try again". The toolkit (`defineToolkit`, `Tools`)
   renders `ask_questions` as a one-question-at-a-time wizard ("Question n of m", Back from the

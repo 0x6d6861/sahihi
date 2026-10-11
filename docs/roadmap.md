@@ -123,6 +123,9 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
       contacts kept), listed on Draft with AI (ADR 0046)
 - [x] Lock a finalised document's fields in the envelope editor; new version after send (ADR 0047)
 - [x] Plan quota for assistant turns; generated documents in exports and retention
+- [x] Start a draft blank, from a PDF in the library, or from an uploaded PDF or Word file,
+      imported word for word; the assistant proposes blanks from the text (`propose_blanks`)
+      (ADR 0049)
 
 ## Later
 

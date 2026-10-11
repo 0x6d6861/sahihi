@@ -1,6 +1,13 @@
 import { z } from "zod"
 import { inlineText, structureIssues } from "./document"
 import {
+  applyMakeBlanks,
+  buildBlanks,
+  countOccurrences,
+  MakeBlanksItemSchema,
+  type ProposeBlanksInput,
+} from "./make-blanks"
+import {
   type BlockNode,
   type GeneratedDocumentData,
   GeneratedDocumentDataSchema,
@@ -24,8 +31,8 @@ import {
 
 /**
  * Assistant edit proposals (docs/ai-documents.md → Proposals, ADR 0044). The assistant never edits
- * the text: it proposes a change to a section (replace, delete) or new sections, and the person
- * accepts or rejects it. Accepting applies the change to the latest version, unless the section it
+ * the text: it proposes a change to a section (replace, delete), new sections, the signers, or
+ * blanks made from an imported document's own text (ADR 0049), and the person accepts or rejects it. Accepting applies the change to the latest version, unless the section it
  * was about changed meanwhile (then it's out of date).
  *
  * The assistant writes sections in a small text format rather than editor JSON: paragraphs and
@@ -122,6 +129,8 @@ export const ProposalChangeSchema = z.discriminatedUnion("kind", [
     sections: z.array(SectionSchema).min(1),
   }),
   z.object({ kind: z.literal("set_signers"), signers: SignersDefinitionSchema }),
+  /** Text in the document that becomes blanks; the blanks themselves are `newVariables`. */
+  z.object({ kind: z.literal("make_blanks"), blanks: z.array(MakeBlanksItemSchema).min(1) }),
 ])
 export type ProposalChange = z.infer<typeof ProposalChangeSchema>
 
@@ -229,12 +238,25 @@ export function buildProposal(
   input:
     | ({ tool: "propose_section_edit" } & ProposeSectionEditInput)
     | ({ tool: "propose_sections" } & ProposeSectionsInput)
-    | ({ tool: "define_signers" } & DefineSignersInput),
+    | ({ tool: "define_signers" } & DefineSignersInput)
+    | ({ tool: "propose_blanks" } & ProposeBlanksInput),
   data: GeneratedDocumentData,
   userTexts: readonly string[],
   newId: () => string,
 ): BuildProposalResult {
   if (input.tool === "define_signers") return buildSignersProposal(input, data, userTexts, newId)
+  if (input.tool === "propose_blanks") {
+    const built = buildBlanks(input, data)
+    if (!built.ok) return built
+    return {
+      ok: true,
+      payload: {
+        change: { kind: "make_blanks", blanks: built.items },
+        newVariables: built.variables,
+      },
+      sectionId: null,
+    }
+  }
   const sections = data.content.content
   const find = (id: string) => sections.find((s) => s.attrs.id === id)
 
@@ -365,6 +387,12 @@ export function applyProposal(
 ): GeneratedDocumentData {
   const { change } = payload
   if (change.kind === "set_signers") return applySigners(data, change.signers, newId)
+  if (change.kind === "make_blanks") {
+    return {
+      ...applyMakeBlanks(data, change.blanks),
+      variables: [...data.variables, ...payload.newVariables],
+    }
+  }
   const sections = data.content.content
   let next: Section[]
   if (change.kind === "insert_sections") {
@@ -406,6 +434,13 @@ export function isProposalStale(
   if (change.kind === "set_signers") {
     return JSON.stringify(currentSigners(base)) !== JSON.stringify(currentSigners(current))
   }
+  if (change.kind === "make_blanks") {
+    // Out of date once a text is gone (edited, or already a blank) or a key was taken meanwhile.
+    return change.blanks.some(
+      (b) =>
+        countOccurrences(current, b.text) === 0 || current.variables.some((v) => v.key === b.key),
+    )
+  }
   const then = find(base, change.sectionId)
   const now = find(current, change.sectionId)
   return !now || JSON.stringify(then) !== JSON.stringify(now)
@@ -441,6 +476,14 @@ export function proposalTexts(
   const { change } = payload
   if (change.kind === "set_signers") {
     return { before: signersText(currentSigners(base)), after: signersText(change.signers) }
+  }
+  if (change.kind === "make_blanks") {
+    // One line per blank: the text as written, and the blank it becomes.
+    const label = (key: string) => variables.find((v) => v.key === key)?.label ?? key
+    return {
+      before: "",
+      after: change.blanks.map((b) => `${JSON.stringify(b.text)} → [${label(b.key)}]`).join("\n"),
+    }
   }
   if (change.kind === "insert_sections") {
     return { before: "", after: change.sections.map((s) => sectionText(s, variables)).join("\n\n") }

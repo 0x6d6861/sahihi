@@ -14,6 +14,8 @@ import {
   blankState,
   blanksStatus,
   chatErrorMessage,
+  draftOrigin,
+  importErrorMessage,
   issueTarget,
   messageSectionId,
   nextOpenBlank,
@@ -284,5 +286,21 @@ describe("signers and parties", () => {
       "party_b_name",
       "party_c_name",
     ])
+  })
+})
+
+describe("starting points", () => {
+  test("draftOrigin tells blank and imported drafts from starters", () => {
+    expect(draftOrigin("blank")).toBe("blank")
+    expect(draftOrigin("import")).toBe("import")
+    expect(draftOrigin("mutual-nda")).toBe("starter")
+  })
+
+  test("importErrorMessage uses the API's reason, or a fallback by status", () => {
+    expect(
+      importErrorMessage({ status: 422, body: { error: "no_text", message: "No text here." } }),
+    ).toBe("No text here.")
+    expect(importErrorMessage({ status: 413, body: null })).toContain("10 MB")
+    expect(importErrorMessage(new Error("network"))).toContain("couldn't be imported")
   })
 })

@@ -11,8 +11,18 @@ import { prisma } from "@sahihi/db"
 import { getObjectBytes } from "@sahihi/infra"
 import { simulateReadableStream } from "ai"
 import { MockLanguageModelV4 } from "ai/test"
+import { strToU8, zipSync } from "fflate"
 import { setAssistantModelForTests } from "../src/lib/assistant/model"
-import { createSender, joinOrganization, request, resetDb, type Sender } from "./helpers"
+import {
+  createSender,
+  joinOrganization,
+  minimalPdf,
+  request,
+  resetDb,
+  type Sender,
+  textPdf,
+  uploadDocument,
+} from "./helpers"
 
 // docs/ai-documents.md
 const json = async <T>(res: Response) => (await res.json()) as T
@@ -1412,5 +1422,145 @@ describe("selected section", () => {
     // Kept with the conversation, so the chip shows again on reload.
     const d = await detail(alice, id)
     expect(JSON.stringify(d.messages)).toContain('"sectionId":"term"')
+  })
+})
+
+describe("starting points (ADR 0049)", () => {
+  beforeEach(() => enableAssistant(alice))
+
+  type Origin = Detail & { document: { starter: string } }
+  const origin = async (id: string) =>
+    json<Origin>(await request(alice, `/api/generated-documents/${id}`))
+
+  const upload = (bytes: Uint8Array, name: string) => {
+    const form = new FormData()
+    form.set("file", new File([bytes as Uint8Array<ArrayBuffer>], name))
+    return request(alice, "/api/generated-documents/import", { method: "POST", body: form })
+  }
+
+  const contract = () =>
+    textPdf(
+      "SERVICES AGREEMENT",
+      "1. Parties",
+      "This agreement is between Acme Ltd and Globex Ltd.",
+      "2. Fees",
+      "Acme Ltd pays KES 5,000 a month.",
+    )
+
+  test("a blank document: one placeholder section and one signer", async () => {
+    const res = await request(alice, "/api/generated-documents", {
+      method: "POST",
+      json: { blank: true },
+    })
+    expect(res.status).toBe(201)
+    const d = await origin((await json<{ id: string }>(res)).id)
+    expect(d.document.starter).toBe("blank")
+    expect(d.version.data.title).toBe("Untitled document")
+    expect(d.version.data.roles.map((r) => r.key)).toEqual(["signer_1"])
+  })
+
+  test("a READY PDF from the library, word for word; another workspace's is not found", async () => {
+    const { document } = await uploadDocument(alice, contract(), "services.pdf")
+    const res = await request(alice, "/api/generated-documents", {
+      method: "POST",
+      json: { documentId: document.id },
+    })
+    expect(res.status).toBe(201)
+    const d = await origin((await json<{ id: string }>(res)).id)
+    expect(d.document.starter).toBe("import")
+    expect(d.version.data.title).toBe("SERVICES AGREEMENT")
+    expect(d.version.data.content.content.map((s) => s.attrs.title)).toEqual(["Parties", "Fees"])
+    expect(JSON.stringify(d.version.data.content)).toContain("Acme Ltd pays KES 5,000 a month.")
+    const event = await prisma.generatedDocumentEvent.findFirst({
+      where: { generatedDocumentId: d.document.id, type: "document.created" },
+    })
+    expect(event?.data).toMatchObject({ source: "pdf", documentId: document.id })
+
+    const bob = await createSender("bob")
+    await enableAssistant(bob)
+    const theirs = await request(bob, "/api/generated-documents", {
+      method: "POST",
+      json: { documentId: document.id },
+    })
+    expect(theirs.status).toBe(404)
+  })
+
+  test("an uploaded PDF or Word file; the file itself isn't stored", async () => {
+    const before = await prisma.document.count()
+    const pdf = await upload(contract(), "services.pdf")
+    expect(pdf.status).toBe(201)
+
+    const w = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+    const docx = zipSync({
+      "word/document.xml": strToU8(
+        `<w:document ${w}><w:body><w:p><w:r><w:t>Lease</w:t></w:r></w:p></w:body></w:document>`,
+      ),
+    })
+    const word = await upload(docx, "lease.docx")
+    expect(word.status).toBe(201)
+    const d = await origin((await json<{ id: string }>(word)).id)
+    expect(d.version.data.title).toBe("Lease")
+    expect(await prisma.document.count()).toBe(before)
+  })
+
+  test("takes a file over the 8 MB JSON limit, refuses one over 10 MB with too_large", async () => {
+    const pad = (mb: number) => new Uint8Array(mb * 1024 * 1024)
+    const big = await upload(pad(9), "big.pdf")
+    expect(big.status).toBe(422) // reached the handler: not a PDF, but no body-limit 413
+    const huge = await upload(pad(11), "huge.pdf")
+    expect(huge.status).toBe(413)
+    expect(await json<{ error: string }>(huge)).toMatchObject({ error: "too_large" })
+  })
+
+  test("refuses a scan, another kind of file and no file at all", async () => {
+    const scan = await upload(minimalPdf(), "scan.pdf")
+    expect(scan.status).toBe(422)
+    expect(await json<{ error: string }>(scan)).toMatchObject({ error: "no_text" })
+
+    const exe = await upload(strToU8("MZ this is a program"), "contract.pdf")
+    expect(exe.status).toBe(422)
+    expect(await json<{ error: string }>(exe)).toMatchObject({ error: "unsupported" })
+
+    const none = await request(alice, "/api/generated-documents/import", {
+      method: "POST",
+      body: new FormData(),
+    })
+    expect(none.status).toBe(400)
+  })
+
+  test("propose_blanks: accepted, the written values become prefilled blanks", async () => {
+    const id = (await json<{ id: string }>(await upload(contract(), "services.pdf"))).id
+    setAssistantModelForTests(
+      toolThenReply("propose_blanks", {
+        blanks: [
+          { text: "Acme Ltd", key: "client_name", label: "Client's name", party: true },
+          { text: "KES 5,000", key: "fee", label: "Monthly fee", type: "amount" },
+        ],
+        rationale: "Parties and amounts as blanks",
+      }),
+    )
+    const res = await request(alice, `/api/generated-documents/${id}/chat`, {
+      method: "POST",
+      json: { messages: [{ id: "m1", role: "user", parts: [{ type: "text", text: "Go" }] }] },
+    })
+    expect(res.status).toBe(200)
+    await res.text()
+    const { proposals } = await json<{ proposals: { id: string; after: string }[] }>(
+      await request(alice, `/api/generated-documents/${id}`),
+    )
+    expect(proposals[0]?.after).toContain('"Acme Ltd" → [Client\'s name]')
+    const accepted = await request(
+      alice,
+      `/api/generated-documents/${id}/proposals/${proposals[0]?.id}/accept`,
+      { method: "POST" },
+    )
+    expect(accepted.status).toBe(200)
+    const d = await detail(alice, id)
+    expect(d.version.data.variables).toMatchObject([
+      { key: "client_name", value: "Acme Ltd", source: "import", party: true },
+      { key: "fee", value: "KES 5,000", type: "amount" },
+    ])
+    expect(JSON.stringify(d.version.data.content)).not.toContain("Acme Ltd")
+    expect(d.issues.some((i) => i.code === "unresolved_variable")).toBe(false)
   })
 })

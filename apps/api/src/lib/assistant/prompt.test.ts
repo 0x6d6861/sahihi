@@ -59,3 +59,23 @@ describe("systemPrompt", () => {
     expect(unknown).not.toContain("# Selected section")
   })
 })
+
+describe("systemPrompt, by how the document started (ADR 0049)", () => {
+  test("an imported document: blanks from its text first, signers once they're accepted", () => {
+    const prompt = systemPrompt({ ...base, data: nda(), origin: "import" })
+    expect(prompt).toContain("# This document was imported")
+    expect(prompt).toContain("propose_blanks")
+    expect(prompt).toContain("only once the blanks are accepted")
+  })
+
+  test("a blank document: find out what it's for, then propose sections", () => {
+    const prompt = systemPrompt({ ...base, data: nda(), origin: "blank" })
+    expect(prompt).toContain("# This document started blank")
+    expect(prompt).not.toContain("# This document was imported")
+  })
+
+  test("a starter: neither", () => {
+    const prompt = systemPrompt({ ...base, data: nda() })
+    expect(prompt).not.toContain("# This document")
+  })
+})

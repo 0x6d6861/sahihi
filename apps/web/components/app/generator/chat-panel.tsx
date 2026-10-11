@@ -23,6 +23,7 @@ import { Tooltip } from "@/components/arc/tooltip/tooltip"
 import { Button as IconButton } from "@/components/ui/button"
 import {
   chatErrorMessage,
+  draftOrigin,
   messageSectionId,
   replyParagraphs,
   sectionExcerpt,
@@ -46,6 +47,7 @@ const toolkit = defineToolkit({
   propose_section_edit: { type: "backend", render: ProposalCard },
   propose_sections: { type: "backend", render: ProposalCard },
   define_signers: { type: "backend", render: ProposalCard },
+  propose_blanks: { type: "backend", render: ProposalCard },
 })
 const config = AuiConfig({ tools: Tools({ toolkit }) })
 
@@ -86,11 +88,55 @@ export function ChatPanel() {
   )
 }
 
-/** Before the first message: what the assistant does, and one click to start. */
+/**
+ * Before the first message: what the assistant does, and one click to start. A blank document
+ * asks for a description instead (the composer is the start); an imported one offers to find its
+ * blanks and signers (ADR 0049).
+ */
 function EmptyState() {
   const { detail, editable } = useGenerator()
   const aui = useAui()
   const title = detail.version.data.title
+  const origin = draftOrigin(detail.document.starter)
+  if (origin === "blank") {
+    return (
+      <div className="mt-2 flex flex-col gap-1 rounded-2xl border border-dashed p-5 text-sm">
+        <p className="font-medium text-foreground">Describe the document you need</p>
+        <p className="text-muted-foreground">
+          Say what it's for and who it's between, below. The assistant asks what it still needs and
+          suggests sections for you to accept. It only uses what you tell it.
+        </p>
+      </div>
+    )
+  }
+  if (origin === "import") {
+    const sections = detail.version.data.content.content.length
+    return (
+      <div className="mt-2 flex flex-col gap-3 rounded-2xl border border-dashed p-5">
+        <div className="flex flex-col gap-1 text-sm">
+          <p className="font-medium text-foreground">
+            Imported {sections} {sections === 1 ? "section" : "sections"} word for word
+          </p>
+          <p className="text-muted-foreground">
+            Check the text against your original. The assistant can suggest which names, dates and
+            amounts become blanks, and who signs. Nothing changes until you accept a suggestion.
+          </p>
+        </div>
+        {editable && (
+          <div>
+            <Button
+              size="sm"
+              onClick={() =>
+                aui.thread().append("Find the blanks and the signers in this document.")
+              }
+            >
+              Find blanks and signers
+            </Button>
+          </div>
+        )}
+      </div>
+    )
+  }
   return (
     <div className="mt-2 flex flex-col gap-3 rounded-2xl border border-dashed p-5">
       <div className="flex flex-col gap-1 text-sm">
@@ -285,6 +331,8 @@ function Composer() {
         <ComposerPrimitive.Input
           submitMode="none"
           rows={2}
+          // A blank document starts with the person's description.
+          autoFocus={draftOrigin(detail.document.starter) === "blank"}
           aria-label="Message the assistant"
           placeholder={section ? "Ask about this section…" : "Message the assistant…"}
           className="block w-full resize-none bg-transparent px-3.5 py-3 text-sm outline-none placeholder:text-muted-foreground"

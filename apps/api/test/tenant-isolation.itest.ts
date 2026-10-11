@@ -322,7 +322,8 @@ const TENANT: Record<string, Case> = {
       },
     },
   }),
-  // Starting from a template takes its id: another workspace's is a 404.
+  // Starting from a template takes its id: another workspace's is a 404. (So does a library
+  // document's, `{ documentId }`: generated-documents.itest.ts → starting points.)
   "POST /api/generated-documents": () => ({
     path: "/api/generated-documents",
     init: { method: "POST", json: { templateId: ids.generationTemplate } },
@@ -396,6 +397,8 @@ const NOT_TENANT = [
   // The caller's own workspace AI switch; no ids.
   "GET /api/generated-documents/settings",
   "PUT /api/generated-documents/settings",
+  // Imports an uploaded file into the caller's own workspace; takes no ids (ADR 0049).
+  "POST /api/generated-documents/import",
   // The caller's own workspace plan and usage; takes no ids.
   "GET /api/billing",
   // The caller's own embedding origins (docs/embedded-signing.md); no ids.

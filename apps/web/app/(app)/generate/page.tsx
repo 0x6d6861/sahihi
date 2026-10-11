@@ -1,5 +1,6 @@
 import { STARTERS } from "@sahihi/core"
 import Link from "next/link"
+import { ImportCard } from "@/components/app/generator/import-dialog"
 import {
   DeleteTemplate,
   EnableAssistant,
@@ -95,8 +96,9 @@ export default async function GeneratePage() {
       <header className="flex flex-col gap-2">
         <h1 className="font-medium text-2xl tracking-tight">Drafting</h1>
         <p className="text-muted-foreground text-sm">
-          Pick a starter or one of your workspace's templates. The assistant asks for every detail
-          it needs and never fills in what it doesn't know. Review the result before you send it.
+          Start blank, bring in your own document, or pick a starter or one of your workspace's
+          templates. The assistant asks for every detail it needs and never fills in what it doesn't
+          know. Review the result before you send it.
         </p>
       </header>
 
@@ -106,6 +108,12 @@ export default async function GeneratePage() {
       <StartGroup>
         <Panel title="Start a document">
           <ul className="grid gap-3 sm:grid-cols-2">
+            <StartCard
+              from={{ blank: true }}
+              name="Blank document"
+              description="Describe what you need and the assistant drafts it, section by section."
+            />
+            <ImportCard />
             {STARTERS.map((s) => (
               <StartCard
                 key={s.key}

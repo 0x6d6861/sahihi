@@ -49,10 +49,16 @@ export const SetVariablesInputSchema = z.object({
 export type SetVariablesInput = z.infer<typeof SetVariablesInputSchema>
 
 // ── REST ─────────────────────────────────────────────────────────────────────
-/** `POST /generated-documents`: from a code starter, or from one of the workspace's templates. */
+/**
+ * `POST /generated-documents`: from a code starter, one of the workspace's templates, a blank page,
+ * or a READY PDF in the workspace's library, imported word for word (ADR 0049). A file from the
+ * person's computer goes to `POST /generated-documents/import` instead.
+ */
 export const CreateGeneratedDocumentSchema = z.union([
   z.object({ starter: z.string().trim().min(1).max(60) }).strict(),
   z.object({ templateId: z.string().trim().min(1).max(64) }).strict(),
+  z.object({ blank: z.literal(true) }).strict(),
+  z.object({ documentId: z.string().trim().min(1).max(64) }).strict(),
 ])
 export type CreateGeneratedDocumentInput = z.infer<typeof CreateGeneratedDocumentSchema>
 

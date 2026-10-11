@@ -54,3 +54,5 @@ export const STARTERS: readonly Starter[] = [
 export function findStarter(key: string): Starter | undefined {
   return STARTERS.find((s) => s.key === key)
 }
+
+export { BLANK_STARTER, blankDocument, IMPORT_STARTER } from "./blank"
