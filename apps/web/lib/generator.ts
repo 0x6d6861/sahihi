@@ -250,6 +250,37 @@ export function blanksStatus(issues: readonly GenerationPreflightIssue[]): {
   return { open, label: `${open} ${open === 1 ? "blank" : "blanks"} open` }
 }
 
+/** Blanks the text uses that are still empty, in the order the text uses them. */
+export function openBlankKeys(data: GeneratedDocumentData): string[] {
+  const empty = new Set(data.variables.filter((v) => v.value === null).map((v) => v.key))
+  return referencedVariableKeys(data.content).filter((key) => empty.has(key))
+}
+
+/**
+ * The open blank to fill after `afterKey` (the first one when it's absent or the last), never
+ * `afterKey` itself: "Save and next" and the blanks pill step through the document with it.
+ */
+export function nextOpenBlank(data: GeneratedDocumentData, afterKey?: string): string | null {
+  const keys = referencedVariableKeys(data.content)
+  const open = new Set(openBlankKeys(data))
+  const start = afterKey ? keys.indexOf(afterKey) + 1 : 0
+  for (const key of [...keys.slice(start), ...keys.slice(0, start)]) {
+    if (key !== afterKey && open.has(key)) return key
+  }
+  return null
+}
+
+/** Where the person fixes a finalise problem: a blank in the text, or the Signers tab. */
+export type IssueTarget = { kind: "blank"; key: string } | { kind: "signers"; roleKey?: string }
+
+export function issueTarget(issue: GenerationPreflightIssue): IssueTarget | null {
+  if (issue.code === "unresolved_variable" && issue.variableKey) {
+    return { kind: "blank", key: issue.variableKey }
+  }
+  if (issue.code === "invalid_structure") return null
+  return issue.roleKey ? { kind: "signers", roleKey: issue.roleKey } : { kind: "signers" }
+}
+
 /**
  * The assistant's reply as paragraphs of plain and **bold** runs. Replies are plain text (the
  * prompt asks for no Markdown headings); bold is the one emphasis worth showing.

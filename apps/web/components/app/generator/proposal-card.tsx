@@ -19,7 +19,8 @@ interface ProposeResult {
 /**
  * `propose_section_edit` / `propose_sections` (docs/ai-documents.md → Proposals): the suggested
  * change as a word diff with the assistant's reason, and Accept / Reject. Nothing changes until the
- * person accepts; accepting makes a version, and the editor shows it.
+ * person accepts; accepting makes a version, and the editor scrolls to it and highlights it (side
+ * by side only: on phones the chat stays). "Show in document" goes to the section it's about.
  */
 export const ProposalCard: ToolCallMessagePartComponent<unknown, ProposeResult> = ({ result }) => {
   const { detail, refresh } = useGenerator()
@@ -44,18 +45,33 @@ export const ProposalCard: ToolCallMessagePartComponent<unknown, ProposeResult> 
 }
 
 function Proposal({ view }: { view: ProposalView }) {
-  const { detail, editable, decideProposal } = useGenerator()
+  const { detail, editable, decideProposal, navigate } = useGenerator()
   const [busy, setBusy] = useState<"accept" | "reject" | null>(null)
   const [error, setError] = useState<string | null>(null)
   const content = detail.version.data.content
   const title = proposalTitle(view, content, numberSections(content))
   const pending = view.status === "PENDING"
+  const sectionId =
+    view.kind !== "set_signers" &&
+    view.kind !== "delete_section" &&
+    view.sectionId &&
+    content.content.some((s) => s.attrs.id === view.sectionId)
+      ? view.sectionId
+      : null
 
   const decide = async (action: "accept" | "reject") => {
     setBusy(action)
     setError(null)
     try {
       await decideProposal(view.id, action)
+      if (
+        action === "accept" &&
+        view.kind === "replace_section" &&
+        view.sectionId &&
+        window.matchMedia("(min-width: 768px)").matches
+      ) {
+        navigate({ kind: "section", id: view.sectionId, flash: true })
+      }
     } catch (err) {
       setError(
         err instanceof ApiError && err.status === 409
@@ -100,23 +116,38 @@ function Proposal({ view }: { view: ProposalView }) {
           {error}
         </p>
       )}
-      {pending && editable && (
+      {((pending && editable) || sectionId) && (
         <div className="flex items-center justify-between gap-2">
-          <Button
-            variant="ghost"
-            loading={busy === "reject"}
-            disabled={busy !== null}
-            onClick={() => decide("reject")}
-          >
-            Reject
-          </Button>
-          <Button
-            loading={busy === "accept"}
-            disabled={busy !== null}
-            onClick={() => decide("accept")}
-          >
-            Accept
-          </Button>
+          {sectionId ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate({ kind: "section", id: sectionId })}
+            >
+              Show in document
+            </Button>
+          ) : (
+            <span />
+          )}
+          {pending && editable && (
+            <span className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                loading={busy === "reject"}
+                disabled={busy !== null}
+                onClick={() => decide("reject")}
+              >
+                Reject
+              </Button>
+              <Button
+                loading={busy === "accept"}
+                disabled={busy !== null}
+                onClick={() => decide("accept")}
+              >
+                Accept
+              </Button>
+            </span>
+          )}
         </div>
       )}
     </section>

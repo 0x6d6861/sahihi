@@ -284,39 +284,57 @@ ADR 0009).
 
 ## Web (`/generate`, `components/app/generator/`)
 
-- `/generate` (**Drafting**, its own tab in the top bar): starters, workspace templates (with delete for those who may) and your drafts; the switch for owners and admins while it's off. "Draft
-  with AI" on All files links here.
+- `/generate` (**Drafting**, its own tab in the top bar): your drafts (first once there are any,
+  with when each was last edited), then starters and workspace templates as pressable cards (the
+  whole card starts a document; one at a time; delete for those who may); the switch for owners
+  and admins while it's off. "Draft with AI" on All files links here.
 - `/generate/:id`: a full page (`isFullPage`) with its own bar (back, title, version, Finalise or
-  Open envelope). Assistant on the left, document on the right; on phones one pane at a time, both
-  mounted.
+  Open envelope as an Arc split button whose menu holds Save as template; just "Save as template"
+  for people who can't finalise). Assistant on the left, document
+  on the right; on phones one pane at a time, both mounted, and a section picked in the document
+  shows an "Ask about it" bar that switches to the assistant.
 - **Chat:** assistant-ui primitives (`useChatRuntime` + `AssistantChatTransport`), styled with Arc.
-  An empty thread shows a "Start drafting" card that sends the first message. The toolkit
-  (`defineToolkit`, `Tools`) renders `ask_questions` as a one-question-at-a-time wizard ("Question
-  n of m", the blank it fills, full-width option rows, then "type your own answer", Skip and
-  Answer) and `set_variables` as "Updated …" with a tick. While a question waits the chat input is
-  closed, so a reply can't be mistaken for an answer. Answered cards show the question and the
-  answer (or Skipped). Replies render paragraphs and `**bold**`.
+  An empty thread shows a "Start drafting" card that sends the first message. While a reply runs
+  with nothing to show yet (before the first words, or after a tool finished), a "Thinking…" line
+  shows; a failed reply shows the reason and "Try again". The toolkit (`defineToolkit`, `Tools`)
+  renders `ask_questions` as a one-question-at-a-time wizard ("Question n of m", Back from the
+  second, the blank it fills, numbered option rows that keys 1–4 pick, then "type your own
+  answer", Skip and Answer; each question eases in from the side the step went) and
+  `set_variables` as "Updated …" with a tick. While a question waits the chat input is closed, so a
+  reply can't be mistaken for an answer. Answered cards show the question and the answer (or
+  Skipped). Suggestion cards have "Show in document"; accepting a section edit scrolls to it and
+  highlights it briefly (side by side only). Replies render paragraphs and `**bold**`.
 - **Composer:** one card. With a section selected it shows "Selected section · 3. Title", a
   two-line excerpt and a clear button; Enter sends, Shift+Enter breaks a line, and the send button
   turns into Stop while the assistant replies. The selection rides on that one message (above) and
   then clears; the sent message shows it as a quote above the bubble.
 - **Document pane:** Preview · Editing · Signers · PDF, and a pill with the open blanks ("3 blanks
-  open" in amber, "All blanks filled" in green). The document sits on a muted background as a
-  centred page.
+  open" in amber, "All blanks filled" in green). While blanks are open the pill is a button that
+  goes to the next one in the text (`nextOpenBlank`) and opens it. The document sits on a muted
+  background as a centred page.
+- **Blanks** fill from Preview as from Editing: click one for its field. "Save and next" (Enter)
+  saves and opens the next open blank; "Save" stays put. A filled blank can be changed, not
+  emptied (an empty answer keeps the value, `applyVariableUpdates`).
 - **Preview** tab (the default): the document read-only. Hovering a section shows "Ask about
   this"; clicking (or Enter / Space) selects it for the next message, clicking again clears it.
 - **Editing** tab: the same editor, editable, with a sticky toolbar (coss `Toolbar`: bold, italic,
   underline, lists, table, insert blank, add section, undo, redo) and a Saved / Saving… / Retry
-  status. Blanks are chips: dashed and amber while empty ("skipped" when skipped), the value with a
+  status. Inside a table, the table button is a menu: add a row or column, delete the row, column
+  or table. A new section's title field takes the focus with "New section" selected. Blanks are chips: dashed and amber while empty ("skipped" when skipped), the value with a
   dotted underline once filled; click one to fill it.
 - **Signers** tab: a `Panel` per role (role, signer or copy, name, email, initials on every page,
-  the role's fields with "Add field"), "Add signer", "Save signers"; the preflight's problems show on
-  the fields. Each card says who it signs for ("Signs for Acme Ltd", or the party's label while
+  the role's fields with "Add field") and "Add signer". It saves on its own like the text
+  (debounced, serialised, Saving… / Saved / Retry); a signer without a role isn't sent. The
+  preflight's problems show on the fields; the field being edited hides only its own until it's
+  saved. Each card says who it signs for ("Signs for Acme Ltd", or the party's label while
   it's empty) and, while the name is empty, offers `Use "Acme Ltd"` for someone signing in person.
   Parties nobody signs for get an info alert with "Add signer for …", which adds a signer linked
   to that party. A suggested set of signers shows as a line-by-line diff in its card.
 - **PDF** tab: the rendered PDF.
-- Finalise: an Arc dialog with the required "I've read the whole document" confirmation.
+- Finalise: never disabled. It first saves whatever the editor and the Signers tab have pending
+  (`flushAll`), then opens an Arc dialog: with problems left, "Before you finalise" lists them,
+  each with "Fill in" (opens the blank) or "Open signers" (the signer's card, focus on its first
+  problem); otherwise the required "I've read the whole document" confirmation.
 - Finalised: "Start a new version" (or "Open new version") and "Open envelope" in the top bar; a
   new version links back with "Replaces a finalised version".
 - Save as template: an Arc dialog from the top bar with the name, a description, and a tick box

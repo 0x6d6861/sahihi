@@ -29,12 +29,21 @@ export function SignatureBlockView({ node, selected }: NodeViewProps) {
         c.type === "paragraph" ? (
           // biome-ignore lint/suspicious/noArrayIndexKey: captions have no ids
           <p key={i} className="text-sm">
-            {c.content.map((n) =>
-              n.type === "text"
-                ? n.text
-                : (variables.find((v) => v.key === n.attrs.key)?.value ??
-                  `[${variables.find((v) => v.key === n.attrs.key)?.label ?? n.attrs.key}]`),
-            )}
+            {c.content.map((n) => {
+              if (n.type === "text") return n.text
+              const v = variables.find((x) => x.key === n.attrs.key)
+              return v?.value != null ? (
+                v.value
+              ) : (
+                // The same chip as an empty blank in the text.
+                <span
+                  key={n.attrs.key}
+                  className="mx-0.5 inline-flex items-baseline whitespace-nowrap rounded-sm border border-warning border-dashed bg-warning/15 px-1.5 text-[0.86em] text-foreground"
+                >
+                  {v?.label ?? n.attrs.key}
+                </span>
+              )
+            })}
           </p>
         ) : (
           <div key={c.attrs.id} className="flex flex-col gap-1">

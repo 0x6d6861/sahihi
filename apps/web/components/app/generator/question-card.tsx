@@ -8,7 +8,7 @@ import {
   AskQuestionsResultSchema,
 } from "@sahihi/core"
 import { useEffect, useRef, useState } from "react"
-import { CheckIcon, ChevronRightIcon, XIcon } from "@/components/app/icons"
+import { ArrowLeftIcon, CheckIcon, ChevronRightIcon, XIcon } from "@/components/app/icons"
 import { Button } from "@/components/arc/button/button"
 import { Input } from "@/components/arc/input/input"
 import { Tooltip } from "@/components/arc/tooltip/tooltip"
@@ -21,7 +21,8 @@ import { useGenerator } from "./generator-context"
 
 /**
  * `ask_questions` (docs/ai-documents.md → Clarifying questions): one question at a time with the
- * assistant's suggested options, a free-text answer, Skip and Answer, and a dismiss control. The
+ * assistant's suggested options (keys 1–4 pick one), a free-text answer, Skip, Answer, Back to the
+ * previous question, and a dismiss control. The
  * answers are saved to the document first (`POST …/variables`, skips mark the blank skipped), then
  * returned to the assistant as the tool result. Once answered, the card collapses to compact
  * "question → answer or Skipped" rows.
@@ -86,6 +87,8 @@ function ActiveQuestions({
 }) {
   const { detail, editable, saveVariables, refresh, setPendingQuestion } = useGenerator()
   const [index, setIndex] = useState(0)
+  // Which way the last step went, so the next question slides in from that side.
+  const [direction, setDirection] = useState<1 | -1>(1)
   const [answers, setAnswers] = useState<Record<string, string | null>>({})
   const [draft, setDraft] = useState("")
   const [saving, setSaving] = useState(false)
@@ -100,6 +103,21 @@ function ActiveQuestions({
   }, [editable, toolCallId, setPendingQuestion])
 
   const question = input.questions[index]
+
+  // Number keys pick an option, unless the person is typing somewhere.
+  const pick = useRef<(n: number) => void>(() => {})
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return
+      const t = e.target as HTMLElement | null
+      if (t?.closest("input, textarea, select, [contenteditable='true']")) return
+      const n = Number(e.key)
+      if (Number.isInteger(n) && n >= 1) pick.current(n)
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [])
+
   if (!editable || !question) {
     return <p className="text-muted-foreground text-sm">The assistant asked questions here.</p>
   }
@@ -128,9 +146,26 @@ function ActiveQuestions({
     setAnswers(next)
     setDraft("")
     if (index + 1 < input.questions.length) {
+      setDirection(1)
       setIndex(index + 1)
       field.current?.focus()
     } else void finish(next)
+  }
+
+  const back = () => {
+    const previous = input.questions[index - 1]
+    if (!previous) return
+    setDirection(-1)
+    setIndex(index - 1)
+    setDraft(
+      previous.options.includes(answers[previous.id] ?? "") ? "" : (answers[previous.id] ?? ""),
+    )
+    setError(null)
+  }
+
+  pick.current = (n) => {
+    const option = question.options[n - 1]
+    if (option !== undefined && !saving) answer(option)
   }
 
   const fills = detail.version.data.variables.find((v) => v.key === question.variableKey)?.label
@@ -140,10 +175,26 @@ function ActiveQuestions({
       aria-label="Questions from the assistant"
       className="overflow-hidden rounded-2xl border border-info/50 bg-card shadow-sm"
     >
-      <header className="flex flex-col gap-1.5 px-4 pt-3.5 pb-3">
+      <header className="flex flex-col gap-1.5 px-4 pt-3.5 pb-1">
         <div className="flex items-center justify-between gap-3">
-          <span className="font-mono text-[11px] text-muted-foreground uppercase tabular-nums tracking-wider">
-            Question {index + 1} of {input.questions.length}
+          <span className="flex items-center gap-1">
+            {index > 0 && (
+              <Tooltip content="Previous question">
+                <CossButton
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Previous question"
+                  className="-ml-1.5"
+                  disabled={saving}
+                  onClick={back}
+                >
+                  <ArrowLeftIcon aria-hidden />
+                </CossButton>
+              </Tooltip>
+            )}
+            <span className="font-mono text-[11px] text-muted-foreground uppercase tabular-nums tracking-wider">
+              Question {index + 1} of {input.questions.length}
+            </span>
           </span>
           <Tooltip content="Dismiss questions">
             <CossButton
@@ -157,28 +208,47 @@ function ActiveQuestions({
             </CossButton>
           </Tooltip>
         </div>
-        <h3 className="font-medium text-[15px] leading-snug">{question.question}</h3>
-        {fills && <p className="text-muted-foreground text-xs">Fills: {fills}</p>}
       </header>
 
-      {question.options.length > 0 && (
-        <div className="flex flex-col gap-1.5 px-3 pb-3">
-          {question.options.map((option) => (
-            // coss, not Arc: Arc's button sizes its label for the morph animation and can't
-            // stretch into a left-aligned row with the chevron on the right.
-            <CossButton
-              key={option}
-              variant="outline"
-              className="h-auto min-h-10 w-full justify-between whitespace-normal py-2 text-left"
-              disabled={saving}
-              onClick={() => answer(option)}
-            >
-              <span className="min-w-0 flex-1">{option}</span>
-              <ChevronRightIcon aria-hidden className="text-muted-foreground" />
-            </CossButton>
-          ))}
+      {/* Keyed by question: each one eases in from the side the step went (opacity only under
+          reduced motion). The answer field below stays put, so its focus survives. */}
+      <div
+        key={question.id}
+        className={cn(
+          "flex flex-col gap-3 transition-[opacity,translate] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] starting:opacity-0 motion-reduce:starting:translate-x-0",
+          direction === 1 ? "starting:translate-x-2" : "starting:-translate-x-2",
+        )}
+      >
+        <div className={cn("flex flex-col gap-1.5 px-4", question.options.length === 0 && "pb-3")}>
+          <h3 className="font-medium text-[15px] leading-snug">{question.question}</h3>
+          {fills && <p className="text-muted-foreground text-xs">Fills: {fills}</p>}
         </div>
-      )}
+
+        {question.options.length > 0 && (
+          <div className="flex flex-col gap-1.5 px-3 pb-3">
+            {question.options.map((option, i) => (
+              // coss, not Arc: Arc's button sizes its label for the morph animation and can't
+              // stretch into a left-aligned row with the chevron on the right.
+              <CossButton
+                key={option}
+                variant="outline"
+                className="h-auto min-h-10 w-full justify-between gap-3 whitespace-normal py-2 text-left"
+                disabled={saving}
+                onClick={() => answer(option)}
+              >
+                <span
+                  aria-hidden
+                  className="w-3 shrink-0 font-mono text-muted-foreground text-xs tabular-nums [@media(pointer:coarse)]:hidden"
+                >
+                  {i + 1}
+                </span>
+                <span className="min-w-0 flex-1">{option}</span>
+                <ChevronRightIcon aria-hidden className="text-muted-foreground" />
+              </CossButton>
+            ))}
+          </div>
+        )}
+      </div>
 
       <form
         className="flex flex-col gap-2.5 border-t bg-muted/40 px-3 py-3"

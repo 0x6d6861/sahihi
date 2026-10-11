@@ -28,12 +28,16 @@ export function SectionView({ node, updateAttributes }: NodeViewProps) {
     <NodeViewWrapper
       as="section"
       aria-label={title}
+      data-section-id={id}
       className={cn(
         // Numbers come from the editor's CSS counter, so they follow the sections' order.
         node.attrs.numbered && "[counter-increment:section]",
         "group relative -mx-3.5 flex flex-col gap-3 rounded-xl px-3.5 pt-1.5 pb-1 transition-colors",
+        // A section that just changed (document-editor.tsx `flash`): on at once, out slowly.
+        "data-[flash=on]:bg-info/15 data-[flash=off]:duration-700",
         askable && "cursor-pointer hover:bg-muted/60",
-        selected && "bg-info/10 ring-1 ring-info",
+        // The chat selection belongs to Preview; in Editing it would sit behind the text.
+        selected && mode === "preview" && "bg-info/10 ring-1 ring-info",
       )}
       {...(askable
         ? {
