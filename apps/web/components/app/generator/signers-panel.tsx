@@ -49,7 +49,7 @@ const FIELD_TYPES = Object.keys(FIELD_NAMES) as GeneratedFieldType[]
  * party's name as the signer's, and parties nobody signs for get an "Add signer for …" button.
  */
 export function SignersPanel() {
-  const { detail, editable, saveSigners, nav, registerFlush } = useGenerator()
+  const { detail, editable, saveSigners, refresh, nav, registerFlush } = useGenerator()
   const saved = currentSigners(detail.version.data)
   const savedJson = JSON.stringify(saved)
   const parties = documentParties(detail.version.data)
@@ -100,6 +100,8 @@ export function SignersPanel() {
       setBaseline(server)
       setDraft((d) => (JSON.stringify(d) === sent ? (JSON.parse(server) as SignersDefinition) : d))
     } catch (err) {
+      // Pick up the current version so the retry saves on top of it; the draft stays dirty.
+      if (err instanceof ApiError && err.status === 409) await refresh().catch(() => {})
       setProblem(
         err instanceof ApiError && err.status === 409
           ? "The document changed meanwhile. Retry to save on top of it."
