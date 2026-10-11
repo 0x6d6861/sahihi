@@ -251,5 +251,7 @@ export const GENERATION_EVENT_TYPES = [
   "document.new_version",
   /** Saved as a workspace template: its id and which values and contacts were kept (keys only). */
   "template.saved",
+  /** A file attached in the chat was read: its kind and length, never its name or text. */
+  "attachment.read",
 ] as const
 export type GenerationEventType = (typeof GENERATION_EVENT_TYPES)[number]

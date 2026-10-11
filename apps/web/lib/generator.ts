@@ -319,3 +319,74 @@ export function importErrorMessage(error: unknown): string {
 export function draftOrigin(starter: string): "blank" | "import" | "starter" {
   return starter === "blank" ? "blank" : starter === "import" ? "import" : "starter"
 }
+
+// ── Chat attachments (docs/ai-documents.md → Attachments, ADR 0050) ─────────────────
+/** The API's limits, repeated here for the browser's checks (the API checks again). */
+export const CHAT_ATTACHMENT_LIMITS = {
+  perMessage: 3,
+  imageBytes: 5 * 1024 * 1024,
+  documentBytes: 10 * 1024 * 1024,
+} as const
+const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"]
+const DOCUMENT_EXTENSIONS = [".pdf", ".docx", ".txt", ".md", ".csv"]
+
+/** What the file picker offers. */
+export const CHAT_ATTACHMENT_ACCEPT = [...DOCUMENT_EXTENSIONS, ...IMAGE_TYPES].join(",")
+
+/**
+ * How a picked file is attached: an image goes as it is (for reference), a document is read on
+ * the server and goes as its text. A string is why it can't be attached.
+ */
+export function chatAttachmentKind(file: {
+  name: string
+  type: string
+  size: number
+}): "image" | "document" | string {
+  if (IMAGE_TYPES.includes(file.type)) {
+    return file.size <= CHAT_ATTACHMENT_LIMITS.imageBytes
+      ? "image"
+      : `${file.name}: images can be at most 5 MB.`
+  }
+  const name = file.name.toLowerCase()
+  if (DOCUMENT_EXTENSIONS.some((ext) => name.endsWith(ext))) {
+    return file.size <= CHAT_ATTACHMENT_LIMITS.documentBytes
+      ? "document"
+      : `${file.name}: files can be at most 10 MB.`
+  }
+  return `${file.name}: attach a PDF, Word or text file, or an image (PNG, JPEG, WebP, GIF).`
+}
+
+/** A document's extracted text as the data URL the message carries (UTF-8, base64). */
+export function textDataUrl(text: string): string {
+  const bytes = new TextEncoder().encode(text)
+  let binary = ""
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+  }
+  return `data:text/plain;charset=utf-8;base64,${btoa(binary)}`
+}
+
+type ChatPart = { type: string; mediaType?: string; filename?: string }
+
+/**
+ * The conversation as the browser sends it: images only on the last message of the person's.
+ * Earlier images aren't kept by the server anyway (they're a note once saved), and resending them
+ * on every turn would make each request carry all of them. The note matches the server's.
+ */
+export function withoutEarlierImages<M extends { role: string; parts: ChatPart[] }>(
+  messages: M[],
+): M[] {
+  const last = messages.findLastIndex((m) => m.role === "user")
+  return messages.map((m, i) => {
+    if (i === last || m.role !== "user") return m
+    if (!m.parts.some((p) => p.type === "file" && p.mediaType?.startsWith("image/"))) return m
+    return {
+      ...m,
+      parts: m.parts.map((p) =>
+        p.type === "file" && p.mediaType?.startsWith("image/")
+          ? { type: "text", text: `[Image “${p.filename ?? "image"}” attached, not kept]` }
+          : p,
+      ),
+    }
+  })
+}

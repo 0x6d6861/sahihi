@@ -167,6 +167,30 @@ Tools (schemas in `packages/core/src/generation/schemas.ts`):
 | `propose_blanks` | Server | Proposes turning text written in the document (a name, a date, an amount) into blanks prefilled with that text (see **Proposals**). Meant for imported documents |
 | `set_variables` | Server | Fills blanks with values the person typed in the chat. Each value must appear, word for word (case, spacing and edge punctuation aside), in something the person said or answered (`isValueAttested`); otherwise nothing changes, `variables.rejected` is recorded and the model is told to ask instead |
 
+### Attachments (ADR 0050)
+
+The composer takes up to three files per message (the paperclip, drag and drop, or paste), each
+prepared as soon as it's picked so problems show before sending:
+
+- **A PDF, Word or text file** (`.pdf`, `.docx`, `.txt`, `.md`, `.csv`, up to 10 MB) goes to
+  `POST /generated-documents/:id/attachments` (multipart `file`, rate-limited), which reads it with
+  the import readers (`blocksToText`) and returns its text, cut at 20,000 characters. The file
+  isn't kept. The message carries the text as a `text/plain` file part; the model reads it as
+  `<attached_file name="…">`, and it counts as something the person said (`attachedStatements`),
+  so `set_variables` and proposals may use values written in it.
+- **An image** (PNG, JPEG, WebP, GIF, up to 5 MB) goes to the model for reference: values read
+  from it aren't evidence, and the prompt tells the assistant to confirm them first. The browser
+  scales a photo down to 2048 px (JPEG) before attaching it, and sends an image only with its own
+  message (`withoutEarlierImages`); earlier ones go as the note the server saves.
+- **Body limits** (`app.ts` → `limitFor`): the attachments route takes the import limit (10 MB +
+  64 KB, 413 `too_large`), the chat route three base64 images plus 4 MB; everything else 8 MB.
+- **Checked every turn** (`assertAttachments`, `apps/api/src/lib/assistant/attachments.ts`): file
+  parts only on the person's messages, data URLs only, those types and sizes, three per message;
+  otherwise 400.
+- **Kept:** a document's text with the conversation; an image is replaced by a note
+  (`forStorage`) when the conversation is saved. `attachment.read` records the kind and length,
+  never the name or text.
+
 ### Clarifying questions
 
 Enforced, not just prompted: a batch has at most three questions (schema), answers go straight
@@ -364,7 +388,8 @@ ADR 0009).
   reply can't be mistaken for an answer. Answered cards show the question and the answer (or
   Skipped). Suggestion cards have "Show in document"; accepting a section edit scrolls to it and
   highlights it briefly (side by side only). Replies render paragraphs and `**bold**`.
-- **Composer:** one card. With a section selected it shows "Selected section · 3. Title", a
+- **Composer:** one card, with a paperclip for attachments (see Attachments): picked files show as
+  chips above the message (reading, ready, or why not) and as chips above the sent bubble. With a section selected it shows "Selected section · 3. Title", a
   two-line excerpt and a clear button; Enter sends, Shift+Enter breaks a line, and the send button
   turns into Stop while the assistant replies. The selection rides on that one message (above) and
   then clears; the sent message shows it as a quote above the bubble.
