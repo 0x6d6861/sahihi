@@ -27,7 +27,30 @@ export default async function Image() {
         fontFamily: "Geist",
       }}
     >
-      <div style={{ fontSize: 40, letterSpacing: "-0.04em" }}>{site.name}</div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 14,
+          fontSize: 40,
+          letterSpacing: "-0.04em",
+        }}
+      >
+        {/* The logo mark (components/ui/Logo.tsx). */}
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path
+            d="M5.9 5.9l12.2 12.2M18.1 5.9L5.9 18.1"
+            stroke="currentColor"
+            strokeWidth="3.6"
+            strokeLinecap="square"
+          />
+          <rect x="10" y="0.9" width="4" height="4" fill="currentColor" />
+          <rect x="19.1" y="10" width="4" height="4" fill="currentColor" />
+          <rect x="10" y="19.1" width="4" height="4" fill="currentColor" />
+          <rect x="0.9" y="10" width="4" height="4" fill="currentColor" />
+        </svg>
+        {site.name}
+      </div>
       <div
         style={{
           display: "flex",

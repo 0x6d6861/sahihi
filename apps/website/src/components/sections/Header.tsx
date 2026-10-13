@@ -1,10 +1,15 @@
+import { LogoMark } from "@/components/ui/Logo"
 import { site } from "@/content/site"
 
 export function Header() {
   return (
     <header className="fixed inset-x-0 top-0 z-50 bg-paper/80 backdrop-blur-md">
       <div className="flex h-16 items-center justify-between px-5 md:h-24 md:px-12">
-        <a href="/" className="text-[1.375rem] font-semibold tracking-[-0.04em] md:text-[1.625rem]">
+        <a
+          href="/"
+          className="flex items-center gap-[0.32em] text-[1.375rem] font-semibold tracking-[-0.04em] md:text-[1.625rem]"
+        >
+          <LogoMark className="size-[0.82em] shrink-0" />
           {site.name}
         </a>
         <nav className="text-nav flex items-center gap-7 md:gap-10">
