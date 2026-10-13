@@ -133,37 +133,6 @@ export function answeredLines(
   result: AskQuestionsResult,
 ): { question: string; answer: string | null }[] {
   return input.questions.map((q) => ({
-/** Where a question card's unsent answers are kept in the browser, per document and tool call. */
-export function questionDraftKey(documentId: string, toolCallId: string): string {
-  return `sahihi:questions:${documentId}:${toolCallId}`
-}
-
-/**
- * Where a question card picks up from its saved answers (a reload, or a reply that failed before
- * the answers reached the assistant): the answers that still match a question, and the first
- * question without one. When every question has an answer it opens the last one, with its typed
- * answer back in the field, so one press sends them all again.
- */
-export function resumeQuestions(
-  input: AskQuestionsInput,
-  saved: unknown,
-): { answers: Record<string, string | null>; index: number; draft: string } {
-  const answers: Record<string, string | null> = {}
-  if (saved && typeof saved === "object" && !Array.isArray(saved)) {
-    for (const q of input.questions) {
-      const value = (saved as Record<string, unknown>)[q.id]
-      if (typeof value === "string" || value === null) answers[q.id] = value
-    }
-  }
-  const open = input.questions.findIndex((q) => !(q.id in answers))
-  if (open !== -1) return { answers, index: open, draft: "" }
-  const index = Math.max(0, input.questions.length - 1)
-  const last = input.questions[index]
-  const value = last ? answers[last.id] : null
-  const draft = last && value && !last.options.includes(value) ? value : ""
-  return { answers, index, draft }
-}
-
     question: q.question,
     answer: result.answers.find((a) => a.questionId === q.id)?.value ?? null,
   }))
