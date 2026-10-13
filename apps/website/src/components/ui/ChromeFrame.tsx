@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 
 /**
- * Brushed-chrome bezel that wraps every product mockup.
+ * Brushed-chrome bezel that wraps every product screenshot.
  * `aspect` sets the screen ratio (e.g. "16/10"); children fill the screen.
  */
 export function ChromeFrame({
@@ -14,7 +14,7 @@ export function ChromeFrame({
   className?: string
 }) {
   return (
-    <div className={`mockup ${className}`}>
+    <div className={`frame ${className}`}>
       <div className="bezel">
         <div className="bezel-screen" style={{ aspectRatio: aspect }}>
           {children}

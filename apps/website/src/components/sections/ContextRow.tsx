@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from "react"
 import { Reveal } from "@/components/ui/Reveal"
 import { Inset, Section } from "@/components/ui/Section"
-import { sample, site } from "@/content/site"
+import { site } from "@/content/site"
 
 const keyword = "text-[#c2410c] dark:text-[#fb923c]"
 const tag = "text-[#1d4ed8] dark:text-[#93c5fd]"
@@ -50,13 +50,10 @@ export function ContextRow() {
         <ContextCard lead={bulk.lead} text={bulk.text}>
           <MarqueeY duration="24s">
             <pre className="font-mono text-[10.5px] leading-[1.7] text-muted">
-              <span className={tag}>Employee name,Employee email</span>
+              <span className={tag}>{site.context.csv[0]}</span>
               {"\n"}
-              {sample.recipients
-                .map((r) => `${r.name},${r.email.split("@")[0]}@example.co.ke`)
-                .join("\n")}
-              {"\n"}Wanjiru Kamau,wanjiru@example.co.ke{"\n"}Juma Ochieng,juma@example.co.ke
-              {"\n"}Njeri Wambui,njeri@example.co.ke{"\n"}
+              {site.context.csv.slice(1).join("\n")}
+              {"\n"}
             </pre>
           </MarqueeY>
         </ContextCard>

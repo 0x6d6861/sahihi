@@ -153,6 +153,16 @@ export const site = {
       { lead: "Bulk send.", text: "One template and a CSV of recipients. Hundreds of envelopes." },
       { lead: "Embedded signing.", text: "Signers finish inside your own site, in an iframe." },
     ],
+    /** Rows of the bulk-send card's CSV (fictional people). */
+    csv: [
+      "Employee name,Employee email",
+      "Achieng Otieno,achieng@example.co.ke",
+      "Baraka Mwangi,baraka@example.co.ke",
+      "Amina Hassan,amina@example.co.ke",
+      "Wanjiru Kamau,wanjiru@example.co.ke",
+      "Juma Ochieng,juma@example.co.ke",
+      "Njeri Wambui,njeri@example.co.ke",
+    ],
   },
 
   process: {
@@ -274,6 +284,15 @@ export const site = {
     ],
   },
 
+  /** Alt text for the full-page app screenshots (src/components/shots). */
+  shots: {
+    files: "All files in Sahihi: envelopes and documents of Tana Freight Ltd with their status",
+    envelope:
+      "A completed envelope: signed and certified, with downloads for the signed PDF and the certificate",
+    drafting: "Drafting a mutual NDA in Sahihi, with the document's blanks highlighted",
+    editor: "The envelope editor: signature, name and date fields on a board resolution",
+  },
+
   footer: {
     year: 2026,
     links: [
@@ -287,73 +306,64 @@ export const site = {
 } as const
 
 /**
- * The sample envelope shown inside every mockup. Fictional people and
- * companies; one consistent example keeps the story continuous.
+ * What the coded demos show: the same fictional workspace as the screenshots
+ * (apps/e2e/showcase/seed.ts), so pictures and demos tell one story.
  */
 export const sample = {
-  workspace: "Tana Freight",
-  title: "Mutual NDA",
-  file: "Mutual NDA.pdf",
-  pages: 3,
-  parties: ["Tana Freight Ltd", "Kilima Agro Ltd"],
-  /** `tone` picks the recipient colour, as Recipient.colorIndex does in the app. */
-  recipients: [
-    {
-      name: "Achieng Otieno",
-      email: "achieng@tanafreight.co.ke",
-      role: "First party",
-      status: "Signed",
-      tone: 0,
-      verify: "Email code",
-      signedAt: "14 Oct 2026, 09:12",
-      ip: "196.201.214.10",
-    },
-    {
-      name: "Baraka Mwangi",
-      email: "baraka@kilimaagro.co.ke",
-      role: "Second party",
-      status: "Signed",
-      tone: 1,
-      verify: "SMS code",
-      signedAt: "14 Oct 2026, 11:47",
-      ip: "105.163.2.88",
-    },
-    {
-      name: "Amina Hassan",
-      email: "amina@kilimaagro.co.ke",
-      role: "Gets a copy",
-      status: "Viewed",
-      tone: 2,
-      verify: "None",
-      signedAt: "",
-      ip: "",
-    },
-  ],
-  sections: [
-    "Definitions",
-    "Confidential information",
-    "Obligations of the receiving party",
-    "Term and termination",
-    "Governing law",
-  ],
-  blanks: {
-    effectiveDate: "1 November 2026",
-    term: "two (2) years",
-    purpose: "evaluating a cold-chain logistics partnership",
-    law: "the laws of Kenya",
+  workspace: "Tana Freight Ltd",
+  nda: "Mutual NDA — Kilima Agro",
+  ndaFile: "Mutual Non-Disclosure Agreement.pdf",
+  completed: "13 Oct 2026 at 11:48",
+  question: {
+    index: "Question 3 of 3",
+    text: "How long should the NDA run from its effective date?",
+    fills: "Term of the agreement",
+    options: ["1 year", "2 years", "3 years"],
   },
-  code: "K7QM-2XDP-9RTA",
-  originalSha256: "9f2c4e81a07d3b56c1e8f40a2d9b7c63e5a1f08d4b2c97e6a3d58f1c0b4e72a9",
-  signedSha256: "4be17d09c3a8e2f56b1d0c94a7e3f28b5c6d1a09e8f7b3c24d5a6e1f09c8b7d32",
-  chainHead: "c03e9a71f5b2d8e4a6c1907f3b5e2d8a4c6f1b9e7d3a5c2f8e0b4d6a1c9e7f35",
-  events: [
-    { time: "13 Oct 16:02", event: "Envelope sent", actor: "Achieng Otieno" },
-    { time: "14 Oct 09:05", event: "Email code verified", actor: "Achieng Otieno" },
-    { time: "14 Oct 09:12", event: "Signed", actor: "Achieng Otieno" },
-    { time: "14 Oct 11:40", event: "SMS code verified", actor: "Baraka Mwangi" },
-    { time: "14 Oct 11:47", event: "Signed", actor: "Baraka Mwangi" },
-    { time: "14 Oct 11:48", event: "Completed", actor: "Sahihi" },
+  proposal: {
+    section: "7. Term",
+    why: "Allow either Party to end the Agreement on 30 days' written notice, keeping the term and survival period.",
+    title: ["Term", " and Termination"],
+    before: "This Agreement starts on the Effective Date and continues for 2",
+    removed: " years.",
+    kept: " years",
+    inserted:
+      ", unless either Party ends it earlier by giving the other Party 30 days' written notice.",
+    after: " The obligations in this Agreement survive its end for 3 years.",
+  },
+  signer: {
+    party: "Tana Freight Ltd",
+    role: "First party",
+    name: "Achieng Otieno",
+    email: "achieng@tanafreight.co.ke",
+    fields: ["Signature", "Full name", "Date signed"],
+  },
+  offer: {
+    title: "Offer letter — Juma Ochieng",
+    from: "Achieng Otieno (Tana Freight Ltd)",
+    file: "Offer of Employment.pdf",
+    signer: "Juma Ochieng",
+    accept: "I accept this offer of employment on the terms set out in this letter.",
+  },
+  otp: { to: "n••••@tanafreight.co.ke", typed: ["4", "8", "1"] },
+  routing: [
+    { name: "Achieng Otieno", email: "achieng@tanafreight.co.ke", step: 1, tone: 0 },
+    { name: "David Kariuki", email: "david@tanafreight.co.ke", step: 2, tone: 1 },
+  ],
+  signers: [
+    { name: "Achieng Otieno", masked: "a••••••@tanafreight.co.ke" },
+    { name: "Baraka Mwangi", masked: "b•••••@kilimaagro.co.ke" },
+  ],
+  originalSha256: "7794e358cab9467dc0ca24c6fc8185d24e61d66c7a4f960b8b9ab2cac1f52d93",
+  signedSha256: "09cdc18f66043d71fb059485c0308be93f20cd6ef6ebe1881028b17c11079285",
+  /** Newest first, as the Activity tab lists them. `kind` picks the icon. */
+  activity: [
+    { text: "Certificate of completion issued", time: "11:48", kind: "seal" },
+    { text: "Signed PDF produced", time: "11:48", kind: "file" },
+    { text: "Everyone has signed", time: "11:47", kind: "seal" },
+    { text: "Baraka Mwangi signed", time: "11:47", kind: "sign" },
+    { text: "Baraka Mwangi agreed to sign electronically", time: "11:46", kind: "consent" },
+    { text: "Baraka Mwangi viewed the documents", time: "11:40", kind: "view" },
+    { text: "Achieng Otieno signed", time: "09:12", kind: "sign" },
   ],
 } as const
-
-export type SampleRecipient = (typeof sample.recipients)[number]

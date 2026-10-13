@@ -2,7 +2,7 @@
 
 import { type MotionValue, motion, useScroll, useTransform } from "motion/react"
 import { type ReactNode, useRef } from "react"
-import { AppWindow, DraftScreen, ProveScreen, SendScreen } from "@/components/mockups/screens"
+import { Shot } from "@/components/shots/Shot"
 import { ArrowLink, PillButton } from "@/components/ui/Button"
 import { ChromeFrame } from "@/components/ui/ChromeFrame"
 import { useSafeReducedMotion } from "@/components/ui/useSafeReducedMotion"
@@ -20,7 +20,14 @@ import { site } from "@/content/site"
 const frames = [
   {
     key: "draft",
-    screen: <DraftScreen />,
+    screen: (
+      <Shot
+        name="drafting"
+        alt={site.shots.drafting}
+        sizes="(min-width: 768px) 25vw, 33vw"
+        position="left top"
+      />
+    ),
     aspect: "1.1/1",
     pos: "left-[7%] top-[26%] w-[32%] md:left-[14%] md:top-[12%] md:w-[25%]",
     rotate: [-8, -4],
@@ -28,7 +35,14 @@ const frames = [
   },
   {
     key: "send",
-    screen: <SendScreen />,
+    screen: (
+      <Shot
+        name="editor"
+        alt={site.shots.editor}
+        sizes="(min-width: 768px) 25vw, 33vw"
+        position="38% 40%"
+      />
+    ),
     aspect: "1.05/1",
     pos: "left-[35%] top-[16%] w-[30%] md:left-[40%] md:top-[6%] md:w-[20%]",
     rotate: [3, 1],
@@ -36,7 +50,14 @@ const frames = [
   },
   {
     key: "prove",
-    screen: <ProveScreen />,
+    screen: (
+      <Shot
+        name="envelope"
+        alt={site.shots.envelope}
+        sizes="(min-width: 768px) 25vw, 33vw"
+        position="left top"
+      />
+    ),
     aspect: "0.95/1",
     pos: "left-[61%] top-[28%] w-[32%] md:left-[62%] md:top-[15%] md:w-[21%]",
     rotate: [9, 4],
@@ -81,7 +102,7 @@ function AnimatedHero() {
           className="pointer-events-none absolute left-1/2 top-1/2 w-[min(94vw,1120px)] -translate-x-1/2 -translate-y-[46%] will-change-transform"
         >
           <ChromeFrame aspect="16/10">
-            <AppWindow />
+            <Shot name="files" alt={site.shots.files} sizes="(max-width: 1120px) 94vw, 1120px" />
           </ChromeFrame>
         </motion.div>
 
@@ -169,7 +190,7 @@ function StaticHero() {
       </div>
       <Wide>
         <ChromeFrame aspect="16/10">
-          <AppWindow />
+          <Shot name="files" alt={site.shots.files} sizes="(max-width: 1120px) 94vw, 1120px" />
         </ChromeFrame>
       </Wide>
     </div>

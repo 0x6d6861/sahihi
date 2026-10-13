@@ -138,6 +138,17 @@ up another run's email.
 - Stop `bun run dev`: Next allows one `next dev` per app directory.
 - First time only: `cd apps/e2e && bunx playwright install chromium`.
 
+**Showcase (screenshots for the marketing site).** `bun run --filter @sahihi/e2e showcase` is
+not a test: it seeds a believable workspace (Tana Freight Ltd; `showcase/seed.ts`), drafts with the
+real assistant, and captures the full-page screens (All files, a completed envelope, the drafting
+editor, the envelope editor) in light and dark into `apps/website/src/assets/shots/`
+(apps/website/docs/SCREENSHOTS.md). Its own stack: api **4200**, web **3200**, database
+`sahihi_showcase_e2e` (dropped and recreated every run), Redis DB **13**. It takes `AI_MODEL` and
+the provider key from the shell or the root `.env` (only those keys); `SHOWCASE_SKIP_AI=1` makes
+no model calls and keeps a plain draft as the drafting shot. Before each run it deletes the Mailpit
+messages to the showcase addresses, and only those. About 3 minutes. Not run in CI (it calls the
+model).
+
 **Conventions:**
 - Files are `*.e2e.ts` (`testMatch`), so a bare `bun test` never picks them up.
 - Wait for `networkidle` after navigating to a page that's compiling for the first time. Typing

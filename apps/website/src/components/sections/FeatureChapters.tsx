@@ -1,10 +1,6 @@
 import type { ReactNode } from "react"
-import { MetalDefs, MetalIcon, type MetalIconName } from "@/components/icons/MetalIcons"
 import {
   AuditDemo,
-  CertificateWindow,
-  DraftingWindow,
-  FieldEditorWindow,
   OtpDemo,
   ProposalDemo,
   QuestionsDemo,
@@ -12,20 +8,26 @@ import {
   SignersDemo,
   SigningDemo,
   VerifyDemo,
-} from "@/components/mockups/screens"
+} from "@/components/demos/screens"
+import { MetalDefs, MetalIcon, type MetalIconName } from "@/components/icons/MetalIcons"
+import { Shot } from "@/components/shots/Shot"
 import { Caption } from "@/components/ui/Caption"
 import { ChromeFrame } from "@/components/ui/ChromeFrame"
 import { Reveal } from "@/components/ui/Reveal"
 import { Inset, Section } from "@/components/ui/Section"
 import { site } from "@/content/site"
 
-const mainMockup: Record<string, ReactNode> = {
-  draft: <DraftingWindow />,
-  send: <FieldEditorWindow />,
-  prove: <CertificateWindow />,
+const alt = site.shots
+const full = "(max-width: 1120px) 94vw, 1120px"
+
+/** Each chapter's main picture: a real full-page screenshot (docs/SCREENSHOTS.md). */
+const mainShot: Record<string, ReactNode> = {
+  draft: <Shot name="drafting" alt={alt.drafting} sizes={full} />,
+  send: <Shot name="editor" alt={alt.editor} sizes={full} />,
+  prove: <Shot name="envelope" alt={alt.envelope} sizes={full} />,
 }
 
-/** Demo kind → mockup and its panel aspect ratio. */
+/** Demo kind → its coded demo (components/demos) and the panel's aspect ratio. */
 const demos: Record<string, { node: ReactNode; aspect: string }> = {
   questions: { node: <QuestionsDemo />, aspect: "16/9" },
   proposal: { node: <ProposalDemo />, aspect: "4/3" },
@@ -59,7 +61,7 @@ export function FeatureChapters() {
             </Inset>
 
             <Reveal className="mt-14">
-              <ChromeFrame aspect="16/10.4">{mainMockup[ch.id]}</ChromeFrame>
+              <ChromeFrame aspect="16/10">{mainShot[ch.id]}</ChromeFrame>
             </Reveal>
 
             <Inset>
@@ -101,7 +103,12 @@ export function FeatureChapters() {
 
 function DemoPanel({ aspect, children }: { aspect: string; children: ReactNode }) {
   return (
-    <div className="mockup overflow-hidden rounded-[28px] bg-panel" style={{ aspectRatio: aspect }}>
+    // A picture of the product, not part of the page's content: screen readers skip it.
+    <div
+      aria-hidden
+      className="demo relative overflow-hidden rounded-[28px] bg-panel"
+      style={{ aspectRatio: aspect }}
+    >
       {children}
     </div>
   )

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "playwright test",
+    "showcase": "playwright test -c showcase/playwright.config.ts",
     "typecheck": "tsc -p ."
   },
   "devDependencies": {

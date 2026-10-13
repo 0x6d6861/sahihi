@@ -18,25 +18,21 @@ Read AGENTS.md, then DESIGN.md, before step 1.
 
 ### A2. Tokens and base styles: `globals.css`, `layout.tsx`
 - Colour tokens (black at fixed opacities), the stepped type `@utility` classes, base `body` styles (weight 500), `::selection`.
-- Load the fonts with `next/font/local`: Geist and Geist Mono from the `geist` package, Inter from `@fontsource-variable/inter`. Don't use `next/font/google` (see AGENTS.md, "Gotchas").
-- Add `.bezel`/`.bezel-screen`, `.mockup`/`.mockup-root`, the marquee keyframes, the FAQ plus/minus, and the reduced-motion block.
+- Load the fonts with `next/font/local`: Geist and Geist Mono from the `geist` package. Don't use `next/font/google` (see AGENTS.md, "Gotchas").
+- Add `.bezel`/`.bezel-screen`, `.frame`, the marquee keyframes, the FAQ plus/minus, and the reduced-motion block.
 - **Checkpoint:** a test page shows a `text-display` heading in Geist on `#f9f9f9`, 96px at desktop width and 48px at 390px.
 
 ### A3. Content: `src/content/site.ts`
-- Fill in the full `site` and `sample` objects (schema in CONTENT.md), typed with `as const`.
+- Fill in the full `site` object (schema in CONTENT.md), typed with `as const`.
 - **Checkpoint:** `typecheck` passes.
 
 ### A4. UI primitives: `components/ui/`
 - `ChromeFrame`, `PillButton`, `ArrowLink`, `Caption`, `Reveal` (client), `Section`/`Inset`.
 - **Checkpoint:** a `ChromeFrame` with a grey child looks like polished metal around glass, and its radii are concentric.
 
-### A5. Mockup parts: `components/mockups/parts.tsx`
-- Build `MockupRoot` and the `--mk-*` palette first, then `PdfPage`/`FieldBox`, the app chrome (`AppTopBar`, `WindowBar`), people and status parts, and the assistant parts.
-- **Checkpoint:** an `AppPage` inside a `ChromeFrame` scales cleanly from 1120px down to 300px wide with nothing overflowing.
-
-### A6. Screens: `components/mockups/screens.tsx`
-- Build all 14 screens listed in MOCKUPS.md.
-- **Checkpoint:** render each screen in its target frame or panel aspect on a scratch page and check that it's legible at its intended size.
+### A5. Screenshots: `components/shots/`
+- Run the showcase (`bun run --filter @sahihi/e2e showcase`) to capture `src/assets/shots/`, then build `Shot` and `shots.ts`, and the coded demos in `components/demos` (SCREENSHOTS.md).
+- **Checkpoint:** a `Shot` in a `ChromeFrame` swaps to its dark capture when the theme flips, and only one image loads.
 
 ### A7. Static sections
 Build them in page order. Each is a server component wrapped in `Reveal`s:
@@ -57,11 +53,11 @@ Build them in page order. Each is a server component wrapped in `Reveal`s:
 
 Ordered by value. Each item has a clear finish line.
 
-1. ~~**Real content.**~~ Done: Sahihi copy, mockups of the real app, a trust section instead of invented quotes, MDX security/privacy/terms pages. Left before launch: CONTENT.md, "Before launch".
-2. **Real screenshots or renders.** Swap selected screens for product images (MOCKUPS.md, "Swapping in real screenshots"), and replace the SVG metal icons with 3D renders. *Done when:* LCP under 2.5s on a throttled mobile Lighthouse run.
+1. ~~**Real content.**~~ Done: Sahihi copy, real app screenshots, a trust section instead of invented quotes, MDX security/privacy/terms pages. Left before launch: CONTENT.md, "Before launch".
+2. ~~**Real screenshots.**~~ Done: full pages are real captures, demos are coded to match (SCREENSHOTS.md). Still open: replace the SVG metal icons with 3D renders. *Done when:* LCP under 2.5s on a throttled mobile Lighthouse run.
 3. **Licensed display font.** Geist stands in for subframe.com's PP Neue Montreal. To match exactly, license Neue Montreal and load it with `next/font/local` into `--font-display`; the type scale was measured from it, so no size changes are needed. *Done when:* no layout shift on load (CLS 0).
 4. ~~**Metadata and social.**~~ Done: `opengraph-image.tsx`, `icon.svg`, `robots.ts`, `sitemap.ts`, `metadataBase` from `site.url`.
 5. **Analytics on CTAs.** Track clicks on the primary and secondary CTAs and pricing. Keep it server-rendered and don't add a client component just for tracking.
 6. **Dark theme (optional).** The original is light-only. If you add a dark theme, define the tokens in `@media (prefers-color-scheme: dark)` and re-tune the bezel gradient; it needs darker stops to read as metal.
-7. **Mobile mockup legibility.** Below 640px, consider hiding the side panels in `AppWindow`/`DraftingWindow` (some already use `hidden sm:flex`) and raising `--mk`.
+7. **Mobile screenshot legibility.** Below 640px the full-window shots are small; consider phone-width captures for the chapter mains.
 8. **Tests.** Add a Playwright spec built from `scripts/screenshots.mjs` that asserts the hero buttons are clickable at scroll 0 and not clickable at 50% of the track.

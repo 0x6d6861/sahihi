@@ -1,6 +1,6 @@
 # Design system
 
-The page should feel like a gallery or a hardware catalogue: one neutral off-white surface, large tight type, almost no colour, and product UI that sits in polished-metal frames. Colour comes only from inside the mockups: recipient colours, status pills and signatures.
+The page should feel like a gallery or a hardware catalogue: one neutral off-white surface, large tight type, almost no colour, and real product screenshots that sit in polished-metal frames. Colour comes only from inside the screenshots.
 
 All tokens are defined in `src/app/globals.css`. If a value you need isn't here, add a token rather than hard-coding it in a section.
 
@@ -23,10 +23,11 @@ The page follows the visitor's system setting until they press **D**, which togg
 | line | `#2a2a2a` |
 
 Rules:
-- **Mockups follow the theme**, like the real Sahihi app. They take their colours from the mockup palette (`--mk-*` on `.mockup` in `globals.css`, redefined under `[data-theme="dark"] .mockup`), copied from Arc's neutral scale in `apps/web/components/arc/foundation.css`. Use `bg-(--mk-surface)`, `text-(--mk-text-2)` and the rest inside mockups, not the page tokens. **PDF paper stays white in both themes** (`--mk-paper*`), as `.on-paper` does in the app.
+- **Demos follow the theme** through the `--dm-*` palette on `.demo` (copied from Arc's neutral tokens, redefined under `[data-theme="dark"] .demo`). Use `bg-(--dm-card)`, `text-(--dm-text-2)` and the rest inside demos, not the page tokens; PDF paper stays white.
+- **Screenshots follow the theme.** Each has a light and a dark capture of the real app; `Shot` shows the one for the current theme (SCREENSHOTS.md). The bezel screen behind them is the app's page colour (`#ffffff`, `#141414` in dark).
 - The chrome bezel and metal icons are unchanged; silver reads well on dark.
 - `bg-ink text-paper` (the featured pricing CTA) inverts on its own. Use `hover:bg-ink/80`, not `hover:bg-black/…`.
-- Any literal colour outside a mockup needs a `dark:` variant, as on the context-card chips and code colours in `ContextRow.tsx`.
+- Any literal colour outside a screenshot needs a `dark:` variant, as on the context-card chips and code colours in `ContextRow.tsx`.
 - Under `prefers-contrast: more`, the raised greys are white in dark mode too (a separate block in `globals.css`).
 
 | Token | Value | Looks like on paper | Tailwind | Used for |
@@ -40,12 +41,10 @@ Rules:
 | pill | `#ebebeb` → hover `#e0e0e0` | — | `bg-pill` | Primary button |
 | pill-raised | `#e3e3e3` → hover `#d9d9d9` | — | `bg-pill-raised` | A grey button on a `bg-panel` card (non-featured pricing CTA) |
 | line | `#e3e3e3` | — | `border-line` | FAQ separators, the only hairlines on the page |
-| select | `#3b82f6` | — | `outline-select` | "Selected" outlines inside mockups |
 
 Rules:
 - Never put a coloured background on a section.
 - Never use a brand-coloured button. The primary button is grey, and only the featured pricing CTA is ink.
-- Inside mockups, recipient colours come from `--mk-tone-0…2` (picked by `recipient.tone`), status colours from `--mk-success`/`--mk-info`.
 
 ## Typography
 
@@ -53,8 +52,8 @@ There are three faces, self-hosted from npm packages and loaded with `next/font/
 
 | Variable | Face | Role |
 |---|---|---|
-| `--font-display` → `font-sans` | **Geist** 400/500/600 | Everything outside mockups |
-| `--font-ui` | Inter | Text inside mockups (`.mockup-root`, weight 400) |
+| `--font-display` → `font-sans` | **Geist** 400/500/600 | Everything outside the demos |
+| `--font-ui` | Inter | Text inside the coded demos (`.demo-root`, weight 400), as in the app |
 | `--font-mono-face` → `font-mono` | Geist Mono | Pillar labels, code |
 
 subframe.com uses PP Neue Montreal (a licensed font) for display, PP Neue Montreal Mono for labels, and OT Neue Montreal Semi Squeezed for prices. Geist stands in for all three. To use Neue Montreal, load it with `next/font/local` into `--font-display`; the sizes below were taken from it and need no change.
@@ -64,12 +63,11 @@ subframe.com uses PP Neue Montreal (a licensed font) for display, PP Neue Montre
 - **Ink text is medium (500).** `body` sets `font-weight: 500`, so headlines, body paragraphs, eyebrows, caption leads, nav links and buttons are all 500.
 - **Grey text is regular (400).** Anything `text-muted` gets `font-normal` beside it: subtitles, the grey half of captions, process lines, plan details, FAQ answers, the footer.
 - Prices are 400.
-- Mockups are 400 (set on `.mockup-root`).
 - Don't use 600/700 outside the header wordmark.
 
 ### Type scale
 
-Sizes are **stepped, not fluid**: one size below 768px and one from 768px up, matching subframe.com's computed styles. They are defined as `@utility` classes in `globals.css`. Values below are size/line-height in px at the default 16px root. The CSS is written in `rem` (px ÷ 16) so visitors who raise their browser's default font size get larger text. Write new text sizes in `rem` too. The exception is mockups and the fixed-size context-card tiles, whose contents must keep their proportions.
+Sizes are **stepped, not fluid**: one size below 768px and one from 768px up, matching subframe.com's computed styles. They are defined as `@utility` classes in `globals.css`. Values below are size/line-height in px at the default 16px root. The CSS is written in `rem` (px ÷ 16) so visitors who raise their browser's default font size get larger text. Write new text sizes in `rem` too. The exception is the fixed-size context-card tiles, whose contents must keep their proportions.
 
 | Class | Mobile | ≥ 768px | Tracking | Weight | Use |
 |---|---|---|---|---|---|
@@ -93,7 +91,7 @@ Sizes are **stepped, not fluid**: one size below 768px and one from 768px up, ma
 Rules:
 - **Headlines end with a period.** "Pricing." and "FAQ." do too.
 - Headlines that wrap get a manual line break (copy stores them as `[line1, line2]`). Don't rely on automatic wrapping for display sizes.
-- Use the scale classes. Don't add `text-[NNpx]` outside mockups and the header wordmark.
+- Use the scale classes. Don't add `text-[NNpx]` outside the context cards and the header wordmark; demos size in `em`.
 
 ### The caption pattern
 
@@ -108,7 +106,7 @@ Smaller variants (feature grid, context cards) use the same pattern with `text-c
 
 ## Layout
 
-- **Content width:** `<Section>` gives `max-w-[1120px]` with `px-4 sm:px-8`. `<Inset>` gives a narrower `max-w-[860px]` column for headlines and copy, so text sits indented relative to the wide mockups. This matches the original.
+- **Content width:** `<Section>` gives `max-w-[1120px]` with `px-4 sm:px-8`. `<Inset>` gives a narrower `max-w-[860px]` column for headlines and copy, so text sits indented relative to the wide screenshots. This matches the original.
 - **Space between sections:** `pb-48` (192px). Sections never have borders or backgrounds.
 - **Wider grids:** the Process steps (`max-w-[1024px]`) and the context cards (`max-w-[1000px]`) break out of `Inset` so their larger text doesn't wrap word by word.
 - **Radii:** demo and quote panels use 28–32px, buttons 16px (`rounded-2xl`), context cards 24px (`rounded-3xl`).
@@ -134,7 +132,7 @@ Smaller variants (feature grid, context cards) use the same pattern with `text-c
 - The screen's radius is the bezel radius minus its padding, so the inner and outer curves stay concentric. Keep that relationship if you change either value.
 - The screen has a 1px dark inner ring and a 2px light inner ring, which give the glass edge.
 
-Use the bezel for: the hero frames, the merged window, and each chapter's main mockup. Don't use it for demo panels; those are flat `bg-panel` rounded rectangles.
+Use the bezel for: the hero frames, the merged window, and each chapter's main screenshot. Don't use it for demo panels; those are flat `bg-panel` rounded rectangles.
 
 ### Icons
 
@@ -155,7 +153,7 @@ Only `transform` and `opacity` may be animated, by scroll or otherwise.
 
 ## Accessibility
 
-- Mockups are decorative. Wrap new ones so screen readers skip them: add `aria-hidden` on the `ChromeFrame` or demo panel if you add any interactive-looking text.
+- Screenshots carry real alt text (`site.shots`); the hero frames and merged window are `pointer-events-none` pictures.
 - Icons are `aria-hidden`.
 - Duplicated marquee content is `aria-hidden`.
 - The FAQ uses `<button aria-expanded aria-controls>` inside `<h3>`, with each answer a `role="region"` labelled by its question. See PAGE_SPEC §9 for why it is not `<details>`.
