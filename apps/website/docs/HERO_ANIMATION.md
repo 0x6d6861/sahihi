@@ -1,14 +1,14 @@
 # Hero scroll sequence
 
-This is the only pinned, scroll-scrubbed animation on the page, implemented in `src/components/sections/HeroStory.tsx`. It tells the product story without words: **three separate tools become one window.**
+This is the only pinned, scroll-scrubbed animation on the page, implemented in `src/components/sections/HeroStory.tsx`. It tells the product story without words: **drafting, sending and proving become one envelope.** The three frames merge into `FilesScreen`: All files, where every draft, envelope and document lives.
 
 ## Structure
 
 ```
 <div ref h-[320svh]>                       ← scroll track (3.2 viewports)
   <div sticky top-0 h-svh overflow-hidden>  ← stage, pinned while the track scrolls
-    frames container   top-16 md:top-24 h-[52svh]  ← the three tilted ChromeFrames + mono labels (clears the header)
-    merged window      centred, min(94vw,1120px), ChromeFrame 16/10 → <AppWindow/>
+    frames container   top-16 md:top-24 h-[52svh]  ← the three tilted quiet frames (ChromeFrame quiet) + mono labels (clears the header)
+    merged window      centred, min(94vw,1120px), ChromeFrame 16/10 → <Screen><FilesScreen/></Screen>
     hero copy          top-[57svh], centred  ← headline, subtitle, CTAs, "works with"
 ```
 
@@ -22,7 +22,7 @@ This is the only pinned, scroll-scrubbed animation on the page, implemented in `
 | 0.05 → 0.14 | Hero copy fades out and rises 40px | `textOpacity` 1→0, `textY` 0→-40 |
 | ≥ 0.12 | Hero copy stops taking clicks | `textPointer` "auto"→"none" |
 | 0.10 → 0.30 | Frames straighten from their initial tilt to a smaller one and drop 12svh into the space the copy left | per-frame `rotate`, `y` |
-| 0.12 → 0.20 | Pillar labels (CANVAS / BROWSER / AGENT) fade in | `labelOpacity` 0→1 |
+| 0.12 → 0.20 | Pillar labels (DRAFT / SEND / PROVE) fade in | `labelOpacity` 0→1 |
 | 0.36 → 0.42 | Labels fade out | `labelOpacity` 1→0 |
 | 0.36 → 0.60 | Frames converge (outer frames move ±16vw to the centre), go fully straight, rise to 10svh and scale 1→1.25 | `x`, `rotate`, `y`, `framesScale` |
 | 0.48 → 0.60 | Frames fade out | `framesOpacity` 1→0 |
@@ -37,9 +37,9 @@ Each frame is an entry in the `frames` array:
 
 | key | screen | aspect | rotate [initial, settled] | shift (converge) | position (mobile → `md`) |
 |---|---|---|---|---|---|
-| canvas | `CanvasScreen` | 1.1/1 | [-8°, -4°] | 0 → +16vw | `left-[7%] top-[26%] w-[32%]` → `md:left-[14%] md:top-[12%] md:w-[25%]` |
-| browser | `BrowserScreen` | 1.05/1 | [3°, 1°] | none | `left-[35%] top-[16%] w-[30%]` → `md:left-[40%] md:top-[6%] md:w-[20%]` |
-| agent | `AgentScreen` | 0.95/1 | [9°, 4°] | 0 → -16vw | `left-[61%] top-[28%] w-[32%]` → `md:left-[62%] md:top-[15%] md:w-[21%]` |
+| draft | `HeroDraft` | 1.1/1 | [-8°, -4°] | 0 → +16vw | `left-[7%] top-[26%] w-[32%]` → `md:left-[14%] md:top-[12%] md:w-[25%]` |
+| send | `HeroSend` | 1.05/1 | [3°, 1°] | none | `left-[35%] top-[16%] w-[30%]` → `md:left-[40%] md:top-[6%] md:w-[20%]` |
+| prove | `HeroProve` | 0.95/1 | [9°, 4°] | 0 → -16vw | `left-[61%] top-[28%] w-[32%]` → `md:left-[62%] md:top-[15%] md:w-[21%]` |
 
 Positions are percentages of the frames container (`52svh` tall, max 1400px wide). The pillar label for each frame is `site.pillars[index]`, so the order of `frames` must match the order of `pillars`.
 
@@ -50,7 +50,7 @@ The screens are visible from scroll 0. Empty bezels on first load read as a load
 - Animate **only** `opacity`, `x`, `y`, `rotate` and `scale`. Motion turns these into `transform`/`opacity`, which the compositor handles without repainting.
 - **Never** scrub `filter`, `blur`, `backdrop-filter`, `box-shadow`, `clip-path`, width or height with scroll. The original site did heavy scroll effects and froze Chrome's renderer twice during review.
 - Each frame and the window have `will-change-transform`. Don't add it anywhere else; too many layers costs memory.
-- The mockups inside the frames are static HTML, so they cost nothing per frame.
+- The screens inside the frames are static HTML, so they cost nothing per frame.
 
 ## Interaction rules
 
@@ -71,7 +71,7 @@ The screens are visible from scroll 0. Empty bezels on first load read as a load
 | A longer or shorter story | the track height `h-[320svh]` (more height means slower scrubbing; keep it ≥ 260svh; then update the hero stops in `scripts/screenshots.mjs`) |
 | Labels on screen longer | widen the hold in `labelOpacity`, e.g. `[0.12, 0.2, 0.42, 0.48]` |
 | A later merge | shift the `0.36/0.48/0.6` stops and the window's `0.46/0.62/0.66` stops by the same amount |
-| Different pillars | change `site.pillars`, the `frames` screens and `AppWindow` together |
+| Different pillars | change `site.pillars`, the `frames` screens and the merged shot together |
 | A fourth frame | add an entry with its own `pos`/`rotate`/`shift`, a fourth pillar, and rebalance the positions; check 390px |
 
 ## Testing it

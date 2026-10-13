@@ -23,7 +23,7 @@ Open the shots for the sections you touched, at **both** sizes. Check:
 
 **Global**
 - [ ] One continuous `paper` background, with no section borders or colour bands
-- [ ] **Dark** (`dark-*` shots): text is white on `#111111`; mockups stay light with dark text inside them (no white text on a light screen); context-card chips and code are readable; the featured pricing CTA is light with dark text
+- [ ] **Dark** (`dark-*` shots): text is white on `#111111`; the product UI uses its dark palette, with PDF paper still white; context-card chips and code are readable; the featured pricing CTA is light with dark text
 - [ ] **Theme hotkey:** pressing D flips the scheme instantly, a reload keeps it, and Cmd+D still bookmarks (not intercepted). No hydration warning in the console
 - [ ] Every headline ends with a period
 - [ ] Captions follow the pattern: ink medium-weight lead, then grey regular-weight text
@@ -34,19 +34,24 @@ Open the shots for the sections you touched, at **both** sizes. Check:
 **Hero** (`desktop-00…05`, `mobile-00…05`)
 - [ ] 00: three tilted chrome frames showing their screens below the header, with the headline, subtitle, both CTAs and the "works with" line
 - [ ] 01: headline nearly gone, frames starting to drop
-- [ ] 02: frames lower in the stage with no large empty band below them, CANVAS / BROWSER / AGENT labels visible
+- [ ] 02: frames lower in the stage with no large empty band below them, DRAFT / SEND / PROVE labels visible
 - [ ] 03: frames converging and fading, merged window appearing
 - [ ] 04–05: one merged window, centred, with no leftover frames visible
 
 **Chapters**
-- [ ] Main mockups are legible at desktop width
-- [ ] Demo panels are evenly rounded, mockups don't overflow, and captions align with the panel edge
-- [ ] Six metal icons in the canvas chapter, three per row on desktop
+- [ ] Main app screens read like the real app at desktop width
+- [ ] Demo panels are evenly rounded, demos are centred with nothing clipped, and captions align with the panel edge
+- [ ] Six metal icons in the draft chapter, three per row on desktop
 
 **Lower page**
 - [ ] Context cards show moving content with faded edges (take a second shot a few seconds later to confirm it moves)
 - [ ] Process numerals staggered on desktop, stacked 1–4 on mobile
-- [ ] Testimonial bento has no holes at desktop
+- [ ] Trust bento has no holes at desktop
+- [ ] Pricing: four plans in a 2×2 grid, limits match `packages/core/src/workspace/billing.ts`, CTAs aligned
+
+**MDX pages** (`{,dark-}{desktop,mobile}-{security,privacy,terms}.jpg`)
+- [ ] Header, one reading column, footer; headings, lists and links styled by `src/mdx-components.tsx`
+- [ ] Privacy and terms show the "Draft, under legal review" panel until reviewed text replaces them
 - [ ] Pricing CTAs sit at the same height
 - [ ] FAQ hairlines visible, plus icons right-aligned
 
@@ -63,5 +68,5 @@ These can't be read off a screenshot:
 
 ## 4. Docs
 
-- [ ] If you changed a section, mockup, token or the hero timing, update the matching file in `docs/` in the same change.
+- [ ] If you changed a section, app screen, token or the hero timing, update the matching file in `docs/` in the same change.
 - [ ] If you added a script, command or env var, update AGENTS.md and README.md.

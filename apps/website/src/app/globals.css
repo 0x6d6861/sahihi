@@ -193,8 +193,8 @@
 
 /* Dark mode is <html data-theme="dark">: the system setting, or the D hotkey
    (ThemeHotkey.tsx). Text stays "one colour at fixed opacities", flipped to
-   white, so every grey keeps its role. Mockups keep their literal light
-   colours: they read as screenshots of a light app. */
+   white, so every grey keeps its role. The coded app UI has its own palette
+   (see "Product demos" below). */
 :root[data-theme="dark"] {
   color-scheme: dark;
   --color-paper: #111111;
@@ -209,23 +209,6 @@
   --color-pill-raised-hover: #343434;
   --color-line: #2a2a2a;
 }
-/* Mockups stay light: their UI text uses the tokens, and white ink on their
-   light screens would vanish. Keep in step with the @theme values above. */
-[data-theme="dark"] .mockup {
-  color-scheme: light;
-  --color-paper: #f9f9f9;
-  --color-ink: rgb(0 0 0 / 0.96);
-  --color-muted: rgb(0 0 0 / 0.55);
-  --color-faint: rgb(0 0 0 / 0.36);
-  --color-ghost: rgb(0 0 0 / 0.19);
-  --color-panel: #efefef;
-  --color-pill: #ebebeb;
-  --color-pill-hover: #e0e0e0;
-  --color-pill-raised: #e3e3e3;
-  --color-pill-raised-hover: #d9d9d9;
-  --color-line: #e3e3e3;
-}
-
 /* Raised greys for visitors who ask for more contrast: faint and ghost are
    below WCAG minimums on paper in both schemes. */
 @media (prefers-contrast: more) {
@@ -283,6 +266,10 @@ body {
 }
 
 /* ── Brushed-chrome bezel ──────────────────────────────────────── */
+/* The bezel's padding and radii scale with the frame's width (cqw). */
+.frame {
+  container-type: inline-size;
+}
 .bezel {
   position: relative;
   padding: clamp(4px, 0.55cqw + 3px, 8px);
@@ -310,23 +297,158 @@ body {
   overflow: hidden;
   height: 100%;
   border-radius: calc(clamp(18px, 2.4cqw, 34px) - clamp(4px, 0.55cqw + 3px, 8px));
-  background: #f1f1ef;
+  background: #ffffff;
   box-shadow:
     inset 0 0 0 1px rgb(0 0 0 / 0.28),
     inset 0 0 0 2px rgb(255 255 255 / 0.35);
 }
 
-/* ── Mockup scaling: children size in `em`, root scales with frame ─ */
-.mockup {
-  container-type: inline-size;
+/* The quiet frame: a hairline ring and a soft lift, for the hero's small
+   illustrations. The screen inside keeps .bezel-screen's radius and clipping. */
+.bezel-quiet {
+  position: relative;
+  border-radius: clamp(14px, 2.4cqw, 26px);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.07),
+    0 1px 2px rgb(0 0 0 / 0.06),
+    0 24px 48px -24px rgb(0 0 0 / 0.28);
 }
-/* Set --mk on a mockup to change how big its UI reads (1.35 ≈ full-width window). */
-.mockup-root {
-  font-size: clamp(5px, calc(var(--mk, 1.35) * 1cqw), 15px);
-  line-height: 1.35;
+.bezel-quiet > .bezel-screen {
+  border-radius: inherit;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.6);
+}
+[data-theme="dark"] .bezel-quiet {
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.1),
+    0 24px 48px -24px rgb(0 0 0 / 0.7);
+}
+[data-theme="dark"] .bezel-quiet > .bezel-screen {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+:root[data-theme="dark"] .bezel-screen {
+  background: #141414;
+}
+
+/* ── Product demos ─────────────────────────────────────────────────
+   Coded recreations of the app's screens and cards (components/demos). Sizes are in `em` off `.demo-root`, whose font size follows the
+   panel's width, so a demo scales as one unit. Colours copy Arc's neutral
+   tokens (apps/web/components/arc/foundation.css) and switch with the page.
+   PDF paper stays white, as in the app. */
+.demo {
+  container-type: inline-size;
+  --dm-bg: #ffffff;
+  --dm-card: #ffffff;
+  --dm-muted: #f5f5f5;
+  --dm-line: #ececec;
+  --dm-strong: #d1d1d1;
+  --dm-text: #141414;
+  --dm-text-2: #5e5e5e;
+  --dm-text-3: #8a8a8a;
+  --dm-accent: #141414;
+  --dm-on-accent: #ffffff;
+  --dm-disabled: #8c8c8c;
+  --dm-success: #15803d;
+  --dm-success-bg: #e8f5ec;
+  --dm-danger: #c42b1c;
+  --dm-insert: #e6f4ea;
+  --dm-warn: #b45309;
+  --dm-warn-bg: #fdf1e2;
+  --dm-tone-0: #2563eb;
+  --dm-tone-1: #16a34a;
+  --dm-tone-2: #d97706;
+  --dm-paper: #ffffff;
+  --dm-paper-ink: #1a1a1a;
+  --dm-shadow: 0 0.8em 2.4em -1em rgb(0 0 0 / 0.25);
+}
+[data-theme="dark"] .demo {
+  --dm-bg: #141414;
+  --dm-card: #1b1b1b;
+  --dm-muted: #262626;
+  --dm-line: #2e2e2e;
+  --dm-strong: #474747;
+  --dm-text: #f2f2f2;
+  --dm-text-2: #bdbdbd;
+  --dm-text-3: #8f8f8f;
+  --dm-accent: #f2f2f2;
+  --dm-on-accent: #141414;
+  --dm-disabled: #7a7a7a;
+  --dm-success: #4ade80;
+  --dm-success-bg: rgb(34 197 94 / 0.14);
+  --dm-danger: #f87171;
+  --dm-insert: rgb(34 197 94 / 0.16);
+  --dm-warn: #fbbf24;
+  --dm-warn-bg: rgb(251 191 36 / 0.14);
+  --dm-shadow: 0 0.8em 2.4em -1em rgb(0 0 0 / 0.6);
+}
+/* Set --dm on a demo to change how big its UI reads. */
+.demo-root {
+  font-size: clamp(6px, calc(var(--dm, 2.6) * 1cqw), 16px);
+  line-height: 1.4;
   letter-spacing: 0;
   font-weight: 400;
   font-family: var(--font-ui), var(--font-sans);
+  color: var(--dm-text);
+}
+
+/* Full app screens (components/demos/pages.tsx): 1em = 1% of the canvas width,
+   so the app's own px ÷ 14.4 (its 1440 px layout) gives every size. */
+.screen-root {
+  font-size: 1cqw;
+  line-height: 1.4;
+  letter-spacing: 0;
+  font-weight: 400;
+  font-family: var(--font-ui), var(--font-sans);
+  color: var(--dm-text);
+}
+
+/* Hero illustrations (components/demos/hero.tsx): 1em = 4% of the frame's
+   width, no minimum, so they keep their proportions even in the small mobile frames. */
+.illus-root {
+  font-size: 4cqw;
+  line-height: 1.35;
+  font-weight: 400;
+  font-family: var(--font-ui), var(--font-sans);
+  color: var(--dm-text);
+}
+
+/* ── Settle ────────────────────────────────────────────────────────
+   Product pictures settle once when they come into view (ui/Settle.tsx sets
+   data-settled): marked parts start slightly lifted, a hair smaller and
+   transparent, and come to rest. Transitions, not keyframes, so nothing
+   restarts; transform and opacity only. */
+.settle [data-s] {
+  opacity: 0;
+  transform: translateY(var(--s-y, 0.6em)) scale(var(--s-scale, 0.985));
+  transition:
+    opacity 420ms ease-out,
+    transform 640ms var(--ease-calm);
+  transition-delay: calc(var(--s-delay, 0ms) + var(--i, 0) * 50ms);
+}
+.settle [data-s="drop"] {
+  --s-y: -0.4em;
+}
+.settle [data-s="pop"] {
+  --s-y: 0em;
+  --s-scale: 0.85;
+}
+.settle [data-s="fade"] {
+  --s-y: 0em;
+  --s-scale: 1;
+}
+.settle[data-settled] [data-s] {
+  opacity: 1;
+  transform: none;
+}
+
+/* ── Code ──────────────────────────────────────────────────────────
+   Highlighted code blocks (rehype-pretty-code + Shiki, next.config.ts): each
+   token carries both themes' colours as --shiki-light / --shiki-dark, and the
+   page theme picks one, so the D hotkey re-colours code at once. */
+pre code[data-theme] span {
+  color: var(--shiki-light);
+}
+[data-theme="dark"] pre code[data-theme] span {
+  color: var(--shiki-dark);
 }
 
 /* ── Marquee ───────────────────────────────────────────────────── */
@@ -362,5 +484,11 @@ body {
   .marquee-x,
   .marquee-y {
     animation: none;
+  }
+  /* Settle keeps a short fade, without movement or stagger. */
+  .settle [data-s] {
+    transform: none;
+    transition: opacity 200ms ease-out;
+    transition-delay: 0ms;
   }
 }

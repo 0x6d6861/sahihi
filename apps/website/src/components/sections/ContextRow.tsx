@@ -1,94 +1,85 @@
 import type { CSSProperties, ReactNode } from "react"
-import { Photo } from "@/components/mockups/parts"
 import { Reveal } from "@/components/ui/Reveal"
 import { Inset, Section } from "@/components/ui/Section"
-import { sampleApp, site } from "@/content/site"
+import { site } from "@/content/site"
 
-/** Four small cards whose contents drift past like marquees. */
+const keyword = "text-[#c2410c] dark:text-[#fb923c]"
+const tag = "text-[#1d4ed8] dark:text-[#93c5fd]"
+
+/** Four small cards whose contents drift past like marquees: the integration surfaces. */
 export function ContextRow() {
-  const [selection, designs, browser, code] = site.context.cards
+  const [api, webhooks, bulk, embed] = site.context.cards
   return (
     <Section className="pb-48">
       <Inset>
         <Reveal>
-          <h2 className="text-lede px-3">{site.context.headline}</h2>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 px-3">
+            <h2 className="text-lede">{site.context.headline}</h2>
+            <a
+              href={site.context.link.href}
+              className="text-caption underline decoration-1 underline-offset-4 transition-opacity hover:opacity-60"
+            >
+              {site.context.link.label} →
+            </a>
+          </div>
         </Reveal>
       </Inset>
       {/* Wider than the Inset column so four cards keep readable 20px captions. */}
       <div className="mx-auto mt-10 grid max-w-[1000px] grid-cols-1 gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
-        <ContextCard lead={selection.lead} text={selection.text}>
-          <MarqueeX duration="30s">
-            <ChipRows
-              rows={[
-                ["div.recipe-stats", "⧉ Larder redesign", "◍ localhost:3000"],
-                ["◍ Larder — Home", "h1.launch-headline", "◇ Button"],
-                ["◇ Chip", "▢ Year bar", "◍ Pricing"],
-              ]}
-            />
-          </MarqueeX>
-        </ContextCard>
-        <ContextCard lead={designs.lead} text={designs.text}>
-          <MarqueeX duration="36s">
-            <div className="flex flex-col gap-2">
-              {[0, 3].map((offset) => (
-                <div key={offset} className="flex gap-2">
-                  {sampleApp.items.slice(offset, offset + 3).map((it, i) => (
-                    <div
-                      key={it.title}
-                      className="flex w-[150px] shrink-0 items-center gap-2 rounded-xl bg-white px-2 dark:bg-white/[0.08] py-1.5 text-[11px] leading-tight"
-                    >
-                      <Photo colors={it.photo} className="!aspect-square w-7 shrink-0 rounded" />
-                      <span>
-                        Card · {["Photo", "Type", "Overlay"][i]}
-                        <br />
-                        <span className="text-muted">Larder redesign</span>
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </MarqueeX>
-        </ContextCard>
-        <ContextCard lead={browser.lead} text={browser.text}>
-          <MarqueeY duration="18s">
+        <ContextCard lead={api.lead} text={api.text}>
+          <MarqueeY duration="20s">
             {[
-              ["▶", "Start dev server", "localhost:3000"],
-              ["▤", "View open tabs", "localhost:3000"],
-              ["◎", "Screenshot tab", "localhost:3000"],
-              ["⧉", "Capture tab", "localhost:3000"],
-              ["◍", "Open URL", "example.com"],
-              ["↓", "Fetch URL", "example.com"],
-            ].map(([icon, verb, target]) => (
-              <p key={verb} className="flex gap-2 whitespace-nowrap py-1 text-[12px]">
-                <span className="text-muted">{icon}</span>
-                {verb}
-                <span className="text-faint">{target}</span>
+              ["POST", "/api/v1/documents?name=nda.pdf", "201"],
+              ["POST", "/api/v1/envelopes", "201"],
+              ["POST", "/api/v1/envelopes/:id/send", "200"],
+              ["GET", "/api/v1/envelopes/:id", "200"],
+              ["GET", "/api/v1/envelopes/:id/downloads", "200"],
+              ["GET", "/api/v1/templates", "200"],
+            ].map(([verb, path, code]) => (
+              <p key={path} className="flex gap-2 whitespace-nowrap py-1 font-mono text-[11px]">
+                <span className={verb === "POST" ? keyword : tag}>{verb}</span>
+                <span className="truncate">{path}</span>
+                <span className="ml-auto text-faint">{code}</span>
               </p>
             ))}
           </MarqueeY>
         </ContextCard>
-        <ContextCard lead={code.lead} text={code.text}>
+        <ContextCard lead={webhooks.lead} text={webhooks.text}>
+          <MarqueeX duration="30s">
+            <ChipRows
+              rows={[
+                ["envelope.sent", "recipient.signed", "envelope.completed"],
+                ["envelope.declined", "Sahihi-Signature: t=…,v1=…", "envelope.voided"],
+                ["envelope.expired", "HMAC-SHA256", "retries with backoff"],
+              ]}
+            />
+          </MarqueeX>
+        </ContextCard>
+        <ContextCard lead={bulk.lead} text={bulk.text}>
           <MarqueeY duration="24s">
-            <pre className="font-mono text-[10.5px] leading-[1.6] text-[#5b5b57] dark:text-[#a3a39e]">
-              <span className="text-[#c2410c] dark:text-[#fb923c]">export function</span>{" "}
-              RecipeCard({"{"} recipe {"}"}) {"{"}
-              {"\n"} <span className="text-[#c2410c] dark:text-[#fb923c]">return</span> ({"\n"} &lt;
-              <span className="text-[#1d4ed8] dark:text-[#93c5fd]">article</span>{" "}
-              className=&quot;flex flex-col&quot;&gt;
-              {"\n"} &lt;<span className="text-[#1d4ed8] dark:text-[#93c5fd]">img</span>{" "}
-              className=&quot;aspect-[4/3]&quot; /&gt;
-              {"\n"} &lt;<span className="text-[#1d4ed8] dark:text-[#93c5fd]">p</span>{" "}
-              className=&quot;line-clamp-3&quot;&gt;
-              {"\n"} {"{"}recipe.title{"}"}
-              {"\n"} &lt;/<span className="text-[#1d4ed8] dark:text-[#93c5fd]">p</span>&gt;
-              {"\n"} &lt;<span className="text-[#1d4ed8] dark:text-[#93c5fd]">Meta</span> {"{"}
-              ...recipe{"}"} /&gt;
-              {"\n"} &lt;/<span className="text-[#1d4ed8] dark:text-[#93c5fd]">article</span>&gt;
-              {"\n"} );
+            <pre className="font-mono text-[10.5px] leading-[1.7] text-muted">
+              <span className={tag}>{site.context.csv[0]}</span>
               {"\n"}
-              {"}"}
+              {site.context.csv.slice(1).join("\n")}
               {"\n"}
+            </pre>
+          </MarqueeY>
+        </ContextCard>
+        <ContextCard lead={embed.lead} text={embed.text}>
+          <MarqueeY duration="26s">
+            <pre className="font-mono text-[10.5px] leading-[1.6] text-muted">
+              &lt;<span className={tag}>iframe</span>
+              {"\n"} src=&quot;{"{"}signingUrl{"}"}&quot;
+              {"\n"} title=&quot;Sign&quot;
+              {"\n"}/&gt;
+              {"\n"}
+              {"\n"}
+              <span className={keyword}>window</span>.addEventListener(
+              {"\n"} &quot;message&quot;, (e) =&gt; {"{"}
+              {"\n"} <span className={keyword}>if</span> (e.data.type ===
+              {"\n"} &quot;sahihi:signed&quot;) done()
+              {"\n"} {"}"}
+              {"\n"}){"\n"}
             </pre>
           </MarqueeY>
         </ContextCard>

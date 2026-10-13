@@ -1,0 +1,237 @@
+export const metadata = {
+  title: "Developers — Sahihi",
+  description:
+    "The Sahihi public API, signed webhooks, bulk send and embedded signing: create, send and track envelopes from your own systems.",
+}
+
+# Developers.
+
+Send envelopes from your own systems, hear back the moment they change, and let people sign
+without leaving your site. Everything here uses the same rules as the app: plan limits, signing
+order, audit trail and certificates all behave the same way.
+
+- [Authentication](#authentication)
+- [Create and send an envelope](#create-and-send-an-envelope)
+- [Endpoints](#endpoints)
+- [Errors and limits](#errors-and-limits)
+- [Webhooks](#webhooks)
+- [Bulk send](#bulk-send)
+- [Embedded signing](#embedded-signing)
+
+## Authentication
+
+Owners and admins create API keys under **Settings → API**. A key belongs to the workspace and
+acts as the person who created it in the audit trail. It is shown **once**: Sahihi stores only a
+hash of it.
+
+Send it as a bearer token to `https://app.sahihi.co.ke/api/v1`:
+
+```http
+GET /api/v1
+Authorization: Bearer sahihi_sk_…
+```
+
+The answer names the workspace and the key's scopes. Give each key the fewest scopes it needs:
+
+- `documents:read`, `documents:write`: read and upload PDFs.
+- `templates:read`: list templates and their roles.
+- `envelopes:read`: list and read envelopes, download signed files, follow bulk sends.
+- `envelopes:write`: create, send and void envelopes, start bulk sends, issue embedded signing links.
+
+Keys can expire after 30, 90 or 365 days, or never. Revoking one takes effect at once. A workspace
+can hold up to 20 active keys.
+
+## Create and send an envelope
+
+**1. Upload the PDF.** The body is the file itself, up to 25 MB.
+
+```bash
+curl -X POST "https://app.sahihi.co.ke/api/v1/documents?name=nda.pdf" \
+  -H "Authorization: Bearer $SAHIHI_KEY" \
+  -H "Content-Type: application/pdf" \
+  --data-binary @nda.pdf
+```
+
+**2. Create the envelope** with its recipients and fields, and send it in the same call.
+Fields point at recipients by their position in the list. Positions are fractions of the page,
+from its top-left corner, so `x: 0.1` is 10% in from the left edge.
+
+```json
+{
+  "documentId": "doc_…",
+  "title": "Mutual NDA — Kilima Agro",
+  "message": "Baraka, here is the NDA we discussed.",
+  "signingOrder": "PARALLEL",
+  "recipients": [
+    { "name": "Achieng Otieno", "email": "achieng@tanafreight.co.ke" },
+    {
+      "name": "Baraka Mwangi",
+      "email": "baraka@kilimaagro.co.ke",
+      "verification": "EMAIL_OTP"
+    }
+  ],
+  "fields": [
+    { "recipient": 0, "type": "SIGNATURE", "page": 3,
+      "x": 0.08, "y": 0.62, "width": 0.36, "height": 0.08 },
+    { "recipient": 1, "type": "SIGNATURE", "page": 3,
+      "x": 0.56, "y": 0.62, "width": 0.36, "height": 0.08 },
+    { "recipient": 1, "type": "DATE_SIGNED", "page": 3,
+      "x": 0.56, "y": 0.73, "width": 0.28, "height": 0.04 }
+  ],
+  "send": true
+}
+```
+
+`POST` it to `/api/v1/envelopes`. Each signer gets their own link by email. Field types are
+`SIGNATURE`, `INITIALS`, `DATE_SIGNED`, `NAME`, `EMAIL`, `TEXT` and `CHECKBOX`. Verification is
+`LINK` (the default), `EMAIL_OTP`, or `SMS_OTP` with a `phone` in international format.
+
+Send up to 10 documents in one envelope with `documentIds` instead of `documentId`; a field's
+`document` is then its index in that list. To start from a template instead, pass `templateId`
+and give each role from `GET /templates` a person: `{ "roleId": "…", "name": "…", "email": "…" }`.
+
+**3. Collect the result.** When everyone has signed, `GET /api/v1/envelopes/:id/downloads` returns
+short-lived links to the signed PDF and the Certificate of Completion. Don't poll for this: listen
+for the `envelope.completed` webhook.
+
+## Endpoints
+
+All paths are under `/api/v1`.
+
+- `GET /` — the workspace and this key's scopes.
+- `POST /documents?name=…` — upload a PDF (`documents:write`).
+- `GET /documents/:id` — a document (`documents:read`).
+- `GET /templates` — templates with their roles (`templates:read`).
+- `GET /envelopes?status=&page=` — envelopes, 50 a page (`envelopes:read`).
+- `POST /envelopes` — create from a document or a template; `send: true` sends it (`envelopes:write`).
+- `GET /envelopes/:id` — an envelope with its documents, recipients and their status (`envelopes:read`).
+- `POST /envelopes/:id/send` — send a draft (`envelopes:write`).
+- `POST /envelopes/:id/void` — void with `{ "reason": "…" }` (`envelopes:write`).
+- `GET /envelopes/:id/downloads` — the signed PDF and certificate, once completed (`envelopes:read`).
+- `POST /bulk-sends`, `GET /bulk-sends/:id` — [bulk send](#bulk-send).
+- `POST /envelopes/:id/recipients/:recipientId/signing-url` — [embedded signing](#embedded-signing).
+
+## Errors and limits
+
+Errors are JSON, `{ "error": "<code>", "message": "…" }`, with `issues` listing each problem when
+the request body doesn't validate.
+
+- `401` — the key is missing, revoked or expired.
+- `403 insufficient_scope` — the key lacks the scope the route needs.
+- `404` — not found, or it belongs to another workspace.
+- `402 quota_exceeded` — this month's envelopes on your plan are used up.
+- `409` — not possible in the envelope's current state, such as sending one that's already sent.
+- `429` — too many requests: 600 a minute per key.
+
+There are no idempotency keys yet: if a `POST` fails, check `GET /envelopes` before you retry.
+
+## Webhooks
+
+Add an HTTPS endpoint under **Settings → API → Webhooks** and pick its events. Sahihi sends a
+signed JSON `POST` whenever one happens:
+
+- `envelope.sent` — the envelope went out.
+- `recipient.signed` — a recipient signed (`data.recipientId` says who).
+- `envelope.completed` — everyone signed **and** the signed PDF and certificate are ready.
+- `envelope.declined` — a recipient declined.
+- `envelope.voided` — the sender voided it.
+- `envelope.expired` — it expired unsigned.
+
+```http
+POST /your/webhook
+Content-Type: application/json
+Sahihi-Signature: t=1790665107,v1=d590…
+Sahihi-Event-Id: evt_95bd8128835e4f25813f4a652df2d788
+Sahihi-Event-Type: envelope.completed
+
+{
+  "id": "evt_95bd8128835e4f25813f4a652df2d788",
+  "type": "envelope.completed",
+  "createdAt": "2026-10-13T08:48:12.193Z",
+  "data": {
+    "envelope": {
+      "id": "…",
+      "title": "Mutual NDA — Kilima Agro",
+      "status": "COMPLETED",
+      "documents": [{ "id": "…", "name": "…", "sha256": "…", "signedSha256": "…" }],
+      "recipients": [{ "id": "…", "name": "…", "status": "SIGNED", "signedAt": "…" }],
+      "certificateCode": "5XV2-MEVQ-Q84C"
+    }
+  }
+}
+```
+
+**Verify every request** before you trust it. `v1` is the hex HMAC-SHA256 of `"<t>.<raw body>"`,
+keyed with the endpoint's signing secret (`whsec_…`, shown once). Check it against the raw body,
+before parsing, and refuse timestamps more than five minutes old:
+
+```ts
+import { createHmac, timingSafeEqual } from "node:crypto"
+
+export function verify(header: string, rawBody: string, secret: string) {
+  const parts = Object.fromEntries(header.split(",").map((p) => p.split("=")))
+  const t = Number(parts.t)
+  if (!t || Math.abs(Date.now() / 1000 - t) > 300) return false
+  const expected = createHmac("sha256", secret).update(`${t}.${rawBody}`).digest("hex")
+  const given = Buffer.from(parts.v1 ?? "", "hex")
+  return given.length === 32 && timingSafeEqual(given, Buffer.from(expected, "hex"))
+}
+```
+
+Answer with any `2xx` within 10 seconds and do slow work afterwards. A failed delivery is retried
+with growing gaps (30 seconds, 2 minutes, 8 minutes, then up to every 6 hours) for about two
+days, with the same event `id` each time, so use it to ignore duplicates. Endpoints must be public
+`https://` addresses; Sahihi doesn't follow redirects.
+
+## Bulk send
+
+One template, many people, one envelope each. `POST /api/v1/bulk-sends` with up to 500 rows; the
+title can use each role's name and email:
+
+```json
+{
+  "templateId": "tpl_…",
+  "title": "IT acceptable use policy — {{Employee name}}",
+  "rows": [
+    { "recipients": [
+      { "roleId": "role_…", "name": "Njeri Wambui", "email": "njeri@tanafreight.co.ke" }
+    ] },
+    { "recipients": [
+      { "roleId": "role_…", "name": "Juma Ochieng", "email": "juma@tanafreight.co.ke" }
+    ] }
+  ]
+}
+```
+
+Every row is checked first; if any is invalid, nothing is sent and the response lists each
+problem. A batch bigger than what's left of this month's plan is refused up front. Follow it with
+`GET /api/v1/bulk-sends/:id`, and the usual webhooks fire for each envelope.
+
+## Embedded signing
+
+Let people sign inside your own site. List your site's origins under **Settings → API → Embedded
+signing**, then create the envelope with that recipient's `"delivery": "EMBEDDED"`. They get no
+email; when they're on your page, your **server** asks for a link:
+
+```http
+POST /api/v1/envelopes/:id/recipients/:recipientId/signing-url
+→ 201 { "url": "https://app.sahihi.co.ke/sign/…?embed=1", "expiresAt": "…" }
+```
+
+Each call issues a new link (valid 30 minutes) and cancels the previous one, so ask right before
+you show it. Put it in an iframe and listen for its messages:
+
+```js
+window.addEventListener("message", (event) => {
+  if (event.origin !== "https://app.sahihi.co.ke") return
+  // event.data.type: "sahihi:ready" | "sahihi:signed" | "sahihi:declined"
+})
+```
+
+Treat those messages as hints for your interface, and confirm the outcome with the
+`recipient.signed` webhook or `GET /api/v1/envelopes/:id`. The signing page can only be framed by
+the origins you listed, and only for embedded recipients.
+
+---
+
+Something missing? Write to [hello@sahihi.co.ke](mailto:hello@sahihi.co.ke).

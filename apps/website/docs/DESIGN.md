@@ -1,6 +1,6 @@
 # Design system
 
-The page should feel like a gallery or a hardware catalogue: one neutral off-white surface, large tight type, almost no colour, and product UI that sits in polished-metal frames. Colour comes only from the "photos" inside the mockups.
+The page should feel like a gallery or a hardware catalogue: one neutral off-white surface, large tight type, almost no colour, and the product itself, rebuilt in code, sitting in polished-metal frames. Colour comes only from inside the product UI.
 
 All tokens are defined in `src/app/globals.css`. If a value you need isn't here, add a token rather than hard-coding it in a section.
 
@@ -23,10 +23,10 @@ The page follows the visitor's system setting until they press **D**, which togg
 | line | `#2a2a2a` |
 
 Rules:
-- **Mockups stay light.** `.mockup` (every `ChromeFrame` and demo panel) re-declares the light token values, because mockup text uses the tokens and would turn white on the light screens. They read as screenshots of a light app. If you change a light token, change its copy in that `.mockup` block too.
+- **Demos follow the theme** through the `--dm-*` palette on `.demo` (copied from Arc's neutral tokens, redefined under `[data-theme="dark"] .demo`). Use `bg-(--dm-card)`, `text-(--dm-text-2)` and the rest inside demos, not the page tokens; PDF paper stays white.
 - The chrome bezel and metal icons are unchanged; silver reads well on dark.
 - `bg-ink text-paper` (the featured pricing CTA) inverts on its own. Use `hover:bg-ink/80`, not `hover:bg-black/…`.
-- Any literal colour outside a mockup needs a `dark:` variant, as on the context-card chips and code colours in `ContextRow.tsx`.
+- Any literal colour outside the product UI needs a `dark:` variant, as on the context-card chips and code colours in `ContextRow.tsx`.
 - Under `prefers-contrast: more`, the raised greys are white in dark mode too (a separate block in `globals.css`).
 
 | Token | Value | Looks like on paper | Tailwind | Used for |
@@ -34,18 +34,16 @@ Rules:
 | paper | `#f9f9f9` | — | `bg-paper` | Page background, everywhere, with no exceptions (`#111111` in dark mode) |
 | ink | `rgb(0 0 0 / 0.96)` | `#0a0a0a` | `text-ink` / `bg-ink` | Primary text, the one dark button (featured pricing CTA) |
 | muted | `rgb(0 0 0 / 0.55)` | `#707070` | `text-muted` | Secondary text: subtitles, the grey half of captions, process lines, plan details, mono labels |
-| faint | `rgb(0 0 0 / 0.36)` | `#9f9f9f` | `text-faint` | Eyebrows ("Design canvas"), list dashes |
-| ghost | `rgb(0 0 0 / 0.19)` | `#c9c9c9` | `text-ghost` | The big "Canvas. Browser. Agent." stack only |
+| faint | `rgb(0 0 0 / 0.36)` | `#9f9f9f` | `text-faint` | Eyebrows ("Drafting assistant"), list dashes |
+| ghost | `rgb(0 0 0 / 0.19)` | `#c9c9c9` | `text-ghost` | The big "Draft. Send. Prove." stack only |
 | panel | `#efefef` | — | `bg-panel` | Demo panels, quote cards, pricing cards, provider cards |
 | pill | `#ebebeb` → hover `#e0e0e0` | — | `bg-pill` | Primary button |
 | pill-raised | `#e3e3e3` → hover `#d9d9d9` | — | `bg-pill-raised` | A grey button on a `bg-panel` card (non-featured pricing CTA) |
 | line | `#e3e3e3` | — | `border-line` | FAQ separators, the only hairlines on the page |
-| select | `#3b82f6` | — | `outline-select` | "Selected" outlines inside mockups |
 
 Rules:
 - Never put a coloured background on a section.
 - Never use a brand-coloured button. The primary button is grey, and only the featured pricing CTA is ink.
-- Inside mockups, the sample-app colours come from `sampleApp.categories` and `item.photo`.
 
 ## Typography
 
@@ -53,8 +51,8 @@ There are three faces, self-hosted from npm packages and loaded with `next/font/
 
 | Variable | Face | Role |
 |---|---|---|
-| `--font-display` → `font-sans` | **Geist** 400/500/600 | Everything outside mockups |
-| `--font-ui` | Inter | Text inside mockups (`.mockup-root`, weight 400) |
+| `--font-display` → `font-sans` | **Geist** 400/500/600 | Everything outside the product UI |
+| `--font-ui` | Inter | Text inside the product UI (`.demo-root`, `.screen-root`, weight 400), as in the app |
 | `--font-mono-face` → `font-mono` | Geist Mono | Pillar labels, code |
 
 subframe.com uses PP Neue Montreal (a licensed font) for display, PP Neue Montreal Mono for labels, and OT Neue Montreal Semi Squeezed for prices. Geist stands in for all three. To use Neue Montreal, load it with `next/font/local` into `--font-display`; the sizes below were taken from it and need no change.
@@ -64,19 +62,18 @@ subframe.com uses PP Neue Montreal (a licensed font) for display, PP Neue Montre
 - **Ink text is medium (500).** `body` sets `font-weight: 500`, so headlines, body paragraphs, eyebrows, caption leads, nav links and buttons are all 500.
 - **Grey text is regular (400).** Anything `text-muted` gets `font-normal` beside it: subtitles, the grey half of captions, process lines, plan details, FAQ answers, the footer.
 - Prices are 400.
-- Mockups are 400 (set on `.mockup-root`).
 - Don't use 600/700 outside the header wordmark.
 
 ### Type scale
 
-Sizes are **stepped, not fluid**: one size below 768px and one from 768px up, matching subframe.com's computed styles. They are defined as `@utility` classes in `globals.css`. Values below are size/line-height in px at the default 16px root. The CSS is written in `rem` (px ÷ 16) so visitors who raise their browser's default font size get larger text. Write new text sizes in `rem` too. The exception is mockups and the fixed-size context-card tiles, whose contents must keep their proportions.
+Sizes are **stepped, not fluid**: one size below 768px and one from 768px up, matching subframe.com's computed styles. They are defined as `@utility` classes in `globals.css`. Values below are size/line-height in px at the default 16px root. The CSS is written in `rem` (px ÷ 16) so visitors who raise their browser's default font size get larger text. Write new text sizes in `rem` too. The exception is the fixed-size context-card tiles, whose contents must keep their proportions.
 
 | Class | Mobile | ≥ 768px | Tracking | Weight | Use |
 |---|---|---|---|---|---|
 | `text-display` | 48/44 | 96/88 | -0.035em | 500 | Hero h1, process headline |
 | `text-headline` | 44/44 | 88/88 | -0.035em | 500 | Chapter headlines, the pillar stack |
-| `text-title` | 40/40 | 64/64 | -0.035em | 500 | Testimonials, Pricing, FAQ headlines |
-| `text-quote` | 32/36 | 48/52 | -0.03em | 500 | Testimonial quotes |
+| `text-title` | 40/40 | 64/64 | -0.035em | 500 | Trust, Pricing, FAQ headlines |
+| `text-quote` | 32/36 | 48/52 | -0.03em | 500 | Trust facts |
 | `text-numeral` | 112/112 | 184/184 | -0.035em | 500 | Process numbers 1–4. Keep line-height equal to font size; shorter clips the glyph |
 | `text-step` | 24/28 | 28/32 | -0.06px | 500 | Process step titles |
 | `text-price` | 64/64 | 96/96 | -0.035em | 400 | Plan prices |
@@ -86,14 +83,14 @@ Sizes are **stepped, not fluid**: one size below 768px and one from 768px up, ma
 | `text-eyebrow` | 24/28 | 28/32 | -0.02em | 500, faint | Label above a chapter headline |
 | `text-nav` | 18/18 | 24/24 | -0.01em | 500 | Header links |
 | `text-button` | 18/22 | 20/24 | -0.01em | 500 | Button and CTA labels |
-| `text-label` | 14/20 mono | same | 0.18em, uppercase | 400, muted | Device labels such as "CANVAS" |
+| `text-label` | 14/20 mono | same | 0.18em, uppercase | 400, muted | Device labels such as "DRAFT" |
 
 "context" in the Weight column means the class sets no weight: ink text inherits 500, and grey text adds `font-normal`.
 
 Rules:
 - **Headlines end with a period.** "Pricing." and "FAQ." do too.
 - Headlines that wrap get a manual line break (copy stores them as `[line1, line2]`). Don't rely on automatic wrapping for display sizes.
-- Use the scale classes. Don't add `text-[NNpx]` outside mockups and the header wordmark.
+- Use the scale classes. Don't add `text-[NNpx]` outside the context cards and the header wordmark; demos size in `em`.
 
 ### The caption pattern
 
@@ -108,11 +105,11 @@ Smaller variants (feature grid, context cards) use the same pattern with `text-c
 
 ## Layout
 
-- **Content width:** `<Section>` gives `max-w-[1120px]` with `px-4 sm:px-8`. `<Inset>` gives a narrower `max-w-[860px]` column for headlines and copy, so text sits indented relative to the wide mockups. This matches the original.
+- **Content width:** `<Section>` gives `max-w-[1120px]` with `px-4 sm:px-8`. `<Inset>` gives a narrower `max-w-[860px]` column for headlines and copy, so text sits indented relative to the wide app screens. This matches the original.
 - **Space between sections:** `pb-48` (192px). Sections never have borders or backgrounds.
 - **Wider grids:** the Process steps (`max-w-[1024px]`) and the context cards (`max-w-[1000px]`) break out of `Inset` so their larger text doesn't wrap word by word.
 - **Radii:** demo and quote panels use 28–32px, buttons 16px (`rounded-2xl`), context cards 24px (`rounded-3xl`).
-- **Grids:** demos use `sm:grid-cols-2`, with `wide: true` spanning both columns. Features use 1 → 2 → 3 columns. Testimonials use a 12-column bento at `md`.
+- **Grids:** demos use `sm:grid-cols-2`, with `wide: true` spanning both columns. Features use 1 → 2 → 3 columns. Trust facts use a 12-column bento at `md`.
 
 ## Components
 
@@ -123,6 +120,7 @@ Smaller variants (feature grid, context cards) use the same pattern with `text-c
 | `ArrowLink` | `ui/Button.tsx` | Secondary action: text plus an arrow that nudges right on hover. |
 | `Caption` | `ui/Caption.tsx` | The caption pattern above. |
 | `Reveal` | `ui/Reveal.tsx` | One-shot fade-and-rise (12px, 450ms, `ease-calm`) when the block enters the viewport. Takes an optional `delay` for staggering. |
+| `Settle` | `ui/Settle.tsx` + `ui/settleMarks.ts` | One-shot settle inside a product picture: parts marked with `s(i, delay, kind)` come to rest when the picture is 35% in view (PRODUCT_UI.md → Settle). |
 | `Section` / `Inset` | `ui/Section.tsx` | Content widths (see Layout). |
 | `MetalIcon` / `MetalDefs` | `icons/MetalIcons.tsx` | Six SVG "steel object" icons: compass, ruler, knob, puck, loupe, slider. |
 
@@ -134,7 +132,7 @@ Smaller variants (feature grid, context cards) use the same pattern with `text-c
 - The screen's radius is the bezel radius minus its padding, so the inner and outer curves stay concentric. Keep that relationship if you change either value.
 - The screen has a 1px dark inner ring and a 2px light inner ring, which give the glass edge.
 
-Use the bezel for: the hero frames, the merged window, and each chapter's main mockup. Don't use it for demo panels; those are flat `bg-panel` rounded rectangles.
+Use the bezel for the merged window and each chapter's main app screen. The hero's three small illustration frames use the **quiet frame** instead (`<ChromeFrame quiet>`, `.bezel-quiet`): no metal, just a hairline ring, a soft drop shadow and the same radius, so the illustrations stay light and the metal is saved for the full screens. Don't use either for demo panels; those are flat `bg-panel` rounded rectangles.
 
 ### Icons
 
@@ -145,6 +143,7 @@ Feature icons are metal objects, not line icons. They are 80×80 SVGs filled wit
 | Pattern | Spec |
 |---|---|
 | Section entry | `Reveal`: opacity 0→1, y `distance`→0 (default 12px; Process steps use 16px), 450ms, `cubic-bezier(0.22,1,0.36,1)`, once, triggered at 10% from the bottom of the viewport. With reduced motion it fades without moving. |
+| Picture settle | `Settle`: marked parts go from `translateY(0.6em) scale(0.985)`, opacity 0 to rest; transform 640ms `ease-calm`, opacity 420ms ease-out, 50ms stagger, CSS transitions toggled once by `data-settled`. Kinds: `lift`, `drop` (−0.4em), `pop` (scale 0.85), `fade`. Reduced motion: a 200ms fade, no movement or stagger. Never on the hero's merged window (it is scrubbed). |
 | Stagger | `delay = index * 0.05–0.08s`, wrapping per row (`i % 3`). `Reveal` ignores the delay below `md` and under reduced motion: on one column each item enters alone, so a delay is only lag. |
 | Hover | Buttons darken one step; the arrow moves 2px. No scale bounces, no springs. |
 | Press | Buttons and the arrow link scale to 0.97 on `:active` (`active:scale-[0.97]`, 150ms ease-out). Add it to any new button. |
@@ -155,7 +154,7 @@ Only `transform` and `opacity` may be animated, by scroll or otherwise.
 
 ## Accessibility
 
-- Mockups are decorative. Wrap new ones so screen readers skip them: add `aria-hidden` on the `ChromeFrame` or demo panel if you add any interactive-looking text.
+- The product UI is `aria-hidden` (captions carry the meaning); the hero frames and merged window are also `pointer-events-none`.
 - Icons are `aria-hidden`.
 - Duplicated marquee content is `aria-hidden`.
 - The FAQ uses `<button aria-expanded aria-controls>` inside `<h3>`, with each answer a `role="region"` labelled by its question. See PAGE_SPEC §9 for why it is not `<details>`.

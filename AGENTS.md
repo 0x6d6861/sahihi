@@ -91,8 +91,9 @@ bun run lint               # biome check
 ```
 
 **Definition of done** for any change: `bun test`, `bun run typecheck` and `bun run lint` all pass,
-the relevant doc in `docs/` is updated if behaviour changed, and the matching checkbox in
-`docs/roadmap.md` is ticked.
+the relevant doc in `docs/` is updated if behaviour changed, the matching checkbox in
+`docs/roadmap.md` is ticked, and **the marketing site is updated if the change is something a
+customer would notice** (see "Keep the website in step").
 
 ## Golden rules (non-negotiable)
 
@@ -185,6 +186,7 @@ the relevant doc in `docs/` is updated if behaviour changed, and the matching ch
 | Any screen or component | `docs/ui.md` |
 | Writing tests | `docs/testing.md` |
 | Why things are the way they are | `docs/decisions/` |
+| The marketing site (copy, coded app screens, developer docs) | `apps/website/AGENTS.md`, then its `docs/` |
 
 ## Workflow for agents
 
@@ -194,7 +196,36 @@ the relevant doc in `docs/` is updated if behaviour changed, and the matching ch
 3. Make a small, focused change and add or adjust tests.
 4. Run `bun test && bun run typecheck && bun run lint`.
 5. Tick the roadmap checkbox and update docs if behaviour changed.
-6. If you made a non-obvious design choice, add an ADR (`docs/decisions/NNNN-title.md`, see the template).
+6. **Update the website** (`apps/website`) when the change adds or changes something customers see:
+   see "Keep the website in step" below. Skip it for internal work (refactors, tests, tooling).
+7. If you made a non-obvious design choice, add an ADR (`docs/decisions/NNNN-title.md`, see the template).
+
+## Keep the website in step
+
+The marketing site describes the product, so a new or changed feature usually means a website
+change in the same piece of work. Find what the feature touches and update it:
+
+| The change | Update on the site |
+|---|---|
+| A new capability, or a changed one (drafting, sending, signing, verifying, templates, inbox…) | Copy in `apps/website/src/content/site.ts`: the chapter (`chapters[]`: body, demo captions, features), `process`, `faq`, `trust` |
+| A screen or card the site shows looks or behaves differently | The coded screen or demo in `apps/website/src/components/demos/` (and `sample` in `site.ts`), matched against fresh captures from `bun run --filter @sahihi/e2e showcase` (apps/website/docs/PRODUCT_UI.md) |
+| Plans, limits or prices (`packages/core/src/workspace/billing.ts`) | `site.pricing` and the pricing footnote |
+| Public API, webhooks, bulk send, embedded signing, API keys | `apps/website/src/app/(pages)/developers/page.mdx` |
+| Security, certificates, verification, retention, data handling | `apps/website/src/app/(pages)/security/page.mdx`, and `privacy/page.mdx` if what is collected or who processes it changed |
+| Something the site says is "on the way" ships (e.g. CA-backed signatures) | Change it to present tense wherever it appears (FAQ, security page, developers page) |
+| A feature is removed or narrowed | Remove or correct every claim about it |
+
+Rules:
+- **Only claims that are true today**, checked against the code and `docs/` (apps/website/docs/CONTENT.md
+  → Claims). Never describe roadmap work as shipped. New legal statements need the user's review:
+  say so in your summary.
+- Follow the site's own rules (`apps/website/AGENTS.md`): copy in `site.ts` or the MDX pages, its
+  voice, its type scale, transform/opacity-only motion.
+- Run its gate when you touch it: from `apps/website`, `bun run typecheck`, `bun run build`, then
+  `bun run start &` and `bun run shots`, and look at the shots you affected in both themes.
+- If a change should reach the site but you're not sure how to present it (a new section, a new
+  page), make the factual updates you can and list the open question in your summary rather than
+  inventing a section.
 
 ## Gotchas
 

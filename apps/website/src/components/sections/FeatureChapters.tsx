@@ -1,38 +1,58 @@
 import type { ReactNode } from "react"
-import { MetalDefs, MetalIcon, type MetalIconName } from "@/components/icons/MetalIcons"
+import { DraftingScreen, EditorScreen, EnvelopeScreen, Screen } from "@/components/demos/pages"
 import {
-  AgentBuildChat,
-  AgentBuildWindow,
-  AgentDesignChat,
-  BrowserWindow,
-  CanvasEditor,
-  CaptureDemo,
-  CommentsDemo,
-  ExplorationsDemo,
-  InspectDemo,
-  PinDemo,
-} from "@/components/mockups/screens"
+  AuditDemo,
+  OtpDemo,
+  ProposalDemo,
+  QuestionsDemo,
+  RoutingDemo,
+  SignersDemo,
+  SigningDemo,
+  VerifyDemo,
+} from "@/components/demos/screens"
+import { MetalDefs, MetalIcon, type MetalIconName } from "@/components/icons/MetalIcons"
 import { Caption } from "@/components/ui/Caption"
 import { ChromeFrame } from "@/components/ui/ChromeFrame"
 import { Reveal } from "@/components/ui/Reveal"
 import { Inset, Section } from "@/components/ui/Section"
+import { Settle } from "@/components/ui/Settle"
 import { site } from "@/content/site"
 
-const mainMockup: Record<string, ReactNode> = {
-  canvas: <CanvasEditor />,
-  browser: <BrowserWindow />,
-  agent: <AgentBuildWindow />,
+/** Each chapter's main picture: a full app screen, coded to match the real one. */
+const mainScreen: Record<string, ReactNode> = {
+  draft: (
+    <Settle>
+      <Screen>
+        <DraftingScreen />
+      </Screen>
+    </Settle>
+  ),
+  send: (
+    <Settle>
+      <Screen>
+        <EditorScreen />
+      </Screen>
+    </Settle>
+  ),
+  prove: (
+    <Settle>
+      <Screen>
+        <EnvelopeScreen />
+      </Screen>
+    </Settle>
+  ),
 }
 
-/** Demo kind → mockup and its panel aspect ratio. */
+/** Demo kind → its coded demo (components/demos) and the panel's aspect ratio. */
 const demos: Record<string, { node: ReactNode; aspect: string }> = {
-  explorations: { node: <ExplorationsDemo />, aspect: "16/9" },
-  comments: { node: <CommentsDemo />, aspect: "16/9" },
-  capture: { node: <CaptureDemo />, aspect: "16/9" },
-  inspect: { node: <InspectDemo />, aspect: "4/3" },
-  pin: { node: <PinDemo />, aspect: "4/3" },
-  "agent-build": { node: <AgentBuildChat />, aspect: "5/4.6" },
-  "agent-design": { node: <AgentDesignChat />, aspect: "5/4.6" },
+  questions: { node: <QuestionsDemo />, aspect: "16/9" },
+  proposal: { node: <ProposalDemo />, aspect: "4/3" },
+  signers: { node: <SignersDemo />, aspect: "4/3" },
+  signing: { node: <SigningDemo />, aspect: "16/9" },
+  otp: { node: <OtpDemo />, aspect: "4/3" },
+  routing: { node: <RoutingDemo />, aspect: "4/3" },
+  verify: { node: <VerifyDemo />, aspect: "4/3" },
+  audit: { node: <AuditDemo />, aspect: "4/3" },
 }
 
 type Demo = { kind: string; lead: string; text: string; wide?: boolean }
@@ -57,7 +77,7 @@ export function FeatureChapters() {
             </Inset>
 
             <Reveal className="mt-14">
-              <ChromeFrame aspect="16/10.4">{mainMockup[ch.id]}</ChromeFrame>
+              <ChromeFrame aspect="16/10">{mainScreen[ch.id]}</ChromeFrame>
             </Reveal>
 
             <Inset>
@@ -99,8 +119,13 @@ export function FeatureChapters() {
 
 function DemoPanel({ aspect, children }: { aspect: string; children: ReactNode }) {
   return (
-    <div className="mockup overflow-hidden rounded-[28px] bg-panel" style={{ aspectRatio: aspect }}>
-      {children}
+    // A picture of the product, not part of the page's content: screen readers skip it.
+    <div
+      aria-hidden
+      className="demo relative overflow-hidden rounded-[28px] bg-panel"
+      style={{ aspectRatio: aspect }}
+    >
+      <Settle>{children}</Settle>
     </div>
   )
 }

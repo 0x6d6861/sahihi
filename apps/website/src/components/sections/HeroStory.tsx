@@ -2,7 +2,8 @@
 
 import { type MotionValue, motion, useScroll, useTransform } from "motion/react"
 import { type ReactNode, useRef } from "react"
-import { AgentScreen, AppWindow, BrowserScreen, CanvasScreen } from "@/components/mockups/screens"
+import { HeroDraft, HeroProve, HeroSend } from "@/components/demos/hero"
+import { FilesScreen, Screen } from "@/components/demos/pages"
 import { ArrowLink, PillButton } from "@/components/ui/Button"
 import { ChromeFrame } from "@/components/ui/ChromeFrame"
 import { useSafeReducedMotion } from "@/components/ui/useSafeReducedMotion"
@@ -19,24 +20,24 @@ import { site } from "@/content/site"
 
 const frames = [
   {
-    key: "canvas",
-    screen: <CanvasScreen />,
+    key: "draft",
+    screen: <HeroDraft />,
     aspect: "1.1/1",
     pos: "left-[7%] top-[26%] w-[32%] md:left-[14%] md:top-[12%] md:w-[25%]",
     rotate: [-8, -4],
     shift: ["0vw", "16vw"],
   },
   {
-    key: "browser",
-    screen: <BrowserScreen />,
+    key: "send",
+    screen: <HeroSend />,
     aspect: "1.05/1",
     pos: "left-[35%] top-[16%] w-[30%] md:left-[40%] md:top-[6%] md:w-[20%]",
     rotate: [3, 1],
     shift: ["0vw", "0vw"],
   },
   {
-    key: "agent",
-    screen: <AgentScreen />,
+    key: "prove",
+    screen: <HeroProve />,
     aspect: "0.95/1",
     pos: "left-[61%] top-[28%] w-[32%] md:left-[62%] md:top-[15%] md:w-[21%]",
     rotate: [9, 4],
@@ -81,7 +82,9 @@ function AnimatedHero() {
           className="pointer-events-none absolute left-1/2 top-1/2 w-[min(94vw,1120px)] -translate-x-1/2 -translate-y-[46%] will-change-transform"
         >
           <ChromeFrame aspect="16/10">
-            <AppWindow />
+            <Screen>
+              <FilesScreen />
+            </Screen>
           </ChromeFrame>
         </motion.div>
 
@@ -117,7 +120,9 @@ function Frame({
       style={{ rotate, x, y, scale }}
       className={`absolute will-change-transform ${f.pos}`}
     >
-      <ChromeFrame aspect={f.aspect}>{f.screen}</ChromeFrame>
+      <ChromeFrame aspect={f.aspect} quiet>
+        {f.screen}
+      </ChromeFrame>
       <motion.p style={{ opacity: labelOpacity }} className="text-label mt-3 text-center">
         {label}
       </motion.p>
@@ -142,8 +147,6 @@ function HeroCopy() {
         <ArrowLink href={site.cta.secondary.href}>{site.cta.secondary.label}</ArrowLink>
       </div>
       <p className="mt-5 flex items-center gap-2 text-[1rem] font-normal leading-6 text-muted md:text-[1.125rem]">
-        <span className="size-3 rounded-full bg-[conic-gradient(#e46b3a,#f6b26b,#e46b3a)]" />
-        <span className="size-3 rounded-full bg-[conic-gradient(#6b7cf6,#a5b4fc,#6b7cf6)]" />
         {site.hero.worksWith}
       </p>
     </>
@@ -161,7 +164,9 @@ function StaticHero() {
             className={`absolute ${f.pos.replace(/top-\[[^\]]+\]/g, "top-0")}`}
             style={{ rotate: `${f.rotate[1]}deg` }}
           >
-            <ChromeFrame aspect={f.aspect}>{f.screen}</ChromeFrame>
+            <ChromeFrame aspect={f.aspect} quiet>
+              {f.screen}
+            </ChromeFrame>
             <p className="text-label mt-3 text-center">{site.pillars[i]}</p>
           </div>
         ))}
@@ -171,7 +176,9 @@ function StaticHero() {
       </div>
       <Wide>
         <ChromeFrame aspect="16/10">
-          <AppWindow />
+          <Screen>
+            <FilesScreen />
+          </Screen>
         </ChromeFrame>
       </Wide>
     </div>

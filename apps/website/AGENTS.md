@@ -8,9 +8,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
-# Agent guide: craft-landing-starter
+# Agent guide: Sahihi website
 
-A single-page, fully static marketing site. It is quiet, near-monochrome and product-led, modelled on the layout of subframe.com. Read this file first, then the doc for the area you are changing.
+The fully static marketing site for Sahihi, the e-signature product in this monorepo: a landing page plus MDX developer, security, privacy and terms pages. It is quiet, near-monochrome and product-led, modelled on the layout of subframe.com, with coded recreations of the Sahihi app (no screenshots). Read this file first, then the doc for the area you are changing.
+
+**The site follows the product.** When a feature in the app is added, changed or removed, the matching copy, coded screen, pricing, `/developers` or `/security` content changes with it, in the same piece of work. The map from kind of change to place on the site is in the root `AGENTS.md` → "Keep the website in step".
 
 ## Docs map
 
@@ -20,7 +22,7 @@ A single-page, fully static marketing site. It is quiet, near-monochrome and pro
 | [docs/DESIGN.md](docs/DESIGN.md) | touching colour, type, spacing, buttons, panels, the chrome bezel or icons |
 | [docs/PAGE_SPEC.md](docs/PAGE_SPEC.md) | adding, changing or reordering a section |
 | [docs/HERO_ANIMATION.md](docs/HERO_ANIMATION.md) | touching the pinned scroll sequence at the top |
-| [docs/MOCKUPS.md](docs/MOCKUPS.md) | changing or adding a product mockup (the fake app UIs) |
+| [docs/PRODUCT_UI.md](docs/PRODUCT_UI.md) | changing or adding a coded app screen or demo |
 | [docs/CONTENT.md](docs/CONTENT.md) | changing copy, or swapping the placeholder product for a real one |
 | [docs/QA_CHECKLIST.md](docs/QA_CHECKLIST.md) | before you say a change is done |
 
@@ -49,7 +51,7 @@ They are general-purpose, and **the Rules below override them**. In particular:
 - **Tailwind CSS v4**. Tokens live in `@theme` in `src/app/globals.css`. There is no `tailwind.config.js`.
 - **Motion v14**: import from `motion/react`, not `framer-motion`.
 - **TypeScript**, strict. **bun** is the package manager.
-- Fonts are **self-hosted** with `next/font/local`, from the `geist` and `@fontsource-variable/inter` npm packages: Geist for display, Inter for mockup UI, Geist Mono for labels.
+- Fonts are **self-hosted** with `next/font/local`, from the `geist` and `@fontsource-variable/inter` npm packages: Geist for display, Inter for the coded app UI (the app's face), Geist Mono for labels.
 
 ## Commands
 
@@ -64,17 +66,20 @@ bun run start        # serve the build
 bun run shots        # screenshots + error/overflow check against :3001 (see QA_CHECKLIST)
 ```
 
-There is no test runner. Biome (root `biome.json`, run `bun run lint` at the root) lints and formats this app too, so code follows the repo style: double quotes, no semicolons, 100 columns. Lint, `typecheck`, `build` and `shots` are the whole gate. `shots` needs a server already running (`bun run build && bun run start &`); first run on a new machine needs `bunx playwright install chromium`. It writes `.shots/{desktop,mobile}-NN.jpg`, the same in dark mode as `dark-{desktop,mobile}-NN.jpg`, plus `reduced-00.jpg` (reduced motion), exits 1 on any page/console error, hydration mismatch or horizontal overflow, and takes `BASE_URL` / `OUT_DIR` env overrides.
+There is no test runner. Biome (root `biome.json`, run `bun run lint` at the root) lints and formats this app too, so code follows the repo style: double quotes, no semicolons, 100 columns. Lint, `typecheck`, `build` and `shots` are the whole gate. `shots` needs a server already running (`bun run build && bun run start &`); first run on a new machine needs `bunx playwright install chromium`. It writes `.shots/{desktop,mobile}-NN.jpg`, the same in dark mode as `dark-{desktop,mobile}-NN.jpg`, plus `reduced-00.jpg` (reduced motion) and one full-page shot per MDX page and pass (`desktop-security.jpg`, …), exits 1 on any page/console error, hydration mismatch or horizontal overflow, and takes `BASE_URL` / `OUT_DIR` env overrides.
 
 ## Layout of the code
 
 ```
 src/
   app/            layout.tsx (fonts, metadata) · page.tsx (section order) · globals.css (tokens, utilities)
-  content/site.ts every string on the page (`site`) + the fictional sample app (`sampleApp`)
+                  opengraph-image.tsx · icon.svg · robots.ts · sitemap.ts
+  app/(pages)/    developers, security, privacy, terms as page.mdx · layout.tsx (header, reading column, footer)
+  mdx-components.tsx  the only place MDX prose is styled
+  content/site.ts every landing-page string (`site`) + `sample`, the data the app UI shows
   components/
     ui/           ChromeFrame · PillButton/ArrowLink · Caption · Reveal · Section/Inset
-    mockups/      parts.tsx (window chrome, sample-app cards) · screens.tsx (composed screens)
+    demos/        pages.tsx (full app screens) · screens.tsx (card demos) · parts.tsx
     icons/        MetalIcons.tsx (SVG brushed-steel icons + shared <defs>)
     sections/     one file per page section, in page order
 scripts/          screenshots.mjs (visual QA)
@@ -83,14 +88,14 @@ docs/             the specs listed above
 
 ## Rules
 
-1. **No copy in components.** Every visible string comes from `src/content/site.ts`. Mockups may hard-code UI chrome text (button labels, file paths, tool names), but the sample app's data comes from `sampleApp`.
-2. **Use the tokens.** Colours come from the tokens, which also carry dark mode (see DESIGN.md): `bg-paper`, `text-ink`, `text-muted`, `text-faint`, `text-ghost`, `bg-panel`, `bg-pill` and the rest; text colours are black at fixed opacities (white in dark mode). Type comes from the stepped scale in DESIGN.md (`text-display`, `text-headline`, `text-title`, `text-lede`, `text-sub`, `text-caption` and the others). **Weight:** ink text is 500 (the `body` default); grey text adds `font-normal`. Mockups are the one exception: they may use literal hex values to imitate a real app.
+1. **No copy in components.** Every visible landing-page string comes from `src/content/site.ts`; long-form pages are `.mdx` content. Demos and marquee cards may hard-code UI chrome text (button labels, endpoints), but example data comes from `sample`. **Every claim must be true of the product today** (CONTENT.md, "Claims").
+2. **Use the tokens.** Colours come from the tokens, which also carry dark mode (see DESIGN.md): `bg-paper`, `text-ink`, `text-muted`, `text-faint`, `text-ghost`, `bg-panel`, `bg-pill` and the rest; text colours are black at fixed opacities (white in dark mode). Type comes from the stepped scale in DESIGN.md (`text-display`, `text-headline`, `text-title`, `text-lede`, `text-sub`, `text-caption` and the others). **Weight:** ink text is 500 (the `body` default); grey text adds `font-normal`. The coded app UI is the exception: it uses the `--dm-*` palette copied from the app (PRODUCT_UI.md).
 3. **Sections are separated by space, never by borders or background changes.** The whole page is one `paper` surface (`#f9f9f9`, `#111111` in dark mode).
 4. **Animate only `transform` and `opacity`.** No scroll-linked `filter`, `blur`, `box-shadow`, width or height. The original page froze the browser renderer, and this is the rule that prevents that.
-5. **There is exactly one pinned, scroll-scrubbed sequence (the hero).** Everything else uses `<Reveal>`, a one-shot fade-and-rise.
+5. **There is exactly one pinned, scroll-scrubbed sequence (the hero).** Everything else uses `<Reveal>`, a one-shot fade-and-rise, or `<Settle>`, the one-shot settle inside product pictures.
 6. **Every animation respects `prefers-reduced-motion`.** `Reveal` and `HeroStory` already branch on `useSafeReducedMotion()` (in `components/ui/`). **Never call Motion's `useReducedMotion()` directly to choose what to render**: it reads the setting on the client's first render, the server can't, and the mismatch is a hydration error. CSS animations are disabled in the `@media (prefers-reduced-motion)` block in `globals.css`.
-7. **Mockups are HTML, sized in `em`.** Never use `px` or `rem` inside a mockup. See MOCKUPS.md.
-8. **Server components by default.** Add `"use client"` only where a hook needs it. Today that is `Reveal.tsx`, `HeroStory.tsx`, `FaqList.tsx` and `ThemeHotkey.tsx`.
+7. **The product is shown in code, sized in `em`.** Full screens and card demos live in `components/demos` and copy the real app; match them against the showcase captures (`bun run --filter @sahihi/e2e showcase`). No screenshots or `px`/`rem` inside them. See PRODUCT_UI.md.
+8. **Server components by default.** Add `"use client"` only where a hook needs it. Today that is `Reveal.tsx`, `Settle.tsx`, `HeroStory.tsx`, `FaqList.tsx` and `ThemeHotkey.tsx`. Helpers that server components call live in plain modules (`settleMarks.ts`), never in a `"use client"` file, and their names must not differ from a component file only by case (macOS file names are case-insensitive).
 9. **Mobile matters.** The page needs a 16px side gutter (`px-4`) and no horizontal scroll at 390px. `body` has `overflow-x-clip` as a safety net, not as a fix.
 10. **Match the surrounding code.** Comments are sparse and explain *why*.
 
@@ -101,7 +106,7 @@ docs/             the specs listed above
 - **No clock reads during render.** With `cacheComponents: true`, prerender fails on `new Date()`, `Date.now()` or `Math.random()` in a server component ("blocking-prerender-current-time"). Keep values like the footer year as constants in `site.ts`.
 - **Tailwind v4 `translate-*`/`rotate-*` use the separate CSS `translate`/`rotate` properties**, so they compose with Motion's `transform`. Centring a Motion element with `-translate-x-1/2` is safe.
 - **Invisible elements still take clicks.** Any layer faded to `opacity: 0` that sits over interactive content needs `pointer-events-none`, or a Motion-driven `pointerEvents`, as the hero copy has.
-- **`.mockup` sets `container-type: inline-size`.** Its size comes from its parent, so it must sit in a parent with a definite width.
+- **`.frame` (ChromeFrame) and `.demo` set `container-type: inline-size`** (`Screen` a size container). Their size comes from their parent, so it must have a definite width.
 - **Don't use `next/font/google`.** Google sometimes returns font URLs with extra query parameters (`/l/font?kit=…&skey=…`), and Turbopack's dev server then fails with "Module not found: Can't resolve '@vercel/turbopack-next/internal/font/google/font'". It depends on Google's response, so it can work in one build and fail in the next. Add new fonts as npm packages or files and load them with `next/font/local`.
 - **The build cache can serve stale CSS.** A `globals.css` edit once built cleanly but shipped the old values. If a CSS change doesn't show up, `rm -rf .next && bun run build` before debugging anything else.
 - **Feature icons depend on `<MetalDefs />`**, which `FeatureChapters` renders once. If you use `<MetalIcon>` somewhere else, the defs must be on the page.

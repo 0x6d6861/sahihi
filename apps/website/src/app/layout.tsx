@@ -10,7 +10,7 @@ import "./globals.css"
 // Turbopack's dev server can't resolve ("Can't resolve '@vercel/turbopack-next/internal/font/google/font'").
 // Self-hosting also means builds need no network.
 
-// Geist for everything outside the mockups. subframe.com uses PP Neue Montreal (licensed);
+// Geist for everything. subframe.com uses PP Neue Montreal (licensed);
 // to use it, point this at its files instead.
 const display = localFont({
   src: "../../node_modules/geist/dist/fonts/geist-sans/Geist-Variable.woff2",
@@ -18,7 +18,7 @@ const display = localFont({
   weight: "100 900",
 })
 
-// Plain Inter for the small UI text inside product mockups, where a tight face gets cramped.
+// Inter for the coded product demos: the app's own UI face.
 const ui = localFont({
   src: "../../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2",
   variable: "--font-ui",
@@ -32,8 +32,15 @@ const mono = localFont({
 })
 
 export const metadata: Metadata = {
+  metadataBase: new URL(site.url),
   title: site.title,
   description: site.description,
+  openGraph: {
+    title: site.title,
+    description: site.description,
+    siteName: site.name,
+    type: "website",
+  },
 }
 
 export const viewport: Viewport = {

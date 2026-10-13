@@ -1,5 +1,5 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": { "noEmit": true, "types": ["node"] },
-  "include": ["*.ts", "tests/**/*.ts", "scripts/**/*.ts"]
+  "include": ["*.ts", "tests/**/*.ts", "scripts/**/*.ts", "showcase/**/*.ts"]
 }

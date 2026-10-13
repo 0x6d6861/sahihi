@@ -1,6 +1,6 @@
 /**
  * Creates the E2E database if needed and applies migrations (run by global-setup with Bun).
- * Refuses anything that isn't a *_e2e database.
+ * `--fresh` drops it first (the showcase run). Refuses anything that isn't a *_e2e database.
  */
 import path from "node:path"
 import { SQL } from "bun"
@@ -13,6 +13,9 @@ const admin = new URL(url)
 admin.pathname = "/postgres"
 const sql = new SQL(admin.toString())
 try {
+  if (process.argv.includes("--fresh")) {
+    await sql.unsafe(`drop database if exists "${name}" with (force)`)
+  }
   const rows = await sql`select 1 from pg_database where datname = ${name}`
   if (rows.length === 0) await sql.unsafe(`create database "${name}"`)
 } finally {

@@ -1,6 +1,6 @@
 # Page spec
 
-The page has one route (`/`). It is composed in `src/app/page.tsx` in the order below, with one component per file in `src/components/sections/`. For each section, "Content" names the key in `site.ts` it reads.
+The home page (`/`) is the landing page; `/security`, `/privacy` and `/terms` are MDX pages (section 11). It is composed in `src/app/page.tsx` in the order below, with one component per file in `src/components/sections/`. For each section, "Content" names the key in `site.ts` it reads.
 
 Every section's acceptance criteria are judged at **1288×900** and **390×844** (the `bun run shots` viewports).
 
@@ -33,37 +33,38 @@ Every section's acceptance criteria are judged at **1288×900** and **390×844**
 
 ## 4. Feature chapters: `FeatureChapters.tsx`
 
-- **Content:** `site.chapters[]`, one chapter per entry, in order (`canvas`, `browser`, `agent`)
+- **Content:** `site.chapters[]`, one chapter per entry, in order (`draft`, `send`, `prove`)
 - **Per chapter:**
   1. Eyebrow (`text-eyebrow`: 28px, faint, 500) plus a two-line `text-headline` (88px), left-aligned in the `Inset` column.
-  2. The main mockup in a `ChromeFrame` (aspect `16/10.4`), full `Section` width. Mapped by `ch.id`: `canvas → CanvasEditor`, `browser → BrowserWindow`, `agent → AgentBuildWindow`.
+  2. The main app screen in a `ChromeFrame` (aspect `16/10`), full `Section` width. Mapped by `ch.id` in `mainScreen`: `draft → DraftingScreen`, `send → EditorScreen`, `prove → EnvelopeScreen`.
   3. The body paragraph: ink, weight-500 `text-lede` (28/36), max 30em.
   4. Demo panels in a 2-column grid. A demo with `wide: true` spans both columns. Each panel is `bg-panel`, radius 28px, with an aspect ratio from the `demos` map, followed by a `Caption` (`text-lede`: ink 500 lead, muted 400 rest).
-  5. **Canvas chapter only:** a features grid (`ch.features`) of a metal icon plus a caption-pattern line in `text-caption` (20/28). 3 columns on desktop, 2 on tablet, 1 on mobile.
-- **Demo kinds** (key → mockup → panel aspect):
+  5. **Draft chapter only:** a features grid (`ch.features`) of a metal icon plus a caption-pattern line in `text-caption` (20/28). 3 columns on desktop, 2 on tablet, 1 on mobile.
+- **Demo kinds** (key → coded demo in `components/demos` → panel aspect):
 
-  | kind | mockup | aspect |
+  | kind | demo | aspect |
   |---|---|---|
-  | `explorations` | `ExplorationsDemo` | 16/9 |
-  | `comments` | `CommentsDemo` | 16/9 |
-  | `capture` | `CaptureDemo` | 16/9 |
-  | `inspect` | `InspectDemo` | 4/3 |
-  | `pin` | `PinDemo` | 4/3 |
-  | `agent-build` | `AgentBuildChat` | 5/4.6 |
-  | `agent-design` | `AgentDesignChat` | 5/4.6 |
+  | `questions` | `QuestionsDemo` | 16/9 |
+  | `proposal` | `ProposalDemo` | 4/3 |
+  | `signers` | `SignersDemo` | 4/3 |
+  | `signing` | `SigningDemo` | 16/9 |
+  | `otp` | `OtpDemo` | 4/3 |
+  | `routing` | `RoutingDemo` | 4/3 |
+  | `verify` | `VerifyDemo` | 4/3 |
+  | `audit` | `AuditDemo` | 4/3 |
 
-  To add a kind: build the screen (MOCKUPS.md), register it in `demos`, then reference it from `site.ts`.
-- **Accept:** every demo panel shows a legible mockup at desktop width. Captions align with the panel's inner edge (`px-3`). The chapter anchors (`#canvas`, `#browser`, `#agent`) work.
+  To add a kind: build it in `components/demos` to match the real card (PRODUCT_UI.md), register it in `demos`, then reference it from `site.ts`.
+- **Accept:** every demo panel shows a legible demo at desktop width, in both themes, with nothing overflowing at 390px. Captions align with the panel's inner edge (`px-3`). The chapter anchors (`#draft`, `#send`, `#prove`) work.
 
-## 5. Context row: `ContextRow.tsx`
+## 5. Integrations: `ContextRow.tsx`
 
 - **Content:** `site.context`
 - **Layout:** a `text-lede` headline (28px, ink, 500, the same size as body copy, as on subframe.com) in the `Inset` column. Below it, four cards sit in a wider `max-w-[1000px]` grid: 1 column on mobile, 2 on tablet, 4 on large screens. Each card is a 150px `bg-panel` tile (radius 24px) followed by a `text-caption` caption.
-- **Card contents:**
-  1. Selection: rows of white chips, scrolling horizontally.
-  2. Designs: thumbnail chips, scrolling horizontally.
-  3. Browser: a list of tool steps, scrolling vertically.
-  4. Codebase: a code snippet, scrolling vertically.
+- **Card contents** (in `site.context.cards` order):
+  1. Public API: `/api/v1` requests with status codes, scrolling vertically.
+  2. Webhooks: event-name chips (`envelope.completed`, …), scrolling horizontally.
+  3. Bulk send: CSV rows (`<Role> name,<Role> email`), scrolling vertically.
+  4. Embedded signing: the iframe and `sahihi:signed` listener, scrolling vertically.
 - **Behaviour:** CSS marquees. The content is rendered twice and translated by -50% so the loop is seamless, the edges fade with `mask-image`, and the duplicate copy is `aria-hidden`.
 - **Accept:** there are no visible seams or jumps, and nothing moves with reduced motion.
 
@@ -78,17 +79,18 @@ Every section's acceptance criteria are judged at **1288×900** and **390×844**
 - **Behaviour:** each step fades up in turn: `<Reveal distance={16} delay={i * 0.06}>`, inside the `<li>` so the list markup stays valid.
 - **Accept:** the numeral's top lines up with the title and its bottom with the last line. No glyph is cut off. The steps stack 1–4 on mobile.
 
-## 7. Testimonials: `Testimonials.tsx`
+## 7. Trust: `Trust.tsx`
 
-- **Content:** `site.testimonials` (up to 5 quotes; placement repeats beyond that)
-- **Layout:** a 12-column bento at `md`, positioned by the `layout` array: `[4 cols × 2 rows, 8, 8, 8, 4]`. Cards are `bg-panel` with radius 32px. Quotes use `text-quote` (48/52 on desktop, 32/36 on mobile, 500), wrapped in curly quotes. There are no names or avatars.
+- **Content:** `site.trust` (up to 5 facts; placement repeats beyond that)
+- **Layout:** a 12-column bento at `md`, positioned by the `layout` array: `[4 cols × 2 rows, 8, 8, 8, 4]`. Cards are `bg-panel` with radius 32px, text in `text-quote` (48/52 on desktop, 32/36 on mobile, 500). Put the shortest facts in slots 1 and 5 (the narrow ones).
+- **Rule:** every fact must be true of the product today and checkable in the code or docs (`docs/security.md`, `docs/certificates.md`). No customer quotes until there are real ones.
 - **Accept:** the grid has no holes at `md`+, and the cards stack on mobile.
 
 ## 8. Pricing: `Pricing.tsx`
 
 - **Content:** `site.pricing`. Anchor: `#pricing`, which the nav and CTAs point to.
-- **Layout:** a headline, then two `bg-panel` cards (radius 32px) side by side from `sm`. Each card has the plan name (`text-lede`, muted, 500), a `text-price` price (96px, weight 400) with its unit beside it (`text-lede`, muted, 400; wraps under the price when narrow), a faint-dash feature list (`text-sub`, muted, 400), and a full-width CTA pinned to the bottom. The `featured` plan's CTA is ink with paper text; the other is grey. A `text-caption` muted footnote follows.
-- **Accept:** both CTAs sit at the same height.
+- **Layout:** a headline, then four `bg-panel` cards (radius 32px) in a 2×2 grid from `sm`. Payments aren't live, so the `text-price` slot shows **envelopes per month**, not a price. The plans and limits mirror `packages/core/src/workspace/billing.ts`; update both together. Each card has the plan name (`text-lede`, muted, 500), the `text-price` number (96px, weight 400) with its unit beside it (`text-lede`, muted, 400; wraps under the price when narrow), a faint-dash feature list (`text-sub`, muted, 400), and a full-width CTA pinned to the bottom. Each plan's CTA goes to its `href` (Free → sign-up, the others → the contact mailto). The `featured` plan's CTA is ink with paper text; the others are grey. A `text-caption` muted footnote follows.
+- **Accept:** the CTAs in each row sit at the same height.
 
 ## 9. FAQ: `Faq.tsx` + `FaqList.tsx` (client)
 
@@ -102,6 +104,15 @@ Every section's acceptance criteria are judged at **1288×900** and **390×844**
 - **Content:** `site.name`, `site.footer`
 - **Layout:** directly after the FAQ (whose `pb-48` provides the space above it). A 14px muted row, with the same side padding as the header (20px, 48px from `md`), with the copyright on the left and links on the right, stacked on mobile. There is no closing call-to-action section; the page ends on the FAQ.
 - **Accept:** the footer year comes from `site.footer.year`, not from `Date`.
+
+## 11. MDX pages: `src/app/(pages)/`
+
+- **Routes:** `/developers`, `/security`, `/privacy`, `/terms`, each a `page.mdx` with `export const metadata`. All static.
+- **Layout:** `(pages)/layout.tsx` renders `Header`, one `Inset` reading column (max 36em, 46em on a page with code blocks, `pt-32 md:pt-44`) and `Footer`. Prose styles live only in `src/mdx-components.tsx` (`h1` → `text-title`, `h2` → `text-sub`, `p`/lists → `text-caption` muted, dash bullets, underlined links, `>` blockquote → `bg-panel` notice).
+- **Developers** (`/developers`): the public API (keys and scopes, a create-and-send walkthrough, endpoints, errors and limits), webhooks (events, payload, signature verification, retries), bulk send and embedded signing. Every statement comes from `docs/public-api.md`, `docs/webhooks.md`, `docs/bulk-send.md` and `docs/embedded-signing.md` at the repo root; update it when those change. Examples use the showcase workspace (Tana Freight Ltd). `##` headings get ids from their text, so the page's own contents can link to them. Linked from the footer and the integrations row.
+- **Code blocks** are highlighted at build time by `rehype-pretty-code` + Shiki (`next.config.ts`), with `github-light` and `github-dark` at once; `globals.css` → Code picks one from `<html data-theme>`. Give each block a language (`http`, `bash`, `json`, `ts`, `js`). Long lines scroll inside their panel; inline code wraps anywhere so it never widens the page.
+- **Content rules:** the security page states only what the product does today (sources: `docs/security.md`, `docs/certificates.md`, `docs/data-retention.md`). Privacy and terms are drafts and keep the "Draft, under legal review" notice until legal-reviewed text replaces them. Dates are written by hand ("Last updated …"), never computed.
+- **Accept:** `bun run shots` covers each page in both themes at both widths, with no overflow.
 
 ---
 

@@ -1,0 +1,87 @@
+export const metadata = {
+  title: "Security — Sahihi",
+  description:
+    "How Sahihi protects signing links, keeps tamper-evident records and lets anyone verify a signed document.",
+}
+
+# Security.
+
+Last updated 13 October 2026.
+
+A signature is only worth the evidence behind it. This page describes how Sahihi produces that
+evidence and protects it. Everything here describes how the product works today.
+
+## Every file is fingerprinted
+
+- When a PDF is uploaded, Sahihi records its **SHA-256** hash. The hash is checked again before
+  anything is stamped onto it, and an original can't change once it's ready to send.
+- Signers' values are stamped into the PDF **on our servers**, never in the browser. The finished
+  file is hashed again, and both hashes go on the Certificate of Completion.
+- Supporting files are hashed too, limited to common document and image types, and always
+  downloaded rather than opened in the page.
+
+## A record nobody can quietly rewrite
+
+- Every step of an envelope (sent, viewed, code verified, signed, declined, voided, completed) is
+  written to an **audit trail**. Each entry includes the hash of the one before, so a changed or
+  missing entry breaks the chain.
+- The database itself refuses to update or delete audit entries: the application's database role
+  has no permission to, and a trigger blocks updates from anyone, administrators included.
+- The latest hash of the chain is printed on the certificate, so a later rewrite of the history
+  would no longer match it.
+
+## Anyone can check a document
+
+- Each certificate carries a code and a QR code that open the public verify page.
+- Anyone can also drop a PDF onto the verify page. The file is **hashed in their browser** and only
+  the fingerprint is sent. It matches signed documents and certificates, never unsigned originals.
+- The verify page shows signers with their email addresses masked, and nothing about other
+  envelopes.
+
+## Signing links and codes
+
+- Each signer gets a unique link made from 32 random bytes. Sahihi stores **only a hash** of it;
+  the link itself exists in the email and nowhere else. It expires with the envelope, changes with
+  every reminder, and stops working if the envelope is voided.
+- You can ask signers for a **six-digit code** by email or SMS first. Codes are stored as hashes,
+  expire after 10 minutes and allow 5 attempts.
+- Signing pages aren't indexed by search engines and don't pass the link on to other sites.
+- Public pages are rate-limited.
+
+## Workspaces stay separate
+
+- Every document, envelope and template belongs to one workspace, and every request is checked
+  against it. An automated test calls every route as a member of another workspace and expects
+  nothing back.
+- Files sit in private storage and are reached only through short-lived signed links.
+- Roles decide who can send, manage templates, invite people or change workspace settings.
+- Members sign in with a password, a passkey or an authenticator app (two-factor).
+
+## Integrations
+
+- API keys carry only the scopes you give them.
+- Webhooks are delivered only to public `https://` addresses and are signed with HMAC-SHA256, so
+  your server can check they came from Sahihi. Webhook secrets are stored encrypted and shown once.
+- Embedded signing only works on the website origins you allow.
+
+## Your data, on your schedule
+
+- Owners and admins choose how long completed envelopes are kept, and can export the workspace's
+  data at any time.
+- Deleting an envelope removes its files and the signers' personal data, but keeps the hashes and
+  the audit trail, so its certificate still verifies.
+- The drafting assistant is off until an owner or admin turns it on, because document text is sent
+  to the model provider while it's on.
+- Logs mask signing links and personal details before they are written.
+
+## What's next
+
+- Signatures backed by a licensed Certification Authority (PAdES), alongside the certificate.
+- Regular anchoring of audit-chain hashes with an independent timestamp authority.
+- Malware scanning for supporting files.
+
+## Reporting a problem
+
+If you think you've found a security issue, email
+[security@sahihi.co.ke](mailto:security@sahihi.co.ke). Please give us a chance to fix it before
+you share it publicly.
