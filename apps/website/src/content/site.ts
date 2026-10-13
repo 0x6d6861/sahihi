@@ -20,7 +20,7 @@ export const site = {
 
   nav: [
     { label: "Security", href: "/security" },
-    { label: "Pricing", href: "/#pricing" },
+    { label: "Verify", href: "/verify" },
     { label: "Log in", href: `${appUrl}/sign-in` },
   ],
 
@@ -356,8 +356,6 @@ export const site = {
       { label: "Security", href: "/security" },
       { label: "Privacy", href: "/privacy" },
       { label: "Terms", href: "/terms" },
-      { label: "Verify", href: "/verify" },
-      { label: "Log in", href: `${appUrl}/sign-in` },
     ],
   },
 } as const

@@ -59,7 +59,7 @@ src/
 
 ### Sections (in order)
 
-1. **Header**: wordmark and underlined text links (Security, Pricing, Log in), sticky.
+1. **Header**: wordmark and underlined text links (Security, Verify, Log in), sticky.
 2. **HeroStory**: the only pinned, scroll-scrubbed sequence. The headline fades, the Draft/Send/Prove frames straighten and merge into the All files screen. It animates only `transform` and `opacity`. Users with `prefers-reduced-motion` get a static version.
 3. **PillarIntro**: "Draft. Send. Prove." in grey display type.
 4. **FeatureChapters**: one chapter per entry in `site.chapters` (drafting assistant, send & sign, certificate), each with a big app screen, demo panels and bold-lead captions. The draft chapter also has the metal-icon grid.
