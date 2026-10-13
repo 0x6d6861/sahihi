@@ -13,6 +13,9 @@ import { Spinner } from "@/components/ui/spinner"
 import { ApiError, api } from "@/lib/api"
 import { shortHash } from "@/lib/documents"
 
+/** sessionStorage key for a hash match; the certificate page reads it once (match-alert.tsx). */
+export const MATCH_KEY = "sahihi:verify-match"
+
 const PDF_ONLY = [{ label: "PDF", icon: FileSearchIcon }]
 
 /** Hashing happens in memory; very large files would strain low-end phones. */
@@ -46,7 +49,10 @@ export function VerifyChecker() {
         json: { sha256 },
       })
       if (match && code) {
-        router.push(`/verify/${encodeURIComponent(code)}?match=${match}`)
+        try {
+          sessionStorage.setItem(MATCH_KEY, JSON.stringify({ code, match }))
+        } catch {}
+        router.push(`/verify/${encodeURIComponent(code)}`)
         return
       }
       setResult({ state: "no_match", name: file.name, sha256 })

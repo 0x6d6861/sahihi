@@ -138,6 +138,14 @@ Use the bezel for the merged window and each chapter's main app screen. The hero
 
 Feature icons are metal objects, not line icons. They are 80×80 SVGs filled with shared gradients (`#mt-h`, `#mt-v`, `#mt-top`, `#mt-ring`) and a blurred contact shadow. To replace them with real 3D renders, use transparent PNG or WebP at 160×160 and keep the `size-20` box.
 
+## Logo
+
+The mark is ※ drawn as a stamp: a saltire with a square in each gap (`components/ui/Logo.tsx`,
+`LogoMark`). It sits before the wordmark in the header at 0.82em, and takes `currentColor`, so it
+follows the theme. The browser-tab icon (`app/icon.svg`, white on a `#141414` tile) and the social
+card (`app/opengraph-image.tsx`) carry the same paths: change all three together. The coded app
+screens keep the app's own logo, since they copy the real app.
+
 ## Motion
 
 | Pattern | Spec |

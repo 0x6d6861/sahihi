@@ -88,7 +88,7 @@ Every section's acceptance criteria are judged at **1288×900** and **390×844**
 
 ## 8. Pricing: `Pricing.tsx`
 
-- **Content:** `site.pricing`. Anchor: `#pricing`, which the nav and CTAs point to.
+- **Content:** `site.pricing`. Anchor: `#pricing` (link to it as `/#pricing` so it works from every page; nothing in the header or footer does today).
 - **Layout:** a headline, then four `bg-panel` cards (radius 32px) in a 2×2 grid from `sm`. Payments aren't live, so the `text-price` slot shows **envelopes per month**, not a price. The plans and limits mirror `packages/core/src/workspace/billing.ts`; update both together. Each card has the plan name (`text-lede`, muted, 500), the `text-price` number (96px, weight 400) with its unit beside it (`text-lede`, muted, 400; wraps under the price when narrow), a faint-dash feature list (`text-sub`, muted, 400), and a full-width CTA pinned to the bottom. Each plan's CTA goes to its `href` (Free → sign-up, the others → the contact mailto). The `featured` plan's CTA is ink with paper text; the others are grey. A `text-caption` muted footnote follows.
 - **Accept:** the CTAs in each row sit at the same height.
 
@@ -113,6 +113,14 @@ Every section's acceptance criteria are judged at **1288×900** and **390×844**
 - **Code blocks** are highlighted at build time by `rehype-pretty-code` + Shiki (`next.config.ts`), with `github-light` and `github-dark` at once; `globals.css` → Code picks one from `<html data-theme>`. Give each block a language (`http`, `bash`, `json`, `ts`, `js`). Long lines scroll inside their panel; inline code wraps anywhere so it never widens the page.
 - **Content rules:** the security page states only what the product does today (sources: `docs/security.md`, `docs/certificates.md`, `docs/data-retention.md`). Privacy and terms are drafts and keep the "Draft, under legal review" notice until legal-reviewed text replaces them. Dates are written by hand ("Last updated …"), never computed.
 - **Accept:** `bun run shots` covers each page in both themes at both widths, with no overflow.
+
+## 12. Verify: `src/app/(pages)/verify/`
+
+- **Routes:** `/verify` (static) and `/verify/<code>` (static shell, filled in the browser; `noindex`, since a record names its signers). The app keeps its own `/verify` pages, which certificates' QR codes point to; these are the public entry from the site (header, hero secondary CTA).
+- **Content:** `site.verify`. Components in `src/components/verify/`: `VerifyChecker` (drop or choose a PDF, or type a code), `CertificateView` (the record), `verify.ts` (code normalising and SHA-256, copied from `@sahihi/core`; keep them in step).
+- **Behaviour:** the file is hashed in the browser with Web Crypto; only the SHA-256 is sent, to `POST /api/verify/hash`. A match opens `/verify/<code>?match=signed_document|certificate`, which shows "File verified" above the record. Codes are normalised as typed (`5xv2 mevq q84c` → `5XV2-MEVQ-Q84C`) before navigating. Requests go to this site's `/api/verify/*`, which `next.config.ts` rewrites to `API_URL`, so the API's rate limit and client-IP handling are the same as for the app.
+- **States:** hashing (spinner, the file name), no match (with the short hash and why re-saved files don't match), too large (100 MB), rate limited (429), not a PDF, certificate not found, lookup failed.
+- **Accept:** a signed PDF from a completed envelope matches; an unsigned file doesn't; a typed code opens its record; an unknown code says so. Check against a running api (`bun run dev`, or the showcase api with `API_URL=http://localhost:4200`).
 
 ---
 

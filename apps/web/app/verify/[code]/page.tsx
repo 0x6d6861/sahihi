@@ -8,7 +8,17 @@ import { Badge } from "@/components/arc/badge/badge"
 import { API_URL } from "@/lib/api-url"
 import { formatDateTime } from "@/lib/format"
 
+import { MatchAlert } from "./match-alert"
+
 export const metadata: Metadata = { title: "Verify certificate" }
+
+function safeDecode(value: string) {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
 
 interface VerifyResponse {
   valid: boolean
@@ -30,32 +40,18 @@ interface VerifyResponse {
   }
 }
 
-const MATCH_TEXT: Record<string, string> = {
-  signed_document:
-    "The file you checked is exactly the signed document for this certificate. It hasn't been changed since signing.",
-  certificate: "The file you checked is exactly this Certificate of Completion, unchanged.",
-}
-
 /**
  * Public certificate verification: the QR code target, and where `/verify` sends a matching file
- * (`?match=signed_document|certificate`).
+ * (the match itself travels in sessionStorage, see MatchAlert).
  */
-export default async function VerifyPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ code: string }>
-  searchParams: Promise<{ match?: string }>
-}) {
-  const raw = decodeURIComponent((await params).code)
-  const { match } = await searchParams
+export default async function VerifyPage({ params }: { params: Promise<{ code: string }> }) {
+  const raw = safeDecode((await params).code)
   const code = normalizeCertificateCode(raw)
   const data: VerifyResponse = code
     ? ((await fetch(`${API_URL}/api/verify/${encodeURIComponent(code)}`, { cache: "no-store" })
         .then((r) => r.json())
         .catch(() => ({ valid: false }))) as VerifyResponse)
     : { valid: false }
-  const matchText = match ? MATCH_TEXT[match] : undefined
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col gap-4 p-4 md:p-8">
@@ -65,11 +61,7 @@ export default async function VerifyPage({
         </Alert>
       ) : (
         <>
-          {matchText && (
-            <Alert tone="success" title="File verified">
-              {matchText}
-            </Alert>
-          )}
+          <MatchAlert code={data.certificate.code} />
           <Panel
             headingLevel={1}
             title={

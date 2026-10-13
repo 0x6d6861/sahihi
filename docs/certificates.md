@@ -28,6 +28,11 @@ party. That's the CA integration below.
 
 ## Verification
 
+Two public UIs call the same API: the app's `/verify` pages (`apps/web/app/verify/`, the target of
+every certificate's QR code) and the marketing site's `/verify` and `/verify/<code>`
+(`apps/website`, through its `/api/verify/*` rewrite to `API_URL`). Both hash the file in the
+browser. Keep them in step when the API or the record changes.
+
 - `GET /api/verify/:code` returns certificate metadata, hashes and signers (emails masked; viewers
   aren't listed).
   - Codes are normalized with `normalizeCertificateCode` (`@sahihi/core`): case, spaces and dashes

@@ -20,13 +20,13 @@ export const site = {
 
   nav: [
     { label: "Security", href: "/security" },
-    { label: "Pricing", href: "/#pricing" },
+    { label: "Verify", href: "/verify" },
     { label: "Log in", href: `${appUrl}/sign-in` },
   ],
 
   cta: {
     primary: { label: "Start free", href: `${appUrl}/sign-up` },
-    secondary: { label: "Verify a document", href: `${appUrl}/verify` },
+    secondary: { label: "Verify a document", href: "/verify" },
   },
 
   hero: {
@@ -285,6 +285,70 @@ export const site = {
     ],
   },
 
+  /** The public verify pages (/verify, /verify/<code>). */
+  verify: {
+    title: "Verify a document.",
+    intro:
+      "Check that a PDF signed with Sahihi, or its Certificate of Completion, is genuine and hasn't changed since it was signed. No account needed.",
+    drop: {
+      title: "Drop a signed PDF or certificate here",
+      hint: "It stays on your device. Only its SHA-256 fingerprint is sent.",
+      choose: "Choose a file",
+      checking: "Checking",
+      checkingHint: "Computing its fingerprint on this device",
+    },
+    code: {
+      label: "Or enter the code from a certificate",
+      placeholder: "K7QM-2XDP-9RTA",
+      button: "Check",
+      invalid: "Codes look like K7QM-2XDP-9RTA: twelve letters and digits.",
+    },
+    noMatch: {
+      title: "No match for",
+      body: "This exact file wasn't signed or certified with Sahihi. If it came from Sahihi, it has been changed since signing: even re-saving or printing to PDF creates a new file. Download the original from your completion email and check that one.",
+    },
+    errors: {
+      notPdf: "Choose a PDF file.",
+      tooLarge: "That file is larger than 100 MB.",
+      rateLimited: "Too many checks in a short time. Please wait a minute and try again.",
+      failed: "The file couldn't be checked. Please try again.",
+      lookup: "The certificate couldn't be loaded. Please try again.",
+    },
+    how: [
+      {
+        lead: "On your device.",
+        text: "Your browser computes the file's SHA-256 fingerprint. The file itself is never uploaded.",
+      },
+      {
+        lead: "Signed copies only.",
+        text: "Only signed documents and certificates match, never unsigned originals.",
+      },
+      {
+        lead: "By code too.",
+        text: "Every certificate carries a code and a QR code that open its record here.",
+      },
+    ],
+    certificate: {
+      loading: "Looking up the certificate…",
+      verified: "Verified",
+      notFound: "Certificate not found",
+      notFoundBody: "No certificate matches the code",
+      completed: "Completed",
+      signers: "Signed by",
+      documents: "Documents",
+      original: "Original SHA-256",
+      signed: "Signed SHA-256",
+      attachments: "Supporting files, shared with the signers, not signed",
+      another: "Verify another document",
+      matched: {
+        signed_document:
+          "The file you checked is exactly the signed document for this certificate. It hasn't been changed since signing.",
+        certificate: "The file you checked is exactly this Certificate of Completion, unchanged.",
+      },
+      fileVerified: "File verified",
+    },
+  },
+
   footer: {
     year: 2026,
     links: [
@@ -292,8 +356,6 @@ export const site = {
       { label: "Security", href: "/security" },
       { label: "Privacy", href: "/privacy" },
       { label: "Terms", href: "/terms" },
-      { label: "Verify", href: `${appUrl}/verify` },
-      { label: "Log in", href: `${appUrl}/sign-in` },
     ],
   },
 } as const

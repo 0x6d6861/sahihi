@@ -55,7 +55,7 @@ They are general-purpose, and **the Rules below override them**. In particular:
 
 ## Commands
 
-This app lives in the Sahihi monorepo (`apps/website`, package `@sahihi/website`). Install from the repo root (one `bun.lock` there); run the scripts below from this folder, or from the root with `bun run dev:website` / `bun run --filter @sahihi/website <script>`. It must stay self-contained: no `@sahihi/*` imports.
+This app lives in the Sahihi monorepo (`apps/website`, package `@sahihi/website`). Install from the repo root (one `bun.lock` there); run the scripts below from this folder, or from the root with `bun run dev:website` / `bun run --filter @sahihi/website <script>`. It must stay self-contained: no `@sahihi/*` imports. Its one setting is `API_URL`, read only in `next.config.ts` for the `/api/verify/*` rewrite behind the `/verify` pages (default `http://localhost:4000`, the dev api); set it at build and start (`API_URL=http://localhost:4000 bun run build`). Everything else needs no env.
 
 ```bash
 bun install          # at the repo root
@@ -95,7 +95,7 @@ docs/             the specs listed above
 5. **There is exactly one pinned, scroll-scrubbed sequence (the hero).** Everything else uses `<Reveal>`, a one-shot fade-and-rise, or `<Settle>`, the one-shot settle inside product pictures.
 6. **Every animation respects `prefers-reduced-motion`.** `Reveal` and `HeroStory` already branch on `useSafeReducedMotion()` (in `components/ui/`). **Never call Motion's `useReducedMotion()` directly to choose what to render**: it reads the setting on the client's first render, the server can't, and the mismatch is a hydration error. CSS animations are disabled in the `@media (prefers-reduced-motion)` block in `globals.css`.
 7. **The product is shown in code, sized in `em`.** Full screens and card demos live in `components/demos` and copy the real app; match them against the showcase captures (`bun run --filter @sahihi/e2e showcase`). No screenshots or `px`/`rem` inside them. See PRODUCT_UI.md.
-8. **Server components by default.** Add `"use client"` only where a hook needs it. Today that is `Reveal.tsx`, `Settle.tsx`, `HeroStory.tsx`, `FaqList.tsx` and `ThemeHotkey.tsx`. Helpers that server components call live in plain modules (`settleMarks.ts`), never in a `"use client"` file, and their names must not differ from a component file only by case (macOS file names are case-insensitive).
+8. **Server components by default.** Add `"use client"` only where a hook needs it. Today that is `Reveal.tsx`, `Settle.tsx`, `HeroStory.tsx`, `FaqList.tsx`, `ThemeHotkey.tsx`, `verify/VerifyChecker.tsx` and `verify/CertificateView.tsx`. Helpers that server components call live in plain modules (`settleMarks.ts`), never in a `"use client"` file, and their names must not differ from a component file only by case (macOS file names are case-insensitive).
 9. **Mobile matters.** The page needs a 16px side gutter (`px-4`) and no horizontal scroll at 390px. `body` has `overflow-x-clip` as a safety net, not as a fix.
 10. **Match the surrounding code.** Comments are sparse and explain *why*.
 
