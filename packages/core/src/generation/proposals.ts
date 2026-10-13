@@ -32,7 +32,7 @@ import {
 /**
  * Assistant edit proposals (docs/ai-documents.md → Proposals, ADR 0044). The assistant never edits
  * the text: it proposes a change to a section (replace, delete), new sections, the signers, or
- * blanks made from an imported document's own text (ADR 0049), and the person accepts or rejects it. Accepting applies the change to the latest version, unless the section it
+ * blanks made from an imported document's own text (ADR 0049), or a new title, and the person accepts or rejects it. Accepting applies the change to the latest version, unless the section it
  * was about changed meanwhile (then it's out of date).
  *
  * The assistant writes sections in a small text format rather than editor JSON: paragraphs and
@@ -119,6 +119,13 @@ export const DefineSignersInputSchema = z.object({
 })
 export type DefineSignersInput = z.infer<typeof DefineSignersInputSchema>
 
+/** A new document title: plain text, no blanks. */
+export const ProposeTitleInputSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  rationale: Rationale,
+})
+export type ProposeTitleInput = z.infer<typeof ProposeTitleInputSchema>
+
 // ── What is stored ───────────────────────────────────────────────────────────
 export const ProposalChangeSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("replace_section"), sectionId: z.string(), section: SectionSchema }),
@@ -131,6 +138,7 @@ export const ProposalChangeSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("set_signers"), signers: SignersDefinitionSchema }),
   /** Text in the document that becomes blanks; the blanks themselves are `newVariables`. */
   z.object({ kind: z.literal("make_blanks"), blanks: z.array(MakeBlanksItemSchema).min(1) }),
+  z.object({ kind: z.literal("set_title"), title: z.string().trim().min(1).max(200) }),
 ])
 export type ProposalChange = z.infer<typeof ProposalChangeSchema>
 
@@ -239,11 +247,13 @@ export function buildProposal(
     | ({ tool: "propose_section_edit" } & ProposeSectionEditInput)
     | ({ tool: "propose_sections" } & ProposeSectionsInput)
     | ({ tool: "define_signers" } & DefineSignersInput)
-    | ({ tool: "propose_blanks" } & ProposeBlanksInput),
+    | ({ tool: "propose_blanks" } & ProposeBlanksInput)
+    | ({ tool: "propose_title" } & ProposeTitleInput),
   data: GeneratedDocumentData,
   userTexts: readonly string[],
   newId: () => string,
 ): BuildProposalResult {
+  if (input.tool === "propose_title") return buildTitleProposal(input, data, userTexts)
   if (input.tool === "define_signers") return buildSignersProposal(input, data, userTexts, newId)
   if (input.tool === "propose_blanks") {
     const built = buildBlanks(input, data)
@@ -330,6 +340,29 @@ export function buildProposal(
   }
 }
 
+function buildTitleProposal(
+  input: ProposeTitleInput,
+  data: GeneratedDocumentData,
+  userTexts: readonly string[],
+): BuildProposalResult {
+  if (input.title === data.title) return { ok: false, error: "That is already the title." }
+  if (/\{\{|\}\}/.test(input.title)) {
+    return { ok: false, error: "A title can't hold blanks; write it as plain text." }
+  }
+  const invented = unattestedSpecifics(input.title, userTexts)
+  if (invented.length) {
+    return {
+      ok: false,
+      error: `The person never said ${invented.map((v) => JSON.stringify(v)).join(", ")}. Leave specifics out of the title.`,
+    }
+  }
+  return {
+    ok: true,
+    payload: { change: { kind: "set_title", title: input.title }, newVariables: [] },
+    sectionId: null,
+  }
+}
+
 function buildSignersProposal(
   input: DefineSignersInput,
   data: GeneratedDocumentData,
@@ -387,6 +420,7 @@ export function applyProposal(
 ): GeneratedDocumentData {
   const { change } = payload
   if (change.kind === "set_signers") return applySigners(data, change.signers, newId)
+  if (change.kind === "set_title") return { ...data, title: change.title }
   if (change.kind === "make_blanks") {
     return {
       ...applyMakeBlanks(data, change.blanks),
@@ -419,7 +453,7 @@ export function applyProposal(
 
 /**
  * Out of date: the section it replaces or deletes changed (or went) since the proposal was made,
- * or the section it inserts after is gone.
+ * the section it inserts after is gone, or the title it replaces was changed.
  */
 export function isProposalStale(
   change: ProposalChange,
@@ -434,6 +468,7 @@ export function isProposalStale(
   if (change.kind === "set_signers") {
     return JSON.stringify(currentSigners(base)) !== JSON.stringify(currentSigners(current))
   }
+  if (change.kind === "set_title") return base.title !== current.title
   if (change.kind === "make_blanks") {
     // Out of date once a text is gone (edited, or already a blank) or a key was taken meanwhile.
     return change.blanks.some(
@@ -477,6 +512,7 @@ export function proposalTexts(
   if (change.kind === "set_signers") {
     return { before: signersText(currentSigners(base)), after: signersText(change.signers) }
   }
+  if (change.kind === "set_title") return { before: base.title, after: change.title }
   if (change.kind === "make_blanks") {
     // One line per blank: the text as written, and the blank it becomes.
     const label = (key: string) => variables.find((v) => v.key === key)?.label ?? key

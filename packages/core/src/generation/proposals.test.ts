@@ -278,6 +278,34 @@ describe("staleness and texts", () => {
   })
 })
 
+describe("title proposals", () => {
+  const propose = (title: string, said: string[] = []) =>
+    buildProposal({ tool: "propose_title", title, rationale: "Clearer" }, nda(), said, newId)
+
+  test("sets the title, shows before and after, and goes stale when the title changes", () => {
+    const result = propose("Confidentiality Agreement")
+    if (!result.ok) throw new Error(result.error)
+    expect(result.sectionId).toBeNull()
+    const base = nda()
+    const next = applyProposal(base, result.payload)
+    expect(next.title).toBe("Confidentiality Agreement")
+    expect(next.content).toEqual(base.content)
+    expect(proposalTexts(result.payload, base)).toEqual({
+      before: base.title,
+      after: "Confidentiality Agreement",
+    })
+    expect(isProposalStale(result.payload.change, base, base)).toBe(false)
+    expect(isProposalStale(result.payload.change, base, next)).toBe(true)
+  })
+
+  test("refuses the same title, blanks and specifics the person never said", () => {
+    expect(propose(nda().title).ok).toBe(false)
+    expect(propose("NDA with {{party_a_name}}").ok).toBe(false)
+    expect(propose("NDA dated 12 March 2026").ok).toBe(false)
+    expect(propose("NDA dated 12 March 2026", ["sign it on 12 March 2026"]).ok).toBe(true)
+  })
+})
+
 describe("diffWords", () => {
   test("marks removed and added words, keeps the rest", () => {
     expect(diffWords("keep it confidential now", "keep it secret now")).toEqual([

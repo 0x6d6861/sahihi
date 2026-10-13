@@ -14,6 +14,8 @@ import {
   ProposeSectionEditInputSchema,
   type ProposeSectionsInput,
   ProposeSectionsInputSchema,
+  type ProposeTitleInput,
+  ProposeTitleInputSchema,
   SetVariablesInputSchema,
 } from "@sahihi/core"
 import { prisma } from "@sahihi/db"
@@ -37,6 +39,7 @@ import {
 } from "../generated-documents"
 import { assertAttachments, attachedStatements, forModel, forStorage } from "./attachments"
 import { assistantModel, assistantModelId } from "./model"
+import { proposalIdsIn, withProposalOutcomes } from "./outcomes"
 import { systemPrompt } from "./prompt"
 
 /**
@@ -149,6 +152,12 @@ function tools(ctx: { generatedDocumentId: string; userId: string; statements: s
       inputSchema: ProposeBlanksInputSchema,
       execute: (input: ProposeBlanksInput) => propose(ctx, { tool: "propose_blanks", ...input }),
     },
+    propose_title: {
+      description:
+        "Propose a new title for the document, as plain text without blanks. The person accepts or rejects it.",
+      inputSchema: ProposeTitleInputSchema,
+      execute: (input: ProposeTitleInput) => propose(ctx, { tool: "propose_title", ...input }),
+    },
   } satisfies ToolSet
 }
 
@@ -247,6 +256,11 @@ export async function streamAssistantReply(input: {
     take: 10,
     select: { id: true, sectionId: true, status: true, rationale: true },
   })
+  // Whether the person accepted or rejected each proposal in the conversation (ADR 0044).
+  const outcomes = await prisma.generatedDocumentProposal.findMany({
+    where: { generatedDocumentId: input.generatedDocumentId, id: { in: proposalIdsIn(messages) } },
+    select: { id: true, status: true },
+  })
 
   const result = streamText({
     model: assistantModel(),
@@ -259,7 +273,10 @@ export async function streamAssistantReply(input: {
       organizationName: input.organizationName,
       today: new Date().toISOString().slice(0, 10),
     }),
-    messages: await convertToModelMessages(forModel(messages), { tools: toolSet }),
+    messages: await convertToModelMessages(
+      forModel(withProposalOutcomes(messages, new Map(outcomes.map((o) => [o.id, o.status])))),
+      { tools: toolSet },
+    ),
     tools: toolSet,
     stopWhen: isStepCount(5),
     abortSignal: input.abortSignal,
