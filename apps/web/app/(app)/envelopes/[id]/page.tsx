@@ -109,6 +109,7 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
           <TableRow>
             {sequential && <TableHead>Step</TableHead>}
             <TableHead>Name</TableHead>
+            <TableHead className="max-md:hidden">Email</TableHead>
             <TableHead>Role</TableHead>
             <TableHead>Verification</TableHead>
             <TableHead>Status</TableHead>
@@ -121,10 +122,8 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
           {e.recipients.map((r) => (
             <TableRow key={r.id}>
               {sequential && <TableCell>{r.order}</TableCell>}
-              <TableCell>
-                <div className="font-medium">{r.name}</div>
-                <div className="text-muted-foreground text-xs">{r.email}</div>
-              </TableCell>
+              <TableCell className="font-medium">{r.name}</TableCell>
+              <TableCell className="text-muted-foreground max-md:hidden">{r.email}</TableCell>
               <TableCell>{ROLE_LABELS[r.role]}</TableCell>
               <TableCell>{VERIFICATION_LABELS[r.verification]}</TableCell>
               <TableCell>

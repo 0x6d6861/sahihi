@@ -112,3 +112,18 @@ export function DocumentStatusIcon({
     />
   )
 }
+
+/** An AI draft's status on /generate: still a draft, or finalised into an envelope. */
+export function DraftStatusIcon({
+  status,
+  className,
+}: {
+  status: "DRAFT" | "FINALIZED"
+  className?: string
+}) {
+  return status === "FINALIZED" ? (
+    <StatusIcon icon={CircleCheckIcon} label="Finalised" tone="success" className={className} />
+  ) : (
+    <StatusIcon icon={FilePenLineIcon} label="Draft" tone="neutral" className={className} />
+  )
+}

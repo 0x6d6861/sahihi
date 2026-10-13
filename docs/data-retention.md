@@ -36,7 +36,8 @@ transaction with the audit event, then removes the original if it's unused. It's
   since the cutoff (`updatedAt`), with their versions, events and conversation. These deletions
   leave no audit record: an AI draft has no envelope, and so no audit trail, to attach one to. A
   finalised one goes when its envelope is purged; one whose finalise stopped before the envelope
-  owns a READY document and is kept. Workspace templates saved from drafts are kept:
+  owns a READY document and is kept. Its creator, an admin or the owner can also delete a draft
+  themselves from Drafting (docs/ai-documents.md → Web), with the same effect. Workspace templates saved from drafts are kept:
   they hold only what someone chose to keep (docs/ai-documents.md → Templates). A file uploaded
   to start a draft (ADR 0049) is read and never stored, so there's nothing of it to retain, export
   or delete; only the draft's text is kept. Files attached in the drafting chat (ADR 0050) aren't

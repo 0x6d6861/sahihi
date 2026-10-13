@@ -4,14 +4,15 @@ import { MAX_IMPORT_BYTES } from "@sahihi/core"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { LibraryDocumentPicker } from "@/components/app/documents/library-document-picker"
-import { FileTextIcon, LoaderIcon } from "@/components/app/icons"
+import { FileTextIcon, LoaderIcon, UploadIcon } from "@/components/app/icons"
 import { Alert } from "@/components/arc/alert/alert"
+import { Button } from "@/components/arc/button/button"
 import { Dialog, DialogContent } from "@/components/arc/dialog/dialog"
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control"
 import { FileUpload } from "@/components/extend/file-upload"
 import { api } from "@/lib/api"
 import { importErrorMessage } from "@/lib/generator"
-import { StartCard, startDocument } from "./start-actions"
+import { startDocument, useStarting } from "./start-actions"
 
 const IMPORTABLE = [
   { label: "PDF", icon: FileTextIcon },
@@ -26,15 +27,15 @@ const ACCEPT =
  * `POST /generated-documents/import`, read and not stored). Either way the wording comes in as
  * written and the new draft opens.
  */
-export function ImportCard() {
+export function ImportButton() {
   const [open, setOpen] = useState(false)
+  const starting = useStarting()
   return (
     <>
-      <StartCard
-        name="Import a document"
-        description="Bring in a PDF or Word file, word for word. The assistant suggests the blanks and signers."
-        onPress={() => setOpen(true)}
-      />
+      <Button variant="secondary" disabled={starting} onClick={() => setOpen(true)}>
+        <UploadIcon aria-hidden />
+        Import a document
+      </Button>
       <ImportDialog open={open} onOpenChange={setOpen} />
     </>
   )

@@ -252,7 +252,11 @@ export function NotificationList({
         pending={loading}
       />
       <Panel className="gap-0 p-0">
-        <div className="flex flex-wrap items-center justify-end gap-3 border-b px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b py-3 ps-9 pe-4">
+          {/* The badge's count, so the strip says where you stand before you scan the list. */}
+          <p className="text-muted-foreground text-sm tabular-nums" aria-live="polite">
+            {filtered ? null : unread.count ? `${unread.count} unread` : "All read"}
+          </p>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" disabled={!hasUnread} onClick={markAllRead}>
               {filtered ? "Mark these read" : "Mark all read"}
@@ -320,7 +324,11 @@ export function NotificationList({
                   <div className="flex shrink-0 items-center gap-1">
                     {view.href && (
                       <span className="max-sm:hidden">
-                        <Button size="sm" onClick={() => open(n, view.href as string)}>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => open(n, view.href as string)}
+                        >
                           {openLabelFor(view.href)}
                         </Button>
                       </span>

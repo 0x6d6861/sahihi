@@ -91,6 +91,7 @@ export default async function BillingPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Plan</TableHead>
+              <TableHead className="max-lg:hidden">For</TableHead>
               <TableHead>Envelopes a month</TableHead>
               <TableHead>Seats</TableHead>
               <TableHead>AI replies a month</TableHead>
@@ -108,7 +109,9 @@ export default async function BillingPage() {
                       </Badge>
                     )}
                   </div>
-                  <div className="text-muted-foreground text-xs">{p.description}</div>
+                </TableCell>
+                <TableCell className="whitespace-nowrap text-muted-foreground max-lg:hidden">
+                  {p.description}
                 </TableCell>
                 <TableCell>{limitLabel(p.envelopesPerMonth, "envelopes")}</TableCell>
                 <TableCell>{limitLabel(p.seats, "seats")}</TableCell>

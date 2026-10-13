@@ -42,6 +42,7 @@ export function MembersTable({ members, viewer }: { members: MemberRow[]; viewer
       <TableHeader>
         <TableRow>
           <TableHead>Member</TableHead>
+          <TableHead className="max-md:hidden">Email</TableHead>
           <TableHead className="w-44">Role</TableHead>
           <TableHead>Joined</TableHead>
           <TableHead className="w-10">
@@ -108,15 +109,13 @@ function MemberRowView({
       <TableCell>
         <div className="flex items-center gap-3">
           <Avatar name={name} src={member.user.image ?? undefined} size="sm" />
-          <div className="min-w-0">
-            <div className="truncate font-medium">
-              {member.user.name}
-              {isViewer && <span className="text-muted-foreground font-normal"> (you)</span>}
-            </div>
-            <div className="truncate text-muted-foreground text-xs">{member.user.email}</div>
-          </div>
+          <span className="min-w-0 truncate font-medium">
+            {member.user.name}
+            {isViewer && <span className="text-muted-foreground font-normal"> (you)</span>}
+          </span>
         </div>
       </TableCell>
+      <TableCell className="text-muted-foreground max-md:hidden">{member.user.email}</TableCell>
       <TableCell>
         {actions.assignableRoles.length > 0 ? (
           <Select

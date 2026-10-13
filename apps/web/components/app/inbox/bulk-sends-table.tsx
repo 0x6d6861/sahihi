@@ -30,17 +30,21 @@ export function BulkSendsTable({ rows }: { rows: BulkSendTableRow[] }) {
           key: "template",
           label: "Batch",
           render: (_, b) => (
-            <span className="flex min-w-0 flex-col gap-0.5">
-              <Link
-                href={`/bulk-sends/${b.id}`}
-                className="truncate font-medium underline-offset-4 hover:underline"
-              >
-                {b.template}
-              </Link>
-              {/* The batch title is the per-row pattern, e.g. "Lease: {{Tenant name}}". */}
-              <span className="truncate text-muted-foreground text-xs" title={b.title}>
-                Titled “{b.title}”
-              </span>
+            <Link
+              href={`/bulk-sends/${b.id}`}
+              className="block truncate font-medium underline-offset-4 hover:underline"
+            >
+              {b.template}
+            </Link>
+          ),
+        },
+        {
+          // The per-row title pattern, e.g. "Lease: {{Tenant name}}".
+          key: "title",
+          label: "Title",
+          render: (_, b) => (
+            <span className="block truncate text-muted-foreground" title={b.title}>
+              {b.title}
             </span>
           ),
         },

@@ -9,6 +9,7 @@ import { DocumentRowActions } from "@/components/app/documents/document-row-acti
 import { DocumentTypeIcon } from "@/components/app/documents/document-type-icon"
 import { EnvelopeCard, type EnvelopeItem } from "@/components/app/envelope/envelope-card"
 import { EnvelopeRowActions } from "@/components/app/envelope/envelope-row-actions"
+import { DetailsCell } from "@/components/app/files/details-cell"
 import {
   BreadcrumbDrops,
   DragCard,
@@ -335,6 +336,7 @@ export default async function FilesPage({
                   <TableRow className="hover:bg-transparent">
                     <SelectHead />
                     <TableHead className="ps-3">Name</TableHead>
+                    <TableHead className="max-lg:hidden">Details</TableHead>
                     <TableHead className="max-md:hidden">Owner</TableHead>
                     <TableHead className="max-md:hidden">Added</TableHead>
                     <TableHead className="w-0">
@@ -437,34 +439,24 @@ function FileRow({
       <TableCell className="w-full max-w-0 ps-3">
         <div className="flex min-w-0 items-center gap-3">
           {f.icon}
-          <div className="flex min-w-0 flex-col gap-0.5">
-            <div className="flex min-w-0 items-center gap-2">
-              {item.color && <ColorDot color={item.color} className="size-2.5" />}
-              <Link
-                href={f.href}
-                title={f.name}
-                className="truncate font-medium underline-offset-4 hover:underline"
-              >
-                {f.name}
-                <ColorName color={item.color} />
-              </Link>
-              {f.status}
-              <div className="hidden shrink-0 sm:flex">
-                <TagBadges tags={item.tags} max={2} />
-              </div>
-            </div>
-            <span className="truncate text-muted-foreground text-xs">
-              {f.meta.filter(Boolean).join(" · ")}
-            </span>
-            <span className="truncate text-muted-foreground text-xs md:hidden">
-              {f.owner.name} · {formatDate(item.createdAt)}
-            </span>
-            <div className="sm:hidden">
-              <TagBadges tags={item.tags} />
+          <div className="flex min-w-0 items-center gap-2">
+            {item.color && <ColorDot color={item.color} className="size-2.5" />}
+            <Link
+              href={f.href}
+              title={f.name}
+              className="truncate font-medium underline-offset-4 hover:underline"
+            >
+              {f.name}
+              <ColorName color={item.color} />
+            </Link>
+            {f.status}
+            <div className="hidden shrink-0 sm:flex">
+              <TagBadges tags={item.tags} max={2} />
             </div>
           </div>
         </div>
       </TableCell>
+      <DetailsCell text={f.meta.filter(Boolean).join(" · ")} />
       <TableCell className="max-w-44 whitespace-nowrap text-muted-foreground max-md:hidden">
         <Person person={f.owner} />
       </TableCell>
