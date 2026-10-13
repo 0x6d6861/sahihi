@@ -1,6 +1,6 @@
 # Hero scroll sequence
 
-This is the only pinned, scroll-scrubbed animation on the page, implemented in `src/components/sections/HeroStory.tsx`. It tells the product story without words: **drafting, sending and proving become one envelope.** The three frames merge into the `files` screenshot: All files, where every draft, envelope and document lives.
+This is the only pinned, scroll-scrubbed animation on the page, implemented in `src/components/sections/HeroStory.tsx`. It tells the product story without words: **drafting, sending and proving become one envelope.** The three frames merge into `FilesScreen`: All files, where every draft, envelope and document lives.
 
 ## Structure
 
@@ -8,7 +8,7 @@ This is the only pinned, scroll-scrubbed animation on the page, implemented in `
 <div ref h-[320svh]>                       ← scroll track (3.2 viewports)
   <div sticky top-0 h-svh overflow-hidden>  ← stage, pinned while the track scrolls
     frames container   top-16 md:top-24 h-[52svh]  ← the three tilted ChromeFrames + mono labels (clears the header)
-    merged window      centred, min(94vw,1120px), ChromeFrame 16/10 → <Shot name="files"/>
+    merged window      centred, min(94vw,1120px), ChromeFrame 16/10 → <Screen><FilesScreen/></Screen>
     hero copy          top-[57svh], centred  ← headline, subtitle, CTAs, "works with"
 ```
 
@@ -37,9 +37,9 @@ Each frame is an entry in the `frames` array:
 
 | key | screen | aspect | rotate [initial, settled] | shift (converge) | position (mobile → `md`) |
 |---|---|---|---|---|---|
-| draft | `drafting` shot | 1.1/1 | [-8°, -4°] | 0 → +16vw | `left-[7%] top-[26%] w-[32%]` → `md:left-[14%] md:top-[12%] md:w-[25%]` |
-| send | `editor` shot | 1.05/1 | [3°, 1°] | none | `left-[35%] top-[16%] w-[30%]` → `md:left-[40%] md:top-[6%] md:w-[20%]` |
-| prove | `verify` card | 0.95/1 | [9°, 4°] | 0 → -16vw | `left-[61%] top-[28%] w-[32%]` → `md:left-[62%] md:top-[15%] md:w-[21%]` |
+| draft | `DraftingScreen` (zoom 1.45) | 1.1/1 | [-8°, -4°] | 0 → +16vw | `left-[7%] top-[26%] w-[32%]` → `md:left-[14%] md:top-[12%] md:w-[25%]` |
+| send | `EditorScreen` (zoom 1.9, on the page) | 1.05/1 | [3°, 1°] | none | `left-[35%] top-[16%] w-[30%]` → `md:left-[40%] md:top-[6%] md:w-[20%]` |
+| prove | `EnvelopeScreen` (zoom 1.45) | 0.95/1 | [9°, 4°] | 0 → -16vw | `left-[61%] top-[28%] w-[32%]` → `md:left-[62%] md:top-[15%] md:w-[21%]` |
 
 Positions are percentages of the frames container (`52svh` tall, max 1400px wide). The pillar label for each frame is `site.pillars[index]`, so the order of `frames` must match the order of `pillars`.
 
@@ -50,7 +50,7 @@ The screens are visible from scroll 0. Empty bezels on first load read as a load
 - Animate **only** `opacity`, `x`, `y`, `rotate` and `scale`. Motion turns these into `transform`/`opacity`, which the compositor handles without repainting.
 - **Never** scrub `filter`, `blur`, `backdrop-filter`, `box-shadow`, `clip-path`, width or height with scroll. The original site did heavy scroll effects and froze Chrome's renderer twice during review.
 - Each frame and the window have `will-change-transform`. Don't add it anywhere else; too many layers costs memory.
-- The screenshots inside the frames are static images, so they cost nothing per frame once decoded.
+- The screens inside the frames are static HTML, so they cost nothing per frame.
 
 ## Interaction rules
 

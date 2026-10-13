@@ -30,9 +30,9 @@ Read AGENTS.md, then DESIGN.md, before step 1.
 - `ChromeFrame`, `PillButton`, `ArrowLink`, `Caption`, `Reveal` (client), `Section`/`Inset`.
 - **Checkpoint:** a `ChromeFrame` with a grey child looks like polished metal around glass, and its radii are concentric.
 
-### A5. Screenshots: `components/shots/`
-- Run the showcase (`bun run --filter @sahihi/e2e showcase`) to capture `src/assets/shots/`, then build `Shot` and `shots.ts`, and the coded demos in `components/demos` (SCREENSHOTS.md).
-- **Checkpoint:** a `Shot` in a `ChromeFrame` swaps to its dark capture when the theme flips, and only one image loads.
+### A5. App UI: `components/demos/`
+- Build the app screens and card demos in `components/demos` against the showcase captures (`bun run --filter @sahihi/e2e showcase`; PRODUCT_UI.md).
+- **Checkpoint:** a `Screen` in a `ChromeFrame` reads like the real app at 1120px and scales cleanly down to 300px, in both themes.
 
 ### A7. Static sections
 Build them in page order. Each is a server component wrapped in `Reveal`s:
@@ -54,10 +54,10 @@ Build them in page order. Each is a server component wrapped in `Reveal`s:
 Ordered by value. Each item has a clear finish line.
 
 1. ~~**Real content.**~~ Done: Sahihi copy, real app screenshots, a trust section instead of invented quotes, MDX security/privacy/terms pages. Left before launch: CONTENT.md, "Before launch".
-2. ~~**Real screenshots.**~~ Done: full pages are real captures, demos are coded to match (SCREENSHOTS.md). Still open: replace the SVG metal icons with 3D renders. *Done when:* LCP under 2.5s on a throttled mobile Lighthouse run.
+2. ~~**Real product UI.**~~ Done: the real screens and cards, rebuilt in code and matched against captures (PRODUCT_UI.md). Still open: replace the SVG metal icons with 3D renders. *Done when:* LCP under 2.5s on a throttled mobile Lighthouse run.
 3. **Licensed display font.** Geist stands in for subframe.com's PP Neue Montreal. To match exactly, license Neue Montreal and load it with `next/font/local` into `--font-display`; the type scale was measured from it, so no size changes are needed. *Done when:* no layout shift on load (CLS 0).
 4. ~~**Metadata and social.**~~ Done: `opengraph-image.tsx`, `icon.svg`, `robots.ts`, `sitemap.ts`, `metadataBase` from `site.url`.
 5. **Analytics on CTAs.** Track clicks on the primary and secondary CTAs and pricing. Keep it server-rendered and don't add a client component just for tracking.
 6. **Dark theme (optional).** The original is light-only. If you add a dark theme, define the tokens in `@media (prefers-color-scheme: dark)` and re-tune the bezel gradient; it needs darker stops to read as metal.
-7. **Mobile screenshot legibility.** Below 640px the full-window shots are small; consider phone-width captures for the chapter mains.
+7. **Mobile legibility.** Below 640px the full screens are small; consider phone-layout screens for the chapter mains.
 8. **Tests.** Add a Playwright spec built from `scripts/screenshots.mjs` that asserts the hero buttons are clickable at scroll 0 and not clickable at 50% of the track.

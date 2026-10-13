@@ -23,7 +23,7 @@ Open the shots for the sections you touched, at **both** sizes. Check:
 
 **Global**
 - [ ] One continuous `paper` background, with no section borders or colour bands
-- [ ] **Dark** (`dark-*` shots): text is white on `#111111`; every screenshot shows its dark capture and every demo its dark palette, with PDF paper still white; context-card chips and code are readable; the featured pricing CTA is light with dark text
+- [ ] **Dark** (`dark-*` shots): text is white on `#111111`; the product UI uses its dark palette, with PDF paper still white; context-card chips and code are readable; the featured pricing CTA is light with dark text
 - [ ] **Theme hotkey:** pressing D flips the scheme instantly, a reload keeps it, and Cmd+D still bookmarks (not intercepted). No hydration warning in the console
 - [ ] Every headline ends with a period
 - [ ] Captions follow the pattern: ink medium-weight lead, then grey regular-weight text
@@ -39,7 +39,7 @@ Open the shots for the sections you touched, at **both** sizes. Check:
 - [ ] 04–05: one merged window, centred, with no leftover frames visible
 
 **Chapters**
-- [ ] Main screenshots are sharp and legible at desktop width
+- [ ] Main app screens read like the real app at desktop width
 - [ ] Demo panels are evenly rounded, demos are centred with nothing clipped, and captions align with the panel edge
 - [ ] Six metal icons in the draft chapter, three per row on desktop
 
@@ -68,5 +68,5 @@ These can't be read off a screenshot:
 
 ## 4. Docs
 
-- [ ] If you changed a section, screenshot, token or the hero timing, update the matching file in `docs/` in the same change.
+- [ ] If you changed a section, app screen, token or the hero timing, update the matching file in `docs/` in the same change.
 - [ ] If you added a script, command or env var, update AGENTS.md and README.md.

@@ -1,6 +1,6 @@
 # Content guide
 
-All landing-page copy lives in `src/content/site.ts`; components contain no marketing text. Long-form pages (security, privacy, terms) are Markdown in `src/app/(legal)/*/page.mdx`. Screenshot alt text is `site.shots`; the coded demos read their example data from `sample` in the same file.
+All landing-page copy lives in `src/content/site.ts`; components contain no marketing text. Long-form pages (security, privacy, terms) are Markdown in `src/app/(legal)/*/page.mdx`. The coded app UI reads its example data from `sample` in the same file.
 
 ## Voice
 
@@ -33,14 +33,13 @@ All landing-page copy lives in `src/content/site.ts`; components contain no mark
 | `trust` | `{headline, facts: {text}[≤5]}` | Trust bento. Every fact must be true today; shortest facts first and last (narrow slots) |
 | `pricing` | `{headline, plans: {name, price, unit, features[], cta, href, featured}[4], footnote}` | Pricing. `price` holds envelopes per month; limits mirror `packages/core/src/workspace/billing.ts` |
 | `faq` | `{headline, items: {q, a}[]}` | FAQ |
-| `shots` | `{[shot]: string}` | Alt text of each app screenshot |
 | `footer` | `{year: number, links: {label, href}[]}` | Footer. `year` is a constant (see AGENTS.md gotchas) |
 
 ### `chapters[]`
 
 ```ts
 {
-  id: "draft" | "send" | "prove",       // anchor id + selects the main screenshot in FeatureChapters
+  id: "draft" | "send" | "prove",       // anchor id + selects the main app screen in FeatureChapters
   eyebrow: string,
   headline: [string, string],          // keep each line short: text-headline is 88px in an 860px column
   body: string,
@@ -49,15 +48,15 @@ All landing-page copy lives in `src/content/site.ts`; components contain no mark
 }
 ```
 
-The `DemoKind` values are listed in PAGE_SPEC.md §4. A new `id` also needs an entry in `mainShot` in `FeatureChapters.tsx`.
+The `DemoKind` values are listed in PAGE_SPEC.md §4. A new `id` also needs an entry in `mainScreen` in `FeatureChapters.tsx`.
 
 ## Schema: `sample`
 
-The demos' data: the same fictional workspace as the screenshots (Tana Freight Ltd, Kilima Agro, the offer to Juma Ochieng). Keys: `workspace`, `nda`, `ndaFile`, `completed`, `question {index, text, fills, options}`, `proposal {section, why, title, before, removed, kept, inserted, after}`, `signer`, `offer`, `otp`, `routing[]`, `signers[]` (masked emails, as the verify page shows them), `originalSha256`, `signedSha256`, `activity[]` (newest first, `kind` picks the icon). Keep it consistent with the screenshots and the seed.
+The app UI's data: the same fictional workspace as the showcase seed (Tana Freight Ltd, Kilima Agro, the offer to Juma Ochieng). Keys: `workspace`, `nda`, `ndaFile`, `completed`, `question {index, text, fills, options}`, `proposal {section, why, title, before, removed, kept, inserted, after}`, `signer`, `offer`, `otp`, `routing[]`, `signers[]` (masked emails, as the verify page shows them), `originalSha256`, `signedSha256`, `activity[]` (newest first, `kind` picks the icon). It also holds the full screens' data: `files[]`, `chat`, `draft`, `board`, `certificate`, `user`. Keep it consistent with the seed.
 
-## Screenshot data
+## Matching the seed
 
-The app screenshots show the showcase workspace (apps/e2e/showcase/seed.ts): Tana Freight Ltd and the people it deals with, all fictional. To change what the screenshots show (names, blanks, messages), edit the seed and re-run the showcase (SCREENSHOTS.md). Keep it believable and consistent: Kenyan names and companies, real-looking addresses, plausible amounts and dates around the capture date.
+The showcase captures (PRODUCT_UI.md) show the same workspace (apps/e2e/showcase/seed.ts): Tana Freight Ltd and the people it deals with, all fictional. To change names, blanks or messages, change both `sample` and the seed, then re-run the showcase to compare. Keep it believable and consistent: Kenyan names and companies, real-looking addresses, plausible amounts and dates around the capture date.
 
 ## Claims
 

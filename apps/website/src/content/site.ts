@@ -284,15 +284,6 @@ export const site = {
     ],
   },
 
-  /** Alt text for the full-page app screenshots (src/components/shots). */
-  shots: {
-    files: "All files in Sahihi: envelopes and documents of Tana Freight Ltd with their status",
-    envelope:
-      "A completed envelope: signed and certified, with downloads for the signed PDF and the certificate",
-    drafting: "Drafting a mutual NDA in Sahihi, with the document's blanks highlighted",
-    editor: "The envelope editor: signature, name and date fields on a board resolution",
-  },
-
   footer: {
     year: 2026,
     links: [
@@ -311,6 +302,88 @@ export const site = {
  */
 export const sample = {
   workspace: "Tana Freight Ltd",
+  user: { name: "Achieng Otieno", initials: "AO" },
+  inbox: 2,
+  /** All files, newest first. `state` picks the status icon after an envelope's name. */
+  files: [
+    {
+      name: "Board resolution — Athi River depot lease",
+      kind: "envelope",
+      sub: "Envelope · Achieng Otieno and David Kariuki",
+      state: "draft",
+    },
+    {
+      name: "Written Resolution of the Board of Directors.pdf",
+      kind: "pdf",
+      sub: "Document",
+      state: "",
+    },
+    {
+      name: "IT acceptable use policy — Njeri Wambui",
+      kind: "envelope",
+      sub: "Envelope · Wanjiru Kamau and Njeri Wambui · 1 of 2 signed",
+      state: "progress",
+    },
+    { name: "IT Acceptable Use Policy.pdf", kind: "pdf", sub: "Document", state: "" },
+    {
+      name: "Offer letter — Juma Ochieng, Operations Coordinator",
+      kind: "envelope",
+      sub: "Envelope · Achieng Otieno and Juma Ochieng · 1 of 2 signed",
+      state: "progress",
+    },
+    { name: "Offer of Employment.pdf", kind: "pdf", sub: "Document", state: "" },
+    {
+      name: "Mutual NDA — Kilima Agro",
+      kind: "envelope",
+      sub: "Envelope · Achieng Otieno + 2 more · 2 of 2 signed",
+      state: "done",
+    },
+    { name: "Mutual Non-Disclosure Agreement.pdf", kind: "pdf", sub: "Document", state: "" },
+  ],
+  added: "13 Oct 2026",
+  /** The drafting conversation: what the person asked, what the assistant did, then its question. */
+  chat: {
+    ask: "We're Tana Freight Ltd (Godown 14, Enterprise Road, Industrial Area, Nairobi). Draft this NDA with Savanna Fresh Exports Ltd of Moi South Lake Road, Naivasha. We're sharing route plans and pricing before a cold-chain pilot for their cut flowers.",
+    updated:
+      "Updated First party's name, First party's address, Second party's name, Second party's address, Purpose of the disclosure",
+    reply: "Filled in both parties, their addresses, and the route-planning and pricing purpose.",
+  },
+  /** The drafted NDA as Preview shows it. `b` marks a filled blank; `open` one still empty. */
+  draft: {
+    title: "Mutual Non-Disclosure Agreement",
+    version: "Draft · version 2",
+    blanksOpen: "4 blanks open",
+    effective: "Effective date",
+    parties: [
+      { name: "Tana Freight Ltd", address: "Godown 14, Enterprise Road, Industrial Area, Nairobi" },
+      { name: "Savanna Fresh Exports Ltd", address: "Moi South Lake Road, Naivasha" },
+    ],
+    purpose: "sharing route plans and pricing before a cold-chain pilot for their cut flowers",
+  },
+  /** The board resolution in the envelope editor (page 1). */
+  board: {
+    title: "Board resolution — Athi River depot lease",
+    heading: "Written Resolution of the Board of Directors",
+    sections: [
+      [
+        "1. Company",
+        'Written resolution of the directors of Tana Freight Ltd (registration number PVT-7LUQ2KZ8) (the "Company"), dated 9 October 2026.',
+      ],
+      [
+        "2. Background",
+        "The directors have considered a lease of a second depot in Athi River. Each director has declared any interest in the matter as the Company's articles and the law require.",
+      ],
+      [
+        "3. Resolutions",
+        "The directors resolve: (a) to the Company enter into a five-year lease of Warehouse 3, Export Processing Zone, Athi River, at a monthly rent not exceeding KES 1,200,000; and (b) that the Managing Director is authorised to sign all documents and do everything necessary to give effect to this resolution.",
+      ],
+      [
+        "4. Effect",
+        "This resolution is passed as a written resolution under the Company's articles of association. It is as valid as if it had been passed at a meeting of the directors properly called and held.",
+      ],
+    ],
+  },
+  certificate: "5XV2-MEVQ-Q84C",
   nda: "Mutual NDA — Kilima Agro",
   ndaFile: "Mutual Non-Disclosure Agreement.pdf",
   completed: "13 Oct 2026 at 11:48",

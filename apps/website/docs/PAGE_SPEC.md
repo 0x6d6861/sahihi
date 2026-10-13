@@ -36,7 +36,7 @@ Every section's acceptance criteria are judged at **1288×900** and **390×844**
 - **Content:** `site.chapters[]`, one chapter per entry, in order (`draft`, `send`, `prove`)
 - **Per chapter:**
   1. Eyebrow (`text-eyebrow`: 28px, faint, 500) plus a two-line `text-headline` (88px), left-aligned in the `Inset` column.
-  2. The main screenshot in a `ChromeFrame` (aspect `16/10`), full `Section` width. Mapped by `ch.id` in `mainShot`: `draft → drafting`, `send → editor`, `prove → envelope`.
+  2. The main app screen in a `ChromeFrame` (aspect `16/10`), full `Section` width. Mapped by `ch.id` in `mainScreen`: `draft → DraftingScreen`, `send → EditorScreen`, `prove → EnvelopeScreen`.
   3. The body paragraph: ink, weight-500 `text-lede` (28/36), max 30em.
   4. Demo panels in a 2-column grid. A demo with `wide: true` spans both columns. Each panel is `bg-panel`, radius 28px, with an aspect ratio from the `demos` map, followed by a `Caption` (`text-lede`: ink 500 lead, muted 400 rest).
   5. **Draft chapter only:** a features grid (`ch.features`) of a metal icon plus a caption-pattern line in `text-caption` (20/28). 3 columns on desktop, 2 on tablet, 1 on mobile.
@@ -53,7 +53,7 @@ Every section's acceptance criteria are judged at **1288×900** and **390×844**
   | `verify` | `VerifyDemo` | 4/3 |
   | `audit` | `AuditDemo` | 4/3 |
 
-  To add a kind: build it in `components/demos` to match the real card (SCREENSHOTS.md), register it in `demos`, then reference it from `site.ts`.
+  To add a kind: build it in `components/demos` to match the real card (PRODUCT_UI.md), register it in `demos`, then reference it from `site.ts`.
 - **Accept:** every demo panel shows a legible demo at desktop width, in both themes, with nothing overflowing at 390px. Captions align with the panel's inner edge (`px-3`). The chapter anchors (`#draft`, `#send`, `#prove`) work.
 
 ## 5. Integrations: `ContextRow.tsx`

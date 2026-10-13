@@ -6,9 +6,9 @@ import { API_URL, serverEnv, WEB_PORT, WEB_URL } from "./env"
 const root = path.resolve(import.meta.dirname, "../../..")
 
 /**
- * Screenshots of the real app for the marketing site (apps/website, docs/MOCKUPS.md → Real
- * screenshots). Builds a believable workspace through the real API and UI, then captures each
- * screen in light and dark. Own stack (api 4200, web 3200, worker, DB sahihi_showcase_e2e).
+ * Reference captures of the real app for the marketing site, whose coded screens are matched to
+ * them (apps/website/docs/PRODUCT_UI.md). Builds a believable workspace through the real API and
+ * UI, then captures each screen in light and dark into showcase/out/. Own stack (api 4200, web 3200, worker, DB sahihi_showcase_e2e).
  * Needs `bun run infra:up`, and no `bun run dev` of the web app running.
  *
  *   bun run --filter @sahihi/e2e showcase

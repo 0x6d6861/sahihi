@@ -41,5 +41,5 @@ export const serverEnv: Record<string, string> = {
   ...aiEnv(),
 }
 
-/** Where the screenshots go: the marketing site's assets. */
-export const OUT_DIR = path.resolve(import.meta.dirname, "../../website/src/assets/shots")
+/** Where the captures go (gitignored): the reference the website's coded screens are matched to. */
+export const OUT_DIR = path.resolve(import.meta.dirname, "out")

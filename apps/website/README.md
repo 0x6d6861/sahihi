@@ -1,6 +1,6 @@
 # Sahihi website
 
-The marketing site for Sahihi: a quiet, product-led landing page (draft, send, prove), with real full-page screenshots of the app and coded demos of its cards, both in light and dark, a scroll-driven hero where three frames merge into one completed envelope, and MDX pages for security, privacy and terms. The layout follows subframe.com's landing page.
+The marketing site for Sahihi: a quiet, product-led landing page (draft, send, prove), with the app itself recreated in code (screens and cards, light and dark), a scroll-driven hero where three frames merge into one completed envelope, and MDX pages for security, privacy and terms. The layout follows subframe.com's landing page.
 
 Built with Next.js 16 (App Router), Tailwind CSS v4, Motion and `@next/mdx`, set in Geist. Every route is static.
 
@@ -26,7 +26,7 @@ Agents start at [AGENTS.md](AGENTS.md) (Claude Code reads it through `CLAUDE.md`
 | [DESIGN.md](docs/DESIGN.md) | Tokens, type scale, layout, components, motion, accessibility |
 | [PAGE_SPEC.md](docs/PAGE_SPEC.md) | Every section: content source, layout, behaviour, acceptance criteria |
 | [HERO_ANIMATION.md](docs/HERO_ANIMATION.md) | The pinned scroll sequence: timeline, frame config, performance rules |
-| [SCREENSHOTS.md](docs/SCREENSHOTS.md) | Screenshots (captured) and coded demos: where each goes, how to re-capture |
+| [PRODUCT_UI.md](docs/PRODUCT_UI.md) | The coded app screens and demos: sizing, palette, matching the real app |
 | [CONTENT.md](docs/CONTENT.md) | Voice, the `site.ts` schema, rebranding checklist |
 | [QA_CHECKLIST.md](docs/QA_CHECKLIST.md) | What to run and look at before calling a change done |
 
@@ -35,7 +35,7 @@ Agents start at [AGENTS.md](AGENTS.md) (Claude Code reads it through `CLAUDE.md`
 | What | Where |
 |---|---|
 | All landing-page copy: headlines, chapters, trust facts, plans, FAQ | `src/content/site.ts` (`site`) |
-| App screenshots (light + dark) | `src/assets/shots/`, captured by `bun run --filter @sahihi/e2e showcase` |
+| The app screens and demos | `src/components/demos/` (data: `sample` in `site.ts`) |
 | Security, privacy and terms | `src/app/(legal)/*/page.mdx`, styled by `src/mdx-components.tsx` |
 | Colours, type scale, bezel, marquee | `src/app/globals.css` |
 | Fonts | `src/app/layout.tsx` |
@@ -52,8 +52,7 @@ src/
   content/        site.ts — every string on the page
   components/
     ui/           ChromeFrame, PillButton/ArrowLink, Caption, Reveal, Section/Inset
-    shots/        Shot + shots.ts (the screenshot pairs)
-    demos/        coded product demos (parts.tsx, screens.tsx)
+    demos/        pages.tsx (full app screens), screens.tsx (card demos), parts.tsx
     icons/        MetalIcons.tsx — SVG brushed-steel feature icons
     sections/     one file per page section
 ```
@@ -61,19 +60,18 @@ src/
 ### Sections (in order)
 
 1. **Header**: wordmark and underlined text links (Security, Pricing, Log in), sticky.
-2. **HeroStory**: the only pinned, scroll-scrubbed sequence. The headline fades, the Draft/Send/Prove frames straighten and merge into `AppWindow`, a completed envelope. It animates only `transform` and `opacity`. Users with `prefers-reduced-motion` get a static version.
+2. **HeroStory**: the only pinned, scroll-scrubbed sequence. The headline fades, the Draft/Send/Prove frames straighten and merge into the All files screen. It animates only `transform` and `opacity`. Users with `prefers-reduced-motion` get a static version.
 3. **PillarIntro**: "Draft. Send. Prove." in grey display type.
-4. **FeatureChapters**: one chapter per entry in `site.chapters` (drafting assistant, send & sign, certificate), each with a big screenshot, demo panels and bold-lead captions. The draft chapter also has the metal-icon grid.
+4. **FeatureChapters**: one chapter per entry in `site.chapters` (drafting assistant, send & sign, certificate), each with a big app screen, demo panels and bold-lead captions. The draft chapter also has the metal-icon grid.
 5. **ContextRow**: integrations (API, webhooks, bulk send, embedded signing) as four marquee cards.
 6. **Process**: four giant numerals.
 7. **Trust**: verifiable product facts in a bento grid.
 8. **Pricing** (four plans by monthly envelopes, no prices yet), then **FAQ**.
 9. **Footer**.
 
-## Screenshots
+## Product UI
 
-Full-page pictures are real screenshots of the app on a seeded, fictional workspace, captured in light and dark by `bun run --filter @sahihi/e2e showcase` (needs `bun run infra:up`). Re-run it after UI changes; never edit the images. The smaller demo panels are coded to match the real cards. See [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md).
-
+Every product picture is code: the real app's screens and cards rebuilt in HTML, sized in `em` so they scale with their frame, and themed with the app's own palette. `bun run --filter @sahihi/e2e showcase` captures the real screens to compare against. See [docs/PRODUCT_UI.md](docs/PRODUCT_UI.md).
 
 ## Notes
 

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import { DraftingScreen, EditorScreen, EnvelopeScreen, Screen } from "@/components/demos/pages"
 import {
   AuditDemo,
   OtpDemo,
@@ -10,21 +11,29 @@ import {
   VerifyDemo,
 } from "@/components/demos/screens"
 import { MetalDefs, MetalIcon, type MetalIconName } from "@/components/icons/MetalIcons"
-import { Shot } from "@/components/shots/Shot"
 import { Caption } from "@/components/ui/Caption"
 import { ChromeFrame } from "@/components/ui/ChromeFrame"
 import { Reveal } from "@/components/ui/Reveal"
 import { Inset, Section } from "@/components/ui/Section"
 import { site } from "@/content/site"
 
-const alt = site.shots
-const full = "(max-width: 1120px) 94vw, 1120px"
-
-/** Each chapter's main picture: a real full-page screenshot (docs/SCREENSHOTS.md). */
-const mainShot: Record<string, ReactNode> = {
-  draft: <Shot name="drafting" alt={alt.drafting} sizes={full} />,
-  send: <Shot name="editor" alt={alt.editor} sizes={full} />,
-  prove: <Shot name="envelope" alt={alt.envelope} sizes={full} />,
+/** Each chapter's main picture: a full app screen, coded to match the real one. */
+const mainScreen: Record<string, ReactNode> = {
+  draft: (
+    <Screen>
+      <DraftingScreen />
+    </Screen>
+  ),
+  send: (
+    <Screen>
+      <EditorScreen />
+    </Screen>
+  ),
+  prove: (
+    <Screen>
+      <EnvelopeScreen />
+    </Screen>
+  ),
 }
 
 /** Demo kind → its coded demo (components/demos) and the panel's aspect ratio. */
@@ -61,7 +70,7 @@ export function FeatureChapters() {
             </Inset>
 
             <Reveal className="mt-14">
-              <ChromeFrame aspect="16/10">{mainShot[ch.id]}</ChromeFrame>
+              <ChromeFrame aspect="16/10">{mainScreen[ch.id]}</ChromeFrame>
             </Reveal>
 
             <Inset>

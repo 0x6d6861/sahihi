@@ -193,8 +193,8 @@
 
 /* Dark mode is <html data-theme="dark">: the system setting, or the D hotkey
    (ThemeHotkey.tsx). Text stays "one colour at fixed opacities", flipped to
-   white, so every grey keeps its role. Screenshots swap to their dark captures
-   (components/shots/Shot.tsx). */
+   white, so every grey keeps its role. The coded app UI has its own palette
+   (see "Product demos" below). */
 :root[data-theme="dark"] {
   color-scheme: dark;
   --color-paper: #111111;
@@ -297,7 +297,6 @@ body {
   overflow: hidden;
   height: 100%;
   border-radius: calc(clamp(18px, 2.4cqw, 34px) - clamp(4px, 0.55cqw + 3px, 8px));
-  /* The app's own page colour, behind screenshots while they load. */
   background: #ffffff;
   box-shadow:
     inset 0 0 0 1px rgb(0 0 0 / 0.28),
@@ -308,8 +307,7 @@ body {
 }
 
 /* ── Product demos ─────────────────────────────────────────────────
-   Coded recreations of app cards (components/demos), next to the real
-   screenshots. Sizes are in `em` off `.demo-root`, whose font size follows the
+   Coded recreations of the app's screens and cards (components/demos). Sizes are in `em` off `.demo-root`, whose font size follows the
    panel's width, so a demo scales as one unit. Colours copy Arc's neutral
    tokens (apps/web/components/arc/foundation.css) and switch with the page.
    PDF paper stays white, as in the app. */
@@ -362,6 +360,17 @@ body {
 /* Set --dm on a demo to change how big its UI reads. */
 .demo-root {
   font-size: clamp(6px, calc(var(--dm, 2.6) * 1cqw), 16px);
+  line-height: 1.4;
+  letter-spacing: 0;
+  font-weight: 400;
+  font-family: var(--font-ui), var(--font-sans);
+  color: var(--dm-text);
+}
+
+/* Full app screens (components/demos/pages.tsx): 1em = 1% of the canvas width,
+   so the app's own px ÷ 14.4 (its 1440 px layout) gives every size. */
+.screen-root {
+  font-size: 1cqw;
   line-height: 1.4;
   letter-spacing: 0;
   font-weight: 400;

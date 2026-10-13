@@ -106,8 +106,8 @@ test("showcase: seed a believable workspace and capture the real screens", async
     await shoot(sender, "drafting")
   })
 
-  // The real assistant (AI_MODEL). SHOWCASE_SKIP_AI keeps the drafting, question and proposal
-  // shots already in assets/shots and makes no model calls.
+  // The real assistant (AI_MODEL). SHOWCASE_SKIP_AI makes no model calls: the plain draft
+  // captured above stays the drafting reference.
   await test.step("drafting with the assistant", async () => {
     if (process.env.SHOWCASE_SKIP_AI) return
     const { id } = await api.call<{ id: string }>("POST", "/generated-documents", {

@@ -7,7 +7,7 @@ import { settle } from "./seed"
 /** Next's dev-mode badge and toasts aren't part of the product. */
 const HIDE = "nextjs-portal{display:none!important} [data-sonner-toaster]{display:none!important}"
 
-/** 1.5× keeps text sharp on the site's 1120px frames (≈ 2160px wide) at a sane file size. */
+/** 1.5×: sharp enough to compare text sizes against the coded screens. */
 export const DESKTOP = { width: 1440, height: 900 }
 export const SCALE = 1.5
 
