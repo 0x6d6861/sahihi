@@ -16,14 +16,7 @@ import {
   UpdateDocumentSchema,
 } from "@sahihi/core"
 import { forOrganization, prisma } from "@sahihi/db"
-import {
-  deleteObject,
-  getObjectBytes,
-  headObject,
-  keys,
-  presignDownload,
-  presignUpload,
-} from "@sahihi/infra"
+import { keys, releaseObject, storageFor } from "@sahihi/infra"
 import { inspectPdf, PdfInspectionError, readFormWidgets, readPageText } from "@sahihi/pdf"
 import { Hono } from "hono"
 import type { AppEnv } from "../lib/env"
@@ -77,7 +70,8 @@ export const documents = new Hono<AppEnv>()
         folderId: input.folderId ?? null,
       },
     })
-    const uploadUrl = await presignUpload(s3Key, input.contentType, input.sizeBytes)
+    const storage = await storageFor(orgId)
+    const uploadUrl = await storage.presignUpload(s3Key, input.contentType, input.sizeBytes)
     return c.json({ document, uploadUrl }, 201)
   })
 
@@ -89,11 +83,12 @@ export const documents = new Hono<AppEnv>()
     if (!doc) notFound("Document")
     if (doc.status !== "UPLOADING") conflict(`Document is already ${doc.status}`)
 
-    const head = await headObject(doc.s3Key)
+    const storage = await storageFor(doc.organizationId)
+    const head = await storage.head(doc.s3Key)
     if (!head) badRequest("Upload not found in storage")
     if (head.sizeBytes > MAX_UPLOAD_BYTES) badRequest("File too large")
 
-    const bytes = await getObjectBytes(doc.s3Key)
+    const bytes = await storage.get(doc.s3Key)
     try {
       const info = await inspectPdf(bytes)
       const updated = await prisma.document.update({
@@ -114,7 +109,7 @@ export const documents = new Hono<AppEnv>()
         where: { id: doc.id },
         data: { status: "FAILED", failureReason: err.message },
       })
-      await deleteObject(doc.s3Key).catch(() => {})
+      await releaseObject(doc.organizationId, doc.s3Key, "upload_rejected").catch(() => {})
       return c.json({ document: failed, error: err.code }, 422)
     }
   })
@@ -198,7 +193,8 @@ export const documents = new Hono<AppEnv>()
       where: scope.document({ id: c.req.param("id"), status: "READY" }),
     })
     if (!doc) notFound("Document")
-    return c.json({ url: await presignDownload(doc.s3Key, { fileName: doc.name }) })
+    const storage = await storageFor(doc.organizationId)
+    return c.json({ url: await storage.presignDownload(doc.s3Key, { fileName: doc.name }) })
   })
 
   /**
@@ -214,7 +210,7 @@ export const documents = new Hono<AppEnv>()
       select: { s3Key: true, pages: true },
     })
     if (!doc) notFound("Document")
-    const bytes = await getObjectBytes(doc.s3Key)
+    const bytes = await (await storageFor(c.get("organizationId"))).get(doc.s3Key)
     const pages = (doc.pages ?? []) as unknown as PageBox[]
     const scanRules = createTextRuleScanner()
     const text = await readPageText(bytes, {
@@ -306,9 +302,11 @@ export const documents = new Hono<AppEnv>()
       data: { deletedAt: new Date(), thumbnailKey: null },
     })
     // The preview only serves the Documents list, which no longer shows it.
-    if (doc.thumbnailKey) await deleteObject(doc.thumbnailKey).catch(() => {})
+    if (doc.thumbnailKey) {
+      await releaseObject(doc.organizationId, doc.thumbnailKey, "deleted").catch(() => {})
+    }
     if (doc.envelopeDocuments.length === 0) {
-      await deleteObject(doc.s3Key).catch(() => {})
+      await releaseObject(doc.organizationId, doc.s3Key, "deleted").catch(() => {})
     }
     return c.body(null, 204)
   })

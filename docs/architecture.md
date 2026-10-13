@@ -34,7 +34,7 @@
 | `@sahihi/core` | Pure domain logic: enums, state machines, routing, coordinates, crypto, audit chain, zod schemas. No I/O. Runs in the browser too. | zod |
 | `@sahihi/config` | Env parsing (`getEnv()`), queue names | core |
 | `@sahihi/db` | Prisma client, `forOrganization`, `appendAuditEvent`, `issueSigningLink` | core |
-| `@sahihi/infra` | S3 (`presignUpload`, `putObject`, …, `keys`), typed queues, Redis | config |
+| `@sahihi/infra` | Storage (`storageFor`, `userStorage`, `releaseObject`, `keys`), typed queues, Redis | config |
 | `@sahihi/pdf` | `inspectPdf`, `stampFields`, `renderCertificate` (pdf-lib, server only) | core |
 | `apps/api` | HTTP | all packages |
 | `apps/worker` | Jobs | all packages |
@@ -177,6 +177,15 @@ user/{userId}/avatar-{version}.png               (profile picture, via /api/avat
 ```
 
 Objects are write-once. `original.pdf` is never overwritten, because its SHA-256 is on the certificate.
+
+Code reaches storage through a driver (ADR 0051), never the S3 client:
+- `storageFor(orgId)` for a workspace's files (`org/{orgId}/…`). Today that is always Sahihi's
+  bucket; workspaces will be able to connect their own (roadmap P7).
+- `userStorage()` for a person's own files (`user/{userId}/…`), which always stay in Sahihi's bucket.
+- `releaseObject(orgId, key, reason)` / `releasePrefix(…)` when a workspace file is no longer
+  needed. Sahihi's bucket deletes it; a customer's bucket will keep it, because Sahihi never deletes
+  there. Only Sahihi's driver (`DeletableStorage`) has `delete`.
+- `platformStorage()` is Sahihi's bucket itself, for tests that check what it holds.
 
 ## Configuration
 

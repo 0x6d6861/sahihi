@@ -75,8 +75,8 @@ better-auth's `organization.delete`:
   templates, webhooks, exports, settings, notifications, AI-generated documents and their
   templates.
 - The `afterDeleteOrganization` hook queues `organization.purge-storage`, which deletes everything
-  under `org/<id>/` in storage (`deletePrefix`, which refuses any prefix that isn't a workspace
-  folder).
+  under `org/<id>/` in storage (`releasePrefix`, which refuses any prefix outside the workspace's
+  folder; ADR 0051).
 - Certificates stop verifying. The dialog says so and suggests exporting first.
 
 ## Deleting an account

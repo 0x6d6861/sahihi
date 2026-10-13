@@ -9,7 +9,7 @@ import {
   safeFileName,
   signedDocumentFileName,
 } from "@sahihi/core"
-import { presignDownload } from "@sahihi/infra"
+import { storageFor } from "@sahihi/infra"
 import { HTTPException } from "hono/http-exception"
 
 /** Prisma `include`/`select` for an envelope's documents, in order. */
@@ -99,6 +99,7 @@ export const totalPages = (rows: { document: { pageCount: number | null } }[]) =
   rows.reduce((n, d) => n + (d.document.pageCount ?? 0), 0)
 
 type DownloadSource = {
+  organizationId: string
   title: string
   bundleS3Key: string | null
   certificate: { s3Key: string } | null
@@ -121,8 +122,9 @@ export async function downloadLinks(e: DownloadSource) {
       ),
     })
   }
+  const storage = await storageFor(e.organizationId)
   const download = (key: string, fileName: string) =>
-    presignDownload(key, { fileName, disposition: "attachment" })
+    storage.presignDownload(key, { fileName, disposition: "attachment" })
   // One document: named after the envelope, as before ADR 0037. Several: each keeps its name.
   const nameOf = (d: { document: { name: string } }) =>
     e.documents.length === 1

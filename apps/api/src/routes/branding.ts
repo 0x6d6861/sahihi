@@ -1,5 +1,5 @@
 import { prisma } from "@sahihi/db"
-import { getObjectBytes } from "@sahihi/infra"
+import { storageFor } from "@sahihi/infra"
 import { Hono } from "hono"
 import { rateLimit } from "../middleware/rate-limit"
 
@@ -21,7 +21,7 @@ export const branding = new Hono()
     if (!settings?.logoKey) return c.json({ error: "not_found" }, 404)
     let bytes: Uint8Array
     try {
-      bytes = await getObjectBytes(settings.logoKey)
+      bytes = await (await storageFor(c.req.param("orgId"))).get(settings.logoKey)
     } catch {
       return c.json({ error: "not_found" }, 404)
     }

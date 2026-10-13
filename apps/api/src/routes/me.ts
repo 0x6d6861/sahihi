@@ -12,14 +12,7 @@ import {
   SaveSignatureSchema,
 } from "@sahihi/core"
 import { prisma } from "@sahihi/db"
-import {
-  createLogger,
-  deleteObject,
-  getObjectBytes,
-  getQueues,
-  keys,
-  putObject,
-} from "@sahihi/infra"
+import { createLogger, getQueues, keys, userStorage } from "@sahihi/infra"
 import { pngFromDataUrl } from "@sahihi/pdf"
 import { Hono } from "hono"
 import { auth } from "../auth"
@@ -41,7 +34,7 @@ const column = { signature: "signatureKey", initials: "initialsKey" } as const
 async function toDataUrl(key: string | null): Promise<string | null> {
   if (!key) return null
   try {
-    return `data:image/png;base64,${Buffer.from(await getObjectBytes(key)).toString("base64")}`
+    return `data:image/png;base64,${Buffer.from(await userStorage().get(key)).toString("base64")}`
   } catch (err) {
     log.warn("saved signature missing from storage", { err })
     return null
@@ -76,7 +69,7 @@ export const me = new Hono<AppEnv>()
     }
     const userId = c.get("user").id
     const key = keys.savedSignature(userId, kind, crypto.randomUUID().slice(0, 8))
-    await putObject(key, png, "image/png")
+    await userStorage().put(key, png, "image/png")
     const previous = await prisma.savedSignature.findUnique({ where: { userId } })
     await prisma.savedSignature.upsert({
       where: { userId },
@@ -84,7 +77,11 @@ export const me = new Hono<AppEnv>()
       update: { [column[kind]]: key },
     })
     const old = previous?.[column[kind]]
-    if (old) await deleteObject(old).catch((err) => log.warn("old signature not deleted", { err }))
+    if (old) {
+      await userStorage()
+        .delete(old)
+        .catch((err) => log.warn("old signature not deleted", { err }))
+    }
     return c.json({ kind, dataUrl })
   })
 
@@ -96,7 +93,9 @@ export const me = new Hono<AppEnv>()
     const key = row?.[column[kind]]
     if (!row || !key) return c.body(null, 204)
     await prisma.savedSignature.update({ where: { userId }, data: { [column[kind]]: null } })
-    await deleteObject(key).catch((err) => log.warn("signature not deleted", { err }))
+    await userStorage()
+      .delete(key)
+      .catch((err) => log.warn("signature not deleted", { err }))
     return c.body(null, 204)
   })
 
@@ -118,7 +117,7 @@ export const me = new Hono<AppEnv>()
     const userId = c.get("user").id
     const version = crypto.randomUUID().slice(0, 8)
     const key = keys.avatar(userId, version)
-    await putObject(key, png, "image/png")
+    await userStorage().put(key, png, "image/png")
     const image = avatarUrl(userId, version)
     const previous = await prisma.$transaction(async (tx) => {
       const before = await tx.userAvatar.findUnique({ where: { userId }, select: { key: true } })
@@ -126,7 +125,11 @@ export const me = new Hono<AppEnv>()
       await tx.user.update({ where: { id: userId }, data: { image } })
       return before?.key ?? null
     })
-    if (previous) await deleteObject(previous).catch((err) => log.warn("old avatar kept", { err }))
+    if (previous) {
+      await userStorage()
+        .delete(previous)
+        .catch((err) => log.warn("old avatar kept", { err }))
+    }
     return c.json({ image })
   })
 
@@ -138,7 +141,11 @@ export const me = new Hono<AppEnv>()
       await tx.user.update({ where: { id: userId }, data: { image: null } })
       return before?.key ?? null
     })
-    if (previous) await deleteObject(previous).catch((err) => log.warn("avatar kept", { err }))
+    if (previous) {
+      await userStorage()
+        .delete(previous)
+        .catch((err) => log.warn("avatar kept", { err }))
+    }
     return c.body(null, 204)
   })
 

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test"
 import { MAX_UPLOAD_BYTES } from "@sahihi/core"
 import { prisma } from "@sahihi/db"
-import { headObject } from "@sahihi/infra"
+import { platformStorage } from "@sahihi/infra"
 import {
   createSender,
   formPdf,
@@ -57,7 +57,7 @@ describe("documents: upload flow", () => {
     expect(status).toBe(422)
     expect(document.status).toBe("FAILED")
     const row = await prisma.document.findUniqueOrThrow({ where: { id: document.id } })
-    expect(await headObject(row.s3Key)).toBeNull()
+    expect(await platformStorage().head(row.s3Key)).toBeNull()
   })
 
   test("upload requests are validated with CreateUploadSchema", async () => {
@@ -166,7 +166,7 @@ describe("documents: delete", () => {
     expect((await request(alice, `/api/documents/${document.id}`)).status).toBe(404)
     const row = await prisma.document.findUniqueOrThrow({ where: { id: document.id } })
     expect(row.deletedAt).not.toBeNull()
-    expect(await headObject(row.s3Key)).toBeNull()
+    expect(await platformStorage().head(row.s3Key)).toBeNull()
   })
 })
 
@@ -201,7 +201,7 @@ describe("documents: access control", () => {
     // Bob's DELETE must not have touched Alice's document.
     const row = await prisma.document.findUniqueOrThrow({ where: { id } })
     expect(row.deletedAt).toBeNull()
-    expect(await headObject(row.s3Key)).not.toBeNull()
+    expect(await platformStorage().head(row.s3Key)).not.toBeNull()
   })
 
   test("envelopes can't be created from another organization's document", async () => {

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { prisma } from "@sahihi/db"
-import { putObject } from "@sahihi/infra"
+import { platformStorage } from "@sahihi/infra"
 import { MockLanguageModelV4 } from "ai/test"
 import { setAssistantModelForTests } from "../src/lib/assistant/model"
 import { app, createSender, request, resetDb, type Sender, uploadDocument } from "./helpers"
@@ -544,7 +544,7 @@ beforeAll(async () => {
     await prisma.envelopeDocument.findFirstOrThrow({ where: { envelopeId: ids.envelope } })
   ).id
   const attachmentKey = `org/${alice.organizationId}/envelopes/${ids.envelope}/attachments/x`
-  await putObject(attachmentKey, new TextEncoder().encode("a,b\n1,2\n"), "text/csv")
+  await platformStorage().put(attachmentKey, new TextEncoder().encode("a,b\n1,2\n"), "text/csv")
   ids.attachment = (
     await prisma.envelopeAttachment.create({
       data: {

@@ -1,6 +1,6 @@
 import { hasPermission, RetentionSettingsSchema } from "@sahihi/core"
 import { forOrganization, prisma } from "@sahihi/db"
-import { getQueues, presignDownload } from "@sahihi/infra"
+import { getQueues, storageFor } from "@sahihi/infra"
 import { Hono } from "hono"
 import { createMiddleware } from "hono/factory"
 import type { AppEnv } from "../lib/env"
@@ -105,7 +105,7 @@ export const data = new Hono<AppEnv>()
     }
     const day = x.createdAt.toISOString().slice(0, 10)
     return c.json({
-      url: await presignDownload(x.s3Key, {
+      url: await (await storageFor(c.get("organizationId"))).presignDownload(x.s3Key, {
         fileName: `sahihi-export-${day}.zip`,
         disposition: "attachment",
       }),

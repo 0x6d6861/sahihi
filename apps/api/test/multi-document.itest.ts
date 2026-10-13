@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test"
 import { CONSENT_VERSION, MAX_ENVELOPE_DOCUMENTS, sha256Hex } from "@sahihi/core"
 import { prisma } from "@sahihi/db"
-import { getObjectBytes, getQueues, headObject } from "@sahihi/infra"
+import { getQueues, platformStorage } from "@sahihi/infra"
 import { unzipSync } from "fflate"
 import { finalizeEnvelope } from "../../worker/src/jobs/finalize"
 import {
@@ -325,7 +325,7 @@ describe("signing and finalizing two documents (ADR 0037)", () => {
     })
     expect(rows.every((d) => d.signedS3Key && d.signedSha256)).toBe(true)
     for (const d of rows) {
-      expect(await sha256Hex(await getObjectBytes(d.signedS3Key as string))).toBe(
+      expect(await sha256Hex(await platformStorage().get(d.signedS3Key as string))).toBe(
         d.signedSha256 as string,
       )
     }
@@ -364,7 +364,7 @@ describe("signing and finalizing two documents (ADR 0037)", () => {
       ].sort(),
     )
     const env = await prisma.envelope.findUniqueOrThrow({ where: { id } })
-    expect(await headObject(env.bundleS3Key as string)).not.toBeNull()
+    expect(await platformStorage().head(env.bundleS3Key as string)).not.toBeNull()
     // A retry is a no-op.
     expect(await finalizeEnvelope(id)).toEqual({ skipped: true })
   })
@@ -431,7 +431,7 @@ describe("templates keep every document and file (ADR 0037)", () => {
     expect(field.envelopeDocumentId).toBe(d.envelope.documents[1]?.id as string)
     const copy = await prisma.envelopeAttachment.findFirstOrThrow({ where: { envelopeId: newId } })
     expect(copy.s3Key).toContain(`/envelopes/${newId}/attachments/`)
-    expect(await headObject(copy.s3Key)).not.toBeNull()
+    expect(await platformStorage().head(copy.s3Key)).not.toBeNull()
   })
 })
 

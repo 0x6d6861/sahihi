@@ -13,15 +13,7 @@ import {
   signedDocumentFileName,
 } from "@sahihi/core"
 import { appendAuditEvent, notifyEnvelopeOwner, prisma, queueEnvelopeWebhook } from "@sahihi/db"
-import {
-  createLogger,
-  enqueueWebhookDeliveries,
-  getObjectBytes,
-  getQueues,
-  keys,
-  putObject,
-  putObjectStream,
-} from "@sahihi/infra"
+import { createLogger, enqueueWebhookDeliveries, getQueues, keys, storageFor } from "@sahihi/infra"
 import { renderCertificate, type StampField, stampFields } from "@sahihi/pdf"
 import { Zip, ZipPassThrough } from "fflate"
 import { getSigningProvider } from "../providers"
@@ -71,13 +63,14 @@ export async function finalizeEnvelope(envelopeId: string) {
 
   // ── 1–4: one signed PDF per document (ADR 0037). Documents already done are skipped, so a
   // retry resumes where it stopped. ──
+  const storage = await storageFor(e.organizationId)
   const signed = new Map<string, string>()
   for (const ed of e.documents) {
     if (ed.signedS3Key && ed.signedSha256) {
       signed.set(ed.id, ed.signedSha256)
       continue
     }
-    const original = await getObjectBytes(ed.document.s3Key)
+    const original = await storage.get(ed.document.s3Key)
     if ((await sha256Hex(original)) !== ed.document.sha256) {
       throw new Error(`Original document hash mismatch for envelope ${envelopeId} (${ed.id})`)
     }
@@ -91,7 +84,7 @@ export async function finalizeEnvelope(envelopeId: string) {
           page: f.page,
           rect,
           type: f.type,
-          value: { kind: "image", png: await getObjectBytes(f.imageS3Key) },
+          value: { kind: "image", png: await storage.get(f.imageS3Key) },
         })
       } else if (f.type === "CHECKBOX") {
         toStamp.push({
@@ -118,7 +111,7 @@ export async function finalizeEnvelope(envelopeId: string) {
 
     const signedSha256 = await sha256Hex(sealed.pdf)
     const signedKey = keys.signedDocument(e.organizationId, envelopeId, ed.id)
-    await putObject(signedKey, sealed.pdf, "application/pdf")
+    await storage.put(signedKey, sealed.pdf, "application/pdf")
     await prisma.$transaction(async (tx) => {
       await tx.envelopeDocument.update({
         where: { id: ed.id },
@@ -212,7 +205,7 @@ export async function finalizeEnvelope(envelopeId: string) {
 
   const certKey = keys.certificate(e.organizationId, envelopeId)
   const certSha = await sha256Hex(pdf)
-  await putObject(certKey, pdf, "application/pdf")
+  await (await storageFor(e.organizationId)).put(certKey, pdf, "application/pdf")
   const webhooks = await prisma.$transaction(async (tx) => {
     await tx.certificate.create({
       data: {
@@ -259,6 +252,7 @@ export async function buildBundle(envelopeId: string) {
     },
   })
   if (!e.certificate || e.purgedAt || e.documents.some((d) => !d.signedS3Key)) return null
+  const storage = await storageFor(e.organizationId)
   const dir = await mkdtemp(join(tmpdir(), "sahihi-bundle-"))
   const path = join(dir, "bundle.zip")
   try {
@@ -272,7 +266,7 @@ export async function buildBundle(envelopeId: string) {
       // PDFs and Office files are already compressed: store them.
       const entry = new ZipPassThrough(name)
       zip.add(entry)
-      entry.push(await getObjectBytes(key), true)
+      entry.push(await storage.get(key), true)
     }
     for (const [i, d] of e.documents.entries()) {
       await add(
@@ -289,7 +283,7 @@ export async function buildBundle(envelopeId: string) {
     if (failed) throw failed
     const key = keys.bundle(e.organizationId, envelopeId)
     const { size } = await stat(path)
-    await putObjectStream(key, createReadStream(path), size, "application/zip")
+    await storage.putStream(key, createReadStream(path), size, "application/zip")
     await prisma.envelope.update({ where: { id: envelopeId }, data: { bundleS3Key: key } })
     return key
   } finally {

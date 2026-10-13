@@ -129,6 +129,18 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
 - [x] Attach files in the drafting chat: documents as text the assistant may use, images for
       reference (ADR 0050)
 
+## P7: Bring your own storage (ADR 0051)
+
+- [x] Storage seam: per-workspace driver (`storageFor`, `userStorage`), deletes of workspace files
+      through `releaseObject` / `releasePrefix`, only Sahihi's driver can delete
+- [ ] Plan tiers (`ownStorage`: Business sync, Enterprise primary) + storage connections: settings
+      page, provider presets, encrypted keys or AWS role, "Test connection" without delete permission
+- [ ] Sync completed envelopes to the customer's storage (outbox + worker, write-once, delivery log,
+      failure notifications, optional backfill)
+- [ ] Primary storage in the customer's bucket: upload staging, API-proxied file access, migration
+      in and out, health check, released-files log and webhook, unique keys for worker retries
+- [ ] Google Drive and OneDrive/SharePoint sync destinations
+
 ## Later
 
 - [ ] **CA integration** via `SigningProvider` (PAdES-B-LT), see `docs/certificates.md`

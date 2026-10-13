@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test"
 import { findStarter, generateCertificateCode } from "@sahihi/core"
 import { appendAuditEvent, prisma } from "@sahihi/db"
-import { getObjectBytes, getQueues, headObject, keys, putObject } from "@sahihi/infra"
+import { getQueues, keys, platformStorage } from "@sahihi/infra"
 import { unzipSync } from "fflate"
 import {
   buildExport,
@@ -59,9 +59,9 @@ async function seedCompleted(completedAt = new Date()) {
   const org = alice.organizationId
   const signedKey = keys.signedDocument(org, envelope.id, envelopeDocumentId)
   const imageKey = keys.fieldImage(org, envelope.id, "f1")
-  await putObject(imageKey, new Uint8Array([137, 80, 78, 71]), "image/png")
-  await putObject(signedKey, pdf, "application/pdf")
-  await putObject(keys.certificate(org, envelope.id), pdf, "application/pdf")
+  await platformStorage().put(imageKey, new Uint8Array([137, 80, 78, 71]), "image/png")
+  await platformStorage().put(signedKey, pdf, "application/pdf")
+  await platformStorage().put(keys.certificate(org, envelope.id), pdf, "application/pdf")
   await prisma.field.createMany({
     data: [
       {
@@ -164,10 +164,13 @@ describe("purge", () => {
       keys.certificate(alice.organizationId, s.envelopeId),
       s.imageKey,
     ]) {
-      expect({ key, exists: Boolean(await headObject(key)) }).toEqual({ key, exists: false })
+      expect({ key, exists: Boolean(await platformStorage().head(key)) }).toEqual({
+        key,
+        exists: false,
+      })
     }
     const doc = await prisma.document.findUniqueOrThrow({ where: { id: s.documentId } })
-    expect(await headObject(doc.s3Key)).toBeNull()
+    expect(await platformStorage().head(doc.s3Key)).toBeNull()
     expect(doc.name).toBe("Deleted document")
     expect(doc.sha256).toMatch(/^[0-9a-f]{64}$/) // hash kept
 
@@ -216,7 +219,7 @@ describe("purge", () => {
     })
     await purgeEnvelope(s.envelopeId, "manual")
     const doc = await prisma.document.findUniqueOrThrow({ where: { id: s.documentId } })
-    expect(await headObject(doc.s3Key)).not.toBeNull()
+    expect(await platformStorage().head(doc.s3Key)).not.toBeNull()
     expect(doc.deletedAt).toBeNull()
   })
 
@@ -281,7 +284,7 @@ describe("export", () => {
     await buildExport(x.id)
     const row = await prisma.dataExport.findUniqueOrThrow({ where: { id: x.id } })
     expect(row).toMatchObject({ status: "READY", envelopeCount: 1 })
-    const files = unzipSync(await getObjectBytes(row.s3Key as string))
+    const files = unzipSync(await platformStorage().get(row.s3Key as string))
     const names = Object.keys(files).sort()
     const folder = names.find((n) => n.endsWith("/envelope.json"))?.split("/")[0] as string
     expect(folder).toContain("Lease")
@@ -320,7 +323,7 @@ describe("export", () => {
       data: { expiresAt: new Date(Date.now() - 1000) },
     })
     expect(await cleanupExports()).toEqual({ deleted: 1 })
-    expect(await headObject(row.s3Key as string)).toBeNull()
+    expect(await platformStorage().head(row.s3Key as string)).toBeNull()
     expect((await request(alice, `/api/data/exports/${x.id}/download`)).status).toBe(409)
     void s
   })
@@ -339,8 +342,8 @@ describe("deleting the workspace", () => {
     ).toBeTruthy()
     const { deleted } = await purgeOrganizationStorage(alice.organizationId)
     expect(deleted).toBeGreaterThanOrEqual(4)
-    expect(await headObject(doc.s3Key)).toBeNull()
-    expect(await headObject(keys.signed(alice.organizationId, s.envelopeId))).toBeNull()
+    expect(await platformStorage().head(doc.s3Key)).toBeNull()
+    expect(await platformStorage().head(keys.signed(alice.organizationId, s.envelopeId))).toBeNull()
   })
 })
 
@@ -417,7 +420,7 @@ describe("AI drafts", () => {
     const { export: x } = (await res.json()) as { export: { id: string } }
     await buildExport(x.id)
     const row = await prisma.dataExport.findUniqueOrThrow({ where: { id: x.id } })
-    const files = unzipSync(await getObjectBytes(row.s3Key as string))
+    const files = unzipSync(await platformStorage().get(row.s3Key as string))
     const text = (name: string) => new TextDecoder().decode(files[name])
     const manifest = JSON.parse(text("manifest.json"))
     expect(manifest.aiDrafts).toEqual([

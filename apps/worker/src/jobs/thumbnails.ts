@@ -1,11 +1,10 @@
 import { prisma } from "@sahihi/db"
 import {
   createLogger,
-  deleteObject,
   enqueueDocumentThumbnail,
-  getObjectBytes,
   keys,
-  putObject,
+  releaseObject,
+  storageFor,
 } from "@sahihi/infra"
 import { renderThumbnail } from "@sahihi/pdf"
 
@@ -34,7 +33,8 @@ export async function renderDocumentThumbnail(documentId: string) {
     return { skipped: true }
   }
 
-  const bytes = await getObjectBytes(doc.s3Key)
+  const storage = await storageFor(doc.organizationId)
+  const bytes = await storage.get(doc.s3Key)
   let png: Uint8Array
   try {
     png = (await renderThumbnail(bytes)).png
@@ -49,13 +49,13 @@ export async function renderDocumentThumbnail(documentId: string) {
   }
 
   const key = keys.thumbnail(doc.organizationId, documentId)
-  await putObject(key, png, "image/png")
+  await storage.put(key, png, "image/png")
   const res = await prisma.document.updateMany({
     where: { id: documentId, deletedAt: null },
     data: { thumbnailKey: key, thumbnailError: null },
   })
   // Deleted while rendering: don't leave the image behind.
-  if (res.count === 0) await deleteObject(key).catch(() => {})
+  if (res.count === 0) await releaseObject(doc.organizationId, key, "deleted").catch(() => {})
   return { rendered: res.count > 0, bytes: png.byteLength }
 }
 

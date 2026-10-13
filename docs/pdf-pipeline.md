@@ -9,10 +9,10 @@ browser                         api                                  S3
   │                              Document(UPLOADING, s3Key)
   │ ◀──────── { document, uploadUrl } (presigned PUT, 5 min)
   │ PUT bytes ───────────────────────────────────────────────────▶ original.pdf
-  │ POST /documents/:id/complete ▶ headObject (exists, size)
-  │                              getObjectBytes → inspectPdf
+  │ POST /documents/:id/complete ▶ storage.head (exists, size)
+  │                              storage.get → inspectPdf
   │                              sha256 → READY {sha256, pageCount, pages}
-  │                              or FAILED {failureReason} + delete object (422)
+  │                              or FAILED {failureReason} + release object (422)
 ```
 
 Web side (`app/(app)/documents/`): Extend `FileUpload` (PDF only, single file) in the empty state

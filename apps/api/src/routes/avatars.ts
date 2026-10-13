@@ -1,5 +1,5 @@
 import { prisma } from "@sahihi/db"
-import { getObjectBytes } from "@sahihi/infra"
+import { userStorage } from "@sahihi/infra"
 import { Hono } from "hono"
 import type { AppEnv } from "../lib/env"
 import { requireUser } from "../middleware/session"
@@ -29,7 +29,7 @@ export const avatars = new Hono<AppEnv>()
     if (!avatar) return c.json({ error: "not_found" }, 404)
     let bytes: Uint8Array
     try {
-      bytes = await getObjectBytes(avatar.key)
+      bytes = await userStorage().get(avatar.key)
     } catch {
       return c.json({ error: "not_found" }, 404)
     }

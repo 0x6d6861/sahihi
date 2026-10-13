@@ -232,6 +232,10 @@ Rules:
 
 ## Gotchas
 
+- **Storage:** workspace files go through `storageFor(orgId)` and are removed only with
+  `releaseObject` / `releasePrefix`; a person's own files (`user/…`) use `userStorage()`. Never
+  create an S3 client or delete a workspace file directly: Sahihi must never delete in a
+  customer's bucket (ADR 0051, `docs/architecture.md` → Storage).
 - **Prisma 7:** the client is generated into `packages/db/src/generated/prisma` (gitignored). Import
   from `@sahihi/db`, never from `@prisma/client`. Run `bun run db:generate` after schema edits.
 - **Next 16:** middleware is now `proxy.ts` (exported `proxy` function). It's only an optimistic cookie
