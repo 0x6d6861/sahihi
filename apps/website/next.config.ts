@@ -6,6 +6,13 @@ const nextConfig: NextConfig = {
   partialPrefetching: true,
   // .mdx files are pages too: developers, security, privacy and terms under app/(pages).
   pageExtensions: ["ts", "tsx", "mdx"],
+  // The verify pages call the public verify API through this site, as the app does: same origin,
+  // and the API sees the visitor's address for its rate limit. API_URL is the one setting the site
+  // reads (server side, at build and start).
+  async rewrites() {
+    const api = process.env.API_URL ?? "http://localhost:4000"
+    return [{ source: "/api/verify/:path*", destination: `${api}/api/verify/:path*` }]
+  },
   turbopack: {
     rules: {
       "*.css": {

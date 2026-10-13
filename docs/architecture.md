@@ -186,7 +186,9 @@ process fails fast) and documented in `.env.example`.
 ## Deployment
 
 Railway: four services (api, worker, web, website) from the monorepo plus managed Postgres and Redis.
-The website is the static marketing site: no env vars, no database, and no calls to the api.
+The website is the marketing site: no database and no server-side logic. Its one setting is
+`API_URL` (the api's internal URL), used only by the `/api/verify/*` rewrite behind its public
+`/verify` pages, so set it on the website service too (build and start).
 The api service runs `prisma migrate deploy` before starting, as the schema owner
 (`MIGRATE_DATABASE_URL`). The api and worker themselves connect with `DATABASE_URL` as a login role
 in `sahihi_app`, which can't run DDL or rewrite the audit trail (see `security.md`). Set `WEB_URL`, `API_URL` and

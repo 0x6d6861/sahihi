@@ -114,6 +114,14 @@ Every section's acceptance criteria are judged at **1288×900** and **390×844**
 - **Content rules:** the security page states only what the product does today (sources: `docs/security.md`, `docs/certificates.md`, `docs/data-retention.md`). Privacy and terms are drafts and keep the "Draft, under legal review" notice until legal-reviewed text replaces them. Dates are written by hand ("Last updated …"), never computed.
 - **Accept:** `bun run shots` covers each page in both themes at both widths, with no overflow.
 
+## 12. Verify: `src/app/(pages)/verify/`
+
+- **Routes:** `/verify` (static) and `/verify/<code>` (static shell, filled in the browser; `noindex`, since a record names its signers). The app keeps its own `/verify` pages, which certificates' QR codes point to; these are the public entry from the site (hero secondary CTA, footer).
+- **Content:** `site.verify`. Components in `src/components/verify/`: `VerifyChecker` (drop or choose a PDF, or type a code), `CertificateView` (the record), `verify.ts` (code normalising and SHA-256, copied from `@sahihi/core`; keep them in step).
+- **Behaviour:** the file is hashed in the browser with Web Crypto; only the SHA-256 is sent, to `POST /api/verify/hash`. A match opens `/verify/<code>?match=signed_document|certificate`, which shows "File verified" above the record. Codes are normalised as typed (`5xv2 mevq q84c` → `5XV2-MEVQ-Q84C`) before navigating. Requests go to this site's `/api/verify/*`, which `next.config.ts` rewrites to `API_URL`, so the API's rate limit and client-IP handling are the same as for the app.
+- **States:** hashing (spinner, the file name), no match (with the short hash and why re-saved files don't match), too large (100 MB), rate limited (429), not a PDF, certificate not found, lookup failed.
+- **Accept:** a signed PDF from a completed envelope matches; an unsigned file doesn't; a typed code opens its record; an unknown code says so. Check against a running api (`bun run dev`, or the showcase api with `API_URL=http://localhost:4200`).
+
 ---
 
 ## Adding a section

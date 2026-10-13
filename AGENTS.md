@@ -152,8 +152,10 @@ customer would notice** (see "Keep the website in step").
     `process.env` elsewhere, with three exceptions: `apps/web` for `API_URL` (`lib/api-url.ts`),
     `STORAGE_ORIGIN`, `NODE_ENV`, `NEXT_RUNTIME` and the Sentry DSNs (`SENTRY_*`,
     `NEXT_PUBLIC_SENTRY_*`, docs/observability.md); `packages/db/prisma.config.ts` for
-    `MIGRATE_DATABASE_URL` / `DATABASE_URL`; and `packages/db/src/index.ts` for `DATABASE_URL` and
-    `NODE_ENV`, so the shared client works in scripts and test preloads without the full server env.
+    `MIGRATE_DATABASE_URL` / `DATABASE_URL`; `packages/db/src/index.ts` for `DATABASE_URL` and
+    `NODE_ENV`, so the shared client works in scripts and test preloads without the full server env;
+    and `apps/website/next.config.ts` for `API_URL` (the `/api/verify` rewrite; the website can't
+    import `@sahihi/config`).
 15. Prisma enums must mirror the unions in `packages/core/src/shared/enums.ts`. `packages/db/src/enums.test.ts`
     enforces this, so update both.
 16. When you change better-auth plugins, run `bun run auth:schema` and reconcile section 1 of
@@ -212,6 +214,7 @@ change in the same piece of work. Find what the feature touches and update it:
 | Plans, limits or prices (`packages/core/src/workspace/billing.ts`) | `site.pricing` and the pricing footnote |
 | Public API, webhooks, bulk send, embedded signing, API keys | `apps/website/src/app/(pages)/developers/page.mdx` |
 | Security, certificates, verification, retention, data handling | `apps/website/src/app/(pages)/security/page.mdx`, and `privacy/page.mdx` if what is collected or who processes it changed |
+| The public verify API (`/api/verify/*`) or what a certificate record shows | Both verify UIs: the app's `apps/web/app/verify/` and the website's `/verify` (`apps/website/src/components/verify/`, copy in `site.verify`) |
 | Something the site says is "on the way" ships (e.g. CA-backed signatures) | Change it to present tense wherever it appears (FAQ, security page, developers page) |
 | A feature is removed or narrowed | Remove or correct every claim about it |
 
