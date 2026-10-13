@@ -385,7 +385,11 @@ ADR 0009).
   second, the blank it fills, numbered option rows that keys 1–4 pick, then "type your own
   answer", Skip and Answer; each question eases in from the side the step went) and
   `set_variables` as "Updated …" with a tick. While a question waits the chat input is closed, so a
-  reply can't be mistaken for an answer. Answered cards show the question and the answer (or
+  reply can't be mistaken for an answer. Answers given so far are kept in the browser
+  (`localStorage`, per document and tool call, `resumeQuestions`): after a reload, or a reply that
+  failed before they reached the assistant, the card resumes at the first unanswered question
+  (the last one, with its typed answer, if all were answered); cleared once sent or dismissed.
+  Answered cards show the question and the answer (or
   Skipped). Suggestion cards have "Show in document"; accepting a section edit scrolls to it and
   highlights it briefly (side by side only). Replies render paragraphs and `**bold**`.
 - **Composer:** one card, with a paperclip for attachments (see Attachments): picked files show as

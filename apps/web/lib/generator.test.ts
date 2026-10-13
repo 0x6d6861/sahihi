@@ -26,8 +26,10 @@ import {
   partyForRole,
   pendingSectionIds,
   proposalTitle,
+  questionDraftKey,
   questionResult,
   replyParagraphs,
+  resumeQuestions,
   roleIssues,
   sectionExcerpt,
   templateChoices,
@@ -81,6 +83,33 @@ describe("question cards", () => {
         { questionId: "q2", value: null },
       ],
     })
+  })
+
+  test("a card resumes at the first question without an answer", () => {
+    expect(resumeQuestions(input, null)).toEqual({ answers: {}, index: 0, draft: "" })
+    expect(resumeQuestions(input, { q1: "1 year" })).toEqual({
+      answers: { q1: "1 year" },
+      index: 1,
+      draft: "",
+    })
+    // A skip counts as an answer; unknown questions and odd values are ignored.
+    expect(resumeQuestions(input, { q1: null, q9: "x", q2: 4 })).toEqual({
+      answers: { q1: null },
+      index: 1,
+      draft: "",
+    })
+    expect(resumeQuestions(input, "garbled").answers).toEqual({})
+    expect(questionDraftKey("doc1", "call1")).toBe("sahihi:questions:doc1:call1")
+  })
+
+  test("with every question answered, it opens the last one with its typed answer", () => {
+    expect(resumeQuestions(input, { q1: "1 year", q2: "Hiring" })).toEqual({
+      answers: { q1: "1 year", q2: "Hiring" },
+      index: 1,
+      draft: "Hiring",
+    })
+    const options = { questions: input.questions.slice(0, 1) }
+    expect(resumeQuestions(options, { q1: "1 year" }).draft).toBe("")
   })
 
   test("answered lines pair each question with its answer or a skip", () => {

@@ -15,7 +15,13 @@ import { Tooltip } from "@/components/arc/tooltip/tooltip"
 import { Button as CossButton } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ApiError } from "@/lib/api"
-import { answeredLines, answerValues, questionResult } from "@/lib/generator"
+import {
+  answeredLines,
+  answerValues,
+  questionDraftKey,
+  questionResult,
+  resumeQuestions,
+} from "@/lib/generator"
 import { cn } from "@/lib/utils"
 import { useGenerator } from "./generator-context"
 
@@ -24,8 +30,9 @@ import { useGenerator } from "./generator-context"
  * assistant's suggested options (keys 1–4 pick one), a free-text answer, Skip, Answer, Back to the
  * previous question, and a dismiss control. The
  * answers are saved to the document first (`POST …/variables`, skips mark the blank skipped), then
- * returned to the assistant as the tool result. Once answered, the card collapses to compact
- * "question → answer or Skipped" rows.
+ * returned to the assistant as the tool result. Answers given so far are kept in this browser, so
+ * after a reload or a failed reply the card resumes at the first unanswered question. Once
+ * answered, the card collapses to compact "question → answer or Skipped" rows.
  */
 export const QuestionCard: ToolCallMessagePartComponent<AskQuestionsInput, AskQuestionsResult> = ({
   toolCallId,
@@ -94,6 +101,35 @@ function ActiveQuestions({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const field = useRef<HTMLInputElement>(null)
+  const draftKey = questionDraftKey(detail.document.id, toolCallId)
+  // The parsed input is a new object every render; the questions of one tool call don't change.
+  const questions = useRef(input)
+
+  // Pick up the answers given before a reload or a failed reply. After mount, since the server
+  // render has no storage.
+  useEffect(() => {
+    let saved: unknown = null
+    try {
+      const raw = localStorage.getItem(draftKey)
+      saved = raw ? JSON.parse(raw) : null
+    } catch {
+      // storage blocked or garbled: start from the first question
+    }
+    const resumed = resumeQuestions(questions.current, saved)
+    if (Object.keys(resumed.answers).length === 0) return
+    setAnswers(resumed.answers)
+    setIndex(resumed.index)
+    setDraft(resumed.draft)
+  }, [draftKey])
+
+  const remember = (all: Record<string, string | null> | null) => {
+    try {
+      if (all) localStorage.setItem(draftKey, JSON.stringify(all))
+      else localStorage.removeItem(draftKey)
+    } catch {
+      // a convenience only: the card still works without storage
+    }
+  }
 
   // While this card waits, the chat input stays closed.
   useEffect(() => {
@@ -129,6 +165,7 @@ function ActiveQuestions({
       const values = answerValues(input, all, detail.version.data.variables)
       if (values.length) await saveVariables(values, "answer")
       onDone(questionResult(input, all))
+      remember(null)
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) await refresh().catch(() => {})
       setError(
@@ -144,6 +181,7 @@ function ActiveQuestions({
   const answer = (value: string | null) => {
     const next = { ...answers, [question.id]: value }
     setAnswers(next)
+    remember(next)
     setDraft("")
     if (index + 1 < input.questions.length) {
       setDirection(1)
@@ -202,7 +240,10 @@ function ActiveQuestions({
               size="icon-sm"
               aria-label="Dismiss questions"
               disabled={saving}
-              onClick={() => onDone({ dismissed: true, answers: [] })}
+              onClick={() => {
+                onDone({ dismissed: true, answers: [] })
+                remember(null)
+              }}
             >
               <XIcon aria-hidden />
             </CossButton>
