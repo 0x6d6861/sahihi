@@ -120,7 +120,9 @@ function Frame({
       style={{ rotate, x, y, scale }}
       className={`absolute will-change-transform ${f.pos}`}
     >
-      <ChromeFrame aspect={f.aspect}>{f.screen}</ChromeFrame>
+      <ChromeFrame aspect={f.aspect} quiet>
+        {f.screen}
+      </ChromeFrame>
       <motion.p style={{ opacity: labelOpacity }} className="text-label mt-3 text-center">
         {label}
       </motion.p>
@@ -162,7 +164,9 @@ function StaticHero() {
             className={`absolute ${f.pos.replace(/top-\[[^\]]+\]/g, "top-0")}`}
             style={{ rotate: `${f.rotate[1]}deg` }}
           >
-            <ChromeFrame aspect={f.aspect}>{f.screen}</ChromeFrame>
+            <ChromeFrame aspect={f.aspect} quiet>
+              {f.screen}
+            </ChromeFrame>
             <p className="text-label mt-3 text-center">{site.pillars[i]}</p>
           </div>
         ))}

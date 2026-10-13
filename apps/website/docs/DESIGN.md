@@ -131,7 +131,7 @@ Smaller variants (feature grid, context cards) use the same pattern with `text-c
 - The screen's radius is the bezel radius minus its padding, so the inner and outer curves stay concentric. Keep that relationship if you change either value.
 - The screen has a 1px dark inner ring and a 2px light inner ring, which give the glass edge.
 
-Use the bezel for: the hero frames, the merged window, and each chapter's main app screen. Don't use it for demo panels; those are flat `bg-panel` rounded rectangles.
+Use the bezel for the merged window and each chapter's main app screen. The hero's three small illustration frames use the **quiet frame** instead (`<ChromeFrame quiet>`, `.bezel-quiet`): no metal, just a hairline ring, a soft drop shadow and the same radius, so the illustrations stay light and the metal is saved for the full screens. Don't use either for demo panels; those are flat `bg-panel` rounded rectangles.
 
 ### Icons
 

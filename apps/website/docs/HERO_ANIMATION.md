@@ -7,7 +7,7 @@ This is the only pinned, scroll-scrubbed animation on the page, implemented in `
 ```
 <div ref h-[320svh]>                       ← scroll track (3.2 viewports)
   <div sticky top-0 h-svh overflow-hidden>  ← stage, pinned while the track scrolls
-    frames container   top-16 md:top-24 h-[52svh]  ← the three tilted ChromeFrames + mono labels (clears the header)
+    frames container   top-16 md:top-24 h-[52svh]  ← the three tilted quiet frames (ChromeFrame quiet) + mono labels (clears the header)
     merged window      centred, min(94vw,1120px), ChromeFrame 16/10 → <Screen><FilesScreen/></Screen>
     hero copy          top-[57svh], centred  ← headline, subtitle, CTAs, "works with"
 ```
