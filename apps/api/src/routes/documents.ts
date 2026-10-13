@@ -84,13 +84,15 @@ export const documents = new Hono<AppEnv>()
     if (doc.status !== "UPLOADING") conflict(`Document is already ${doc.status}`)
 
     const storage = await storageFor(doc.organizationId)
-    const head = await storage.head(doc.s3Key)
+    const head = await storage.uploaded(doc.s3Key)
     if (!head) badRequest("Upload not found in storage")
     if (head.sizeBytes > MAX_UPLOAD_BYTES) badRequest("File too large")
 
-    const bytes = await storage.get(doc.s3Key)
+    const bytes = await storage.readUpload(doc.s3Key)
     try {
       const info = await inspectPdf(bytes)
+      // Validated: only now does it reach the workspace's storage (docs/storage.md → Uploads).
+      await storage.commitUpload(doc.s3Key, bytes, "application/pdf")
       const updated = await prisma.document.update({
         where: { id: doc.id },
         data: {
@@ -109,7 +111,7 @@ export const documents = new Hono<AppEnv>()
         where: { id: doc.id },
         data: { status: "FAILED", failureReason: err.message },
       })
-      await releaseObject(doc.organizationId, doc.s3Key, "upload_rejected").catch(() => {})
+      await storage.discardUpload(doc.s3Key).catch(() => {})
       return c.json({ document: failed, error: err.code }, 422)
     }
   })
@@ -303,10 +305,10 @@ export const documents = new Hono<AppEnv>()
     })
     // The preview only serves the Documents list, which no longer shows it.
     if (doc.thumbnailKey) {
-      await releaseObject(doc.organizationId, doc.thumbnailKey, "deleted").catch(() => {})
+      await releaseObject(doc.organizationId, doc.thumbnailKey, "DELETED").catch(() => {})
     }
     if (doc.envelopeDocuments.length === 0) {
-      await releaseObject(doc.organizationId, doc.s3Key, "deleted").catch(() => {})
+      await releaseObject(doc.organizationId, doc.s3Key, "DELETED").catch(() => {})
     }
     return c.body(null, 204)
   })

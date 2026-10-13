@@ -3,6 +3,8 @@ import {
   assistantQuotaExceededMessage,
   billingPeriod,
   canAddSeat,
+  canConnectStorage,
+  canSyncStorage,
   checkAssistantQuota,
   checkEnvelopeQuota,
   PLANS,
@@ -82,5 +84,32 @@ describe("quotas", () => {
     expect(quotaExceededMessage(PLANS.free, new Date("2026-09-30T21:00:00Z"))).toContain(
       "1 October",
     )
+  })
+})
+
+describe("own storage (ADR 0051)", () => {
+  const none = { sync: 0, primary: 0 }
+
+  test("tiers: Business syncs, Enterprise also keeps primary storage", () => {
+    expect(PLANS.free.ownStorage).toBe("none")
+    expect(PLANS.starter.ownStorage).toBe("none")
+    expect(PLANS.business.ownStorage).toBe("sync")
+    expect(PLANS.enterprise.ownStorage).toBe("primary")
+    expect(canSyncStorage(PLANS.starter)).toBe(false)
+    expect(canSyncStorage(PLANS.business)).toBe(true)
+  })
+
+  test("sync needs Business and a free destination", () => {
+    expect(canConnectStorage(PLANS.starter, "SYNC", none).ok).toBe(false)
+    expect(canConnectStorage(PLANS.business, "SYNC", none).ok).toBe(true)
+    const full = canConnectStorage(PLANS.business, "SYNC", { sync: 1, primary: 0 })
+    expect(full).toEqual({ ok: false, message: expect.stringContaining("1 sync destination.") })
+    expect(canConnectStorage(PLANS.enterprise, "SYNC", { sync: 4, primary: 1 }).ok).toBe(true)
+  })
+
+  test("primary storage needs Enterprise, one per workspace", () => {
+    expect(canConnectStorage(PLANS.business, "PRIMARY", none).ok).toBe(false)
+    expect(canConnectStorage(PLANS.enterprise, "PRIMARY", none).ok).toBe(true)
+    expect(canConnectStorage(PLANS.enterprise, "PRIMARY", { sync: 0, primary: 1 }).ok).toBe(false)
   })
 })

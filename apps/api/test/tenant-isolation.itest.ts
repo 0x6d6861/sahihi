@@ -35,6 +35,8 @@ const ids = {
   generatedVersion: "",
   proposal: "",
   generationTemplate: "",
+  storageConnection: "",
+  storageDelivery: "",
 }
 
 type Case = () => { path: string; init?: RequestInit & { json?: unknown } }
@@ -213,6 +215,41 @@ const TENANT: Record<string, Case> = {
     path: `/api/webhooks/${ids.webhook}/test`,
     init: { method: "POST" },
   }),
+  "PATCH /api/storage/connections/:id": () => ({
+    path: `/api/storage/connections/${ids.storageConnection}`,
+    init: { method: "PATCH", json: { name: "Stolen" } },
+  }),
+  "POST /api/storage/connections/:id/test": () => ({
+    path: `/api/storage/connections/${ids.storageConnection}/test`,
+    init: { method: "POST" },
+  }),
+  "POST /api/storage/connections/:id/activate": () => ({
+    path: `/api/storage/connections/${ids.storageConnection}/activate`,
+    init: { method: "POST" },
+  }),
+  "POST /api/storage/connections/:id/migration/retry": () => ({
+    path: `/api/storage/connections/${ids.storageConnection}/migration/retry`,
+    init: { method: "POST" },
+  }),
+  "DELETE /api/storage/connections/:id": () => ({
+    path: `/api/storage/connections/${ids.storageConnection}`,
+    init: { method: "DELETE" },
+  }),
+  "GET /api/storage/connections/:id/deliveries": () => ({
+    path: `/api/storage/connections/${ids.storageConnection}/deliveries`,
+  }),
+  "POST /api/storage/connections/:id/deliveries/:deliveryId/retry": () => ({
+    path: `/api/storage/connections/${ids.storageConnection}/deliveries/${ids.storageDelivery}/retry`,
+    init: { method: "POST" },
+  }),
+  "POST /api/storage/connections/:id/retry-failed": () => ({
+    path: `/api/storage/connections/${ids.storageConnection}/retry-failed`,
+    init: { method: "POST" },
+  }),
+  "POST /api/storage/connections/:id/backfill": () => ({
+    path: `/api/storage/connections/${ids.storageConnection}/backfill`,
+    init: { method: "POST", json: { days: 30 } },
+  }),
   "POST /api/webhooks/:id/deliveries/:deliveryId/retry": () => ({
     path: `/api/webhooks/${ids.webhook}/deliveries/${ids.delivery}/retry`,
     init: { method: "POST" },
@@ -379,6 +416,9 @@ const LISTS = [
   "GET /api/activity",
   "GET /api/generated-documents",
   "GET /api/generated-documents/templates",
+  // Released files in the caller's own bucket (storage.itest.ts).
+  "GET /api/storage/releases",
+  "GET /api/storage/releases.csv",
 ]
 
 /**
@@ -402,6 +442,15 @@ const isStaffDashboard = (route: string) =>
 const NOT_TENANT = [
   // Creates in the caller's own org and takes no ids from the request.
   "POST /api/webhooks",
+  "POST /api/storage/connections",
+  // The caller's own storage overview and IAM policy text (docs/storage.md); no ids.
+  "GET /api/storage",
+  "GET /api/storage/aws-policies",
+  // OAuth to a cloud drive: the signed state binds the callback to the caller's org and user.
+  "POST /api/storage/oauth/start",
+  "GET /api/storage/oauth/:slug/callback",
+  // Files from a workspace's own bucket: the signed ticket is the permission (storage.itest.ts).
+  "GET /api/storage/objects/:ticket",
   // The caller's own workspace AI switch; no ids.
   "GET /api/generated-documents/settings",
   "PUT /api/generated-documents/settings",
@@ -476,6 +525,7 @@ async function snapshot() {
     attachments,
     generatedDocuments,
     generationTemplates,
+    storageConnections,
   ] = await Promise.all([
     prisma.document.findMany({
       where: { organizationId: alice.organizationId },
@@ -511,6 +561,10 @@ async function snapshot() {
       include: { versions: true, proposals: true },
     }),
     prisma.generationTemplate.findMany({ where: { organizationId: alice.organizationId } }),
+    prisma.storageConnection.findMany({
+      where: { organizationId: alice.organizationId },
+      include: { deliveries: true, releases: true },
+    }),
   ])
   return {
     documents,
@@ -526,6 +580,7 @@ async function snapshot() {
     attachments,
     generatedDocuments,
     generationTemplates,
+    storageConnections,
   }
 }
 
@@ -654,6 +709,42 @@ beforeAll(async () => {
     },
   )
   ids.generationTemplate = ((await template.json()) as { id: string }).id
+  // Own storage (docs/storage.md): a sync destination with one failed delivery and one released file.
+  const connection = await prisma.storageConnection.create({
+    data: {
+      organizationId: alice.organizationId,
+      createdById: alice.userId,
+      purpose: "SYNC",
+      provider: "S3_COMPATIBLE",
+      name: "Alice's archive",
+      endpoint: "https://s3.example.com",
+      region: "us-east-1",
+      bucket: "alice-archive",
+      auth: "ACCESS_KEYS",
+      accessKeyId: "AKIAALICE",
+      secretEncrypted: "v1.x.y",
+      status: "ACTIVE",
+    },
+  })
+  ids.storageConnection = connection.id
+  ids.storageDelivery = (
+    await prisma.storageDelivery.create({
+      data: {
+        organizationId: alice.organizationId,
+        connectionId: connection.id,
+        envelopeId: ids.envelope,
+        status: "FAILED",
+      },
+    })
+  ).id
+  await prisma.storageRelease.create({
+    data: {
+      organizationId: alice.organizationId,
+      connectionId: connection.id,
+      key: `org/${alice.organizationId}/documents/x/original.pdf`,
+      reason: "DELETED",
+    },
+  })
 })
 
 afterAll(() => setAssistantModelForTests(null))
@@ -715,6 +806,7 @@ describe("tenant isolation", () => {
       "/api/bulk-sends",
       "/api/generated-documents",
       "/api/generated-documents/templates",
+      "/api/storage/releases",
     ]) {
       const mine = (await (await request(alice, path)).json()) as { items: unknown[] }
       const theirs = (await (await request(mallory, path)).json()) as { items: unknown[] }

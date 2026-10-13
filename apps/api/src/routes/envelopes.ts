@@ -481,13 +481,15 @@ export const envelopes = new Hono<AppEnv>()
     if (a.status !== "UPLOADING") conflict(`File is already ${a.status}`)
     const orgId = c.get("organizationId")
     const storage = await storageFor(orgId)
-    const head = await storage.head(a.s3Key)
+    const head = await storage.uploaded(a.s3Key)
     if (!head || head.sizeBytes !== a.sizeBytes || head.sizeBytes > MAX_UPLOAD_BYTES) {
       await prisma.envelopeAttachment.update({ where: { id: a.id }, data: { status: "FAILED" } })
-      await releaseObject(orgId, a.s3Key, "upload_rejected").catch(() => {})
+      await storage.discardUpload(a.s3Key).catch(() => {})
       badRequest("Upload not found in storage, or it doesn't match the announced size")
     }
-    const sha256 = await sha256Hex(await storage.get(a.s3Key))
+    const bytes = await storage.readUpload(a.s3Key)
+    const sha256 = await sha256Hex(bytes)
+    await storage.commitUpload(a.s3Key, bytes, a.contentType)
     const saved = await prisma.$transaction(async (tx) => {
       const updated = await tx.envelopeAttachment.update({
         where: { id: a.id },
@@ -526,7 +528,7 @@ export const envelopes = new Hono<AppEnv>()
         })
       }
     })
-    await releaseObject(c.get("organizationId"), a.s3Key, "deleted").catch(() => {})
+    await releaseObject(c.get("organizationId"), a.s3Key, "DELETED").catch(() => {})
     return c.body(null, 204)
   })
 

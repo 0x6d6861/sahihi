@@ -1,4 +1,8 @@
-import { envelopeEventData, type WebhookEventType } from "@sahihi/core"
+import {
+  type EnvelopeWebhookEvent,
+  envelopeEventData,
+  type StorageWebhookEvent,
+} from "@sahihi/core"
 import type { Prisma } from "./generated/prisma/client"
 
 /**
@@ -13,7 +17,7 @@ export async function queueEnvelopeWebhook(
   tx: Prisma.TransactionClient,
   input: {
     envelopeId: string
-    type: WebhookEventType
+    type: EnvelopeWebhookEvent
     /** Extra top-level data, e.g. `{ recipientId }` for recipient.signed */
     extra?: Record<string, unknown>
   },
@@ -57,6 +61,36 @@ export async function queueEnvelopeWebhook(
           eventId,
           type: input.type,
           payload,
+        },
+        select: { id: true },
+      }),
+    ),
+  )
+  return created.map((d) => d.id)
+}
+
+/**
+ * A workspace-level event (own storage, ADR 0051): same outbox rules as envelope events. `data` is
+ * the event's payload as sent.
+ */
+export async function queueWorkspaceWebhook(
+  tx: Prisma.TransactionClient,
+  input: { organizationId: string; type: StorageWebhookEvent; data: Record<string, unknown> },
+): Promise<string[]> {
+  const endpoints = await tx.webhookEndpoint.findMany({
+    where: { organizationId: input.organizationId, enabled: true, events: { has: input.type } },
+    select: { id: true },
+  })
+  const eventId = `evt_${crypto.randomUUID().replace(/-/g, "")}`
+  const created = await Promise.all(
+    endpoints.map((ep) =>
+      tx.webhookDelivery.create({
+        data: {
+          endpointId: ep.id,
+          organizationId: input.organizationId,
+          eventId,
+          type: input.type,
+          payload: input.data as Prisma.InputJsonValue,
         },
         select: { id: true },
       }),

@@ -12,8 +12,22 @@ import {
   sha256Hex,
   signedDocumentFileName,
 } from "@sahihi/core"
-import { appendAuditEvent, notifyEnvelopeOwner, prisma, queueEnvelopeWebhook } from "@sahihi/db"
-import { createLogger, enqueueWebhookDeliveries, getQueues, keys, storageFor } from "@sahihi/infra"
+import {
+  appendAuditEvent,
+  notifyEnvelopeOwner,
+  prisma,
+  queueEnvelopeWebhook,
+  queueStorageDeliveries,
+} from "@sahihi/db"
+import {
+  createLogger,
+  enqueueStorageDeliveries,
+  enqueueWebhookDeliveries,
+  getQueues,
+  keys,
+  objectVersion,
+  storageFor,
+} from "@sahihi/infra"
 import { renderCertificate, type StampField, stampFields } from "@sahihi/pdf"
 import { Zip, ZipPassThrough } from "fflate"
 import { getSigningProvider } from "../providers"
@@ -110,7 +124,7 @@ export async function finalizeEnvelope(envelopeId: string) {
     })
 
     const signedSha256 = await sha256Hex(sealed.pdf)
-    const signedKey = keys.signedDocument(e.organizationId, envelopeId, ed.id)
+    const signedKey = keys.signedDocument(e.organizationId, envelopeId, ed.id, objectVersion())
     await storage.put(signedKey, sealed.pdf, "application/pdf")
     await prisma.$transaction(async (tx) => {
       await tx.envelopeDocument.update({
@@ -203,10 +217,10 @@ export async function finalizeEnvelope(envelopeId: string) {
     })),
   })
 
-  const certKey = keys.certificate(e.organizationId, envelopeId)
+  const certKey = keys.certificate(e.organizationId, envelopeId, objectVersion())
   const certSha = await sha256Hex(pdf)
   await (await storageFor(e.organizationId)).put(certKey, pdf, "application/pdf")
-  const webhooks = await prisma.$transaction(async (tx) => {
+  const { webhooks, deliveries } = await prisma.$transaction(async (tx) => {
     await tx.certificate.create({
       data: {
         envelopeId,
@@ -223,7 +237,14 @@ export async function finalizeEnvelope(envelopeId: string) {
     })
     await notifyEnvelopeOwner(tx, { envelopeId, type: "envelope.completed" })
     // Emitted here, not at the last signature, so receivers can fetch the signed PDF right away.
-    return queueEnvelopeWebhook(tx, { envelopeId, type: "envelope.completed" })
+    return {
+      webhooks: await queueEnvelopeWebhook(tx, { envelopeId, type: "envelope.completed" }),
+      // Copies to the workspace's sync destinations (docs/storage.md → Sync).
+      deliveries: await queueStorageDeliveries(tx, {
+        organizationId: e.organizationId,
+        envelopeId,
+      }),
+    }
   })
 
   // ── 6: "Download all" (a convenience; failures don't hold up the completion) ──
@@ -234,6 +255,7 @@ export async function finalizeEnvelope(envelopeId: string) {
   // ── 7: notify ──
   await getQueues().notifications.add("envelope.completed", { envelopeId })
   await enqueueWebhookDeliveries(webhooks)
+  await enqueueStorageDeliveries(deliveries)
   return { code }
 }
 
@@ -281,7 +303,7 @@ export async function buildBundle(envelopeId: string) {
     zip.end()
     await writer.end()
     if (failed) throw failed
-    const key = keys.bundle(e.organizationId, envelopeId)
+    const key = keys.bundle(e.organizationId, envelopeId, objectVersion())
     const { size } = await stat(path)
     await storage.putStream(key, createReadStream(path), size, "application/zip")
     await prisma.envelope.update({ where: { id: envelopeId }, data: { bundleS3Key: key } })

@@ -37,7 +37,7 @@ export default async function DataPage() {
     <div className="flex flex-col gap-6">
       <Panel
         title="Retention"
-        description="How long signed agreements are kept (Kenya Data Protection Act: keep personal data only as long as needed)."
+        description="How long signed agreements are kept (Kenya Data Protection Act: keep personal data only as long as needed). With your own storage (Settings → Storage), this covers Sahihi's copy: files in your bucket stay until you remove them."
       >
         <RetentionForm initial={settings.data?.retentionYears ?? null} />
       </Panel>

@@ -69,6 +69,18 @@ export interface WebhookJobs {
   "webhook.deliver": { deliveryId: string }
 }
 
+/** Own storage (docs/storage.md, ADR 0051). */
+export interface StorageJobs {
+  /** Copy one completed envelope to one sync destination. Enqueue with enqueueStorageDeliveries. */
+  "storage.deliver": { deliveryId: string }
+  /** Move a workspace's files into (or back out of) its primary storage. */
+  "storage.migrate": { connectionId: string }
+  /** Every 6 hours: test every connection; FAILING ones notify admins. */
+  "storage.check": Record<string, never>
+  /** Every 5 minutes: deliveries committed but never enqueued (outbox). */
+  "storage.sweep": Record<string, never>
+}
+
 export type JobName<M> = Extract<keyof M, string>
 
 let connection: Redis | undefined
@@ -106,6 +118,7 @@ let queues:
       maintenance: TypedQueue<MaintenanceJobs>
       webhooks: TypedQueue<WebhookJobs>
       documents: TypedQueue<DocumentJobs>
+      storage: TypedQueue<StorageJobs>
     }
   | undefined
 
@@ -116,6 +129,7 @@ export function getQueues() {
     maintenance: new TypedQueue<MaintenanceJobs>(QUEUES.maintenance),
     webhooks: new TypedQueue<WebhookJobs>(QUEUES.webhooks),
     documents: new TypedQueue<DocumentJobs>(QUEUES.documents),
+    storage: new TypedQueue<StorageJobs>(QUEUES.storage),
   }
   return queues
 }
@@ -154,5 +168,53 @@ export async function enqueueDocumentThumbnail(documentId: string) {
     "document.thumbnail",
     { documentId },
     { jobId: `thumb-${documentId}`, attempts: 3 },
+  )
+}
+
+/** Attempts per sync delivery (≈ 1 day with the exponential backoff below). */
+export const STORAGE_DELIVERY_ATTEMPTS = 8
+
+/**
+ * Enqueue sync deliveries AFTER the transaction that created them has committed (outbox, like
+ * webhooks). The job id is the delivery id, so the sweep never delivers one twice at once.
+ */
+export async function enqueueStorageDeliveries(
+  deliveryIds: string[],
+  /** A manual retry of a FAILED delivery needs a new job id. */
+  { retryKey }: { retryKey?: string } = {},
+) {
+  const { storage } = getQueues()
+  await Promise.all(
+    deliveryIds.map((deliveryId) =>
+      storage.add(
+        "storage.deliver",
+        { deliveryId },
+        {
+          jobId: retryKey ? `std-${deliveryId}-${retryKey}` : `std-${deliveryId}`,
+          attempts: STORAGE_DELIVERY_ATTEMPTS,
+          backoff: { type: "exponential", delay: 60_000 },
+        },
+      ),
+    ),
+  )
+}
+
+/** One migration per connection at a time (the job id is the connection id and the direction). */
+export async function enqueueStorageMigration(connectionId: string, direction: "in" | "out") {
+  const { storage } = getQueues()
+  const jobId = `stm-${connectionId}-${direction}`
+  // A finished or failed run keeps its id; clear it so "Retry" can start a new one.
+  const previous = await storage.raw.getJob(jobId)
+  if (previous && ((await previous.isFailed()) || (await previous.isCompleted()))) {
+    await previous.remove()
+  }
+  await storage.add(
+    "storage.migrate",
+    { connectionId },
+    {
+      jobId,
+      attempts: 5,
+      backoff: { type: "exponential", delay: 30_000 },
+    },
   )
 }

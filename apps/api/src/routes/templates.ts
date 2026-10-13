@@ -274,7 +274,7 @@ export const templates = new Hono<AppEnv>()
     // supporting files go.
     await prisma.template.delete({ where: { id: template.id } })
     for (const a of template.attachments) {
-      await releaseObject(template.organizationId, a.s3Key, "deleted").catch(() => {})
+      await releaseObject(template.organizationId, a.s3Key, "DELETED").catch(() => {})
     }
     return c.body(null, 204)
   })

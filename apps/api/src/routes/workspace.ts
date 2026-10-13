@@ -59,7 +59,7 @@ export const workspace = new Hono<AppEnv>()
       return before?.logoKey ?? null
     })
     if (previous) {
-      await releaseObject(organizationId, previous, "replaced").catch((err) =>
+      await releaseObject(organizationId, previous, "REPLACED").catch((err) =>
         log.warn("old logo kept", { err }),
       )
     }
@@ -80,7 +80,7 @@ export const workspace = new Hono<AppEnv>()
       return before?.logoKey ?? null
     })
     if (previous) {
-      await releaseObject(organizationId, previous, "deleted").catch((err) =>
+      await releaseObject(organizationId, previous, "DELETED").catch((err) =>
         log.warn("logo kept", { err }),
       )
     }

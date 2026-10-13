@@ -32,8 +32,11 @@ describe("document thumbnails (ADR 0033)", () => {
 
     expect(await renderDocumentThumbnail(document.id)).toMatchObject({ rendered: true })
     const row = await prisma.document.findUniqueOrThrow({ where: { id: document.id } })
-    expect(row.thumbnailKey).toBe(
-      `org/${alice.organizationId}/documents/${document.id}/thumbnail.png`,
+    // Versioned, so a retry never rewrites an object (ADR 0051).
+    expect(row.thumbnailKey).toMatch(
+      new RegExp(
+        `^org/${alice.organizationId}/documents/${document.id}/thumbnail-[0-9a-f]{8}\\.png$`,
+      ),
     )
     expect(await renderDocumentThumbnail(document.id)).toEqual({ skipped: true })
 

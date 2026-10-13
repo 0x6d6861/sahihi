@@ -7,7 +7,7 @@ import {
   prisma,
   queueEnvelopeWebhook,
 } from "@sahihi/db"
-import { createLogger, enqueueWebhookDeliveries, getQueues, releaseObject } from "@sahihi/infra"
+import { createLogger, enqueueWebhookDeliveries, getQueues, storageFor } from "@sahihi/infra"
 
 const log = createLogger("worker")
 
@@ -109,9 +109,11 @@ export async function sweepAbandonedUploads(now = new Date()) {
       swept += 1
       // Missing keys are a no-op in S3, so an error here is a real outage. The row is already
       // swept; log the key so the orphaned (private) object can be removed by hand.
-      await releaseObject(doc.organizationId, doc.s3Key, "upload_abandoned").catch((err: unknown) =>
-        log.error("could not delete abandoned upload", { key: doc.s3Key, err }),
-      )
+      await (await storageFor(doc.organizationId))
+        .discardUpload(doc.s3Key)
+        .catch((err: unknown) =>
+          log.error("could not delete abandoned upload", { key: doc.s3Key, err }),
+        )
     }
     if (stale.length < SWEEP_BATCH) break
   }
@@ -128,9 +130,11 @@ export async function sweepAbandonedUploads(now = new Date()) {
     })
     if (res.count === 0) continue
     swept += 1
-    await releaseObject(a.envelope.organizationId, a.s3Key, "upload_abandoned").catch(
-      (err: unknown) => log.error("could not delete abandoned file upload", { key: a.s3Key, err }),
-    )
+    await (await storageFor(a.envelope.organizationId))
+      .discardUpload(a.s3Key)
+      .catch((err: unknown) =>
+        log.error("could not delete abandoned file upload", { key: a.s3Key, err }),
+      )
   }
   return { swept }
 }

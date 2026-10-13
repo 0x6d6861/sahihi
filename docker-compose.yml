@@ -33,6 +33,7 @@ services:
         sleep 1;
       done;
       aws --endpoint-url http://minio:9000 s3api head-bucket --bucket sahihi-documents 2>/dev/null || aws --endpoint-url http://minio:9000 s3 mb s3://sahihi-documents;
+      aws --endpoint-url http://minio:9000 s3api head-bucket --bucket sahihi-customer 2>/dev/null || aws --endpoint-url http://minio:9000 s3 mb s3://sahihi-customer;
       exit 0;
       "
     environment:

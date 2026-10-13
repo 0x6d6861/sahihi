@@ -37,6 +37,7 @@ export * from "./inbox/activity"
 export * from "./integrations/api-keys"
 export * from "./integrations/embed"
 export * from "./integrations/public-api"
+export * from "./integrations/storage"
 export * from "./integrations/webhooks"
 
 export * from "./notifications/notifications"

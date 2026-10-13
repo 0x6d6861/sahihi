@@ -21,6 +21,13 @@ describe("prisma enums match @sahihi/core", () => {
     ["GeneratedDocumentStatus", core.GENERATED_DOCUMENT_STATUSES, $Enums.GeneratedDocumentStatus],
     ["GenerationActor", core.GENERATION_ACTORS, $Enums.GenerationActor],
     ["ProposalStatus", core.PROPOSAL_STATUSES, $Enums.ProposalStatus],
+    ["StorageProvider", core.STORAGE_PROVIDERS, $Enums.StorageProvider],
+    ["StoragePurpose", core.STORAGE_PURPOSES, $Enums.StoragePurpose],
+    ["StorageAuthMethod", core.STORAGE_AUTH_METHODS, $Enums.StorageAuthMethod],
+    ["StorageConnectionStatus", core.STORAGE_CONNECTION_STATUSES, $Enums.StorageConnectionStatus],
+    ["StoragePrimaryState", core.STORAGE_PRIMARY_STATES, $Enums.StoragePrimaryState],
+    ["StorageDeliveryStatus", core.STORAGE_DELIVERY_STATUSES, $Enums.StorageDeliveryStatus],
+    ["StorageReleaseReason", core.STORAGE_RELEASE_REASONS, $Enums.StorageReleaseReason],
   ]
   for (const [name, coreValues, prismaEnum] of pairs) {
     test(name, () => {

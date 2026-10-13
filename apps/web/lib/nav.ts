@@ -39,6 +39,7 @@ export const SETTINGS_NAV = [
   { href: "/settings/members", label: "Members" },
   { href: "/settings/billing", label: "Plan & usage" },
   { href: "/settings/data", label: "Data" },
+  { href: "/settings/storage", label: "Storage" },
   { href: "/settings/api", label: "API" },
 ] as const
 

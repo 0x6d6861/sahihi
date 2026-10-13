@@ -3,6 +3,7 @@ import {
   createLogger,
   enqueueDocumentThumbnail,
   keys,
+  objectVersion,
   releaseObject,
   storageFor,
 } from "@sahihi/infra"
@@ -48,14 +49,14 @@ export async function renderDocumentThumbnail(documentId: string) {
     return { rendered: false }
   }
 
-  const key = keys.thumbnail(doc.organizationId, documentId)
+  const key = keys.thumbnail(doc.organizationId, documentId, objectVersion())
   await storage.put(key, png, "image/png")
   const res = await prisma.document.updateMany({
     where: { id: documentId, deletedAt: null },
     data: { thumbnailKey: key, thumbnailError: null },
   })
   // Deleted while rendering: don't leave the image behind.
-  if (res.count === 0) await releaseObject(doc.organizationId, key, "deleted").catch(() => {})
+  if (res.count === 0) await releaseObject(doc.organizationId, key, "DELETED").catch(() => {})
   return { rendered: res.count > 0, bytes: png.byteLength }
 }
 

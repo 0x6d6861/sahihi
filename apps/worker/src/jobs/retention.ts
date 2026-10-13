@@ -23,6 +23,7 @@ import {
   createLogger,
   getQueues,
   keys,
+  objectVersion,
   releaseObject,
   releasePrefix,
   storageFor,
@@ -30,7 +31,7 @@ import {
 } from "@sahihi/infra"
 import { Zip, ZipPassThrough } from "fflate"
 
-const log = createLogger("retention")
+const log = createLogger("RETENTION")
 
 /**
  * Retention, export and deletion (docs/data-retention.md, ADR 0015).
@@ -54,7 +55,7 @@ export async function purgeEnvelope(envelopeId: string, reason: PurgeReason) {
   if (!isClosed(e.status)) return { skipped: true, reason: "not closed" }
 
   // 1. Files: signed PDFs, certificate PDF, signature images, supporting files, the bundle.
-  await releasePrefix(e.organizationId, keys.envelopePrefix(e.organizationId, e.id), "retention")
+  await releasePrefix(e.organizationId, keys.envelopePrefix(e.organizationId, e.id), "RETENTION")
 
   // 2. Personal data, in one transaction with the audit event.
   const now = new Date()
@@ -133,9 +134,9 @@ export async function purgeEnvelope(envelopeId: string, reason: PurgeReason) {
       select: { s3Key: true, thumbnailKey: true, deletedAt: true },
     })
     if (!doc) continue
-    await releaseObject(e.organizationId, doc.s3Key, "retention").catch(() => {})
+    await releaseObject(e.organizationId, doc.s3Key, "RETENTION").catch(() => {})
     if (doc.thumbnailKey) {
-      await releaseObject(e.organizationId, doc.thumbnailKey, "retention").catch(() => {})
+      await releaseObject(e.organizationId, doc.thumbnailKey, "RETENTION").catch(() => {})
     }
     await prisma.document.update({
       where: { id: documentId },
@@ -404,7 +405,7 @@ export async function buildExport(exportId: string) {
     await writer.end()
     if (failed) throw failed
 
-    const key = keys.export(job.organizationId, job.id)
+    const key = keys.export(job.organizationId, job.id, objectVersion())
     const { size } = await stat(path)
     await storage.putStream(key, createReadStream(path), size, "application/zip")
     const now = new Date()
@@ -466,7 +467,7 @@ export async function cleanupExports(now: Date = new Date()) {
     select: { id: true, organizationId: true, s3Key: true },
   })
   for (const x of expired) {
-    await releaseObject(x.organizationId, x.s3Key as string, "expired").catch(() => {})
+    await releaseObject(x.organizationId, x.s3Key as string, "EXPIRED").catch(() => {})
     await prisma.dataExport.update({ where: { id: x.id }, data: { s3Key: null } })
   }
   return { deleted: expired.length }
@@ -478,7 +479,7 @@ export async function purgeOrganizationStorage(organizationId: string) {
     deleted: await releasePrefix(
       organizationId,
       keys.orgPrefix(organizationId),
-      "workspace_deleted",
+      "WORKSPACE_DELETED",
     ),
   }
 }

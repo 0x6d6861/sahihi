@@ -13,8 +13,14 @@ export {
 export * from "./generated/prisma/client"
 export { notifyEnvelopeOwner, notifyUsers, notifyWorkspaceAdmins } from "./notifications"
 export { issueSigningLink } from "./signing-links"
+export {
+  createStorageRegistry,
+  queueStorageDeliveries,
+  referencedKeys,
+  storageConnectionConfigSelect,
+} from "./storage"
 export { forOrganization } from "./tenant"
-export { queueEnvelopeWebhook } from "./webhooks"
+export { queueEnvelopeWebhook, queueWorkspaceWebhook } from "./webhooks"
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient }
 

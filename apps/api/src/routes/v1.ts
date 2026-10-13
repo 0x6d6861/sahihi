@@ -147,7 +147,7 @@ export const v1 = new Hono<ApiKeyEnv>()
       await queueThumbnail(doc.id)
       return c.json({ document: docView(doc) }, 201)
     } catch (err) {
-      await releaseObject(orgId, s3Key, "upload_rejected").catch(() => {})
+      await releaseObject(orgId, s3Key, "UPLOAD_REJECTED").catch(() => {})
       throw err
     }
   })
