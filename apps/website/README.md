@@ -36,7 +36,7 @@ Agents start at [AGENTS.md](AGENTS.md) (Claude Code reads it through `CLAUDE.md`
 |---|---|
 | All landing-page copy: headlines, chapters, trust facts, plans, FAQ | `src/content/site.ts` (`site`) |
 | The app screens and demos | `src/components/demos/` (data: `sample` in `site.ts`) |
-| Security, privacy and terms | `src/app/(legal)/*/page.mdx`, styled by `src/mdx-components.tsx` |
+| Developer docs, security, privacy and terms | `src/app/(pages)/*/page.mdx`, styled by `src/mdx-components.tsx`; code highlighted at build time (Shiki) |
 | Colours, type scale, bezel, marquee | `src/app/globals.css` |
 | Fonts | `src/app/layout.tsx` |
 | Section order | `src/app/page.tsx` |

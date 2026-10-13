@@ -1,7 +1,7 @@
 /**
  * All page copy lives here. Components read from this file and contain no
- * marketing text of their own. Long-form pages (security, privacy, terms) are
- * MDX files under src/app/(legal)/.
+ * marketing text of their own. Long-form pages (developers, security, privacy,
+ * terms) are MDX files under src/app/(pages)/.
  */
 
 /** The web app. Placeholder until the production domain is final. */
@@ -147,6 +147,7 @@ export const site = {
 
   context: {
     headline: "It fits the systems you already run.",
+    link: { label: "Developer docs", href: "/developers" },
     cards: [
       { lead: "Public API.", text: "Create, send and track envelopes with a scoped API key." },
       { lead: "Webhooks.", text: "Signed events when an envelope is sent, signed or completed." },
@@ -287,6 +288,7 @@ export const site = {
   footer: {
     year: 2026,
     links: [
+      { label: "Developers", href: "/developers" },
       { label: "Security", href: "/security" },
       { label: "Privacy", href: "/privacy" },
       { label: "Terms", href: "/terms" },

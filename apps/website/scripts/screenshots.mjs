@@ -68,7 +68,7 @@ for (const { name, viewport, colorScheme } of passes) {
 }
 
 // The MDX pages: errors, overflow and one full-page shot each, per pass.
-for (const path of ["/security", "/privacy", "/terms"]) {
+for (const path of ["/developers", "/security", "/privacy", "/terms"]) {
   for (const { name, viewport, colorScheme } of passes) {
     const label = `${name}${path.replace("/", "-")}`
     const page = await browser.newPage({ viewport, colorScheme })

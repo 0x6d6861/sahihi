@@ -13,7 +13,15 @@ export function ContextRow() {
     <Section className="pb-48">
       <Inset>
         <Reveal>
-          <h2 className="text-lede px-3">{site.context.headline}</h2>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 px-3">
+            <h2 className="text-lede">{site.context.headline}</h2>
+            <a
+              href={site.context.link.href}
+              className="text-caption underline decoration-1 underline-offset-4 transition-opacity hover:opacity-60"
+            >
+              {site.context.link.label} →
+            </a>
+          </div>
         </Reveal>
       </Inset>
       {/* Wider than the Inset column so four cards keep readable 20px captions. */}

@@ -440,6 +440,17 @@ body {
   transform: none;
 }
 
+/* ── Code ──────────────────────────────────────────────────────────
+   Highlighted code blocks (rehype-pretty-code + Shiki, next.config.ts): each
+   token carries both themes' colours as --shiki-light / --shiki-dark, and the
+   page theme picks one, so the D hotkey re-colours code at once. */
+pre code[data-theme] span {
+  color: var(--shiki-light);
+}
+[data-theme="dark"] pre code[data-theme] span {
+  color: var(--shiki-dark);
+}
+
 /* ── Marquee ───────────────────────────────────────────────────── */
 @keyframes marquee-x {
   to {

@@ -1,6 +1,6 @@
 # Content guide
 
-All landing-page copy lives in `src/content/site.ts`; components contain no marketing text. Long-form pages (security, privacy, terms) are Markdown in `src/app/(legal)/*/page.mdx`. The coded app UI reads its example data from `sample` in the same file.
+All landing-page copy lives in `src/content/site.ts`; components contain no marketing text. Long-form pages (developers, security, privacy, terms) are Markdown in `src/app/(pages)/*/page.mdx`. The coded app UI reads its example data from `sample` in the same file.
 
 ## Voice
 

@@ -10,7 +10,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # Agent guide: Sahihi website
 
-The fully static marketing site for Sahihi, the e-signature product in this monorepo: a landing page plus MDX security, privacy and terms pages. It is quiet, near-monochrome and product-led, modelled on the layout of subframe.com, with coded recreations of the Sahihi app (no screenshots). Read this file first, then the doc for the area you are changing.
+The fully static marketing site for Sahihi, the e-signature product in this monorepo: a landing page plus MDX developer, security, privacy and terms pages. It is quiet, near-monochrome and product-led, modelled on the layout of subframe.com, with coded recreations of the Sahihi app (no screenshots). Read this file first, then the doc for the area you are changing.
 
 ## Docs map
 
@@ -72,7 +72,7 @@ There is no test runner. Biome (root `biome.json`, run `bun run lint` at the roo
 src/
   app/            layout.tsx (fonts, metadata) · page.tsx (section order) · globals.css (tokens, utilities)
                   opengraph-image.tsx · icon.svg · robots.ts · sitemap.ts
-  app/(legal)/    security, privacy, terms as page.mdx · layout.tsx (header, reading column, footer)
+  app/(pages)/    developers, security, privacy, terms as page.mdx · layout.tsx (header, reading column, footer)
   mdx-components.tsx  the only place MDX prose is styled
   content/site.ts every landing-page string (`site`) + `sample`, the data the app UI shows
   components/

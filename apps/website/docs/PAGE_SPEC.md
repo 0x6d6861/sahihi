@@ -105,10 +105,12 @@ Every section's acceptance criteria are judged at **1288×900** and **390×844**
 - **Layout:** directly after the FAQ (whose `pb-48` provides the space above it). A 14px muted row, with the same side padding as the header (20px, 48px from `md`), with the copyright on the left and links on the right, stacked on mobile. There is no closing call-to-action section; the page ends on the FAQ.
 - **Accept:** the footer year comes from `site.footer.year`, not from `Date`.
 
-## 11. MDX pages: `src/app/(legal)/`
+## 11. MDX pages: `src/app/(pages)/`
 
-- **Routes:** `/security`, `/privacy`, `/terms`, each a `page.mdx` with `export const metadata`. All static.
-- **Layout:** `(legal)/layout.tsx` renders `Header`, one `Inset` reading column (max 36em, `pt-32 md:pt-44`) and `Footer`. Prose styles live only in `src/mdx-components.tsx` (`h1` → `text-title`, `h2` → `text-sub`, `p`/lists → `text-caption` muted, dash bullets, underlined links, `>` blockquote → `bg-panel` notice).
+- **Routes:** `/developers`, `/security`, `/privacy`, `/terms`, each a `page.mdx` with `export const metadata`. All static.
+- **Layout:** `(pages)/layout.tsx` renders `Header`, one `Inset` reading column (max 36em, 46em on a page with code blocks, `pt-32 md:pt-44`) and `Footer`. Prose styles live only in `src/mdx-components.tsx` (`h1` → `text-title`, `h2` → `text-sub`, `p`/lists → `text-caption` muted, dash bullets, underlined links, `>` blockquote → `bg-panel` notice).
+- **Developers** (`/developers`): the public API (keys and scopes, a create-and-send walkthrough, endpoints, errors and limits), webhooks (events, payload, signature verification, retries), bulk send and embedded signing. Every statement comes from `docs/public-api.md`, `docs/webhooks.md`, `docs/bulk-send.md` and `docs/embedded-signing.md` at the repo root; update it when those change. Examples use the showcase workspace (Tana Freight Ltd). `##` headings get ids from their text, so the page's own contents can link to them. Linked from the footer and the integrations row.
+- **Code blocks** are highlighted at build time by `rehype-pretty-code` + Shiki (`next.config.ts`), with `github-light` and `github-dark` at once; `globals.css` → Code picks one from `<html data-theme>`. Give each block a language (`http`, `bash`, `json`, `ts`, `js`). Long lines scroll inside their panel; inline code wraps anywhere so it never widens the page.
 - **Content rules:** the security page states only what the product does today (sources: `docs/security.md`, `docs/certificates.md`, `docs/data-retention.md`). Privacy and terms are drafts and keep the "Draft, under legal review" notice until legal-reviewed text replaces them. Dates are written by hand ("Last updated …"), never computed.
 - **Accept:** `bun run shots` covers each page in both themes at both widths, with no overflow.
 
