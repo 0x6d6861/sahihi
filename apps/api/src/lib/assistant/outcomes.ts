@@ -1,4 +1,10 @@
-import type { ProposalStatus } from "@sahihi/core"
+import {
+  type GeneratedDocumentData,
+  GeneratedDocumentDataSchema,
+  isProposalStale,
+  ProposalPayloadSchema,
+  type ProposalStatus,
+} from "@sahihi/core"
 import type { UIMessage } from "ai"
 
 /**
@@ -65,6 +71,22 @@ export function withProposalOutcomes(
         } as Part
       }),
     }
+  })
+}
+
+/**
+ * The status the person sees: a PENDING proposal whose section or title has moved on since its
+ * base version is STALE, though the row stays PENDING until someone tries to accept it.
+ */
+export function withStaleStatus<
+  R extends { status: string; baseVersionId: string; payload: unknown },
+>(rows: R[], bases: ReadonlyMap<string, unknown>, latest: GeneratedDocumentData): R[] {
+  return rows.map((r) => {
+    if (r.status !== "PENDING") return r
+    const baseData = bases.get(r.baseVersionId)
+    const base = baseData ? GeneratedDocumentDataSchema.parse(baseData) : latest
+    const { change } = ProposalPayloadSchema.parse(r.payload)
+    return isProposalStale(change, base, latest) ? { ...r, status: "STALE" } : r
   })
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
+import { applyProposal, buildProposal, importContent } from "@sahihi/core"
 import type { UIMessage } from "ai"
-import { proposalIdsIn, withProposalOutcomes } from "./outcomes"
+import { proposalIdsIn, withProposalOutcomes, withStaleStatus } from "./outcomes"
 
 const proposal = (toolCallId: string, output: unknown) =>
   ({
@@ -59,5 +60,37 @@ describe("proposal outcomes", () => {
     const parts = out[1]?.parts as { output?: { status?: string } }[]
     expect(parts[1]?.output?.status).toBe("stale")
     expect(parts[2]?.output?.status).toBe("pending")
+  })
+})
+
+describe("withStaleStatus", () => {
+  const doc = () =>
+    importContent(
+      [{ type: "paragraph", runs: [{ text: "Between Acme Ltd and Beta Co" }] }],
+      "x.pdf",
+    )
+  const built = buildProposal(
+    {
+      tool: "propose_blanks",
+      blanks: [{ text: "Acme Ltd", key: "party_a", label: "Party", type: "text" as const }],
+      rationale: "Parties",
+    },
+    doc(),
+    [],
+    () => "n",
+  )
+  if (!built.ok) throw new Error(built.error)
+  const row = (status: string) => ({ status, baseVersionId: "v1", payload: built.payload })
+  const bases = new Map([["v1", doc()]])
+
+  test("a pending proposal whose text has moved on reads as stale", () => {
+    const latest = applyProposal(doc(), built.payload)
+    expect(withStaleStatus([row("PENDING")], bases, latest)[0]?.status).toBe("STALE")
+  })
+
+  test("a pending proposal on unchanged text and decided ones keep their status", () => {
+    expect(withStaleStatus([row("PENDING")], bases, doc())[0]?.status).toBe("PENDING")
+    const latest = applyProposal(doc(), built.payload)
+    expect(withStaleStatus([row("ACCEPTED")], bases, latest)[0]?.status).toBe("ACCEPTED")
   })
 })
