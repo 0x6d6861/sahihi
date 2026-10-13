@@ -4,13 +4,18 @@
  * for text. 1em = 4% of the frame's width, so they read at any size. Theme-aware via `--dm-*`.
  */
 import type { CSSProperties, ReactNode } from "react"
+import { Settle } from "@/components/ui/Settle"
+import { s as settle } from "@/components/ui/settleMarks"
 import { sample } from "@/content/site"
 import { Icon, Scrawl, tone } from "./parts"
+
+type Settled = ReturnType<typeof settle>
 
 function Illustration({ children }: { children: ReactNode }) {
   return (
     <div aria-hidden className="demo absolute inset-0 overflow-hidden bg-(--dm-muted)">
-      <div className="illus-root absolute inset-0">{children}</div>
+      {/* Each step settles once: the page lands, then what happens to it. */}
+      <Settle className="illus-root">{children}</Settle>
     </div>
   )
 }
@@ -29,24 +34,37 @@ function Sheet({
   children,
   className = "",
   style,
+  at = settle(0),
 }: {
   children: ReactNode
   className?: string
   style?: CSSProperties
+  at?: Settled
 }) {
   return (
     <div
+      data-s={at["data-s"]}
       className={`absolute rounded-[0.9em] bg-(--dm-paper) p-[1.4em] text-(--dm-paper-ink) shadow-[0_0.6em_1.8em_-0.6em_rgb(0_0_0/0.25)] ${className}`}
-      style={style}
+      style={{ ...at.style, ...style }}
     >
       {children}
     </div>
   )
 }
 
-function Floating({ children, className = "" }: { children: ReactNode; className?: string }) {
+/** Lands on the sheet after it: the step's outcome. */
+function Floating({
+  children,
+  className = "",
+  at = settle(0, 220),
+}: {
+  children: ReactNode
+  className?: string
+  at?: Settled
+}) {
   return (
     <div
+      {...at}
       className={`absolute rounded-[1.1em] border border-(--dm-line) bg-(--dm-card) p-[1em] shadow-(--dm-shadow) ${className}`}
     >
       {children}
@@ -57,12 +75,15 @@ function Floating({ children, className = "" }: { children: ReactNode; className
 /* ── Draft: a sheet whose blanks fill in, and the assistant's question ── */
 
 export function HeroDraft() {
+  // Filled blanks fade in after the page lands, as if the assistant just wrote them.
   const blank = (filled: boolean, w: string) => (
     <span
+      {...(filled ? settle(0, 520, "fade") : {})}
       className={`inline-block h-[1.05em] rounded-[0.35em] align-middle ${
         filled ? "" : "border border-dashed border-(--dm-warn) bg-(--dm-warn-bg)"
       }`}
       style={{
+        ...(filled ? settle(0, 520, "fade").style : {}),
         width: w,
         background: filled ? "color-mix(in oklab, var(--dm-tone-0) 18%, white)" : undefined,
       }}
@@ -97,6 +118,7 @@ export function HeroDraft() {
           {sample.question.options.map((o, i) => (
             <span
               key={o}
+              {...settle(i, 380)}
               className={`flex items-center rounded-full border px-[0.7em] py-[0.3em] text-[0.72em] ${
                 i === 1
                   ? "border-transparent bg-(--dm-accent) text-(--dm-on-accent)"
@@ -131,7 +153,7 @@ export function HeroSend() {
         </div>
         <div className="mt-[1.4em] grid grid-cols-2 gap-[0.8em]">
           {[0, 1].map((i) => (
-            <div key={i}>
+            <div key={i} {...settle(i, 200)}>
               <div
                 className="flex h-[2.6em] items-center justify-center rounded-[0.5em] border-[0.12em] text-[0.7em]"
                 style={{
@@ -148,7 +170,10 @@ export function HeroSend() {
           ))}
         </div>
       </Sheet>
-      <Floating className="right-[6%] bottom-[9%] flex items-center gap-[0.6em] rounded-full px-[0.9em] py-[0.6em]">
+      <Floating
+        at={settle(0, 420)}
+        className="right-[6%] bottom-[9%] flex items-center gap-[0.6em] rounded-full px-[0.9em] py-[0.6em]"
+      >
         <span className="flex -space-x-[0.4em]">
           {sample.signers.map((s, i) => (
             <span
@@ -224,8 +249,12 @@ export function HeroProve() {
           SHA-256 {hash.slice(0, 6)}…{hash.slice(-6)}
         </div>
         <div className="mt-[0.9em] flex flex-col gap-[0.55em]">
-          {sample.signers.map((s) => (
-            <span key={s.name} className="flex items-center gap-[0.5em] text-[0.7em]">
+          {sample.signers.map((s, i) => (
+            <span
+              key={s.name}
+              {...settle(i, 260)}
+              className="flex items-center gap-[0.5em] text-[0.7em]"
+            >
               <span className="grid size-[1.3em] place-items-center rounded-full bg-[#dcfce7] text-[#15803d]">
                 <Icon name="check" className="text-[0.75em]" />
               </span>
@@ -243,7 +272,10 @@ export function HeroProve() {
           ))}
         </div>
       </Sheet>
-      <Floating className="right-[7%] bottom-[9%] flex items-center gap-[0.5em] rounded-full px-[0.9em] py-[0.5em]">
+      <Floating
+        at={settle(0, 480, "drop")}
+        className="right-[7%] bottom-[9%] flex items-center gap-[0.5em] rounded-full px-[0.9em] py-[0.5em]"
+      >
         <span className="grid size-[1.6em] place-items-center rounded-full bg-(--dm-success-bg) text-(--dm-success)">
           <Icon name="seal" className="text-[0.9em]" />
         </span>

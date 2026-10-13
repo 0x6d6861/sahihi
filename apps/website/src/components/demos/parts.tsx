@@ -31,15 +31,19 @@ export function Card({
   children,
   className = "",
   style,
+  at,
 }: {
   children: ReactNode
   className?: string
   style?: CSSProperties
+  /** How the card settles into its panel (`s()` from ui/settleMarks). */
+  at?: { "data-s": string; style: CSSProperties }
 }) {
   return (
     <div
+      data-s={at?.["data-s"]}
       className={`rounded-[1.4em] border border-(--dm-line) bg-(--dm-card) shadow-(--dm-shadow) ${className}`}
-      style={style}
+      style={{ ...at?.style, ...style }}
     >
       {children}
     </div>

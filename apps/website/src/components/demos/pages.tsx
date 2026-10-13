@@ -5,6 +5,7 @@
  * envelope) and follow the theme through the `--dm-*` palette. Data comes from `sample`.
  */
 import type { ReactNode } from "react"
+import { s as settle } from "@/components/ui/settleMarks"
 import { sample } from "@/content/site"
 import { Badge, Icon, tone } from "./parts"
 
@@ -283,7 +284,10 @@ export function EnvelopeScreen() {
             <Button icon="copy">Copy status</Button>
           </div>
         </div>
-        <div className="mt-[1.7em] rounded-[1.8em] border border-(--dm-line) bg-(--dm-card) p-[1.65em]">
+        <div
+          {...settle(0, 200)}
+          className="mt-[1.7em] rounded-[1.8em] border border-(--dm-line) bg-(--dm-card) p-[1.65em]"
+        >
           <p className="text-[1.1em]">Signed and certified</p>
           <p className="mt-[0.3em] text-[0.97em] text-(--dm-text-2)">
             Everyone signed on 13 Oct 2026. The signed PDF and the Certificate of Completion are
@@ -368,7 +372,11 @@ export function DraftingScreen() {
               {sample.chat.updated}
             </p>
             <p className="text-[0.97em]">{sample.chat.reply}</p>
-            <div className="overflow-hidden rounded-[1.4em] border border-(--dm-tone-0)/40 bg-(--dm-card)">
+            {/* The focus of this screen: it lands, then its choices (only where a Settle wraps it). */}
+            <div
+              {...settle(0, 200)}
+              className="overflow-hidden rounded-[1.4em] border border-(--dm-tone-0)/40 bg-(--dm-card)"
+            >
               <div className="flex flex-col gap-[0.3em] px-[1.1em] pt-[1em] pb-[0.9em]">
                 <div className="flex items-center gap-[0.6em] text-(--dm-text-3)">
                   <Icon name="chevronLeft" className="text-[0.85em]" />
@@ -383,6 +391,7 @@ export function DraftingScreen() {
                   {q.options.map((o, i) => (
                     <span
                       key={o}
+                      {...settle(i, 380)}
                       className="flex h-[2.75em] items-center gap-[1em] rounded-full border border-(--dm-strong) px-[1em] text-[0.97em]"
                     >
                       <span className="text-[0.8em] text-(--dm-text-3)">{i + 1}</span>
@@ -477,7 +486,8 @@ function PlacedField({
   selected?: boolean
 }) {
   return (
-    <span className="mt-[0.25em] block">
+    // The selected field drops into place, as if just placed (only where a Settle wraps it).
+    <span {...(selected ? settle(0, 320, "pop") : {})} className="mt-[0.25em] block">
       <span
         className="flex items-center justify-center gap-[0.3em] rounded-[0.7em] border-[0.13em] text-[0.6em]"
         style={{

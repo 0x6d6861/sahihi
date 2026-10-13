@@ -2,6 +2,7 @@
  * The demo panels, coded to match the real app's cards (compare the full-page screenshots and
  * apps/e2e/showcase). Each fills a `.demo` panel and scales with it. Data comes from `sample`.
  */
+import { s as settle } from "@/components/ui/settleMarks"
 import { sample } from "@/content/site"
 import { Badge, Card, DemoRoot, Field, Icon, Pill, Scrawl, tone } from "./parts"
 
@@ -11,7 +12,7 @@ export function QuestionsDemo() {
   const q = sample.question
   return (
     <DemoRoot scale={1.55}>
-      <Card className="w-[26em] overflow-hidden border-(--dm-tone-0)/40">
+      <Card at={settle(0, 100)} className="w-[26em] overflow-hidden border-(--dm-tone-0)/40">
         <div className="flex flex-col gap-[0.35em] px-[1.3em] pt-[1.1em] pb-[0.9em]">
           <div className="flex items-center gap-[0.6em] text-(--dm-text-3)">
             <Icon name="chevronLeft" className="text-[0.85em]" />
@@ -24,6 +25,7 @@ export function QuestionsDemo() {
             {q.options.map((o, i) => (
               <span
                 key={o}
+                {...settle(i, 300)}
                 className="flex items-center gap-[0.9em] rounded-full border border-(--dm-strong) px-[1em] py-[0.55em] text-[0.88em]"
               >
                 <span className="text-[0.8em] text-(--dm-text-3)">{i + 1}</span>
@@ -54,7 +56,7 @@ export function ProposalDemo() {
   const p = sample.proposal
   return (
     <DemoRoot scale={2.9}>
-      <Card className="w-[22em] p-[1.1em]">
+      <Card at={settle(0, 100)} className="w-[22em] p-[1.1em]">
         <div className="flex items-center justify-between gap-[0.6em]">
           <p className="text-[0.95em]">Suggested edit to {p.section}</p>
           <Badge>Waiting for you</Badge>
@@ -63,13 +65,23 @@ export function ProposalDemo() {
         <div className="mt-[0.8em] rounded-[1em] border border-(--dm-line) p-[0.9em] text-[0.75em] leading-[1.6]">
           <p>
             {p.title[0]}
-            <ins className="rounded-[0.3em] bg-(--dm-insert) no-underline">{p.title[1]}</ins>
+            <ins
+              {...settle(0, 560, "fade")}
+              className="rounded-[0.3em] bg-(--dm-insert) no-underline"
+            >
+              {p.title[1]}
+            </ins>
           </p>
           <p>
             {p.before}
             <del className="text-(--dm-danger)">{p.removed}</del>
             {p.kept}
-            <ins className="rounded-[0.3em] bg-(--dm-insert) no-underline">{p.inserted}</ins>
+            <ins
+              {...settle(0, 560, "fade")}
+              className="rounded-[0.3em] bg-(--dm-insert) no-underline"
+            >
+              {p.inserted}
+            </ins>
             {p.after}
           </p>
         </div>
@@ -91,7 +103,7 @@ export function SignersDemo() {
   const s = sample.signer
   return (
     <DemoRoot scale={2.9}>
-      <Card className="w-[22em] p-[1.1em]">
+      <Card at={settle(0, 100)} className="w-[22em] p-[1.1em]">
         <div className="flex items-baseline justify-between">
           <p className="text-[0.95em]">For {s.party}</p>
           <span className="text-[0.75em] text-(--dm-text-2)">Remove</span>
@@ -109,9 +121,10 @@ export function SignersDemo() {
         </div>
         <p className="mt-[0.8em] text-[0.8em]">Fields</p>
         <div className="mt-[0.35em] divide-y divide-(--dm-line) rounded-[1em] border border-(--dm-line)">
-          {s.fields.map((f) => (
+          {s.fields.map((f, i) => (
             <div
               key={f}
+              {...settle(i, 300)}
               className="flex items-center gap-[0.6em] px-[0.8em] py-[0.5em] text-[0.78em]"
             >
               {f}
@@ -135,7 +148,10 @@ export function SigningDemo() {
   return (
     <DemoRoot scale={1.5} className="gap-[2.4em]">
       {/* The signing page on a phone, jumped to the signature field. */}
-      <div className="flex h-[88%] w-[15em] shrink-0 flex-col gap-[0.6em] overflow-hidden rounded-[2.2em] border-[0.4em] border-(--dm-text) bg-(--dm-bg) p-[0.7em] shadow-(--dm-shadow)">
+      <div
+        {...settle(0, 100)}
+        className="flex h-[88%] w-[15em] shrink-0 flex-col gap-[0.6em] overflow-hidden rounded-[2.2em] border-[0.4em] border-(--dm-text) bg-(--dm-bg) p-[0.7em] shadow-(--dm-shadow)"
+      >
         <Card className="p-[0.9em] shadow-none">
           <p className="text-[1.05em] leading-[1.15] tracking-[-0.01em]">{o.title}</p>
           <p className="mt-[0.35em] text-[0.62em] text-(--dm-text-2)">
@@ -163,7 +179,7 @@ export function SigningDemo() {
       </div>
 
       {/* The signature dialog. */}
-      <Card className="hidden w-[22em] p-[1.2em] sm:block">
+      <Card at={settle(0, 320)} className="hidden w-[22em] p-[1.2em] sm:block">
         <div className="flex items-start justify-between">
           <div>
             <p className="text-[0.95em]">Add your signature</p>
@@ -210,7 +226,7 @@ export function SigningDemo() {
 export function OtpDemo() {
   return (
     <DemoRoot scale={2.9}>
-      <Card className="w-[17em] p-[1.3em]">
+      <Card at={settle(0, 100)} className="w-[17em] p-[1.3em]">
         <p className="text-[1.4em] leading-[1.15] tracking-[-0.01em]">Verify it&apos;s you</p>
         <p className="mt-[0.4em] text-[0.75em] text-(--dm-text-2)">
           Enter the 6-digit code sent to {sample.otp.to}.
@@ -221,6 +237,8 @@ export function OtpDemo() {
             <span
               // biome-ignore lint/suspicious/noArrayIndexKey: fixed six slots
               key={i}
+              // Typed digits appear one by one, at typing pace (slower than a list stagger).
+              {...(d ? settle(0, 380 + i * 140, "pop") : {})}
               className={`grid h-[2.2em] w-[1.95em] place-items-center rounded-[0.7em] border text-[0.9em] ${
                 d
                   ? "border-(--dm-text-2) bg-(--dm-muted)"
@@ -247,7 +265,7 @@ export function OtpDemo() {
 export function RoutingDemo() {
   return (
     <DemoRoot scale={2.9}>
-      <Card className="w-[22em] p-[1.1em]">
+      <Card at={settle(0, 100)} className="w-[22em] p-[1.1em]">
         <p className="text-[0.95em]">Recipients</p>
         <p className="mt-[0.2em] text-[0.72em] text-(--dm-text-2)">
           Invited step by step. Recipients on the same step sign in parallel.
@@ -255,6 +273,7 @@ export function RoutingDemo() {
         {sample.routing.map((r, i) => (
           <div
             key={r.email}
+            {...settle(i, 300)}
             className={`mt-[0.8em] ${i ? "border-t border-(--dm-line) pt-[0.8em]" : ""}`}
           >
             <div className="flex items-center gap-[0.5em] text-[0.82em]">
@@ -291,7 +310,10 @@ export function VerifyDemo() {
   const half = (h: string) => [h.slice(0, 32), h.slice(32)]
   return (
     <DemoRoot scale={2.9} className="flex-col gap-[0.6em]">
-      <Card className="flex w-[22em] gap-[0.6em] px-[1em] py-[0.75em] shadow-none">
+      <Card
+        at={settle(0, 500, "drop")}
+        className="flex w-[22em] gap-[0.6em] px-[1em] py-[0.75em] shadow-none"
+      >
         <Icon name="check" className="mt-[0.15em] text-(--dm-success)" />
         <div>
           <p className="text-[0.85em]">File verified</p>
@@ -301,7 +323,7 @@ export function VerifyDemo() {
           </p>
         </div>
       </Card>
-      <Card className="w-[22em] p-[1.1em]">
+      <Card at={settle(0, 100)} className="w-[22em] p-[1.1em]">
         <div className="flex items-center gap-[0.5em]">
           <p className="text-[1.15em] tracking-[-0.01em]">{sample.nda}</p>
           <Badge kind="success">Verified</Badge>
@@ -332,7 +354,7 @@ export function AuditDemo() {
   const total = 13
   return (
     <DemoRoot scale={2.9}>
-      <Card className="w-[22em] p-[1.1em]">
+      <Card at={settle(0, 100)} className="w-[22em] p-[1.1em]">
         <div className="flex items-baseline justify-between">
           <p className="text-[0.9em]">Today</p>
           <span className="text-[0.72em] text-(--dm-text-3)">{total} updates</span>
@@ -341,7 +363,7 @@ export function AuditDemo() {
           {sample.activity.map((e, i) => {
             const done = e.kind === "seal" || e.kind === "sign"
             return (
-              <div key={e.text} className="flex gap-[0.7em]">
+              <div key={e.text} {...settle(i, 260)} className="flex gap-[0.7em]">
                 <div className="flex flex-col items-center">
                   <span
                     className={`grid size-[1.7em] shrink-0 place-items-center rounded-full border text-[0.8em] ${

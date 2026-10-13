@@ -49,6 +49,30 @@ weight, and follow the theme. They show one fictional workspace, Tana Freight Lt
 - Text is Inter (`--font-ui`), the app's face, weight 400.
 - Every picture is `aria-hidden`: the captions and headings carry the meaning.
 
+## Settle
+
+Each picture settles once as it comes into view: the page or card lands, then what happens on it,
+in the order that tells the step. `<Settle>` (`ui/Settle.tsx`) wraps the picture and sets
+`data-settled` when 35% of it is in view; parts marked with `s(i, delay, kind)` from
+`ui/settleMarks.ts` move from slightly lifted and transparent to rest (globals.css → Settle).
+
+| Picture | Order |
+|---|---|
+| Hero Draft | sheet → filled blanks fade in → question card lands → choices one by one |
+| Hero Send | page → each signer's field → the signing-links pill |
+| Hero Prove | certificate → each signer's tick → "Verified" drops in last |
+| Questions, Signers, Routing, Audit | card → its rows in turn |
+| Proposal | card → the inserted wording fades in after it |
+| Signing | phone → the signature dialog |
+| Code step | card → the typed digits appear one by one, at typing pace (140 ms apart) |
+| Verify | certificate card → the "File verified" banner drops in above it |
+| Chapter screens | one focal element: the question card (Drafting), the selected field (Editor), "Signed and certified" (Envelope) |
+
+The hero's merged window has no settle: the scroll scrub already brings it in, and it sits in view
+(invisible) from load, so an in-view trigger would fire unseen. Marks only take effect inside a
+`Settle`, so the same screen can appear elsewhere without them. Transform and opacity only; reduced
+motion keeps a 200 ms fade. Keep stagger short (50 ms) and total delays under about 700 ms.
+
 ## Matching the real app
 
 Build and change these by looking at the real screens, not from memory:

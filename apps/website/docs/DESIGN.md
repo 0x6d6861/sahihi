@@ -120,6 +120,7 @@ Smaller variants (feature grid, context cards) use the same pattern with `text-c
 | `ArrowLink` | `ui/Button.tsx` | Secondary action: text plus an arrow that nudges right on hover. |
 | `Caption` | `ui/Caption.tsx` | The caption pattern above. |
 | `Reveal` | `ui/Reveal.tsx` | One-shot fade-and-rise (12px, 450ms, `ease-calm`) when the block enters the viewport. Takes an optional `delay` for staggering. |
+| `Settle` | `ui/Settle.tsx` + `ui/settleMarks.ts` | One-shot settle inside a product picture: parts marked with `s(i, delay, kind)` come to rest when the picture is 35% in view (PRODUCT_UI.md → Settle). |
 | `Section` / `Inset` | `ui/Section.tsx` | Content widths (see Layout). |
 | `MetalIcon` / `MetalDefs` | `icons/MetalIcons.tsx` | Six SVG "steel object" icons: compass, ruler, knob, puck, loupe, slider. |
 
@@ -142,6 +143,7 @@ Feature icons are metal objects, not line icons. They are 80×80 SVGs filled wit
 | Pattern | Spec |
 |---|---|
 | Section entry | `Reveal`: opacity 0→1, y `distance`→0 (default 12px; Process steps use 16px), 450ms, `cubic-bezier(0.22,1,0.36,1)`, once, triggered at 10% from the bottom of the viewport. With reduced motion it fades without moving. |
+| Picture settle | `Settle`: marked parts go from `translateY(0.6em) scale(0.985)`, opacity 0 to rest; transform 640ms `ease-calm`, opacity 420ms ease-out, 50ms stagger, CSS transitions toggled once by `data-settled`. Kinds: `lift`, `drop` (−0.4em), `pop` (scale 0.85), `fade`. Reduced motion: a 200ms fade, no movement or stagger. Never on the hero's merged window (it is scrubbed). |
 | Stagger | `delay = index * 0.05–0.08s`, wrapping per row (`i % 3`). `Reveal` ignores the delay below `md` and under reduced motion: on one column each item enters alone, so a delay is only lag. |
 | Hover | Buttons darken one step; the arrow moves 2px. No scale bounces, no springs. |
 | Press | Buttons and the arrow link scale to 0.97 on `:active` (`active:scale-[0.97]`, 150ms ease-out). Add it to any new button. |

@@ -15,24 +15,31 @@ import { Caption } from "@/components/ui/Caption"
 import { ChromeFrame } from "@/components/ui/ChromeFrame"
 import { Reveal } from "@/components/ui/Reveal"
 import { Inset, Section } from "@/components/ui/Section"
+import { Settle } from "@/components/ui/Settle"
 import { site } from "@/content/site"
 
 /** Each chapter's main picture: a full app screen, coded to match the real one. */
 const mainScreen: Record<string, ReactNode> = {
   draft: (
-    <Screen>
-      <DraftingScreen />
-    </Screen>
+    <Settle>
+      <Screen>
+        <DraftingScreen />
+      </Screen>
+    </Settle>
   ),
   send: (
-    <Screen>
-      <EditorScreen />
-    </Screen>
+    <Settle>
+      <Screen>
+        <EditorScreen />
+      </Screen>
+    </Settle>
   ),
   prove: (
-    <Screen>
-      <EnvelopeScreen />
-    </Screen>
+    <Settle>
+      <Screen>
+        <EnvelopeScreen />
+      </Screen>
+    </Settle>
   ),
 }
 
@@ -118,7 +125,7 @@ function DemoPanel({ aspect, children }: { aspect: string; children: ReactNode }
       className="demo relative overflow-hidden rounded-[28px] bg-panel"
       style={{ aspectRatio: aspect }}
     >
-      {children}
+      <Settle>{children}</Settle>
     </div>
   )
 }

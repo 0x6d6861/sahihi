@@ -411,6 +411,35 @@ body {
   color: var(--dm-text);
 }
 
+/* ── Settle ────────────────────────────────────────────────────────
+   Product pictures settle once when they come into view (ui/Settle.tsx sets
+   data-settled): marked parts start slightly lifted, a hair smaller and
+   transparent, and come to rest. Transitions, not keyframes, so nothing
+   restarts; transform and opacity only. */
+.settle [data-s] {
+  opacity: 0;
+  transform: translateY(var(--s-y, 0.6em)) scale(var(--s-scale, 0.985));
+  transition:
+    opacity 420ms ease-out,
+    transform 640ms var(--ease-calm);
+  transition-delay: calc(var(--s-delay, 0ms) + var(--i, 0) * 50ms);
+}
+.settle [data-s="drop"] {
+  --s-y: -0.4em;
+}
+.settle [data-s="pop"] {
+  --s-y: 0em;
+  --s-scale: 0.85;
+}
+.settle [data-s="fade"] {
+  --s-y: 0em;
+  --s-scale: 1;
+}
+.settle[data-settled] [data-s] {
+  opacity: 1;
+  transform: none;
+}
+
 /* ── Marquee ───────────────────────────────────────────────────── */
 @keyframes marquee-x {
   to {
@@ -444,5 +473,11 @@ body {
   .marquee-x,
   .marquee-y {
     animation: none;
+  }
+  /* Settle keeps a short fade, without movement or stagger. */
+  .settle [data-s] {
+    transform: none;
+    transition: opacity 200ms ease-out;
+    transition-delay: 0ms;
   }
 }
