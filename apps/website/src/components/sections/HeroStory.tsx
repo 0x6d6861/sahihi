@@ -2,13 +2,8 @@
 
 import { type MotionValue, motion, useScroll, useTransform } from "motion/react"
 import { type ReactNode, useRef } from "react"
-import {
-  DraftingScreen,
-  EditorScreen,
-  EnvelopeScreen,
-  FilesScreen,
-  Screen,
-} from "@/components/demos/pages"
+import { HeroDraft, HeroProve, HeroSend } from "@/components/demos/hero"
+import { FilesScreen, Screen } from "@/components/demos/pages"
 import { ArrowLink, PillButton } from "@/components/ui/Button"
 import { ChromeFrame } from "@/components/ui/ChromeFrame"
 import { useSafeReducedMotion } from "@/components/ui/useSafeReducedMotion"
@@ -26,11 +21,7 @@ import { site } from "@/content/site"
 const frames = [
   {
     key: "draft",
-    screen: (
-      <Screen zoom={1.45}>
-        <DraftingScreen />
-      </Screen>
-    ),
+    screen: <HeroDraft />,
     aspect: "1.1/1",
     pos: "left-[7%] top-[26%] w-[32%] md:left-[14%] md:top-[12%] md:w-[25%]",
     rotate: [-8, -4],
@@ -38,11 +29,7 @@ const frames = [
   },
   {
     key: "send",
-    screen: (
-      <Screen zoom={1.9} focus={[0.3, 0.7]}>
-        <EditorScreen />
-      </Screen>
-    ),
+    screen: <HeroSend />,
     aspect: "1.05/1",
     pos: "left-[35%] top-[16%] w-[30%] md:left-[40%] md:top-[6%] md:w-[20%]",
     rotate: [3, 1],
@@ -50,11 +37,7 @@ const frames = [
   },
   {
     key: "prove",
-    screen: (
-      <Screen zoom={1.45}>
-        <EnvelopeScreen />
-      </Screen>
-    ),
+    screen: <HeroProve />,
     aspect: "0.95/1",
     pos: "left-[61%] top-[28%] w-[32%] md:left-[62%] md:top-[15%] md:w-[21%]",
     rotate: [9, 4],

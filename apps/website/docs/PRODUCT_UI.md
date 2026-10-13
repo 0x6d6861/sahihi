@@ -13,22 +13,27 @@ weight, and follow the theme. They show one fictional workspace, Tana Freight Lt
 |---|---|
 | `pages.tsx` | Full screens on a 16:10 canvas (`Screen`): `FilesScreen`, `DraftingScreen`, `EditorScreen`, `EnvelopeScreen`, plus the shared `TopBar` |
 | `screens.tsx` | Single-card demos for the panels: `QuestionsDemo`, `ProposalDemo`, `SignersDemo`, `SigningDemo` (phone + signature dialog), `OtpDemo`, `RoutingDemo`, `VerifyDemo`, `AuditDemo` |
+| `hero.tsx` | Illustrative screens for the hero's three small frames: `HeroDraft` (a sheet whose blanks fill in, the assistant's question), `HeroSend` (a page with each signer's field, the signing links), `HeroProve` (the certificate with its fingerprint, QR and "Verified") |
 | `parts.tsx` | Pieces: `DemoRoot`, `Card`, `Pill`, `Badge`, `Field`, `Icon` (Lucide-style line icons), `Scrawl` |
 
 | Screen | On the site |
 |---|---|
 | `FilesScreen` | Hero merged window |
-| `DraftingScreen` | Hero frame 1 (zoomed), draft chapter main |
-| `EditorScreen` | Hero frame 2 (zoomed onto the page), send chapter main |
-| `EnvelopeScreen` | Hero frame 3 (zoomed), prove chapter main |
+| `DraftingScreen` | Draft chapter main |
+| `EditorScreen` | Send chapter main |
+| `EnvelopeScreen` | Prove chapter main |
+| `HeroDraft`, `HeroSend`, `HeroProve` | Hero frames 1–3 |
 
 ## Sizing
 
 - **Full screens:** `Screen` renders a 16:10 canvas whose `.screen-root` font size is 1% of its
   width. The app is laid out at 1440 px with 14–14.4 px text, so **an app size in px ÷ 14.4 is the
   `em` to write** (a 64 px top bar is `h-[4.45em]`, 28 px titles `text-[1.95em]`). `zoom` > 1 shows
-  part of the screen larger, `focus` picks which part (fractions of the overflow): the hero's small
-  frames use it.
+  part of the screen larger, `focus` picks which part (fractions of the overflow).
+- **Hero illustrations:** `.illus-root` is 4% of the frame's width, with no minimum, so they keep
+  their proportions in the small mobile frames. They are illustrations, not the full UI: big shapes,
+  few words, grey bars for body text. Keep them that way; the full UI is the merged window and the
+  chapters.
 - **Demos:** `.demo-root` takes its font size from the panel's width (`--dm`, about 1.5 for wide
   panels, 2.9 for half panels).
 - Only `em` inside both. No `px` or `rem`.

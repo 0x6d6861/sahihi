@@ -37,9 +37,9 @@ Each frame is an entry in the `frames` array:
 
 | key | screen | aspect | rotate [initial, settled] | shift (converge) | position (mobile → `md`) |
 |---|---|---|---|---|---|
-| draft | `DraftingScreen` (zoom 1.45) | 1.1/1 | [-8°, -4°] | 0 → +16vw | `left-[7%] top-[26%] w-[32%]` → `md:left-[14%] md:top-[12%] md:w-[25%]` |
-| send | `EditorScreen` (zoom 1.9, on the page) | 1.05/1 | [3°, 1°] | none | `left-[35%] top-[16%] w-[30%]` → `md:left-[40%] md:top-[6%] md:w-[20%]` |
-| prove | `EnvelopeScreen` (zoom 1.45) | 0.95/1 | [9°, 4°] | 0 → -16vw | `left-[61%] top-[28%] w-[32%]` → `md:left-[62%] md:top-[15%] md:w-[21%]` |
+| draft | `HeroDraft` | 1.1/1 | [-8°, -4°] | 0 → +16vw | `left-[7%] top-[26%] w-[32%]` → `md:left-[14%] md:top-[12%] md:w-[25%]` |
+| send | `HeroSend` | 1.05/1 | [3°, 1°] | none | `left-[35%] top-[16%] w-[30%]` → `md:left-[40%] md:top-[6%] md:w-[20%]` |
+| prove | `HeroProve` | 0.95/1 | [9°, 4°] | 0 → -16vw | `left-[61%] top-[28%] w-[32%]` → `md:left-[62%] md:top-[15%] md:w-[21%]` |
 
 Positions are percentages of the frames container (`52svh` tall, max 1400px wide). The pillar label for each frame is `site.pillars[index]`, so the order of `frames` must match the order of `pillars`.
 

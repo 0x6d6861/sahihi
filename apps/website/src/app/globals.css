@@ -378,6 +378,16 @@ body {
   color: var(--dm-text);
 }
 
+/* Hero illustrations (components/demos/hero.tsx): 1em = 4% of the frame's
+   width, no minimum, so they keep their proportions even in the small mobile frames. */
+.illus-root {
+  font-size: 4cqw;
+  line-height: 1.35;
+  font-weight: 400;
+  font-family: var(--font-ui), var(--font-sans);
+  color: var(--dm-text);
+}
+
 /* ── Marquee ───────────────────────────────────────────────────── */
 @keyframes marquee-x {
   to {
