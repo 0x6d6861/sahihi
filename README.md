@@ -16,7 +16,7 @@ bun run infra:up                # Postgres, Redis, MinIO (+ bucket), Mailpit
 bun run db:generate
 bun run db:migrate              # applies committed migrations (prisma migrate dev)
 bun run ui:bootstrap            # installs coss ui + Extend UI components into apps/web
-bun run dev                     # web http://localhost:3000 · api http://localhost:4000
+bun run dev                     # web http://localhost:3000 · api http://localhost:4000 · website http://localhost:3001
 ```
 
 - Emails (verification, signing links, OTPs) land in Mailpit: http://localhost:8025
@@ -45,13 +45,18 @@ Start with [`AGENTS.md`](./AGENTS.md), then [`docs/architecture.md`](./docs/arch
 
 ## Deploying (Railway)
 
-Run three services from this repo, each with a start command, plus Postgres and Redis plugins:
+Run four services from this repo, each with a start command, plus Postgres and Redis plugins:
 
 | Service | Build | Start |
 |---|---|---|
 | api | `bun install && bun run db:generate` | `bun run --filter @sahihi/db migrate:deploy && bun apps/api/src/index.ts` |
 | worker | `bun install && bun run db:generate` | `bun apps/worker/src/index.ts` |
 | web | `bun install && bun run --filter @sahihi/web build` | `bun run --filter @sahihi/web start` |
+| website | `bun install && bun run --filter @sahihi/website build` | `bun run --filter @sahihi/website start` |
+
+The website (marketing site) listens on 3001, needs no env vars and no database, and can sit on
+the apex domain with the web app on a subdomain. Set its watch paths to `apps/website/**` and
+`bun.lock` so app changes don't redeploy it.
 
 Use any S3-compatible bucket (AWS S3, Cloudflare R2, Railway volume + MinIO) and set
 `EMAIL_TRANSPORT=postmark`. See `docs/architecture.md` → Deployment.
