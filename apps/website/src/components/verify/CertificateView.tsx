@@ -1,9 +1,15 @@
 "use client"
 
-import { useParams, useSearchParams } from "next/navigation"
+import { useParams } from "next/navigation"
 import { useEffect, useState } from "react"
 import { site } from "@/content/site"
-import { type CertificateRecord, formatWhen, type HashMatch, normalizeCode } from "./verify"
+import {
+  type CertificateRecord,
+  formatWhen,
+  type HashMatch,
+  normalizeCode,
+  takeMatch,
+} from "./verify"
 
 const t = site.verify.certificate
 
@@ -15,19 +21,22 @@ type State =
 
 /**
  * A certificate's public record: the QR code target, and where /verify sends a matching file
- * (`?match=signed_document|certificate`). Fetched in the browser through this site's
+ * (remembered in sessionStorage, never in the URL). Fetched in the browser through this site's
  * `/api/verify` proxy, so the page itself stays a static shell.
  */
 export function CertificateView() {
   const params = useParams<{ code: string }>()
-  const match = useSearchParams().get("match") as HashMatch | null
-  const raw = decodeURIComponent(params.code ?? "")
+  const raw = safeDecode(params.code ?? "")
   const code = normalizeCode(raw)
+  const [match, setMatch] = useState<HashMatch | null>(null)
   const [state, setState] = useState<State>(code ? { kind: "loading" } : { kind: "missing" })
 
   useEffect(() => {
     if (!code) return
     let live = true
+    // Strict mode runs this twice and the first read clears it, so never reset to null.
+    const remembered = takeMatch(code)
+    if (remembered) setMatch(remembered)
     fetch(`/api/verify/${encodeURIComponent(code)}`)
       .then(async (res) => {
         if (res.status === 404) return { kind: "missing" } as const
@@ -140,6 +149,14 @@ export function CertificateView() {
       </section>
     </div>
   )
+}
+
+function safeDecode(value: string) {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
 }
 
 function Check({ small = false }: { small?: boolean }) {

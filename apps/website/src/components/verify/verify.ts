@@ -28,6 +28,31 @@ export const MAX_VERIFY_BYTES = 100 * 1024 * 1024
 
 export type HashMatch = "signed_document" | "certificate"
 
+const MATCH_KEY = "sahihi:verify-match"
+
+/**
+ * The checker records a hash match here (not in the URL, which anyone can forge) just before it
+ * opens the certificate page, which reads it once.
+ */
+export function rememberMatch(code: string, match: HashMatch) {
+  try {
+    sessionStorage.setItem(MATCH_KEY, JSON.stringify({ code, match }))
+  } catch {}
+}
+
+/** The remembered match for this certificate, cleared on read. */
+export function takeMatch(code: string): HashMatch | null {
+  try {
+    const raw = sessionStorage.getItem(MATCH_KEY)
+    sessionStorage.removeItem(MATCH_KEY)
+    const saved = raw ? (JSON.parse(raw) as { code?: string; match?: string }) : null
+    if (!saved || normalizeCode(saved.code ?? "") !== code) return null
+    return saved.match === "signed_document" || saved.match === "certificate" ? saved.match : null
+  } catch {
+    return null
+  }
+}
+
 /** `GET /api/verify/:code`, as the API returns it (signers' emails are masked there). */
 export interface CertificateRecord {
   valid: boolean

@@ -3,7 +3,14 @@
 import { useRouter } from "next/navigation"
 import { type DragEvent, type FormEvent, useRef, useState } from "react"
 import { site } from "@/content/site"
-import { type HashMatch, MAX_VERIFY_BYTES, normalizeCode, sha256Hex, shortHash } from "./verify"
+import {
+  type HashMatch,
+  MAX_VERIFY_BYTES,
+  normalizeCode,
+  rememberMatch,
+  sha256Hex,
+  shortHash,
+} from "./verify"
 
 const t = site.verify
 
@@ -47,7 +54,8 @@ export function VerifyChecker() {
         code?: string
       }
       if (match && found) {
-        router.push(`/verify/${encodeURIComponent(found)}?match=${match}`)
+        rememberMatch(found, match)
+        router.push(`/verify/${encodeURIComponent(found)}`)
         return
       }
       setState({ kind: "no_match", name: file.name, sha256 })
