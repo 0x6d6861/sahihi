@@ -14,6 +14,8 @@ import {
   ProposeSectionEditInputSchema,
   type ProposeSectionsInput,
   ProposeSectionsInputSchema,
+  type ProposeTitleInput,
+  ProposeTitleInputSchema,
   SetVariablesInputSchema,
 } from "@sahihi/core"
 import { prisma } from "@sahihi/db"
@@ -37,6 +39,7 @@ import {
 } from "../generated-documents"
 import { assertAttachments, attachedStatements, forModel, forStorage } from "./attachments"
 import { assistantModel, assistantModelId } from "./model"
+import { proposalIdsIn, withProposalOutcomes, withStaleStatus } from "./outcomes"
 import { systemPrompt } from "./prompt"
 
 /**
@@ -149,6 +152,12 @@ function tools(ctx: { generatedDocumentId: string; userId: string; statements: s
       inputSchema: ProposeBlanksInputSchema,
       execute: (input: ProposeBlanksInput) => propose(ctx, { tool: "propose_blanks", ...input }),
     },
+    propose_title: {
+      description:
+        "Propose a new title for the document, as plain text without blanks. The person accepts or rejects it.",
+      inputSchema: ProposeTitleInputSchema,
+      execute: (input: ProposeTitleInput) => propose(ctx, { tool: "propose_title", ...input }),
+    },
   } satisfies ToolSet
 }
 
@@ -241,12 +250,37 @@ export async function streamAssistantReply(input: {
   })
   const origin =
     doc?.starter === BLANK_STARTER ? "blank" : doc?.starter === IMPORT_STARTER ? "import" : null
-  const proposals = await prisma.generatedDocumentProposal.findMany({
+  const select = {
+    id: true,
+    sectionId: true,
+    status: true,
+    rationale: true,
+    baseVersionId: true,
+    payload: true,
+  } as const
+  const recent = await prisma.generatedDocumentProposal.findMany({
     where: { generatedDocumentId: input.generatedDocumentId },
     orderBy: { createdAt: "desc" },
     take: 10,
-    select: { id: true, sectionId: true, status: true, rationale: true },
+    select,
   })
+  // Whether the person accepted or rejected each proposal in the conversation (ADR 0044).
+  const answered = await prisma.generatedDocumentProposal.findMany({
+    where: { generatedDocumentId: input.generatedDocumentId, id: { in: proposalIdsIn(messages) } },
+    select,
+  })
+  // STALE is derived on read, so the rows still say PENDING: apply the same check the page does.
+  const pendingRows = [...recent, ...answered].filter((r) => r.status === "PENDING")
+  const bases = new Map(
+    (
+      await prisma.generatedDocumentVersion.findMany({
+        where: { id: { in: [...new Set(pendingRows.map((r) => r.baseVersionId))] } },
+        select: { id: true, data: true },
+      })
+    ).map((b) => [b.id, b.data]),
+  )
+  const proposals = withStaleStatus(recent, bases, version.data)
+  const outcomes = withStaleStatus(answered, bases, version.data)
 
   const result = streamText({
     model: assistantModel(),
@@ -259,7 +293,10 @@ export async function streamAssistantReply(input: {
       organizationName: input.organizationName,
       today: new Date().toISOString().slice(0, 10),
     }),
-    messages: await convertToModelMessages(forModel(messages), { tools: toolSet }),
+    messages: await convertToModelMessages(
+      forModel(withProposalOutcomes(messages, new Map(outcomes.map((o) => [o.id, o.status])))),
+      { tools: toolSet },
+    ),
     tools: toolSet,
     stopWhen: isStepCount(5),
     abortSignal: input.abortSignal,

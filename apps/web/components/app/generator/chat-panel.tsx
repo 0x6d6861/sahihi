@@ -1,6 +1,6 @@
 "use client"
 
-import { AssistantChatTransport, useChatRuntime } from "@assistant-ui/ai-sdk"
+import { AssistantChatTransport, useAISDKChat, useChatRuntime } from "@assistant-ui/ai-sdk"
 import {
   ActionBarPrimitive,
   AssistantRuntimeProvider,
@@ -16,7 +16,7 @@ import {
   useAuiState,
 } from "@assistant-ui/react"
 import { lastAssistantMessageIsCompleteWithToolCalls, type UIMessage } from "ai"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { ArrowUpIcon, LoaderIcon, StopIcon, XIcon } from "@/components/app/icons"
 import { Button } from "@/components/arc/button/button"
 import { Tooltip } from "@/components/arc/tooltip/tooltip"
@@ -25,6 +25,7 @@ import {
   chatErrorMessage,
   draftOrigin,
   messageSectionId,
+  proposalsToContinueAfter,
   replyParagraphs,
   sectionExcerpt,
   withoutEarlierImages,
@@ -51,6 +52,7 @@ const toolkit = defineToolkit({
   propose_sections: { type: "backend", render: ProposalCard },
   define_signers: { type: "backend", render: ProposalCard },
   propose_blanks: { type: "backend", render: ProposalCard },
+  propose_title: { type: "backend", render: ProposalCard },
 })
 const config = AuiConfig({ tools: Tools({ toolkit }) })
 
@@ -97,9 +99,31 @@ export function ChatPanel() {
           </AuiIf>
         </ThreadPrimitive.Viewport>
         <Composer />
+        <ContinueAfterDecisions />
       </ThreadPrimitive.Root>
     </AssistantRuntimeProvider>
   )
+}
+
+/**
+ * Once the person has accepted or rejected every suggestion in the assistant's last reply, the
+ * assistant replies on its own: the request carries no new message, so it continues that reply,
+ * and the server tells it what was decided (docs/ai-documents.md → Proposals).
+ */
+function ContinueAfterDecisions() {
+  const { detail, decided } = useGenerator()
+  const chat = useAISDKChat()
+  const running = useAuiState((s) => s.thread.isRunning)
+  const last = useAuiState((s) => s.thread.messages.at(-1))
+  const continued = useRef(new Set<string>())
+  useEffect(() => {
+    if (running || !chat) return
+    const ids = proposalsToContinueAfter(last, detail.proposals, decided, continued.current)
+    if (ids.length === 0) return
+    for (const id of ids) continued.current.add(id)
+    void chat.sendMessage().catch(() => {})
+  }, [running, chat, last, detail.proposals, decided])
+  return null
 }
 
 /**

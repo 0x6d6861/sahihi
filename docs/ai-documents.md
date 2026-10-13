@@ -165,6 +165,7 @@ Tools (schemas in `packages/core/src/generation/schemas.ts`):
 | `propose_sections` | Server | Proposes new sections after a given one (or at the start) |
 | `define_signers` | Server | Proposes the signers (see **Signers**): every role, its fields and the party it signs for. Contacts only if the person stated them (or a filled party value) |
 | `propose_blanks` | Server | Proposes turning text written in the document (a name, a date, an amount) into blanks prefilled with that text (see **Proposals**). Meant for imported documents |
+| `propose_title` | Server | Proposes a new title (plain text, no blanks; see **Proposals**). A blank document's placeholder title is replaced this way |
 | `set_variables` | Server | Fills blanks with values the person typed in the chat. Each value must appear, word for word (case, spacing and edge punctuation aside), in something the person said or answered (`isValueAttested`); otherwise nothing changes, `variables.rejected` is recorded and the model is told to ask instead |
 
 ### Attachments (ADR 0050)
@@ -265,6 +266,22 @@ or rejects it from a card in the chat (`packages/core/src/generation/proposals.t
   whose value is that text (`status: answered`, `source: "import"`); the value comes from the
   document, so it needs no evidence from the chat. Out of date once a text no longer occurs or a key
   was taken. The card lists `"Acme Ltd" → [Client's name]`, one line per blank.
+- **The assistant knows the outcome:** a proposal's tool result is saved as it was made
+  (`pending`). Before each turn the server sets every proposal result in the conversation to the
+  proposal's current status (`accepted`, `rejected`, `stale`, `pending`) with a note saying what
+  that means (`withProposalOutcomes`, `apps/api/src/lib/assistant/outcomes.ts`), so the model reads
+  the decision where it made the proposal. Only the model's copy changes; the saved conversation
+  doesn't.
+- **The assistant replies on its own** once the person has decided every suggestion in its last
+  reply (at least one during this visit, none still waiting, every tool call answered;
+  `proposalsToContinueAfter`): the browser sends the conversation with no new message
+  (`sendMessage()`), the server continues that reply, and the prompt tells the assistant to say in
+  a sentence what changed and carry on. It happens once per set of suggestions, and not after a
+  reload.
+- **Title** (`propose_title`, `set_title`): a new title as plain text. Refused when it's the
+  current title, holds `{{…}}`, or names a specific the person never stated. Out of date once the
+  title changed. Accepting also renames the document in the drafts list (`appendVersion` copies the
+  title).
 - The detail returns the last 30 proposals with before and after text (blanks by label), pending
   ones reported `STALE` as soon as their section moves on. The prompt lists the last 10 with their
   outcome, so the assistant doesn't repeat a rejected change.
@@ -385,7 +402,11 @@ ADR 0009).
   second, the blank it fills, numbered option rows that keys 1–4 pick, then "type your own
   answer", Skip and Answer; each question eases in from the side the step went) and
   `set_variables` as "Updated …" with a tick. While a question waits the chat input is closed, so a
-  reply can't be mistaken for an answer. Answered cards show the question and the answer (or
+  reply can't be mistaken for an answer. Answers given so far are kept in the browser
+  (`localStorage`, per document and tool call, `resumeQuestions`): after a reload, or a reply that
+  failed before they reached the assistant, the card resumes at the first unanswered question
+  (the last one, with its typed answer, if all were answered); cleared once sent or dismissed.
+  Answered cards show the question and the answer (or
   Skipped). Suggestion cards have "Show in document"; accepting a section edit scrolls to it and
   highlights it briefly (side by side only). Replies render paragraphs and `**bold**`.
 - **Composer:** one card, with a paperclip for attachments (see Attachments): picked files show as

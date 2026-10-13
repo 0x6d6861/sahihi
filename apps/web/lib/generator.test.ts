@@ -25,9 +25,12 @@ import {
   type ProposalView,
   partyForRole,
   pendingSectionIds,
+  proposalsToContinueAfter,
   proposalTitle,
+  questionDraftKey,
   questionResult,
   replyParagraphs,
+  resumeQuestions,
   roleIssues,
   sectionExcerpt,
   templateChoices,
@@ -81,6 +84,33 @@ describe("question cards", () => {
         { questionId: "q2", value: null },
       ],
     })
+  })
+
+  test("a card resumes at the first question without an answer", () => {
+    expect(resumeQuestions(input, null)).toEqual({ answers: {}, index: 0, draft: "" })
+    expect(resumeQuestions(input, { q1: "1 year" })).toEqual({
+      answers: { q1: "1 year" },
+      index: 1,
+      draft: "",
+    })
+    // A skip counts as an answer; unknown questions and odd values are ignored.
+    expect(resumeQuestions(input, { q1: null, q9: "x", q2: 4 })).toEqual({
+      answers: { q1: null },
+      index: 1,
+      draft: "",
+    })
+    expect(resumeQuestions(input, "garbled").answers).toEqual({})
+    expect(questionDraftKey("doc1", "call1")).toBe("sahihi:questions:doc1:call1")
+  })
+
+  test("with every question answered, it opens the last one with its typed answer", () => {
+    expect(resumeQuestions(input, { q1: "1 year", q2: "Hiring" })).toEqual({
+      answers: { q1: "1 year", q2: "Hiring" },
+      index: 1,
+      draft: "Hiring",
+    })
+    const options = { questions: input.questions.slice(0, 1) }
+    expect(resumeQuestions(options, { q1: "1 year" }).draft).toBe("")
   })
 
   test("answered lines pair each question with its answer or a skip", () => {
@@ -353,4 +383,51 @@ test("withoutEarlierImages keeps images only on the person's last message", () =
   const out = withoutEarlierImages(messages)
   expect(out[0]?.parts).toEqual([{ type: "text", text: "[Image “a.png” attached, not kept]" }, doc])
   expect(out[2]?.parts).toEqual([img("b.png")])
+})
+
+describe("proposalsToContinueAfter", () => {
+  const call = (toolName: string, result: unknown) => ({ type: "tool-call", toolName, result })
+  const reply = (...content: { type: string; toolName?: string; result?: unknown }[]) => ({
+    role: "assistant",
+    content: [{ type: "text" }, ...content],
+  })
+  const last = reply(
+    call("propose_section_edit", { ok: true, proposalId: "p1" }),
+    call("propose_title", { ok: true, proposalId: "p2" }),
+    call("propose_sections", { ok: false, error: "no" }),
+  )
+  const none = new Set<string>()
+
+  test("continues once every proposal in the last reply is decided, one of them this visit", () => {
+    const decided = [
+      { id: "p1", status: "ACCEPTED" as const },
+      { id: "p2", status: "REJECTED" as const },
+    ]
+    expect(proposalsToContinueAfter(last, decided, new Set(["p2"]), none)).toEqual(["p1", "p2"])
+    // Already continued, or nothing decided during this visit (a reload): no reply.
+    expect(proposalsToContinueAfter(last, decided, new Set(["p2"]), new Set(["p1"]))).toEqual([])
+    expect(proposalsToContinueAfter(last, decided, none, none)).toEqual([])
+  })
+
+  test("waits while a proposal is pending or a tool call has no result", () => {
+    const some = [
+      { id: "p1", status: "ACCEPTED" as const },
+      { id: "p2", status: "PENDING" as const },
+    ]
+    expect(proposalsToContinueAfter(last, some, new Set(["p1"]), none)).toEqual([])
+    expect(proposalsToContinueAfter(last, [some[0] as never], new Set(["p1"]), none)).toEqual([])
+    const asking = reply(
+      call("propose_title", { ok: true, proposalId: "p1" }),
+      call("ask_questions", undefined),
+    )
+    expect(proposalsToContinueAfter(asking, some, new Set(["p1"]), none)).toEqual([])
+  })
+
+  test("only after the assistant's own last message with proposals", () => {
+    const decided = [{ id: "p1", status: "ACCEPTED" as const }]
+    expect(
+      proposalsToContinueAfter({ role: "user", content: [] }, decided, new Set(["p1"]), none),
+    ).toEqual([])
+    expect(proposalsToContinueAfter(reply(), decided, new Set(["p1"]), none)).toEqual([])
+  })
 })

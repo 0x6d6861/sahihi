@@ -40,7 +40,13 @@ export interface GeneratorDetail {
 /** An assistant proposal as the page shows it (`GET /generated-documents/:id`). */
 export interface ProposalView {
   id: string
-  kind: "replace_section" | "delete_section" | "insert_sections" | "set_signers" | "make_blanks"
+  kind:
+    | "replace_section"
+    | "delete_section"
+    | "insert_sections"
+    | "set_signers"
+    | "make_blanks"
+    | "set_title"
   sectionId: string | null
   /** STALE also for pending proposals whose section has changed since. */
   status: ProposalStatus
@@ -88,6 +94,37 @@ export function questionResult(
       return { questionId: q.id, value: raw == null ? null : raw.trim() || null }
     }),
   }
+}
+
+/** Where a question card's unsent answers are kept in the browser, per document and tool call. */
+export function questionDraftKey(documentId: string, toolCallId: string): string {
+  return `sahihi:questions:${documentId}:${toolCallId}`
+}
+
+/**
+ * Where a question card picks up from its saved answers (a reload, or a reply that failed before
+ * the answers reached the assistant): the answers that still match a question, and the first
+ * question without one. When every question has an answer it opens the last one, with its typed
+ * answer back in the field, so one press sends them all again.
+ */
+export function resumeQuestions(
+  input: AskQuestionsInput,
+  saved: unknown,
+): { answers: Record<string, string | null>; index: number; draft: string } {
+  const answers: Record<string, string | null> = {}
+  if (saved && typeof saved === "object" && !Array.isArray(saved)) {
+    for (const q of input.questions) {
+      const value = (saved as Record<string, unknown>)[q.id]
+      if (typeof value === "string" || value === null) answers[q.id] = value
+    }
+  }
+  const open = input.questions.findIndex((q) => !(q.id in answers))
+  if (open !== -1) return { answers, index: open, draft: "" }
+  const index = Math.max(0, input.questions.length - 1)
+  const last = input.questions[index]
+  const value = last ? answers[last.id] : null
+  const draft = last && value && !last.options.includes(value) ? value : ""
+  return { answers, index, draft }
 }
 
 /** Answered questions as "question → answer" lines for the collapsed cards. */
@@ -148,8 +185,52 @@ export function proposalTitle(
   if (view.kind === "insert_sections") return "Suggested new section"
   if (view.kind === "set_signers") return "Suggested signers"
   if (view.kind === "make_blanks") return "Suggested blanks"
+  if (view.kind === "set_title") return "Suggested title"
   if (view.kind === "delete_section") return `Suggested removal of ${name}`
   return `Suggested edit to ${name}`
+}
+
+/** The assistant's tools whose result is a proposal for the person to accept or reject. */
+export const PROPOSAL_TOOL_NAMES: readonly string[] = [
+  "propose_section_edit",
+  "propose_sections",
+  "define_signers",
+  "propose_blanks",
+  "propose_title",
+]
+
+interface ThreadMessageLike {
+  role: string
+  content: readonly { type: string; toolName?: string; result?: unknown }[]
+}
+
+/**
+ * The proposals to continue the conversation after: when the last message is the assistant's, all
+ * its tool calls have results, and the person has decided every proposal in it during this visit
+ * (at least one, and none still waiting), the assistant replies on its own. Empty otherwise, or
+ * once it already continued after them.
+ */
+export function proposalsToContinueAfter(
+  last: ThreadMessageLike | undefined,
+  proposals: readonly Pick<ProposalView, "id" | "status">[],
+  decided: ReadonlySet<string>,
+  continued: ReadonlySet<string>,
+): string[] {
+  if (last?.role !== "assistant") return []
+  const calls = last.content.filter((p) => p.type === "tool-call")
+  if (calls.some((p) => p.result === undefined)) return []
+  const ids = calls.flatMap((p) => {
+    if (!p.toolName || !PROPOSAL_TOOL_NAMES.includes(p.toolName)) return []
+    const r = p.result as { ok?: unknown; proposalId?: unknown } | null
+    return r?.ok === true && typeof r.proposalId === "string" ? [r.proposalId] : []
+  })
+  if (ids.length === 0 || ids.some((id) => continued.has(id))) return []
+  if (!ids.some((id) => decided.has(id))) return []
+  const waiting = ids.some((id) => {
+    const status = proposals.find((p) => p.id === id)?.status
+    return status === undefined || status === "PENDING"
+  })
+  return waiting ? [] : ids
 }
 
 /** Sections with a suggestion waiting, for the editor's badge. */

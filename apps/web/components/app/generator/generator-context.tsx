@@ -36,6 +36,8 @@ interface GeneratorState {
   }) => Promise<string>
   /** Accept or reject an assistant proposal; then the page reloads the document. */
   decideProposal: (proposalId: string, action: "accept" | "reject") => Promise<void>
+  /** Proposals the person accepted or rejected during this visit (the assistant then replies). */
+  decided: ReadonlySet<string>
   selectedSectionId: string | null
   setSelectedSectionId: (id: string | null) => void
   pendingQuestion: string | null
@@ -68,6 +70,7 @@ export function GeneratorProvider({
   const [detail, setDetail] = useState(initial)
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null)
   const [pendingQuestion, setPendingQuestion] = useState<string | null>(null)
+  const [decided, setDecided] = useState<ReadonlySet<string>>(() => new Set())
   const [tab, setTab] = useState<DocumentTab>("preview")
   const [pane, setPane] = useState<Pane>("chat")
   const [nav, setNav] = useState<GeneratorState["nav"]>(null)
@@ -134,6 +137,7 @@ export function GeneratorProvider({
       } finally {
         // Accepted: a new version; out of date: the new status. Either way, show the server's state.
         await refresh()
+        setDecided((d) => new Set(d).add(proposalId))
       }
     },
     [base, refresh],
@@ -168,6 +172,7 @@ export function GeneratorProvider({
       saveSigners,
       saveContent,
       decideProposal,
+      decided,
       selectedSectionId,
       setSelectedSectionId,
       pendingQuestion,
@@ -189,6 +194,7 @@ export function GeneratorProvider({
       saveSigners,
       saveContent,
       decideProposal,
+      decided,
       selectedSectionId,
       pendingQuestion,
       editable,
