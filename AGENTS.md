@@ -24,6 +24,7 @@ Read this file first, then the doc for the area you're touching (see **Doc map**
 | API | **Hono** on Bun — `apps/api` |
 | Jobs | **BullMQ** + Redis — `apps/worker` |
 | Web | **Next.js 16** App Router, React 19, Tailwind v4 — `apps/web` |
+| Marketing site | Static **Next.js 16** + Tailwind v4 + Motion — `apps/website` (own design rules, see its `AGENTS.md`) |
 | UI | **Arc** (`@uiarc/*`, CSS modules + Motion) for primitives and the design tokens, **coss ui** (Base UI) where Arc has no equivalent, **Extend UI** document components, **shadcn/ui** (`base-nova`) as fallback. Light + dark. **Defaults only**, see UI rules and ADR 0023 |
 | Auth | **better-auth** + Organization plugin (senders only) |
 | DB | PostgreSQL + **Prisma 7** (`prisma-client` generator, `@prisma/adapter-pg`) |
@@ -31,7 +32,7 @@ Read this file first, then the doc for the area you're touching (see **Doc map**
 | Storage | S3-compatible (MinIO locally), presigned URLs only |
 | Email / SMS | **React Email** templates in `packages/emails` (preview: `bun run emails:dev`), SMTP→Mailpit in dev, Postmark in prod / Africa's Talking for SMS OTP |
 | Lint / format | **Biome** |
-| Deploy target | Railway (api, worker, web as 3 services + Postgres + Redis) |
+| Deploy target | Railway (api, worker, web, website as 4 services + Postgres + Redis) |
 
 ## Repo map
 
@@ -42,6 +43,8 @@ apps/
   worker/     BullMQ consumers: notifications, envelope finalize, webhooks, maintenance (expire/remind/sweeps/retention/exports)
   web/        Next.js. (auth)/ sign-in/up/onboarding, (app)/ files+inbox+settings (document, envelope, template and bulk-send pages without tabs),
               sign/[token], verify/[code]
+  website/    Static marketing site (:3001). Self-contained: no `@sahihi/*` imports, own design system and
+              docs (apps/website/AGENTS.md). The UI rules below (Arc/coss/Extend) cover apps/web only
   e2e/        Playwright journey on its own stack (api :4100, web :3100, worker, DB sahihi_e2e; docs/testing.md)
 packages/
   config/     Env schema (zod) + queue names. The ONLY place process.env is parsed.
@@ -75,7 +78,7 @@ cp .env.example .env
 bun run db:generate        # prisma client → packages/db/src/generated (gitignored)
 bun run db:migrate         # prisma migrate dev
 bun run ui:bootstrap       # ONE-TIME: install coss + Extend components into apps/web (needs internet)
-bun run dev                # api :4000, worker, web :3000
+bun run dev                # api :4000, worker, web :3000, website :3001
 
 bun test                   # unit tests (no DB/Redis needed)
 bun run test:integration   # API integration tests (needs infra:up; uses sahihi_test DB)

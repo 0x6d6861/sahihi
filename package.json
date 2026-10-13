@@ -12,6 +12,7 @@
     "dev:api": "bun run --filter @sahihi/api dev",
     "dev:worker": "bun run --filter @sahihi/worker dev",
     "dev:web": "bun run --filter @sahihi/web dev",
+    "dev:website": "bun run --filter @sahihi/website dev",
     "build": "bun run --filter '*' build",
     "typecheck": "bun run --filter '*' typecheck",
     "test": "bun test packages apps/api/src apps/worker apps/web/lib scripts",
