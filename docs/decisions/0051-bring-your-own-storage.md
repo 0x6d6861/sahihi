@@ -25,10 +25,10 @@ the customer explicitly chose that.
     sync to other destinations included. Free and Starter: neither.
 - **S3-compatible first**, with the existing `@aws-sdk/client-s3`: AWS S3, Cloudflare R2, Backblaze
   B2, Wasabi, DigitalOcean Spaces, MinIO, and GCS through its S3 interoperability. On AWS, an IAM
-  role (STS AssumeRole with an ExternalId we generate) is preferred to access keys. Google Drive and
-  OneDrive/SharePoint come later as sync destinations, Azure Blob on request. No storage abstraction
-  library: flydrive doesn't cover Azure or presigned uploads, and OpenDAL is a native addon with
-  unproven Bun support.
+  role (STS AssumeRole with a per-workspace ExternalId derived from a server secret) is preferred to
+  access keys. Google Drive (`drive.file`) and OneDrive (app folder) are sync destinations through
+  their REST APIs and plain `fetch`; Azure Blob on request. No storage abstraction library: flydrive
+  doesn't cover Azure or presigned uploads, and OpenDAL is a native addon with unproven Bun support.
 - **Sahihi never deletes anything in a customer's bucket.** Not on a user action, retention purge,
   workspace deletion or disconnect.
   - Our setup guides ask for `PutObject`, `GetObject` and `ListBucket` only, so the customer's own
@@ -37,7 +37,7 @@ the customer explicitly chose that.
   - Customer storage is **write-once**: an existing key is skipped when its bytes match and refused
     when they don't.
   - Where we used to delete, we **release**: the object leaves our records and is listed in a
-    released-files log (settings, CSV, public API, a `storage.objects_released` webhook event).
+    released-files log (settings, CSV, a `storage.objects_released` webhook event).
     Where the provider supports tags (AWS S3), released objects are tagged `sahihi=released` so a
     lifecycle rule can expire them.
   - Uploads for a primary-storage workspace land in a staging area in our bucket and reach the
@@ -58,11 +58,13 @@ the customer explicitly chose that.
   security pages must say so (new legal wording, needs review).
 - Released files build up in customer buckets (deleted drafts, purged envelopes) until the customer
   cleans them up.
-- **Write-once breaks retries that rewrite a key with different bytes.** `stampFields` sets the
-  PDF modification date to "now", so a finalize retry after the upload but before the database
-  update writes a different signed PDF to the same key; `bundle.zip` is rebuilt the same way.
-  Before primary storage ships, worker outputs for customer storage need keys unique per attempt
-  (or deterministic bytes).
+- **Write-once and retries.** A finalize retry produces different bytes (the PDF modification date
+  and the certificate code change), so every key a job or request can write twice now carries a
+  version that is new on each attempt (`objectVersion()`): thumbnails, signature images, signed PDFs,
+  certificates, bundles, exports. An unused earlier attempt is an orphan under the envelope's folder,
+  deleted with it in Sahihi's bucket and released in a customer's.
+- Workspace-level events (`storage.*`) aren't in the envelope audit trail (it's per envelope, like
+  webhook endpoint changes); connection changes are visible in Settings → Storage and the logs.
 - A workspace using primary storage can't be moved below Enterprise until its files are migrated
   back (`billing:set-plan` refuses). Below Business, sync destinations are paused, not removed.
 - Storage failures become a customer-visible state (health check, notifications, a delivery log),

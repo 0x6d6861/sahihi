@@ -123,7 +123,7 @@ export const STORAGE_PROVIDER_INFO: Record<StorageProvider, StorageProviderInfo>
     endpoint: ({ region }) => `https://s3.${region}.wasabisys.com`,
     defaultRegion: "eu-central-1",
     forcePathStyle: false,
-    supportsTagging: true,
+    supportsTagging: false,
     supportsRole: false,
     supportsPrimary: true,
     help: "Use an access key for a sub-user whose policy allows put, get and list only.",

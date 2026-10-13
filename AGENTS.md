@@ -29,7 +29,7 @@ Read this file first, then the doc for the area you're touching (see **Doc map**
 | Auth | **better-auth** + Organization plugin (senders only) |
 | DB | PostgreSQL + **Prisma 7** (`prisma-client` generator, `@prisma/adapter-pg`) |
 | PDF | **pdf-lib** (server-side stamping, certificate rendering), **PDFium WASM** (`@embedpdf/pdfium`, text extraction for field detection) |
-| Storage | S3-compatible (MinIO locally), presigned URLs only |
+| Storage | S3-compatible (MinIO locally), presigned URLs or tickets; workspaces may bring their own (docs/storage.md) |
 | Email / SMS | **React Email** templates in `packages/emails` (preview: `bun run emails:dev`), SMTP→Mailpit in dev, Postmark in prod / Africa's Talking for SMS OTP |
 | Lint / format | **Biome** |
 | Deploy target | Railway (api, worker, web, website as 4 services + Postgres + Redis) |
@@ -55,7 +55,7 @@ packages/
   db/         Prisma schema + client, tenant scoping, appendAuditEvent, issueSigningLink
   envelopes/  Envelope services shared by api + worker: send, void, create (document/template), routing,
               bulk send, embedded links. Throws EnvelopeError (mapped to HTTP in app.onError)
-  infra/      S3 storage + typed BullMQ queues + Redis
+  infra/      Storage drivers (Sahihi's bucket, customers' buckets, Drive/OneDrive) + typed BullMQ queues + Redis
   pdf/        src/parse/ (inspectPdf, readFormWidgets, readPageText), src/render/ (stampFields, renderCertificate),
               src/text/ (Noto fonts, text fitting), src/fixtures/ (test PDF builders)
   emails/     React Email templates → { subject, html, text }; preview server (see its README)
@@ -182,6 +182,7 @@ customer would notice** (see "Keep the website in step").
 | Embedded signing (iframe, allowed origins) | `docs/embedded-signing.md` |
 | Plans, envelope quotas, seats | `docs/billing.md` |
 | Retention, export, deleting data or a workspace | `docs/data-retention.md` |
+| Own storage: sync destinations, primary storage, cloud drives | `docs/storage.md` |
 | Logs, error tracking, queue dashboard | `docs/observability.md` |
 | Certificates, `/verify`, CA integration | `docs/certificates.md` |
 | Any public route, tokens, tenancy | `docs/security.md` |

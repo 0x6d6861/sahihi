@@ -113,6 +113,29 @@ trusting it (as before) let anyone pick their own rate-limit bucket and forge th
   `sahihi` superuser, so the restrictions are only exercised by the integration test.
 - Planned: periodic anchoring of chain heads (e.g. to an RFC 3161 timestamp authority).
 
+## Own storage (docs/storage.md, ADR 0051)
+
+Owners and admins can connect storage that receives the workspace's files, so:
+
+- **Never delete:** customer drivers have no delete method and are write-once; workspace files are
+  removed only through `releaseObject` / `releasePrefix`, which log releases instead of deleting
+  there. The setup guide grants put, get and list only.
+- **SSRF:** storage endpoints follow the webhook rules (`checkStorageEndpoint`) and their DNS
+  answers are re-checked whenever a client is built (every 5 minutes at most).
+  `STORAGE_ALLOW_PRIVATE_ENDPOINTS=true` is for development and tests only. Residual risk: DNS
+  rebinding between checks.
+- **Secrets:** secret access keys and OAuth refresh tokens are stored AES-256-GCM encrypted
+  (`encryptSecret`) and never returned. AWS roles are assumed with a per-workspace ExternalId derived
+  from `BETTER_AUTH_SECRET` (`awsExternalId`), so one workspace can't use another's role. Rotating
+  `BETTER_AUTH_SECRET` changes ExternalIds and invalidates stored secrets.
+- **Tickets** (`/api/storage/objects/:ticket`, public, rate-limited 600/min): HMAC-signed with an
+  HKDF key of its own, expiring (5 minutes, or 15–30 for cacheable thumbnails), naming one key that
+  must be under the ticket's own `org/<id>/`. Failures answer 404. Only PDFs and PNG/JPEG images
+  are ever inline; everything else is a download, with `nosniff`.
+- **OAuth:** the `state` is HMAC-signed (own key), expires after 15 minutes and must come back to
+  the same user and workspace; scopes are Drive's `drive.file` and OneDrive's app folder.
+- **Uploads** for primary storage wait in `staging/` in Sahihi's bucket until validated.
+
 ## Webhooks
 
 Owners and admins can send the org's envelope data to a URL of their choosing, so the
@@ -129,8 +152,9 @@ checks are strict (`docs/webhooks.md`, ADR 0013):
 - **Secrets:** generated server-side and shown once (create, rotate). They're stored AES-256-GCM
   encrypted with a key derived from `BETTER_AUTH_SECRET` (HKDF, own `info`). Responses carry only the
   last 4 characters. Rotating `BETTER_AUTH_SECRET` means rotating every webhook secret.
-- **Payloads:** the tenant's own envelope data (titles, recipients' names/emails/statuses, hashes).
-  Never signing tokens, OTPs or IP addresses.
+- **Payloads:** the tenant's own envelope data (titles, recipients' names/emails/statuses, hashes),
+  or for `storage.*` events the connection, object key and error. Never signing tokens, OTPs, IP
+  addresses or storage credentials.
 - Response bodies are stored trimmed to 1,000 characters, for debugging.
 
 ## Documents
@@ -144,7 +168,8 @@ them for malware yet; that needs an external scanner.
 
 
 - The bucket is private. Every read or write uses a presigned URL (PUT for 5 minutes; GET short-lived
-  with a `Content-Disposition` filename).
+  with a `Content-Disposition` filename), or a storage ticket for files in a workspace's own bucket
+  (below).
 - Uploads are re-validated on the server (size, PDF parse, not encrypted). The original's SHA-256 is
   re-checked before stamping.
 - Signature PNGs are validated as PNGs (magic bytes) and size-limited (≤ ~500 KB each, 8 MB per body).
