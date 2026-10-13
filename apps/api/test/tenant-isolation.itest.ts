@@ -328,6 +328,14 @@ const TENANT: Record<string, Case> = {
     path: "/api/generated-documents",
     init: { method: "POST", json: { templateId: ids.generationTemplate } },
   }),
+  "POST /api/generated-documents/:id/attachments": () => {
+    const form = new FormData()
+    form.set("file", new File(["notes"], "notes.txt"))
+    return {
+      path: `/api/generated-documents/${ids.generatedDocument}/attachments`,
+      init: { method: "POST", body: form },
+    }
+  },
   "POST /api/generated-documents/:id/template": () => ({
     path: `/api/generated-documents/${ids.generatedDocument}/template`,
     init: { method: "POST", json: { versionId: ids.generatedVersion, name: "Stolen" } },

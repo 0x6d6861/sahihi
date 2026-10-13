@@ -71,3 +71,24 @@ export function blocksLength(blocks: readonly ImportedBlock[]): number {
   }
   return n
 }
+
+/**
+ * Blocks as plain text, one block per line: what a chat attachment gives the assistant. Headings
+ * keep their place, list items get a bullet, table cells are joined with " | ".
+ */
+export function blocksToText(blocks: readonly ImportedBlock[]): string {
+  return blocks
+    .map((b) => {
+      if (b.type === "heading") return b.text
+      if (b.type === "listItem") return `• ${runsText(b.runs)}`
+      if (b.type === "table") {
+        return b.rows
+          .map((row) => row.map((cell) => runsText(cell).replace(/\n/g, " ")).join(" | "))
+          .join("\n")
+      }
+      return runsText(b.runs)
+    })
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join("\n")
+}

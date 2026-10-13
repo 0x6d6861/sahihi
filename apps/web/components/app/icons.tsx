@@ -44,6 +44,7 @@ import {
   MailSend01Icon as HugeMailSendIcon,
   Cursor01Icon as HugeMousePointer2Icon,
   PackageIcon as HugePackageIcon,
+  Attachment01Icon as HugePaperclipIcon,
   Pdf02Icon as HugePdfIcon,
   PencilEdit02Icon as HugePencilIcon,
   Pen01Icon as HugePenLineIcon,
@@ -127,6 +128,7 @@ export const MailIcon = icon(HugeMailIcon)
 export const MousePointer2Icon = icon(HugeMousePointer2Icon)
 export const PdfIcon = icon(HugePdfIcon)
 export const PackageIcon = icon(HugePackageIcon)
+export const PaperclipIcon = icon(HugePaperclipIcon)
 export const PencilIcon = icon(HugePencilIcon)
 export const PenLineIcon = icon(HugePenLineIcon)
 export const PlusIcon = icon(HugePlusIcon)

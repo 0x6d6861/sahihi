@@ -293,21 +293,26 @@ interface SetVariablesResult {
 }
 
 /**
- * `set_variables`: what the assistant filled from the chat, or why it was refused. When a result
- * arrives during this visit, the document reloads to show the new values.
+ * `set_variables`: what the assistant filled from the chat, or why it was refused. When the
+ * document on screen doesn't show the applied values yet (the result arrived during this visit),
+ * it reloads once. Judged by the data, not by timing: a fast reply can render with its result
+ * already there.
  */
 export const AppliedNote: ToolCallMessagePartComponent<
   { values?: { key: string; value: string }[] },
   SetVariablesResult
 > = ({ args, result }) => {
   const { detail, refresh } = useGenerator()
-  const hadResult = useRef(result !== undefined)
+  const fetched = useRef(false)
+  const behind = (args.values ?? []).some(
+    (v) => detail.version.data.variables.find((x) => x.key === v.key)?.value !== v.value,
+  )
   useEffect(() => {
-    if (result?.ok && !hadResult.current) {
-      hadResult.current = true
+    if (result?.ok && behind && !fetched.current) {
+      fetched.current = true
       void refresh().catch(() => {})
     }
-  }, [result, refresh])
+  }, [result, behind, refresh])
 
   if (!result) return null
   if (!result.ok) {

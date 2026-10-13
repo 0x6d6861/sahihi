@@ -126,6 +126,8 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
 - [x] Start a draft blank, from a PDF in the library, or from an uploaded PDF or Word file,
       imported word for word; the assistant proposes blanks from the text (`propose_blanks`)
       (ADR 0049)
+- [x] Attach files in the drafting chat: documents as text the assistant may use, images for
+      reference (ADR 0050)
 
 ## Later
 
