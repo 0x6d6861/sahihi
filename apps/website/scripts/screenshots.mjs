@@ -1,8 +1,8 @@
-// Visual check for agents: screenshots the page at desktop and phone widths
+// Visual check for agents: screenshots the home page at desktop and phone widths
 // and reports runtime errors (including hydration mismatches) and horizontal
 // overflow, in light and dark colour schemes. A final pass loads the page with
 // reduced motion, which takes a different render path (static hero, rows that
-// snap instead of glide).
+// snap instead of glide). The MDX pages get one full-page shot per pass.
 //
 //   bun run build && bun run start &      # serve on :3001 (or set BASE_URL)
 //   bun run shots                          # writes to ./.shots/
@@ -65,6 +65,33 @@ for (const { name, viewport, colorScheme } of passes) {
     })
   }
   console.log(`${name}: ${i} shots, page height ${height}px`)
+}
+
+// The MDX pages: errors, overflow and one full-page shot each, per pass.
+for (const path of ["/security", "/privacy", "/terms"]) {
+  for (const { name, viewport, colorScheme } of passes) {
+    const label = `${name}${path.replace("/", "-")}`
+    const page = await browser.newPage({ viewport, colorScheme })
+    page.on("pageerror", (e) => problems.push(`${label}: pageerror: ${e.message}`))
+    page.on(
+      "console",
+      (m) => m.type() === "error" && problems.push(`${label}: console: ${m.text()}`),
+    )
+    await page.goto(`${base}${path}`, { waitUntil: "networkidle" })
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth,
+    )
+    if (overflow) problems.push(`${label}: horizontal overflow`)
+    await page.waitForTimeout(600)
+    await page.screenshot({
+      path: `${out}/${label}.jpg`,
+      type: "jpeg",
+      quality: 65,
+      fullPage: true,
+    })
+    await page.close()
+  }
+  console.log(`${path}: checked`)
 }
 
 // Reduced-motion pass: errors only, plus one shot of the static hero.

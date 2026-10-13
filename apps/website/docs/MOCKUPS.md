@@ -1,11 +1,11 @@
 # Product mockups
 
-The product UIs on the page are **HTML, not images**, so they stay sharp at any size, cost no asset weight, and can be edited like code. All of them show the same fictional app ("Larder", a recipe notebook) so the story stays continuous from section to section.
+The product UIs on the page are **HTML, not images**, so they stay sharp at any size, cost no asset weight, follow the light/dark theme and can be edited like code. They imitate the real Sahihi web app (`apps/web`) and all show the same fictional envelope (a mutual NDA between Tana Freight Ltd and Kilima Agro Ltd), so the story stays continuous from section to section.
 
 Files:
-- `src/components/mockups/parts.tsx` holds the building blocks: window chrome, panels, and sample-app cards.
+- `src/components/mockups/parts.tsx` holds the building blocks: app chrome, paper and fields, people and status, evidence, assistant pieces.
 - `src/components/mockups/screens.tsx` holds the composed screens that sections place on the page.
-- `sampleApp` in `src/content/site.ts` holds the sample app's name, heading, categories and six items.
+- `sample` in `src/content/site.ts` holds the sample envelope: parties, recipients, sections, blanks, hashes, certificate code and events.
 
 ## The scaling model (read this before editing)
 
@@ -15,9 +15,9 @@ Files:
    The font size is therefore a percentage of the container's width.
 3. **Every size inside a mockup is in `em`**: text (`text-[0.8em]`), padding (`p-[0.9em]`), gaps, radii, icon sizes. The whole UI scales as one unit.
 4. `scale` on `MockupRoot` sets `--mk`. Use it to make a screen "read" bigger or smaller:
-   - ~1.35 for a full-width window (`AppWindow`, `CanvasEditor`, `BrowserWindow`, `AgentBuildWindow`)
-   - ~1.5–1.9 for wide demo panels (`CaptureDemo`, `ExplorationsDemo`, `CommentsDemo`)
-   - ~2.2–2.6 for small frames and half-width panels (hero screens, `InspectDemo`, `PinDemo`, chats)
+   - ~1.35 for a full-width window (`AppWindow`, `DraftingWindow`, `FieldEditorWindow`, `CertificateWindow`)
+   - ~1.6–1.7 for wide demo panels (`QuestionsDemo`, `SigningDemo`)
+   - ~2.2–2.4 for the hero frames, 3.3 for half-width demo panels (`ProposalDemo`, `OtpDemo`, …)
 
 **Never use `px` or `rem` inside a mockup.** It won't scale, and it will break at mobile widths.
 
@@ -28,42 +28,41 @@ Nested `text-[0.6em]` multiplies with its parent. If you shrink a card with `cla
 | Part | What it renders |
 |---|---|
 | `MockupRoot` | Scaling root. Props: `scale?`, `className?` |
-| `Photo` | A "food photo" built from gradients (plate on table) from `item.photo` = `[plate, rim, table]`. Aspect 4/3 by default; override with `!aspect-square` etc. |
-| `MetaRow` | Category dot, category name, date |
-| `SampleCard` | A sample-app card. `variant`: `photo` (default), `type`, `overlay`, `night`, `label`, `split`. `selected` adds the blue selection outline |
-| `AppLogo` | The sample app's three-shape logo and name |
-| `BarChart`, `FilterChips` | The "cooked this year" chart and category chips |
-| `AppPage` | The sample app's main page. Props: `cards` (0–6), `chart`, `selected` (card index) |
-| `TrafficLights`, `TabBar`, `UrlBar` | Desktop window chrome. `TabBar` takes `tabs[{icon?: "globe"\|"canvas", label}]`, `active` and `agent` (shows the Agent pill) |
-| `Toolbar` | Floating tool pill at the bottom centre of a canvas. Its parent must be `relative` |
-| `PanelLabel` | Small grey label ("Pages", "Layers") |
-| `LayersPanel` | Pages and layer tree. `layers[{label, depth?, kind?: frame\|text\|comp\|img}]`, `selected` |
-| `ChatBubble`, `ToolStep`, `Composer`, `AgentPanel` | Agent chat: user bubble, a tool-call row ("Edited src/…"), the message box with branch/diff, and the whole panel |
-| `InspectorRow` | Label/value row for property inspectors |
+| `TrafficLights`, `WindowBar` | Browser chrome with an address (`url`) |
+| `Wordmark`, `AppTopBar` | The app's logo and top-bar navigation (`active` item), workspace name, bell, avatar |
+| `PanelLabel`, `Button`, `Card`, `SettingRow` | Small grey label; pill button (`primary`); floating card; label/value row |
+| `Avatar`, `StatusPill`, `RecipientRow` | Recipient initial in its colour; Signed/Viewed/Completed/Draft pill; a recipient line (`order?`, `detail?`, `status?`) |
+| `TextLines`, `PdfPage` | Grey text bars; a white PDF page (`heading?`) whose children are overlays in % of the page |
+| `Signature`, `FieldBox` | A one-stroke signature; a placed field (`tone`, `label`, `at: [left, top, width, height]` in %, `filled?`, `selected?`) |
+| `Blank` | A blank in drafted text, dashed until `filled` |
+| `HashRow`, `shortHash`, `QrCode` | Mono hash row; `9f2c4e81…0b4e72a9`; a deterministic decorative QR grid |
+| `ChatBubble`, `AssistantText`, `Question`, `Composer` | Drafting assistant: user message, reply, question card (`options`, `picked`), message box |
+| `toneColor(tone)` | `var(--mk-tone-N)`, the recipient colour (as `Recipient.colorIndex` in the app) |
 
 ## Screens (`screens.tsx`)
 
 | Screen | Used in | Shows |
 |---|---|---|
-| `CanvasScreen` | Hero frame 1 | Canvas with three artboards and a toolbar |
-| `BrowserScreen` | Hero frame 2 | Browser tab showing the app page |
-| `AgentScreen` | Hero frame 3 | Agent chat with one planning prompt |
-| `AppWindow` | Hero merged window | Tab bar, layers, canvas with the app page, and the agent panel |
-| `CanvasEditor` | Canvas chapter main | Layers, two artboards with a components strip, and a component inspector |
-| `ExplorationsDemo` | Canvas demo | Six card variants A–F in a grid |
-| `CommentsDemo` | Canvas demo | Selected card, comment thread, and two named cursors |
-| `BrowserWindow` | Browser chapter main | Browser with several tabs, the app page with chart, and a sidebar |
-| `CaptureDemo` | Browser demo | Browser and canvas windows overlapping, with the captured element outlined |
-| `InspectDemo` | Browser demo | Live page with a selected heading and its inspector |
-| `PinDemo` | Browser demo | Pinned element comment and an agent panel replying |
-| `AgentBuildWindow` | Agent chapter main | App page and an agent log of the implementation |
-| `AgentBuildChat` | Agent demo | Agent implementing a button variant and opening a PR |
-| `AgentDesignChat` | Agent demo | Agent producing two design directions |
+| `DraftScreen` | Hero frame 1 | Draft with blanks and an assistant question |
+| `SendScreen` | Hero frame 2 | Signature page with fields and the field toolbar |
+| `ProveScreen` | Hero frame 3 | Certificate of Completion |
+| `AppWindow` | Hero merged window | A completed envelope: pages, recipients, activity, downloads |
+| `DraftingWindow` | Draft chapter main | Editor with sections and blanks, assistant panel with questions |
+| `QuestionsDemo` | Draft demo | Document next to a batch of three questions |
+| `ProposalDemo` | Draft demo | Suggested section edit as a diff, accept/reject |
+| `SignersDemo` | Draft demo | Suggested signers with their fields |
+| `FieldEditorWindow` | Send chapter main | Step pill, recipients in order, field types, page with fields, field properties |
+| `SigningDemo` | Send demo | Phone signing page with progress, signature dialog |
+| `OtpDemo` | Send demo | Six-digit code step |
+| `RoutingDemo` | Send demo | Signing order, reminders, expiry |
+| `CertificateWindow` | Prove chapter main | Full certificate on the verify page with its summary |
+| `VerifyDemo` | Prove demo | Drop-a-PDF verify with a match |
+| `AuditDemo` | Prove demo | Hash-chained audit trail |
 
 ## Adding a screen
 
 1. Compose it in `screens.tsx` from parts. The root must be `<MockupRoot scale={…}>`.
-2. Use only `em` sizes. Take the sample app's data from `sampleApp`, never invented inline.
+2. Use only `em` sizes. Take the sample data from `sample`, never invented inline.
 3. Decide where it goes:
    - as a chapter's main mockup: add it to `mainMockup` in `FeatureChapters.tsx`
    - as a demo: add `{ node, aspect }` to `demos` in `FeatureChapters.tsx`, then add a demo with that `kind` to the chapter in `site.ts`
@@ -72,8 +71,10 @@ Nested `text-[0.6em]` multiplies with its parent. If you shrink a card with `cla
 ## Style inside mockups
 
 - Mockups use the `--font-ui` face (Inter) with `letter-spacing: 0`, set on `.mockup-root`.
-- Literal hex colours are allowed here to imitate a real app: window greys `#e7e7e5`/`#f7f7f6`, app surface `#dddad2`, card `#fbfaf6`, selection `#3b82f6`.
-- Symbols stand in for icons (`➤ + ◯ ⌕ ▢ ◇ ›`). If you swap in an icon library, keep the icons `em`-sized.
+- **Colours come from the mockup palette** (`--mk-*` in `globals.css`), which switches with the page theme: `bg-(--mk-surface)`, `bg-(--mk-muted)`, `border-(--mk-line)`, `text-(--mk-text-2)`, `text-(--mk-success)` and so on. Don't use the page tokens (`text-muted`, `bg-panel`) inside a screen, and don't add `dark:` variants: the palette does it.
+- **Paper stays white** in both themes (`--mk-paper`, `--mk-paper-ink`, `--mk-paper-line`, `--mk-paper-text`), as `.on-paper` does in the app. Literal colours are fine on paper only (signature ink, blank highlights).
+- Half-width 4/3 demos use `scale={3.3}`; wide 16/9 demos 1.6–1.7; hero frames 2.2–2.4; full windows the default 1.35.
+- Symbols stand in for icons (`✓ ↓ ✆ ⌀ ◔`). If you swap in an icon library, keep the icons `em`-sized.
 
 ## Swapping in real screenshots
 
@@ -81,7 +82,7 @@ When the real product exists, a screen can become an image:
 
 ```tsx
 <ChromeFrame aspect="16/10">
-  <Image src="/shots/canvas.png" alt="" fill className="object-cover object-top" sizes="(max-width: 1120px) 94vw, 1120px" />
+  <Image src="/shots/drafting.png" alt="" fill className="object-cover object-top" sizes="(max-width: 1120px) 94vw, 1120px" />
 </ChromeFrame>
 ```
 

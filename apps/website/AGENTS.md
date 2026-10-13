@@ -8,9 +8,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
-# Agent guide: craft-landing-starter
+# Agent guide: Sahihi website
 
-A single-page, fully static marketing site. It is quiet, near-monochrome and product-led, modelled on the layout of subframe.com. Read this file first, then the doc for the area you are changing.
+The fully static marketing site for Sahihi, the e-signature product in this monorepo: a landing page plus MDX security, privacy and terms pages. It is quiet, near-monochrome and product-led, modelled on the layout of subframe.com, with HTML mockups of the real Sahihi app. Read this file first, then the doc for the area you are changing.
 
 ## Docs map
 
@@ -64,17 +64,20 @@ bun run start        # serve the build
 bun run shots        # screenshots + error/overflow check against :3001 (see QA_CHECKLIST)
 ```
 
-There is no test runner. Biome (root `biome.json`, run `bun run lint` at the root) lints and formats this app too, so code follows the repo style: double quotes, no semicolons, 100 columns. Lint, `typecheck`, `build` and `shots` are the whole gate. `shots` needs a server already running (`bun run build && bun run start &`); first run on a new machine needs `bunx playwright install chromium`. It writes `.shots/{desktop,mobile}-NN.jpg`, the same in dark mode as `dark-{desktop,mobile}-NN.jpg`, plus `reduced-00.jpg` (reduced motion), exits 1 on any page/console error, hydration mismatch or horizontal overflow, and takes `BASE_URL` / `OUT_DIR` env overrides.
+There is no test runner. Biome (root `biome.json`, run `bun run lint` at the root) lints and formats this app too, so code follows the repo style: double quotes, no semicolons, 100 columns. Lint, `typecheck`, `build` and `shots` are the whole gate. `shots` needs a server already running (`bun run build && bun run start &`); first run on a new machine needs `bunx playwright install chromium`. It writes `.shots/{desktop,mobile}-NN.jpg`, the same in dark mode as `dark-{desktop,mobile}-NN.jpg`, plus `reduced-00.jpg` (reduced motion) and one full-page shot per MDX page and pass (`desktop-security.jpg`, …), exits 1 on any page/console error, hydration mismatch or horizontal overflow, and takes `BASE_URL` / `OUT_DIR` env overrides.
 
 ## Layout of the code
 
 ```
 src/
-  app/            layout.tsx (fonts, metadata) · page.tsx (section order) · globals.css (tokens, utilities)
-  content/site.ts every string on the page (`site`) + the fictional sample app (`sampleApp`)
+  app/            layout.tsx (fonts, metadata) · page.tsx (section order) · globals.css (tokens, mockup palette)
+                  opengraph-image.tsx · icon.svg · robots.ts · sitemap.ts
+  app/(legal)/    security, privacy, terms as page.mdx · layout.tsx (header, reading column, footer)
+  mdx-components.tsx  the only place MDX prose is styled
+  content/site.ts every landing-page string (`site`) + the sample envelope the mockups show (`sample`)
   components/
     ui/           ChromeFrame · PillButton/ArrowLink · Caption · Reveal · Section/Inset
-    mockups/      parts.tsx (window chrome, sample-app cards) · screens.tsx (composed screens)
+    mockups/      parts.tsx (app chrome, paper and fields, evidence, assistant) · screens.tsx (composed screens)
     icons/        MetalIcons.tsx (SVG brushed-steel icons + shared <defs>)
     sections/     one file per page section, in page order
 scripts/          screenshots.mjs (visual QA)
@@ -83,8 +86,8 @@ docs/             the specs listed above
 
 ## Rules
 
-1. **No copy in components.** Every visible string comes from `src/content/site.ts`. Mockups may hard-code UI chrome text (button labels, file paths, tool names), but the sample app's data comes from `sampleApp`.
-2. **Use the tokens.** Colours come from the tokens, which also carry dark mode (see DESIGN.md): `bg-paper`, `text-ink`, `text-muted`, `text-faint`, `text-ghost`, `bg-panel`, `bg-pill` and the rest; text colours are black at fixed opacities (white in dark mode). Type comes from the stepped scale in DESIGN.md (`text-display`, `text-headline`, `text-title`, `text-lede`, `text-sub`, `text-caption` and the others). **Weight:** ink text is 500 (the `body` default); grey text adds `font-normal`. Mockups are the one exception: they may use literal hex values to imitate a real app.
+1. **No copy in components.** Every visible landing-page string comes from `src/content/site.ts`; long-form pages are `.mdx` content. Mockups may hard-code UI chrome text (button labels, field types, menu items), but the sample envelope's data comes from `sample`. **Every claim must be true of the product today** (CONTENT.md, "Claims").
+2. **Use the tokens.** Colours come from the tokens, which also carry dark mode (see DESIGN.md): `bg-paper`, `text-ink`, `text-muted`, `text-faint`, `text-ghost`, `bg-panel`, `bg-pill` and the rest; text colours are black at fixed opacities (white in dark mode). Type comes from the stepped scale in DESIGN.md (`text-display`, `text-headline`, `text-title`, `text-lede`, `text-sub`, `text-caption` and the others). **Weight:** ink text is 500 (the `body` default); grey text adds `font-normal`. Mockups are the one exception: they use the `--mk-*` mockup palette, which follows the theme (DESIGN.md), and literal colours on PDF paper.
 3. **Sections are separated by space, never by borders or background changes.** The whole page is one `paper` surface (`#f9f9f9`, `#111111` in dark mode).
 4. **Animate only `transform` and `opacity`.** No scroll-linked `filter`, `blur`, `box-shadow`, width or height. The original page froze the browser renderer, and this is the rule that prevents that.
 5. **There is exactly one pinned, scroll-scrubbed sequence (the hero).** Everything else uses `<Reveal>`, a one-shot fade-and-rise.

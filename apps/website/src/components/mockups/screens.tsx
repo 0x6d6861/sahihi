@@ -2,527 +2,689 @@
  * Composed product screens. Each one fills its parent (a ChromeFrame screen
  * or a grey demo panel) and scales via MockupRoot.
  */
-import { sampleApp } from "@/content/site"
+import { sample } from "@/content/site"
 import {
-  AgentPanel,
-  AppPage,
+  AppTopBar,
+  AssistantText,
+  Avatar,
+  Blank,
+  Button,
+  Card,
   ChatBubble,
-  InspectorRow,
-  LayersPanel,
+  Composer,
+  FieldBox,
+  HashRow,
   MockupRoot,
   PanelLabel,
-  SampleCard,
-  TabBar,
-  Toolbar,
-  ToolStep,
-  UrlBar,
+  PdfPage,
+  QrCode,
+  Question,
+  RecipientRow,
+  SettingRow,
+  Signature,
+  StatusPill,
+  shortHash,
+  TextLines,
+  toneColor,
+  WindowBar,
 } from "./parts"
 
-const items = sampleApp.items
+const [first, second] = sample.recipients
 
-const appLayers = [
-  { label: "Home", kind: "frame" as const },
-  { label: "Stack", depth: 1 },
-  { label: "Card", depth: 2, kind: "comp" as const },
-  { label: "Card", depth: 2, kind: "comp" as const },
-  { label: "Card", depth: 2, kind: "comp" as const },
-  { label: "Launch", kind: "frame" as const },
-]
+/** Field layout on the NDA's signature page, shared by the editor, hero and merged window. */
+const signatureFields = [
+  { tone: 0, label: "Signature", at: [8, 62, 36, 8], filled: "signature" },
+  { tone: 0, label: "Date signed", at: [8, 73, 28, 4.5], filled: "14 Oct 2026" },
+  { tone: 1, label: "Signature", at: [56, 62, 36, 8], filled: "signature" },
+  { tone: 1, label: "Date signed", at: [56, 73, 28, 4.5], filled: "14 Oct 2026" },
+] as const
+
+function SignaturePage({ filled = true, selected }: { filled?: boolean; selected?: number }) {
+  return (
+    <PdfPage heading={false}>
+      <p className="text-[0.55em] font-semibold">5. {sample.sections[4]}</p>
+      <TextLines widths={[100, 94, 98, 60]} className="mt-[0.8em]" />
+      <TextLines widths={[100, 97, 91, 40]} className="mt-[0.9em]" />
+      <p className="mt-[1.4em] text-[0.5em] opacity-60">
+        Signed by the parties on the dates below.
+      </p>
+      <p className="absolute left-[8%] top-[56%] text-[0.5em] opacity-60">{sample.parties[0]}</p>
+      <p className="absolute left-[56%] top-[56%] text-[0.5em] opacity-60">{sample.parties[1]}</p>
+      {signatureFields.map((f, i) => (
+        <FieldBox
+          key={`${f.tone}-${f.label}`}
+          tone={f.tone}
+          label={f.label}
+          at={[...f.at]}
+          filled={filled ? f.filled : undefined}
+          selected={selected === i}
+        />
+      ))}
+    </PdfPage>
+  )
+}
+
+/** The drafted document as the editor shows it: numbered sections with blanks. */
+function DraftDoc({
+  sections = 3,
+  filled = true,
+  signatures = false,
+}: {
+  sections?: number
+  filled?: boolean
+  signatures?: boolean
+}) {
+  const b = sample.blanks
+  return (
+    <div className="flex flex-col gap-[0.9em] bg-(--mk-paper) p-[2em] text-[0.8em] leading-[1.6] text-(--mk-paper-ink) shadow-[0_0.2em_0.8em_rgb(0_0_0/0.1)]">
+      <p className="text-[1.25em] font-semibold tracking-[-0.01em]">
+        Mutual Non-Disclosure Agreement
+      </p>
+      <p className="text-(--mk-paper-text)">
+        This Agreement is made on <Blank filled={filled}>{b.effectiveDate}</Blank> between{" "}
+        <Blank>{sample.parties[0]}</Blank> and <Blank>{sample.parties[1]}</Blank> for the purpose of{" "}
+        <Blank filled={filled}>{b.purpose}</Blank>.
+      </p>
+      {sample.sections.slice(0, sections).map((s, i) => (
+        <div key={s}>
+          <p className="font-semibold">
+            {i + 1}. {s}
+          </p>
+          {i === 2 ? (
+            <p className="text-(--mk-paper-text)">
+              The receiving party keeps the information confidential for{" "}
+              <Blank filled={filled}>{b.term}</Blank> after disclosure.
+            </p>
+          ) : (
+            <TextLines widths={[100, 92, 64]} className="mt-[0.5em]" />
+          )}
+        </div>
+      ))}
+      {signatures && (
+        <div className="mt-[0.6em] grid grid-cols-2 gap-[2em]">
+          {sample.parties.map((p, i) => (
+            <div key={p}>
+              <div
+                className="h-[2.2em] rounded-[0.25em] border border-dashed"
+                style={{ borderColor: toneColor(i) }}
+              />
+              <p className="mt-[0.3em] text-[0.85em] text-(--mk-paper-text)">For {p}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 /* ── Hero / scroll story ───────────────────────────────────────── */
 
-export function CanvasScreen() {
+export function DraftScreen() {
   return (
-    <MockupRoot scale={2.2} className="relative bg-[#ececea]">
-      <div className="absolute left-[4%] top-[6%] w-[52%] scale-100">
-        <p className="mb-[0.3em] text-[0.6em] text-[#9b9b97]">Home</p>
-        <AppPage cards={3} className="!gap-[0.8em] !p-[1em] text-[0.55em]" />
+    <MockupRoot scale={2.2} className="relative overflow-hidden bg-(--mk-desk)">
+      <div className="absolute left-[7%] top-[7%] w-[86%] text-[0.75em]">
+        <DraftDoc sections={5} filled={false} />
       </div>
-      <div className="absolute right-[4%] top-[14%] w-[34%]">
-        <p className="mb-[0.3em] text-[0.6em] text-select">Card · type</p>
-        <SampleCard item={items[1]} variant="type" className="text-[0.6em]" />
-      </div>
-      <div className="absolute bottom-[14%] left-[24%] w-[30%]">
-        <p className="mb-[0.3em] text-[0.6em] text-[#9b9b97]">Card · photo</p>
-        <SampleCard item={items[0]} selected className="text-[0.6em]" />
-      </div>
-      <Toolbar />
+      <Card className="absolute bottom-[7%] right-[5%] flex w-[72%] flex-col gap-[0.7em] p-[0.9em]">
+        <PanelLabel>Assistant · 1 of 3</PanelLabel>
+        <Question
+          q="When should the agreement take effect?"
+          options={["On signing", sample.blanks.effectiveDate, "Skip"]}
+          picked={1}
+        />
+      </Card>
     </MockupRoot>
   )
 }
 
-export function BrowserScreen() {
+export function SendScreen() {
   return (
-    <MockupRoot scale={2.2} className="flex flex-col bg-[#f7f7f6]">
-      <TabBar tabs={[{ label: "localhost:3000" }]} agent={false} />
-      <UrlBar url="localhost:3000/home" />
-      <AppPage cards={3} className="flex-1 text-[0.7em]" />
+    <MockupRoot scale={2.2} className="relative overflow-hidden bg-(--mk-desk)">
+      <div className="absolute left-1/2 top-[17%] w-[74%] -translate-x-1/2 text-[1.3em]">
+        <SignaturePage filled={false} selected={0} />
+      </div>
+      <Card className="absolute left-1/2 top-[5%] flex -translate-x-1/2 items-center gap-[0.5em] whitespace-nowrap px-[0.7em] py-[0.4em] text-[0.7em]">
+        <span className="size-[0.7em] rounded-full" style={{ background: toneColor(0) }} />
+        {first.name}
+        <span className="text-(--mk-text-3)">·</span>
+        <span className="rounded-full bg-(--mk-muted) px-[0.6em]">Signature</span>
+        <span className="text-(--mk-text-2)">Date</span>
+        <span className="text-(--mk-text-2)">Text</span>
+      </Card>
     </MockupRoot>
   )
 }
 
-export function AgentScreen() {
+export function ProveScreen() {
   return (
-    <MockupRoot scale={2.6}>
-      <AgentPanel title="Plan recipe tagging">
-        <ChatBubble>
-          Plan a feature for tagging where each recipe came from.
-          <br />
-          <br />
-          Read the codebase for an approach, then capture the current screens and explore a few
-          designs.
-        </ChatBubble>
-      </AgentPanel>
+    <MockupRoot scale={2.4} className="relative overflow-hidden bg-(--mk-desk)">
+      <div className="absolute left-1/2 top-[7%] w-[90%] -translate-x-1/2 text-[1.1em]">
+        <CertificatePaper />
+      </div>
     </MockupRoot>
   )
 }
 
-/** The single window the three hero frames merge into. */
+/** The single window the three hero frames merge into: a completed envelope. */
 export function AppWindow() {
   return (
-    <MockupRoot className="flex flex-col bg-[#f4f4f2]">
-      <TabBar
-        tabs={[{ label: "localhost:3000" }, { icon: "canvas", label: "Canvas" }]}
-        active={1}
-      />
-      <div className="relative flex min-h-0 flex-1 gap-[0.8em] p-[0.8em]">
-        <LayersPanel
-          page="Larder redesign"
-          layers={appLayers}
-          selected={2}
-          className="hidden w-[20%] sm:flex"
-        />
-        <div className="relative flex flex-1 items-center justify-center rounded-[0.7em] bg-[#ebebe9]">
-          <div className="w-[78%]">
-            <AppPage cards={3} selected={0} className="text-[0.8em]" />
+    <MockupRoot className="flex flex-col bg-(--mk-bg)">
+      <AppTopBar />
+      <div className="flex min-h-0 flex-1">
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex items-center gap-[0.8em] px-[1.6em] pt-[1.2em]">
+            <p className="text-[1.3em] font-semibold tracking-[-0.02em]">{sample.title}</p>
+            <StatusPill status="Completed" />
+            <span className="ml-auto flex gap-[0.5em]">
+              <Button>↓ Certificate</Button>
+              <Button primary>↓ Signed PDF</Button>
+            </span>
           </div>
-          <Toolbar />
-        </div>
-        <div className="w-[30%] overflow-hidden rounded-[0.7em] sm:w-[26%]">
-          <AgentPanel title="Plan recipe tagging">
-            <ChatBubble>Plan a feature for tagging where each recipe came from.</ChatBubble>
-            <ToolStep verb="Read" detail="src/components/Card.tsx" />
-            <ToolStep verb="Captured" detail="localhost:3000/home" />
-          </AgentPanel>
-        </div>
-      </div>
-    </MockupRoot>
-  )
-}
-
-/* ── Chapter 1: canvas ─────────────────────────────────────────── */
-
-export function CanvasEditor() {
-  return (
-    <MockupRoot className="flex flex-col bg-[#f4f4f2]">
-      <TabBar tabs={[{ icon: "canvas", label: "Larder" }]} />
-      <div className="relative flex min-h-0 flex-1 gap-[0.8em] p-[0.8em]">
-        <LayersPanel
-          page="Larder"
-          selected={6}
-          className="hidden w-[20%] sm:flex"
-          layers={[
-            { label: "Home" },
-            { label: "Launch" },
-            { label: "Header", depth: 1 },
-            { label: "Hero", depth: 1 },
-            { label: "Copy", depth: 2 },
-            { label: "Cook something good.", depth: 3, kind: "text" },
-            { label: "Button", depth: 3, kind: "comp" },
-            { label: "Button", depth: 3, kind: "comp" },
-            { label: "Captures", depth: 2 },
-            { label: "Image", depth: 3, kind: "img" },
-            { label: "Footer", depth: 1 },
-          ]}
-        />
-        <div className="relative flex flex-1 flex-col gap-[1.2em] p-[0.6em]">
-          <div className="grid grid-cols-[1fr_1.5fr] gap-[1.2em]">
-            <div>
-              <PanelLabel>Home</PanelLabel>
-              <AppPage cards={3} className="mt-[0.3em] !gap-[0.6em] !p-[0.8em] text-[0.5em]" />
+          <p className="px-[1.6em] pt-[0.3em] text-[0.75em] text-(--mk-text-3)">
+            {sample.file} · {sample.pages} pages · code {sample.code}
+          </p>
+          <div className="relative mt-[1em] flex min-h-0 flex-1 justify-center gap-[1.2em] overflow-hidden bg-(--mk-desk) pt-[1.4em]">
+            <div className="hidden w-[40%] text-[1.25em] sm:block">
+              <PdfPage />
             </div>
-            <div>
-              <p className="text-[0.75em] text-select">Launch</p>
-              <div className="relative mt-[0.3em] flex aspect-[16/10] flex-col justify-center gap-[0.6em] bg-[#dddad2] p-[1.4em]">
-                <p className="text-[2.1em] leading-none tracking-[-0.04em]">
-                  Cook something
-                  <br />
-                  good.
-                </p>
-                <p className="text-[0.65em] text-[#6f6d66]">
-                  Your notebook for recipes worth keeping.
-                </p>
-                <span className="w-fit rounded-[0.4em] px-[0.6em] py-[0.2em] text-[0.6em] outline outline-[0.15em] outline-[#c026d3]">
-                  Start for free
-                </span>
-                <div className="absolute right-[6%] top-[12%] w-[30%] rotate-6 shadow-lg">
-                  <SampleCard item={items[3]} className="text-[0.45em]" />
-                </div>
-                <div className="absolute bottom-[10%] right-[24%] w-[26%] -rotate-3 shadow-lg">
-                  <SampleCard item={items[0]} className="text-[0.45em]" />
-                </div>
-              </div>
+            <div className="w-[60%] text-[1.25em] sm:w-[40%]">
+              <SignaturePage />
             </div>
           </div>
-          <div>
-            <PanelLabel>Components</PanelLabel>
-            <div className="mt-[0.4em] flex items-start gap-[1.2em]">
-              <SampleCard item={items[1]} className="w-[18%] text-[0.5em]" />
-              <div className="flex gap-[0.4em]">
-                {["#f8f8f7", "#2b2b2f", "#d9482b", "#2f5bd3", "#f3c13a"].map((c) => (
-                  <span
-                    key={c}
-                    className="size-[1.4em] rounded-[0.3em] border border-black/10"
-                    style={{ background: c }}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-          <Toolbar />
         </div>
-        <div className="hidden w-[22%] flex-col gap-[0.8em] rounded-[0.7em] bg-white p-[0.9em] sm:flex">
-          <div className="flex gap-[0.6em] text-[0.75em]">
-            <span className="rounded-[0.4em] bg-[#ececea] px-[0.6em] py-[0.15em]">Design</span>
-            <span className="py-[0.15em] text-[#8f8f8a]">Code</span>
+        <div className="flex w-[34%] flex-col gap-[0.4em] border-l border-(--mk-line) bg-(--mk-surface) p-[1.2em] sm:w-[27%]">
+          <PanelLabel>Recipients</PanelLabel>
+          {sample.recipients.map((r) => (
+            <RecipientRow key={r.email} r={r} />
+          ))}
+          <div className="mt-[0.8em]">
+            <PanelLabel>Activity</PanelLabel>
           </div>
-          <p className="text-[0.8em]">Button</p>
-          <PanelLabel>Properties</PanelLabel>
-          <InspectorRow label="variant" value="primary" />
-          <InspectorRow label="disabled" value="false" />
-          <InspectorRow label="children" value="Start for free" />
-          <InspectorRow label="size" value="medium" />
-          <InspectorRow label="icon" value="None" />
-          <PanelLabel>Size</PanelLabel>
-          <InspectorRow label="W" value="Hug" />
-          <InspectorRow label="H" value="40" />
-        </div>
-      </div>
-    </MockupRoot>
-  )
-}
-
-export function ExplorationsDemo() {
-  const variants = ["photo", "type", "overlay", "label", "split", "night"] as const
-  return (
-    <MockupRoot scale={1.9} className="flex gap-[1em] p-[1em]">
-      <LayersPanel
-        page="Explorations"
-        layers={variants.map((v, i) => ({ label: `${String.fromCharCode(65 + i)} · ${v}` }))}
-        className="hidden w-[24%] sm:flex"
-      />
-      <div className="grid flex-1 grid-cols-3 content-start gap-[1em]">
-        {variants.map((v, i) => (
-          <div key={v}>
-            <p className="mb-[0.3em] text-[0.65em] text-[#8f8f8a]">
-              {String.fromCharCode(65 + i)} · {v}
+          {sample.events.slice(-4).map((e) => (
+            <p key={e.time} className="flex gap-[0.6em] truncate text-[0.72em]">
+              <span className="w-[5.5em] shrink-0 text-(--mk-text-3)">{e.time}</span>
+              <span className="truncate">
+                {e.event} <span className="text-(--mk-text-3)">· {e.actor}</span>
+              </span>
             </p>
-            <SampleCard item={items[i % items.length]} variant={v} className="text-[0.7em]" />
+          ))}
+        </div>
+      </div>
+    </MockupRoot>
+  )
+}
+
+/* ── Chapter 1: draft ──────────────────────────────────────────── */
+
+export function DraftingWindow() {
+  return (
+    <MockupRoot className="flex flex-col bg-(--mk-bg)">
+      <AppTopBar active="Drafting" />
+      <div className="flex min-h-0 flex-1">
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex items-center gap-[0.6em] border-b border-(--mk-line) bg-(--mk-surface) px-[1.2em] py-[0.6em] text-[0.78em]">
+            <span className="font-medium">{sample.title}</span>
+            <StatusPill status="Draft" />
+            <span className="ml-[1em] hidden gap-[0.9em] text-(--mk-text-2) sm:flex">
+              <b>B</b> <i>I</i> <u>U</u> <span>≔</span> <span>⊞</span> <span>§ Section</span>
+            </span>
+            <span className="ml-auto flex gap-[0.5em]">
+              <Button>Preview</Button>
+              <Button primary>Finalise</Button>
+            </span>
+          </div>
+          <div className="min-h-0 flex-1 overflow-hidden bg-(--mk-desk) px-[8%] pt-[1.6em]">
+            <DraftDoc sections={5} signatures />
+          </div>
+        </div>
+        <div className="flex w-[36%] flex-col gap-[0.9em] border-l border-(--mk-line) bg-(--mk-surface) p-[1.1em] sm:w-[30%]">
+          <div className="flex gap-[0.4em] text-[0.75em]">
+            <span className="rounded-full bg-(--mk-muted) px-[0.8em] py-[0.15em]">Assistant</span>
+            <span className="px-[0.5em] py-[0.15em] text-(--mk-text-2)">Blanks 9/12</span>
+            <span className="px-[0.5em] py-[0.15em] text-(--mk-text-2)">Signers</span>
+          </div>
+          <ChatBubble>
+            Draft a mutual NDA with {sample.parties[1]} for the cold-chain pilot.
+          </ChatBubble>
+          <AssistantText>
+            I started from the Mutual NDA starter and filled in both parties. Three questions before
+            the rest:
+          </AssistantText>
+          <Card className="flex flex-col gap-[0.8em] p-[0.9em]">
+            <Question
+              q="How long should confidentiality last?"
+              options={["1 year", "2 years", "5 years"]}
+              picked={1}
+            />
+            <Question q="Which law governs it?" options={["Kenya", "Uganda", "Other"]} picked={0} />
+          </Card>
+          <Composer />
+        </div>
+      </div>
+    </MockupRoot>
+  )
+}
+
+export function QuestionsDemo() {
+  return (
+    <MockupRoot
+      scale={1.7}
+      className="relative flex items-center justify-center gap-[1.6em] p-[1.6em]"
+    >
+      <div className="hidden w-[46%] text-[0.75em] sm:block">
+        <DraftDoc sections={3} filled={false} />
+      </div>
+      <Card className="flex w-[22em] flex-col gap-[1em] p-[1.2em]">
+        <div className="flex items-center justify-between">
+          <PanelLabel>A few questions</PanelLabel>
+          <span className="text-[0.7em] text-(--mk-text-3)">3 of 12 blanks</span>
+        </div>
+        <Question
+          q="When should the agreement take effect?"
+          options={["On signing", sample.blanks.effectiveDate]}
+          picked={1}
+        />
+        <Question
+          q="How long should confidentiality last?"
+          options={["1 year", "2 years", "5 years"]}
+          picked={1}
+        />
+        <Question q="Which law governs it?" options={["Kenya", "Uganda", "Other"]} />
+        <div className="flex justify-end gap-[0.5em]">
+          <Button>Skip</Button>
+          <Button primary>Fill 3 blanks</Button>
+        </div>
+      </Card>
+    </MockupRoot>
+  )
+}
+
+export function ProposalDemo() {
+  return (
+    <MockupRoot scale={3.3} className="flex items-center justify-center p-[1.2em]">
+      <Card className="flex w-full flex-col gap-[0.8em] p-[1em]">
+        <PanelLabel>Suggested edit · 4. {sample.sections[3]}</PanelLabel>
+        <div className="flex flex-col gap-[0.4em] text-[0.75em] leading-[1.5]">
+          <p className="rounded-[0.4em] bg-(--mk-danger-bg) px-[0.6em] py-[0.3em] text-(--mk-danger) line-through">
+            Either party may end this Agreement at any time.
+          </p>
+          <p className="rounded-[0.4em] bg-(--mk-success-bg) px-[0.6em] py-[0.3em] text-(--mk-success)">
+            Either party may end this Agreement with 30 days&apos; written notice. Obligations under
+            section 3 survive.
+          </p>
+        </div>
+        <div className="flex justify-end gap-[0.5em]">
+          <Button>Reject</Button>
+          <Button primary>Accept</Button>
+        </div>
+      </Card>
+    </MockupRoot>
+  )
+}
+
+export function SignersDemo() {
+  return (
+    <MockupRoot scale={3.3} className="flex items-center justify-center p-[1.2em]">
+      <Card className="flex w-full flex-col gap-[0.5em] p-[1em]">
+        <PanelLabel>Suggested signers</PanelLabel>
+        {[first, second].map((r) => (
+          <div
+            key={r.email}
+            className="rounded-[0.6em] border border-(--mk-line) px-[0.6em] py-[0.2em]"
+          >
+            <RecipientRow r={r} status={false} detail={r.email} />
+            <div className="flex flex-wrap gap-[0.3em] pb-[0.4em] text-[0.62em]">
+              {["Signature", "Full name", "Date signed"].map((f) => (
+                <span
+                  key={f}
+                  className="rounded-[0.3em] border px-[0.5em]"
+                  style={{ borderColor: toneColor(r.tone), color: toneColor(r.tone) }}
+                >
+                  {f}
+                </span>
+              ))}
+            </div>
           </div>
         ))}
-      </div>
+        <div className="flex justify-end gap-[0.5em] pt-[0.3em]">
+          <Button>Edit</Button>
+          <Button primary>Accept</Button>
+        </div>
+      </Card>
     </MockupRoot>
   )
 }
 
-export function CommentsDemo() {
+/* ── Chapter 2: send ───────────────────────────────────────────── */
+
+export function FieldEditorWindow() {
+  const steps = ["Documents", "Recipients", "Fields", "Review"]
   return (
-    <MockupRoot scale={1.9} className="relative flex items-center justify-center p-[2em]">
-      <div className="flex items-start gap-[0.8em]">
-        <div className="relative w-[18em]">
-          <p className="mb-[0.3em] text-[0.65em] text-select">A · ship</p>
-          <SampleCard item={items[0]} selected />
-          <span className="absolute -right-[0.6em] top-[1.2em] grid size-[1.3em] place-items-center rounded-full bg-[#ea580c] text-[0.7em] text-white ring-2 ring-white">
-            M
-          </span>
-          <span className="absolute -right-[2.5em] -top-[1em] rounded-[0.3em] bg-[#ea580c] px-[0.4em] text-[0.6em] text-white">
-            ➤ Mara
-          </span>
-        </div>
-        <div className="mt-[1.4em] flex w-[17em] flex-col gap-[0.6em] rounded-[0.8em] bg-white p-[0.9em] shadow-[0_0.4em_1.6em_rgb(0_0_0/0.08)]">
-          <Comment who="Mara" color="#ea580c" when="2m" text="Thoughts on the new card?" />
-          <Comment
-            who="Theo"
-            color="#16a34a"
-            when="Just now"
-            text="Love it — but let the photo fill the card and clamp the title to 3 lines. I'll have the agent open a PR."
-          />
-          <div className="h-[2.4em] rounded-[0.5em] bg-[#f3f3f1] px-[0.6em] py-[0.4em] text-[0.7em] text-[#a3a39e]">
-            Reply…
+    <MockupRoot className="flex flex-col bg-(--mk-bg)">
+      <div className="flex h-[3em] shrink-0 items-center gap-[1em] border-b border-(--mk-line) bg-(--mk-surface) px-[1.2em] text-[0.8em]">
+        <span className="text-(--mk-text-2)">✕</span>
+        <span className="font-medium">{sample.title}</span>
+        <span className="mx-auto hidden items-center gap-[0.2em] rounded-full bg-(--mk-muted) p-[0.2em] sm:flex">
+          {steps.map((s, i) => (
+            <span
+              key={s}
+              className={`rounded-full px-[0.8em] py-[0.15em] ${
+                i === 2 ? "bg-(--mk-surface) shadow-(--mk-shadow)" : "text-(--mk-text-2)"
+              }`}
+            >
+              {i + 1}. {s}
+            </span>
+          ))}
+        </span>
+        <Button primary className="ml-auto sm:ml-0">
+          Review &amp; send
+        </Button>
+      </div>
+      <div className="flex min-h-0 flex-1">
+        <div className="hidden w-[24%] flex-col gap-[0.3em] border-r border-(--mk-line) bg-(--mk-surface) p-[1.1em] sm:flex">
+          <PanelLabel>Recipients · in order</PanelLabel>
+          {sample.recipients.map((r, i) => (
+            <RecipientRow
+              key={r.email}
+              r={r}
+              order={i + 1}
+              status={false}
+              detail={r.role === "Gets a copy" ? r.role : `${r.role} · ${r.verify}`}
+            />
+          ))}
+          <div className="mt-[1em]">
+            <PanelLabel>Fields</PanelLabel>
           </div>
-        </div>
-      </div>
-      <span className="absolute bottom-[22%] right-[12%] rounded-[0.3em] bg-[#16a34a] px-[0.4em] text-[0.6em] text-white">
-        ➤ Theo
-      </span>
-      <Toolbar active={2} />
-    </MockupRoot>
-  )
-}
-
-function Comment({
-  who,
-  color,
-  when,
-  text,
-}: {
-  who: string
-  color: string
-  when: string
-  text: string
-}) {
-  return (
-    <div className="flex gap-[0.5em] text-[0.72em]">
-      <span
-        className="grid size-[1.5em] shrink-0 place-items-center rounded-full text-white"
-        style={{ background: color }}
-      >
-        {who[0]}
-      </span>
-      <div>
-        <p>
-          {who} <span className="text-[#a3a39e]">{when}</span>
-        </p>
-        <p className="mt-[0.15em] leading-[1.35]">{text}</p>
-      </div>
-    </div>
-  )
-}
-
-/* ── Chapter 2: browser ────────────────────────────────────────── */
-
-export function BrowserWindow() {
-  return (
-    <MockupRoot className="flex flex-col bg-[#f7f7f6]">
-      <TabBar
-        tabs={[
-          { label: "Moodboard – inspiration" },
-          { label: "Pull requests" },
-          { label: "localhost:3000" },
-        ]}
-        active={2}
-      />
-      <UrlBar url="localhost:3000/recipes" />
-      <div className="relative flex min-h-0 flex-1 bg-[#dddad2]">
-        <div className="hidden w-[22%] flex-col gap-[0.5em] p-[1.4em] text-[0.8em] sm:flex">
-          <span className="rounded-[0.4em] bg-[#ebe8e1] px-[0.7em] py-[0.4em]">☰ All</span>
-          {sampleApp.categories.map((c) => (
-            <span key={c.name} className="flex items-center gap-[0.5em] px-[0.7em] text-[#6f6d66]">
-              <span className="size-[0.45em] rounded-full" style={{ background: c.color }} />
-              {c.name}
+          {["Signature", "Initials", "Date signed", "Full name", "Text", "Checkbox"].map((f, i) => (
+            <span
+              key={f}
+              className={`rounded-[0.5em] px-[0.6em] py-[0.25em] text-[0.75em] ${
+                i === 0 ? "bg-(--mk-muted)" : "text-(--mk-text-2)"
+              }`}
+            >
+              {f}
             </span>
           ))}
         </div>
-        <AppPage cards={6} chart className="flex-1 !bg-transparent" />
-        <Toolbar />
-      </div>
-    </MockupRoot>
-  )
-}
-
-export function CaptureDemo() {
-  return (
-    <MockupRoot scale={1.5} className="relative p-[1.2em]">
-      <div className="absolute left-[2%] top-[4%] h-[92%] w-[54%] overflow-hidden rounded-[0.7em] bg-white shadow-sm">
-        <TabBar
-          tabs={[{ label: "localhost:3000" }, { icon: "canvas", label: "Canvas" }]}
-          agent={false}
-        />
-        <AppPage chart cards={2} className="!gap-[1em] text-[0.8em]" />
-      </div>
-      <div className="absolute right-[2%] top-[6%] h-[88%] w-[52%] overflow-hidden rounded-[0.7em] bg-[#ececea] shadow-[0_0.6em_2em_rgb(0_0_0/0.12)]">
-        <TabBar
-          tabs={[{ label: "localhost:3000" }, { icon: "canvas", label: "Canvas" }]}
-          active={1}
-          agent={false}
-        />
-        <div className="flex flex-col gap-[1em] p-[1.4em]">
-          <div>
-            <PanelLabel>Recipes / Header</PanelLabel>
-            <div className="mt-[0.3em] bg-[#dddad2] p-[1em]">
-              <p className="text-[2.2em] leading-none tracking-[-0.05em]">{sampleApp.heading}</p>
-              <p className="mt-[0.4em] text-[0.7em] text-[#6f6d66]">{sampleApp.meta}</p>
-            </div>
-          </div>
-          <div>
-            <p className="text-[0.75em] text-select">Chart & filters</p>
-            <div className="mt-[0.3em] flex flex-col gap-[0.7em] bg-[#dddad2] p-[1em] outline outline-[0.12em] outline-select">
-              <p className="text-[0.75em]">
-                Cooked this year <span className="text-[#8f8f8a]">2026 · 38 recipes</span>
-              </p>
-              <div className="text-[0.9em]">
-                <AppChart />
-              </div>
-            </div>
+        <div className="relative flex min-w-0 flex-1 justify-center overflow-hidden bg-(--mk-desk) pt-[1.6em]">
+          <div className="w-[64%] text-[1.4em]">
+            <SignaturePage filled={false} selected={2} />
           </div>
         </div>
-        <Toolbar />
+        <div className="flex w-[30%] flex-col gap-[0.2em] border-l border-(--mk-line) bg-(--mk-surface) p-[1.1em] sm:w-[22%]">
+          <PanelLabel>Field</PanelLabel>
+          <SettingRow label="Type" value="Signature" />
+          <SettingRow
+            label="Signer"
+            value={
+              <span className="flex items-center gap-[0.4em]">
+                <span className="size-[0.6em] rounded-full" style={{ background: toneColor(1) }} />
+                {second.name.split(" ")[0]}
+              </span>
+            }
+          />
+          <SettingRow label="Required" value="Yes" />
+          <SettingRow label="Page" value={`${sample.pages} of ${sample.pages}`} />
+          <p className="mt-[0.8em] text-[0.7em] leading-[1.5] text-(--mk-text-3)">
+            Drag to move, arrow keys to nudge, ⌫ to remove.
+          </p>
+        </div>
       </div>
     </MockupRoot>
   )
 }
 
-function AppChart() {
+export function SigningDemo() {
   return (
-    <div className="flex flex-col gap-[0.6em]">
-      <div className="flex h-[3.5em] items-end gap-[0.5em] border-b border-black/15">
-        {[3, 5, 2, 6, 9, 4, 2, 7, 11, 5, 3, 8].map((h, i) => (
-          <span
-            // biome-ignore lint/suspicious/noArrayIndexKey: static list, never reordered
-            key={i}
-            className="w-[0.22em]"
-            style={{ height: `${h * 8}%`, background: i === 8 ? "#2f5bd3" : "#9d9a92" }}
-          />
+    <MockupRoot
+      scale={1.6}
+      className="relative flex items-center justify-center gap-[2em] p-[1.4em]"
+    >
+      <div className="flex h-[92%] w-[15em] shrink-0 flex-col overflow-hidden rounded-[2em] border-[0.45em] border-(--mk-accent) bg-(--mk-bg)">
+        <div className="flex items-center justify-between bg-(--mk-surface) px-[1em] py-[0.7em] text-[0.7em]">
+          <span className="font-medium">{sample.title}</span>
+          <span className="text-(--mk-text-3)">from {sample.workspace}</span>
+        </div>
+        <div className="relative min-h-0 flex-1 overflow-hidden bg-(--mk-desk) px-[0.8em] pt-[0.8em]">
+          <PdfPage heading={false} className="text-[1.3em]">
+            <TextLines widths={[100, 94, 98, 60, 100, 88]} />
+            <FieldBox tone={1} label="Sign here" at={[8, 52, 50, 11]} selected />
+            <FieldBox tone={1} label="Date signed" at={[8, 67, 34, 6]} filled="14 Oct 2026" />
+          </PdfPage>
+        </div>
+        <div className="flex flex-col gap-[0.5em] bg-(--mk-surface) px-[1em] py-[0.8em]">
+          <div className="h-[0.3em] overflow-hidden rounded-full bg-(--mk-muted)">
+            <div className="h-full w-2/3 rounded-full bg-(--mk-accent)" />
+          </div>
+          <div className="flex items-center justify-between text-[0.7em]">
+            <span className="text-(--mk-text-2)">2 of 3 fields</span>
+            <Button primary>Next field ↓</Button>
+          </div>
+        </div>
+      </div>
+      <Card className="hidden w-[20em] flex-col gap-[0.8em] p-[1.1em] sm:flex">
+        <p className="text-[0.85em] font-medium">Add your signature</p>
+        <div className="flex gap-[0.3em] text-[0.72em]">
+          <span className="rounded-full bg-(--mk-muted) px-[0.8em]">Draw</span>
+          <span className="px-[0.5em] text-(--mk-text-2)">Type</span>
+          <span className="px-[0.5em] text-(--mk-text-2)">Upload</span>
+        </div>
+        <div className="grid h-[6.5em] place-items-center rounded-[0.6em] border border-dashed border-(--mk-line) bg-(--mk-paper)">
+          <Signature className="h-[60%] w-[70%] text-[#1e3a8a]" />
+        </div>
+        <p className="text-[0.65em] leading-[1.5] text-(--mk-text-3)">
+          I agree to sign electronically and that this signature is as valid as my handwritten one.
+        </p>
+        <div className="flex justify-end gap-[0.5em]">
+          <Button>Clear</Button>
+          <Button primary>Adopt and sign</Button>
+        </div>
+      </Card>
+    </MockupRoot>
+  )
+}
+
+export function OtpDemo() {
+  const digits = ["4", "8", "1", "", "", ""]
+  return (
+    <MockupRoot scale={3.3} className="flex items-center justify-center p-[1.2em]">
+      <Card className="flex w-full flex-col items-center gap-[0.8em] p-[1.3em] text-center">
+        <span className="grid size-[2.2em] place-items-center rounded-full bg-(--mk-muted)">✆</span>
+        <p className="text-[0.95em] font-medium">Check your phone</p>
+        <p className="text-[0.72em] text-(--mk-text-2)">
+          We sent a 6-digit code to +254 7•• ••• 488
+        </p>
+        <div className="flex gap-[0.35em]">
+          {digits.map((d, i) => (
+            <span
+              // biome-ignore lint/suspicious/noArrayIndexKey: fixed six slots
+              key={i}
+              className={`grid h-[2.2em] w-[1.8em] place-items-center rounded-[0.5em] border text-[0.9em] ${
+                i === 3 ? "border-(--mk-accent)" : "border-(--mk-line)"
+              }`}
+            >
+              {d}
+            </span>
+          ))}
+        </div>
+        <p className="text-[0.65em] text-(--mk-text-3)">Resend in 24 s</p>
+      </Card>
+    </MockupRoot>
+  )
+}
+
+export function RoutingDemo() {
+  return (
+    <MockupRoot scale={3.3} className="flex items-center justify-center p-[1.2em]">
+      <Card className="flex w-full flex-col p-[1em]">
+        <PanelLabel>Signing order</PanelLabel>
+        <div className="relative mt-[0.3em]">
+          <span className="absolute bottom-[1.3em] left-[0.6em] top-[1.3em] w-px bg-(--mk-line)" />
+          {sample.recipients.map((r, i) => (
+            <RecipientRow key={r.email} r={r} order={i + 1} status={false} />
+          ))}
+        </div>
+        <div className="mt-[0.5em]">
+          <SettingRow label="Order" value="One after another" />
+          <SettingRow label="Reminders" value="Every 3 days" />
+          <SettingRow label="Expires" value="30 Nov 2026" />
+        </div>
+      </Card>
+    </MockupRoot>
+  )
+}
+
+/* ── Chapter 3: prove ──────────────────────────────────────────── */
+
+/** The Certificate of Completion, as `renderCertificate` lays it out. */
+function CertificatePaper({ compact = false }: { compact?: boolean }) {
+  const signers = sample.recipients.filter((r) => r.status === "Signed")
+  return (
+    <div className="flex flex-col gap-[0.9em] bg-(--mk-paper) p-[1.6em] text-(--mk-paper-ink) shadow-[0_0.2em_0.8em_rgb(0_0_0/0.12)]">
+      <div className="flex items-start justify-between gap-[1em]">
+        <div>
+          <p className="text-[0.55em] tracking-[0.12em] opacity-60">SAHIHI</p>
+          <p className="text-[1em] font-semibold tracking-[-0.01em]">Certificate of Completion</p>
+          <p className="mt-[0.2em] text-[0.62em] opacity-60">
+            {sample.title} · {sample.workspace}
+          </p>
+        </div>
+        <div className="flex flex-col items-center gap-[0.3em]">
+          <QrCode className="size-[3.6em] text-(--mk-paper-ink)" />
+          <span className="font-mono text-[0.5em]">{sample.code}</span>
+        </div>
+      </div>
+      <div className="flex flex-col gap-[0.3em] border-y border-(--mk-paper-line) py-[0.6em]">
+        <HashRow label="Original SHA-256" value={sample.originalSha256} />
+        <HashRow label="Signed SHA-256" value={sample.signedSha256} />
+        {!compact && <HashRow label="Audit chain head" value={sample.chainHead} />}
+      </div>
+      <div className="flex flex-col gap-[0.5em]">
+        {signers.map((r) => (
+          <div key={r.email} className="flex items-center gap-[0.7em] text-[0.62em]">
+            <span className="text-[#15803d]">✓</span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-medium">{r.name}</span>
+              {!compact && (
+                <span className="block opacity-60">
+                  {r.verify} · {r.ip}
+                </span>
+              )}
+            </span>
+            <span className="opacity-60">{r.signedAt}</span>
+          </div>
         ))}
       </div>
-      <div className="flex gap-[0.8em] text-[0.7em]">
-        <span className="rounded-full bg-[#f6f4ee] px-[0.5em]">All</span>
-        {sampleApp.categories.map((c) => (
-          <span key={c.name}>● {c.name}</span>
-        ))}
-      </div>
+      {!compact && (
+        <div className="flex flex-col gap-[0.25em] border-t border-(--mk-paper-line) pt-[0.6em]">
+          {sample.events.map((e) => (
+            <p key={e.time} className="flex gap-[1em] text-[0.55em]">
+              <span className="w-[7em] shrink-0 opacity-60">{e.time}</span>
+              <span className="flex-1">{e.event}</span>
+              <span className="opacity-60">{e.actor}</span>
+            </p>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
-export function InspectDemo() {
+export function CertificateWindow() {
   return (
-    <MockupRoot scale={2.6} className="flex gap-[0.5em] p-[0.6em]">
-      <div className="flex flex-1 flex-col overflow-hidden rounded-[0.6em] bg-[#dddad2]">
-        <p className="bg-white py-[0.4em] text-center text-[0.65em] text-[#77777a]">
-          localhost:3000/home
-        </p>
-        <div className="relative flex flex-1 flex-col gap-[0.6em] p-[1em]">
-          <p className="text-[0.75em]">{sampleApp.name}</p>
-          <p className="w-fit text-[2em] leading-[0.95] tracking-[-0.04em] outline outline-[0.08em] outline-select">
-            Cook
-            <br />
-            something.
-          </p>
-          <span className="h-[0.15em] w-[3em] bg-[#d9482b]" />
-          <p className="text-[0.6em] text-[#6f6d66]">Your notebook for recipes worth keeping.</p>
-          <span className="absolute bottom-[0.8em] left-1/2 -translate-x-1/2 rounded-full bg-white px-[0.7em] py-[0.3em] text-[0.6em] shadow">
-            1 change · <b className="font-medium">Send</b>
-          </span>
-        </div>
-      </div>
-      <div className="flex w-[44%] flex-col gap-[0.5em] rounded-[0.6em] bg-white p-[0.7em]">
-        <p className="text-[0.7em]">
-          span <span className="float-right rounded bg-[#eef] px-[0.3em] text-select">span</span>
-        </p>
-        <p className="font-mono text-[0.55em] text-[#8f8f8a]">src/components/Hero.tsx:24</p>
-        <PanelLabel>Color</PanelLabel>
-        <InspectorRow label="●" value="Primary Text" />
-        <PanelLabel>Text</PanelLabel>
-        <InspectorRow label="Font" value="Inter" />
-        <InspectorRow label="Size" value="112" />
-        <InspectorRow label="Tracking" value="-0.03em" />
-      </div>
-    </MockupRoot>
-  )
-}
-
-export function PinDemo() {
-  return (
-    <MockupRoot scale={2.6} className="relative flex p-[0.6em]">
-      <div className="relative flex-1 overflow-hidden rounded-[0.6em] bg-[#dddad2] p-[0.8em]">
-        <p className="text-[1.6em] tracking-[-0.04em]">{sampleApp.heading}</p>
-        <div className="relative mt-[0.4em] w-[60%]">
-          <SampleCard item={items[1]} className="text-[0.75em]" />
-          <span className="absolute left-[-0.4em] top-[62%] grid size-[1.2em] place-items-center rounded-full bg-select text-[0.6em] text-white">
-            1
-          </span>
-          <span className="absolute inset-x-0 top-[58%] h-[22%] outline outline-[0.1em] outline-select" />
-        </div>
-      </div>
-      <div className="absolute right-[3%] top-[6%] h-[88%] w-[52%] overflow-hidden rounded-[0.6em] shadow-[0_0.4em_1.6em_rgb(0_0_0/0.15)]">
-        <AgentPanel title="Update card title" diff={[53, 12]}>
-          <p className="ml-auto rounded-[0.5em] border border-black/10 px-[0.6em] py-[0.3em] text-[0.65em]">
-            ⌖ 1 change
-          </p>
-          <p className="text-[0.72em] leading-[1.4]">
-            I&apos;ll clamp the selected title in Card.tsx and leave the rest of the card as is.
-          </p>
-        </AgentPanel>
-      </div>
-    </MockupRoot>
-  )
-}
-
-/* ── Chapter 3: agent ──────────────────────────────────────────── */
-
-export function AgentBuildWindow() {
-  return (
-    <MockupRoot className="flex flex-col bg-[#f4f4f2]">
-      <TabBar tabs={[{ label: "localhost:3000" }]} />
-      <div className="flex min-h-0 flex-1 gap-[0.6em] p-[0.6em]">
-        <div className="relative flex flex-1 flex-col overflow-hidden rounded-[0.6em]">
-          <UrlBar url="localhost:3000/recipes" />
-          <AppPage cards={3} className="flex-1" />
-          <Toolbar />
-        </div>
-        <div className="w-[34%] overflow-hidden rounded-[0.6em] sm:w-[28%]">
-          <AgentPanel title="Implement card design" diff={[53, 12]}>
-            <ChatBubble>implement this design in a grid</ChatBubble>
-            <ToolStep verb="Read canvas" detail="Recipe cards" />
-            <ToolStep verb="Ran" detail="Read Card component and tokens" />
-            <ToolStep verb="Edited" detail="src/components/Card.tsx" />
-            <ToolStep verb="Opened" detail="localhost:3000/recipes" />
-            <ToolStep verb="Screenshot" detail="localhost:3000/recipes" />
-            <p className="text-[0.75em] leading-[1.4]">
-              All cards now use the new layout: cover photo, three-line title, category and date.
-              Checked in the browser.
-            </p>
-          </AgentPanel>
-        </div>
-      </div>
-    </MockupRoot>
-  )
-}
-
-export function AgentBuildChat() {
-  return (
-    <MockupRoot scale={2.6}>
-      <AgentPanel
-        title="Implement button and open PR"
-        branch="feat/floating-button"
-        diff={[53, 12]}
-      >
-        <ChatBubble>Implement this new button variant, then commit and open a PR.</ChatBubble>
-        <ToolStep verb="Read component" detail="Button" />
-        <ToolStep verb="Edited" detail="src/components/ui/Button.tsx" />
-        <ToolStep verb="Ran" detail="Check types and build" />
-        <ToolStep verb="Ran" detail="Commit, push branch, open PR" />
-        <p className="text-[0.75em] leading-[1.4]">
-          Added the variant and opened a PR. Tests and lint pass.
-        </p>
-        <p className="text-[0.75em] underline">Add Floating Button variant ↗</p>
-      </AgentPanel>
-    </MockupRoot>
-  )
-}
-
-export function AgentDesignChat() {
-  return (
-    <MockupRoot scale={2.6}>
-      <AgentPanel title="Explore card directions">
-        <ChatBubble>Explore a photo-led and a type-led direction for this card.</ChatBubble>
-        <ToolStep verb="Read design" detail="Home card" />
-        <ToolStep verb="Designed" detail="2 variations in Larder" />
-        <div className="grid grid-cols-2 gap-[0.5em] rounded-[0.6em] bg-[#f3f3f1] p-[0.5em]">
-          <div>
-            <p className="mb-[0.2em] text-[0.6em] text-[#8f8f8a]">Photo first</p>
-            <SampleCard item={items[0]} className="text-[0.55em]" />
-          </div>
-          <div>
-            <p className="mb-[0.2em] text-[0.6em] text-[#8f8f8a]">Type first</p>
-            <SampleCard item={items[0]} variant="type" className="text-[0.55em]" />
+    <MockupRoot className="flex flex-col bg-(--mk-bg)">
+      <WindowBar url={`sahihi.co.ke/verify/${sample.code}`} />
+      <div className="flex min-h-0 flex-1">
+        <div className="flex min-w-0 flex-1 justify-center overflow-hidden bg-(--mk-desk) px-[4%] pt-[1.6em]">
+          <div className="w-full max-w-[34em] text-[1.05em]">
+            <CertificatePaper />
           </div>
         </div>
-        <p className="text-[0.75em] leading-[1.4]">
-          Done. Two directions, both built from the original card.
+        <div className="flex w-[34%] flex-col gap-[0.7em] border-l border-(--mk-line) bg-(--mk-surface) p-[1.2em] sm:w-[28%]">
+          <div className="flex items-center gap-[0.5em] rounded-[0.7em] bg-(--mk-success-bg) px-[0.8em] py-[0.6em] text-[0.78em] text-(--mk-success)">
+            ✓ Valid certificate
+          </div>
+          <PanelLabel>Envelope</PanelLabel>
+          <SettingRow label="Document" value={sample.file} />
+          <SettingRow label="Pages" value={sample.pages} />
+          <SettingRow label="Completed" value="14 Oct 2026" />
+          <SettingRow label="Provider" value="Sahihi" />
+          <PanelLabel>Signers</PanelLabel>
+          {[first, second].map((r) => (
+            <div key={r.email} className="flex items-center gap-[0.6em] text-[0.75em]">
+              <Avatar name={r.name} tone={r.tone} />
+              <span className="truncate">{r.name}</span>
+              <span className="ml-auto text-(--mk-text-3)">
+                {r.email.replace(/^(.).*@/, "$1•••@")}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </MockupRoot>
+  )
+}
+
+export function VerifyDemo() {
+  return (
+    <MockupRoot scale={3.3} className="flex items-center justify-center p-[1.2em]">
+      <Card className="flex w-full flex-col gap-[0.8em] p-[1em]">
+        <p className="text-[0.95em] font-medium">Verify a document</p>
+        <div className="flex flex-col items-center gap-[0.4em] rounded-[0.7em] border border-dashed border-(--mk-line) bg-(--mk-muted) py-[1em] text-[0.72em]">
+          <span className="grid h-[2.4em] w-[1.9em] place-items-end rounded-[0.25em] bg-(--mk-paper) p-[0.2em] text-[0.6em] font-semibold text-[#b91c1c] shadow-sm">
+            PDF
+          </span>
+          <span>{sample.title} (signed).pdf</span>
+          <span className="font-mono text-[0.85em] text-(--mk-text-3)">
+            {shortHash(sample.signedSha256)}
+          </span>
+        </div>
+        <div className="flex items-center gap-[0.6em] rounded-[0.7em] bg-(--mk-success-bg) px-[0.8em] py-[0.5em] text-[0.75em] text-(--mk-success)">
+          ✓ Matches a signed document · {sample.code}
+        </div>
+        <p className="text-[0.65em] text-(--mk-text-3)">
+          Hashed in your browser. The file never leaves this device.
         </p>
-      </AgentPanel>
+      </Card>
+    </MockupRoot>
+  )
+}
+
+export function AuditDemo() {
+  const chain = sample.events.slice(1)
+  const hashes = [
+    sample.originalSha256,
+    sample.signedSha256,
+    sample.chainHead,
+    sample.originalSha256.split("").reverse().join(""),
+    sample.signedSha256.split("").reverse().join(""),
+  ]
+  return (
+    <MockupRoot scale={3.3} className="flex items-center justify-center p-[1.2em]">
+      <Card className="flex w-full flex-col p-[1em]">
+        <PanelLabel>Audit trail · append-only</PanelLabel>
+        <div className="relative mt-[0.5em] flex flex-col gap-[0.55em]">
+          <span className="absolute bottom-[0.6em] left-[0.35em] top-[0.6em] w-px bg-(--mk-line)" />
+          {chain.map((e, i) => (
+            <div
+              key={e.time}
+              className="relative flex items-center gap-[0.7em] pl-[1.3em] text-[0.68em]"
+            >
+              <span className="absolute left-0 size-[0.75em] rounded-full border-[0.15em] border-(--mk-surface) bg-(--mk-accent)" />
+              <span className="min-w-0 flex-1 truncate">
+                {e.event} <span className="text-(--mk-text-3)">· {e.actor}</span>
+              </span>
+              <span className="font-mono text-[0.9em] text-(--mk-text-3)">
+                {hashes[i].slice(0, 6)}
+              </span>
+            </div>
+          ))}
+        </div>
+        <p className="mt-[0.7em] text-[0.62em] text-(--mk-text-3)">
+          Each hash covers the previous one. Head {shortHash(sample.chainHead, 6)} is on the
+          certificate.
+        </p>
+      </Card>
     </MockupRoot>
   )
 }

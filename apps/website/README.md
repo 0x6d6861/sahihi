@@ -1,8 +1,8 @@
-# craft-landing-starter
+# Sahihi website
 
-A starter for a quiet, product-led marketing page: a near-monochrome layout, chrome-bezel product mockups, and a scroll-driven hero where three frames merge into one app window. The style follows subframe.com's landing page, with all copy and the sample app replaced by placeholders.
+The marketing site for Sahihi: a quiet, product-led landing page (draft, send, prove), with HTML mockups of the real app, a scroll-driven hero where three frames merge into one completed envelope, and MDX pages for security, privacy and terms. The layout follows subframe.com's landing page.
 
-Built with Next.js 16 (App Router), Tailwind CSS v4 and Motion, set in Geist. The page is fully static.
+Built with Next.js 16 (App Router), Tailwind CSS v4, Motion and `@next/mdx`, set in Geist. Every route is static.
 
 ## Run it
 
@@ -30,17 +30,19 @@ Agents start at [AGENTS.md](AGENTS.md) (Claude Code reads it through `CLAUDE.md`
 | [CONTENT.md](docs/CONTENT.md) | Voice, the `site.ts` schema, rebranding checklist |
 | [QA_CHECKLIST.md](docs/QA_CHECKLIST.md) | What to run and look at before calling a change done |
 
-## Make it yours
+## Where things live
 
 | What | Where |
 |---|---|
-| All page copy: name, headlines, features, quotes, pricing, FAQ | `src/content/site.ts` (`site`) |
-| The fictional app shown in every mockup ("Larder") | `src/content/site.ts` (`sampleApp`) |
-| Colours, type scale, bezel, marquee | `src/app/globals.css` |
+| All landing-page copy: headlines, chapters, trust facts, plans, FAQ | `src/content/site.ts` (`site`) |
+| The sample envelope shown in every mockup | `src/content/site.ts` (`sample`) |
+| Security, privacy and terms | `src/app/(legal)/*/page.mdx`, styled by `src/mdx-components.tsx` |
+| Colours, type scale, bezel, mockup palette, marquee | `src/app/globals.css` |
 | Fonts | `src/app/layout.tsx` |
 | Section order | `src/app/page.tsx` |
+| Social card, icon, robots, sitemap | `src/app/opengraph-image.tsx`, `icon.svg`, `robots.ts`, `sitemap.ts` |
 
-The components contain no marketing text. Change `site.ts` and the whole page follows.
+Before launch: set `site.url`, `site.appUrl` and `site.contact`, and replace the privacy and terms drafts (docs/CONTENT.md, "Before launch").
 
 ## Structure
 
@@ -57,19 +59,19 @@ src/
 
 ### Sections (in order)
 
-1. **Header**: wordmark and underlined text links, sticky.
-2. **HeroStory**: the only pinned, scroll-scrubbed sequence. The headline fades, the empty frames fill with Canvas/Browser/Agent screens, then they straighten and merge into `AppWindow`. It animates only `transform` and `opacity`. Users with `prefers-reduced-motion` get a static version.
-3. **PillarIntro**: "Canvas. Browser. Agent." in grey display type.
-4. **FeatureChapters**: one chapter per entry in `site.chapters`, each with a big mockup, demo panels and bold-lead captions. The canvas chapter also has the metal-icon grid.
-5. **ContextRow**: four cards with marquee content.
+1. **Header**: wordmark and underlined text links (Security, Pricing, Log in), sticky.
+2. **HeroStory**: the only pinned, scroll-scrubbed sequence. The headline fades, the Draft/Send/Prove frames straighten and merge into `AppWindow`, a completed envelope. It animates only `transform` and `opacity`. Users with `prefers-reduced-motion` get a static version.
+3. **PillarIntro**: "Draft. Send. Prove." in grey display type.
+4. **FeatureChapters**: one chapter per entry in `site.chapters` (drafting assistant, send & sign, certificate), each with a big mockup, demo panels and bold-lead captions. The draft chapter also has the metal-icon grid.
+5. **ContextRow**: integrations (API, webhooks, bulk send, embedded signing) as four marquee cards.
 6. **Process**: four giant numerals.
-7. **Testimonials**: a bento grid. Placement is set by the `layout` array in the component.
-8. **Pricing**, then **FAQ** (native `<details>`, no JS).
+7. **Trust**: verifiable product facts in a bento grid.
+8. **Pricing** (four plans by monthly envelopes, no prices yet), then **FAQ**.
 9. **Footer**.
 
 ## How the mockups scale
 
-Product UIs are built in HTML, not images, so text stays sharp at any size. Each mockup sits inside a `.mockup` container. `.mockup-root` sets its font size in container units (`calc(var(--mk) * 1cqw)`), and every child is sized in `em`. To make a mockup read larger or smaller, pass `scale` to `<MockupRoot>`. That sets `--mk`; 1.35 suits a full-width window.
+Product UIs are built in HTML, not images, so text stays sharp at any size and follows the theme. Each mockup sits inside a `.mockup` container. `.mockup-root` sets its font size in container units (`calc(var(--mk) * 1cqw)`), and every child is sized in `em`. To make a mockup read larger or smaller, pass `scale` to `<MockupRoot>`. That sets `--mk`; 1.35 suits a full-width window.
 
 ## Swapping in real assets
 

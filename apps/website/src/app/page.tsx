@@ -7,7 +7,7 @@ import { HeroStory } from "@/components/sections/HeroStory"
 import { PillarIntro } from "@/components/sections/PillarIntro"
 import { Pricing } from "@/components/sections/Pricing"
 import { Process } from "@/components/sections/Process"
-import { Testimonials } from "@/components/sections/Testimonials"
+import { Trust } from "@/components/sections/Trust"
 
 export default function Home() {
   return (
@@ -19,7 +19,7 @@ export default function Home() {
         <FeatureChapters />
         <ContextRow />
         <Process />
-        <Testimonials />
+        <Trust />
         <Pricing />
         <Faq />
       </main>

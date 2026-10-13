@@ -28,8 +28,7 @@ export function Pricing() {
                   ))}
                 </ul>
                 <a
-                  // biome-ignore lint/a11y/useValidAnchor: placeholder until the sign-up URL is wired
-                  href="#"
+                  href={plan.href}
                   className={`text-button mt-10 inline-flex h-12 items-center justify-center rounded-2xl px-6 transition-[background-color,scale] duration-150 ease-out active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink md:h-[52px] ${
                     plan.featured
                       ? "bg-ink text-paper hover:bg-ink/80"

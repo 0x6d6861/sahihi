@@ -1,6 +1,6 @@
 # Hero scroll sequence
 
-This is the only pinned, scroll-scrubbed animation on the page, implemented in `src/components/sections/HeroStory.tsx`. It tells the product story without words: **three separate tools become one window.**
+This is the only pinned, scroll-scrubbed animation on the page, implemented in `src/components/sections/HeroStory.tsx`. It tells the product story without words: **drafting, sending and proving become one envelope.** The three frames merge into `AppWindow`, a completed envelope with its recipients and activity.
 
 ## Structure
 
@@ -22,7 +22,7 @@ This is the only pinned, scroll-scrubbed animation on the page, implemented in `
 | 0.05 → 0.14 | Hero copy fades out and rises 40px | `textOpacity` 1→0, `textY` 0→-40 |
 | ≥ 0.12 | Hero copy stops taking clicks | `textPointer` "auto"→"none" |
 | 0.10 → 0.30 | Frames straighten from their initial tilt to a smaller one and drop 12svh into the space the copy left | per-frame `rotate`, `y` |
-| 0.12 → 0.20 | Pillar labels (CANVAS / BROWSER / AGENT) fade in | `labelOpacity` 0→1 |
+| 0.12 → 0.20 | Pillar labels (DRAFT / SEND / PROVE) fade in | `labelOpacity` 0→1 |
 | 0.36 → 0.42 | Labels fade out | `labelOpacity` 1→0 |
 | 0.36 → 0.60 | Frames converge (outer frames move ±16vw to the centre), go fully straight, rise to 10svh and scale 1→1.25 | `x`, `rotate`, `y`, `framesScale` |
 | 0.48 → 0.60 | Frames fade out | `framesOpacity` 1→0 |
@@ -37,9 +37,9 @@ Each frame is an entry in the `frames` array:
 
 | key | screen | aspect | rotate [initial, settled] | shift (converge) | position (mobile → `md`) |
 |---|---|---|---|---|---|
-| canvas | `CanvasScreen` | 1.1/1 | [-8°, -4°] | 0 → +16vw | `left-[7%] top-[26%] w-[32%]` → `md:left-[14%] md:top-[12%] md:w-[25%]` |
-| browser | `BrowserScreen` | 1.05/1 | [3°, 1°] | none | `left-[35%] top-[16%] w-[30%]` → `md:left-[40%] md:top-[6%] md:w-[20%]` |
-| agent | `AgentScreen` | 0.95/1 | [9°, 4°] | 0 → -16vw | `left-[61%] top-[28%] w-[32%]` → `md:left-[62%] md:top-[15%] md:w-[21%]` |
+| draft | `DraftScreen` | 1.1/1 | [-8°, -4°] | 0 → +16vw | `left-[7%] top-[26%] w-[32%]` → `md:left-[14%] md:top-[12%] md:w-[25%]` |
+| send | `SendScreen` | 1.05/1 | [3°, 1°] | none | `left-[35%] top-[16%] w-[30%]` → `md:left-[40%] md:top-[6%] md:w-[20%]` |
+| prove | `ProveScreen` | 0.95/1 | [9°, 4°] | 0 → -16vw | `left-[61%] top-[28%] w-[32%]` → `md:left-[62%] md:top-[15%] md:w-[21%]` |
 
 Positions are percentages of the frames container (`52svh` tall, max 1400px wide). The pillar label for each frame is `site.pillars[index]`, so the order of `frames` must match the order of `pillars`.
 

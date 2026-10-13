@@ -1,16 +1,17 @@
 import type { ReactNode } from "react"
 import { MetalDefs, MetalIcon, type MetalIconName } from "@/components/icons/MetalIcons"
 import {
-  AgentBuildChat,
-  AgentBuildWindow,
-  AgentDesignChat,
-  BrowserWindow,
-  CanvasEditor,
-  CaptureDemo,
-  CommentsDemo,
-  ExplorationsDemo,
-  InspectDemo,
-  PinDemo,
+  AuditDemo,
+  CertificateWindow,
+  DraftingWindow,
+  FieldEditorWindow,
+  OtpDemo,
+  ProposalDemo,
+  QuestionsDemo,
+  RoutingDemo,
+  SignersDemo,
+  SigningDemo,
+  VerifyDemo,
 } from "@/components/mockups/screens"
 import { Caption } from "@/components/ui/Caption"
 import { ChromeFrame } from "@/components/ui/ChromeFrame"
@@ -19,20 +20,21 @@ import { Inset, Section } from "@/components/ui/Section"
 import { site } from "@/content/site"
 
 const mainMockup: Record<string, ReactNode> = {
-  canvas: <CanvasEditor />,
-  browser: <BrowserWindow />,
-  agent: <AgentBuildWindow />,
+  draft: <DraftingWindow />,
+  send: <FieldEditorWindow />,
+  prove: <CertificateWindow />,
 }
 
 /** Demo kind → mockup and its panel aspect ratio. */
 const demos: Record<string, { node: ReactNode; aspect: string }> = {
-  explorations: { node: <ExplorationsDemo />, aspect: "16/9" },
-  comments: { node: <CommentsDemo />, aspect: "16/9" },
-  capture: { node: <CaptureDemo />, aspect: "16/9" },
-  inspect: { node: <InspectDemo />, aspect: "4/3" },
-  pin: { node: <PinDemo />, aspect: "4/3" },
-  "agent-build": { node: <AgentBuildChat />, aspect: "5/4.6" },
-  "agent-design": { node: <AgentDesignChat />, aspect: "5/4.6" },
+  questions: { node: <QuestionsDemo />, aspect: "16/9" },
+  proposal: { node: <ProposalDemo />, aspect: "4/3" },
+  signers: { node: <SignersDemo />, aspect: "4/3" },
+  signing: { node: <SigningDemo />, aspect: "16/9" },
+  otp: { node: <OtpDemo />, aspect: "4/3" },
+  routing: { node: <RoutingDemo />, aspect: "4/3" },
+  verify: { node: <VerifyDemo />, aspect: "4/3" },
+  audit: { node: <AuditDemo />, aspect: "4/3" },
 }
 
 type Demo = { kind: string; lead: string; text: string; wide?: boolean }

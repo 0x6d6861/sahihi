@@ -193,8 +193,8 @@
 
 /* Dark mode is <html data-theme="dark">: the system setting, or the D hotkey
    (ThemeHotkey.tsx). Text stays "one colour at fixed opacities", flipped to
-   white, so every grey keeps its role. Mockups keep their literal light
-   colours: they read as screenshots of a light app. */
+   white, so every grey keeps its role. Mockups follow the theme too, through
+   their own palette (see "Mockup palette" below). */
 :root[data-theme="dark"] {
   color-scheme: dark;
   --color-paper: #111111;
@@ -209,23 +209,6 @@
   --color-pill-raised-hover: #343434;
   --color-line: #2a2a2a;
 }
-/* Mockups stay light: their UI text uses the tokens, and white ink on their
-   light screens would vanish. Keep in step with the @theme values above. */
-[data-theme="dark"] .mockup {
-  color-scheme: light;
-  --color-paper: #f9f9f9;
-  --color-ink: rgb(0 0 0 / 0.96);
-  --color-muted: rgb(0 0 0 / 0.55);
-  --color-faint: rgb(0 0 0 / 0.36);
-  --color-ghost: rgb(0 0 0 / 0.19);
-  --color-panel: #efefef;
-  --color-pill: #ebebeb;
-  --color-pill-hover: #e0e0e0;
-  --color-pill-raised: #e3e3e3;
-  --color-pill-raised-hover: #d9d9d9;
-  --color-line: #e3e3e3;
-}
-
 /* Raised greys for visitors who ask for more contrast: faint and ghost are
    below WCAG minimums on paper in both schemes. */
 @media (prefers-contrast: more) {
@@ -310,7 +293,7 @@ body {
   overflow: hidden;
   height: 100%;
   border-radius: calc(clamp(18px, 2.4cqw, 34px) - clamp(4px, 0.55cqw + 3px, 8px));
-  background: #f1f1ef;
+  background: var(--mk-bg);
   box-shadow:
     inset 0 0 0 1px rgb(0 0 0 / 0.28),
     inset 0 0 0 2px rgb(255 255 255 / 0.35);
@@ -319,6 +302,62 @@ body {
 /* ── Mockup scaling: children size in `em`, root scales with frame ─ */
 .mockup {
   container-type: inline-size;
+}
+
+/* ── Mockup palette ────────────────────────────────────────────────
+   Mockups imitate the Sahihi app, which has light and dark themes (Arc's
+   neutral scale in apps/web/components/arc/foundation.css), so they switch
+   with the page. PDF paper is the exception: it stays white in both themes,
+   as it does in the app (.on-paper). */
+.mockup {
+  --mk-bg: #f7f7f7;
+  --mk-surface: #ffffff;
+  --mk-raised: #ffffff;
+  --mk-muted: #f1f1f1;
+  --mk-line: #e9e9e9;
+  --mk-text: #141414;
+  --mk-text-2: #5e5e5e;
+  --mk-text-3: #8a8a8a;
+  --mk-accent: #262626;
+  --mk-on-accent: #ffffff;
+  --mk-desk: #ededed;
+  --mk-shadow: 0 0.4em 1.4em rgb(0 0 0 / 0.08), 0 0.05em 0.2em rgb(0 0 0 / 0.05);
+  --mk-success: #15803d;
+  --mk-success-bg: #dcfce7;
+  --mk-info: #1d4ed8;
+  --mk-info-bg: #dbeafe;
+  --mk-warn: #b45309;
+  --mk-danger: #b91c1c;
+  --mk-danger-bg: #fee2e2;
+  /* Recipient colours (Recipient.colorIndex): mid tones that read on paper and on both themes. */
+  --mk-tone-0: #3b82f6;
+  --mk-tone-1: #16a34a;
+  --mk-tone-2: #d97706;
+  --mk-paper: #ffffff;
+  --mk-paper-ink: #1a1a1a;
+  --mk-paper-line: #dcdcdc;
+  --mk-paper-text: #6b6b6b;
+}
+[data-theme="dark"] .mockup {
+  --mk-bg: #1b1b1b;
+  --mk-surface: #212121;
+  --mk-raised: #282828;
+  --mk-muted: #2c2c2c;
+  --mk-line: #333333;
+  --mk-text: #f2f2f2;
+  --mk-text-2: #bdbdbd;
+  --mk-text-3: #8f8f8f;
+  --mk-accent: #e6e6e6;
+  --mk-on-accent: #141414;
+  --mk-desk: #161616;
+  --mk-shadow: 0 0.4em 1.4em rgb(0 0 0 / 0.45), 0 0.05em 0.2em rgb(0 0 0 / 0.3);
+  --mk-success: #4ade80;
+  --mk-success-bg: rgb(34 197 94 / 0.16);
+  --mk-info: #93c5fd;
+  --mk-info-bg: rgb(59 130 246 / 0.18);
+  --mk-warn: #fbbf24;
+  --mk-danger: #fca5a5;
+  --mk-danger-bg: rgb(239 68 68 / 0.18);
 }
 /* Set --mk on a mockup to change how big its UI reads (1.35 ≈ full-width window). */
 .mockup-root {

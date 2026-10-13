@@ -136,6 +136,9 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
 - [x] Bulk send, public API + API keys, embedded signing (docs/public-api.md, docs/bulk-send.md,
       docs/embedded-signing.md, ADR 0017)
 - [ ] SMS/WhatsApp delivery of signing links (Africa's Talking)
+- [x] Marketing site (`apps/website`): real Sahihi copy, theme-aware HTML mockups of the app, trust facts,
+      plans by monthly limits, MDX security/privacy/terms pages, social card, sitemap (apps/website/docs/)
+- [ ] Marketing site launch: real domains in `site.ts`, legal-reviewed privacy, terms and FAQ answer
 - Automatic field detection, local only (ADR 0020):
   - [x] Import the PDF's own form fields (AcroForm) as suggested fields, roles from field names
   - [x] Anchor tags (`{{s1:signature}}`) on the text layer (PDFium WASM, `docs/pdf-pipeline.md`)

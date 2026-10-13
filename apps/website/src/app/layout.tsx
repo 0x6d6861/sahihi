@@ -32,8 +32,15 @@ const mono = localFont({
 })
 
 export const metadata: Metadata = {
+  metadataBase: new URL(site.url),
   title: site.title,
   description: site.description,
+  openGraph: {
+    title: site.title,
+    description: site.description,
+    siteName: site.name,
+    type: "website",
+  },
 }
 
 export const viewport: Viewport = {

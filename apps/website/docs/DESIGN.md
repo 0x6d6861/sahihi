@@ -1,6 +1,6 @@
 # Design system
 
-The page should feel like a gallery or a hardware catalogue: one neutral off-white surface, large tight type, almost no colour, and product UI that sits in polished-metal frames. Colour comes only from the "photos" inside the mockups.
+The page should feel like a gallery or a hardware catalogue: one neutral off-white surface, large tight type, almost no colour, and product UI that sits in polished-metal frames. Colour comes only from inside the mockups: recipient colours, status pills and signatures.
 
 All tokens are defined in `src/app/globals.css`. If a value you need isn't here, add a token rather than hard-coding it in a section.
 
@@ -23,7 +23,7 @@ The page follows the visitor's system setting until they press **D**, which togg
 | line | `#2a2a2a` |
 
 Rules:
-- **Mockups stay light.** `.mockup` (every `ChromeFrame` and demo panel) re-declares the light token values, because mockup text uses the tokens and would turn white on the light screens. They read as screenshots of a light app. If you change a light token, change its copy in that `.mockup` block too.
+- **Mockups follow the theme**, like the real Sahihi app. They take their colours from the mockup palette (`--mk-*` on `.mockup` in `globals.css`, redefined under `[data-theme="dark"] .mockup`), copied from Arc's neutral scale in `apps/web/components/arc/foundation.css`. Use `bg-(--mk-surface)`, `text-(--mk-text-2)` and the rest inside mockups, not the page tokens. **PDF paper stays white in both themes** (`--mk-paper*`), as `.on-paper` does in the app.
 - The chrome bezel and metal icons are unchanged; silver reads well on dark.
 - `bg-ink text-paper` (the featured pricing CTA) inverts on its own. Use `hover:bg-ink/80`, not `hover:bg-black/…`.
 - Any literal colour outside a mockup needs a `dark:` variant, as on the context-card chips and code colours in `ContextRow.tsx`.
@@ -34,8 +34,8 @@ Rules:
 | paper | `#f9f9f9` | — | `bg-paper` | Page background, everywhere, with no exceptions (`#111111` in dark mode) |
 | ink | `rgb(0 0 0 / 0.96)` | `#0a0a0a` | `text-ink` / `bg-ink` | Primary text, the one dark button (featured pricing CTA) |
 | muted | `rgb(0 0 0 / 0.55)` | `#707070` | `text-muted` | Secondary text: subtitles, the grey half of captions, process lines, plan details, mono labels |
-| faint | `rgb(0 0 0 / 0.36)` | `#9f9f9f` | `text-faint` | Eyebrows ("Design canvas"), list dashes |
-| ghost | `rgb(0 0 0 / 0.19)` | `#c9c9c9` | `text-ghost` | The big "Canvas. Browser. Agent." stack only |
+| faint | `rgb(0 0 0 / 0.36)` | `#9f9f9f` | `text-faint` | Eyebrows ("Drafting assistant"), list dashes |
+| ghost | `rgb(0 0 0 / 0.19)` | `#c9c9c9` | `text-ghost` | The big "Draft. Send. Prove." stack only |
 | panel | `#efefef` | — | `bg-panel` | Demo panels, quote cards, pricing cards, provider cards |
 | pill | `#ebebeb` → hover `#e0e0e0` | — | `bg-pill` | Primary button |
 | pill-raised | `#e3e3e3` → hover `#d9d9d9` | — | `bg-pill-raised` | A grey button on a `bg-panel` card (non-featured pricing CTA) |
@@ -45,7 +45,7 @@ Rules:
 Rules:
 - Never put a coloured background on a section.
 - Never use a brand-coloured button. The primary button is grey, and only the featured pricing CTA is ink.
-- Inside mockups, the sample-app colours come from `sampleApp.categories` and `item.photo`.
+- Inside mockups, recipient colours come from `--mk-tone-0…2` (picked by `recipient.tone`), status colours from `--mk-success`/`--mk-info`.
 
 ## Typography
 
@@ -75,8 +75,8 @@ Sizes are **stepped, not fluid**: one size below 768px and one from 768px up, ma
 |---|---|---|---|---|---|
 | `text-display` | 48/44 | 96/88 | -0.035em | 500 | Hero h1, process headline |
 | `text-headline` | 44/44 | 88/88 | -0.035em | 500 | Chapter headlines, the pillar stack |
-| `text-title` | 40/40 | 64/64 | -0.035em | 500 | Testimonials, Pricing, FAQ headlines |
-| `text-quote` | 32/36 | 48/52 | -0.03em | 500 | Testimonial quotes |
+| `text-title` | 40/40 | 64/64 | -0.035em | 500 | Trust, Pricing, FAQ headlines |
+| `text-quote` | 32/36 | 48/52 | -0.03em | 500 | Trust facts |
 | `text-numeral` | 112/112 | 184/184 | -0.035em | 500 | Process numbers 1–4. Keep line-height equal to font size; shorter clips the glyph |
 | `text-step` | 24/28 | 28/32 | -0.06px | 500 | Process step titles |
 | `text-price` | 64/64 | 96/96 | -0.035em | 400 | Plan prices |
@@ -86,7 +86,7 @@ Sizes are **stepped, not fluid**: one size below 768px and one from 768px up, ma
 | `text-eyebrow` | 24/28 | 28/32 | -0.02em | 500, faint | Label above a chapter headline |
 | `text-nav` | 18/18 | 24/24 | -0.01em | 500 | Header links |
 | `text-button` | 18/22 | 20/24 | -0.01em | 500 | Button and CTA labels |
-| `text-label` | 14/20 mono | same | 0.18em, uppercase | 400, muted | Device labels such as "CANVAS" |
+| `text-label` | 14/20 mono | same | 0.18em, uppercase | 400, muted | Device labels such as "DRAFT" |
 
 "context" in the Weight column means the class sets no weight: ink text inherits 500, and grey text adds `font-normal`.
 
@@ -112,7 +112,7 @@ Smaller variants (feature grid, context cards) use the same pattern with `text-c
 - **Space between sections:** `pb-48` (192px). Sections never have borders or backgrounds.
 - **Wider grids:** the Process steps (`max-w-[1024px]`) and the context cards (`max-w-[1000px]`) break out of `Inset` so their larger text doesn't wrap word by word.
 - **Radii:** demo and quote panels use 28–32px, buttons 16px (`rounded-2xl`), context cards 24px (`rounded-3xl`).
-- **Grids:** demos use `sm:grid-cols-2`, with `wide: true` spanning both columns. Features use 1 → 2 → 3 columns. Testimonials use a 12-column bento at `md`.
+- **Grids:** demos use `sm:grid-cols-2`, with `wide: true` spanning both columns. Features use 1 → 2 → 3 columns. Trust facts use a 12-column bento at `md`.
 
 ## Components
 

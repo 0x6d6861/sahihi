@@ -2,7 +2,7 @@
 
 import { type MotionValue, motion, useScroll, useTransform } from "motion/react"
 import { type ReactNode, useRef } from "react"
-import { AgentScreen, AppWindow, BrowserScreen, CanvasScreen } from "@/components/mockups/screens"
+import { AppWindow, DraftScreen, ProveScreen, SendScreen } from "@/components/mockups/screens"
 import { ArrowLink, PillButton } from "@/components/ui/Button"
 import { ChromeFrame } from "@/components/ui/ChromeFrame"
 import { useSafeReducedMotion } from "@/components/ui/useSafeReducedMotion"
@@ -19,24 +19,24 @@ import { site } from "@/content/site"
 
 const frames = [
   {
-    key: "canvas",
-    screen: <CanvasScreen />,
+    key: "draft",
+    screen: <DraftScreen />,
     aspect: "1.1/1",
     pos: "left-[7%] top-[26%] w-[32%] md:left-[14%] md:top-[12%] md:w-[25%]",
     rotate: [-8, -4],
     shift: ["0vw", "16vw"],
   },
   {
-    key: "browser",
-    screen: <BrowserScreen />,
+    key: "send",
+    screen: <SendScreen />,
     aspect: "1.05/1",
     pos: "left-[35%] top-[16%] w-[30%] md:left-[40%] md:top-[6%] md:w-[20%]",
     rotate: [3, 1],
     shift: ["0vw", "0vw"],
   },
   {
-    key: "agent",
-    screen: <AgentScreen />,
+    key: "prove",
+    screen: <ProveScreen />,
     aspect: "0.95/1",
     pos: "left-[61%] top-[28%] w-[32%] md:left-[62%] md:top-[15%] md:w-[21%]",
     rotate: [9, 4],
@@ -142,8 +142,6 @@ function HeroCopy() {
         <ArrowLink href={site.cta.secondary.href}>{site.cta.secondary.label}</ArrowLink>
       </div>
       <p className="mt-5 flex items-center gap-2 text-[1rem] font-normal leading-6 text-muted md:text-[1.125rem]">
-        <span className="size-3 rounded-full bg-[conic-gradient(#e46b3a,#f6b26b,#e46b3a)]" />
-        <span className="size-3 rounded-full bg-[conic-gradient(#6b7cf6,#a5b4fc,#6b7cf6)]" />
         {site.hero.worksWith}
       </p>
     </>
