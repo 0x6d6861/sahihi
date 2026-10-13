@@ -12,6 +12,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 The fully static marketing site for Sahihi, the e-signature product in this monorepo: a landing page plus MDX developer, security, privacy and terms pages. It is quiet, near-monochrome and product-led, modelled on the layout of subframe.com, with coded recreations of the Sahihi app (no screenshots). Read this file first, then the doc for the area you are changing.
 
+**The site follows the product.** When a feature in the app is added, changed or removed, the matching copy, coded screen, pricing, `/developers` or `/security` content changes with it, in the same piece of work. The map from kind of change to place on the site is in the root `AGENTS.md` → "Keep the website in step".
+
 ## Docs map
 
 | Read this | When you are… |

@@ -10,5 +10,8 @@ argument-hint: "[optional roadmap item text to target]"
    defaults (docs/ui.md), and API changes follow the security checklist (docs/security.md).
 4. Add or extend tests for any pure logic.
 5. Run `bun test && bun run typecheck && bun run lint` and fix failures.
-6. Tick the roadmap item and update the docs if behaviour changed. Summarise what changed and any
-   follow-ups.
+6. Tick the roadmap item and update the docs if behaviour changed.
+7. If customers would notice the change, update the marketing site in the same piece of work
+   (AGENTS.md → "Keep the website in step": copy, coded screens, pricing, /developers, /security)
+   and run its gate (`apps/website`: typecheck, build, shots). Only claims true today.
+8. Summarise what changed, what changed on the website (or why nothing did), and any follow-ups.
