@@ -12,7 +12,14 @@
 
 :root {
   /* Field edges must reach 3:1 against every surface (WCAG 1.4.11, docs/ui.md); Arc's default is 1.75:1. */
-  --border-strong: oklch(64% 0 0);
+  --border-strong: oklch(62% 0 0);
+
+  /* Depth in light mode (docs/ui.md → Surfaces): Arc's page, cards and raised layers are all white, so
+     the app shell paints its pages on an off-white canvas and white panels sit on it. The grey fills
+     (search, tiles, tracks) step down one so they still read on the canvas. Dark mode is layered
+     already: the canvas is its background. */
+  --canvas: oklch(98.4% 0 0);
+  --surface-muted: var(--neutral-3);
   --font-sans: var(--font-body);
   --font-heading: var(--font-display);
 
@@ -67,10 +74,17 @@
 
 .dark,
 :root[data-theme="dark"] {
+  --canvas: var(--background);
+  --surface-muted: oklch(26% 0 0);
   --border-strong: oklch(54% 0 0);
   --destructive: oklch(54% 0.21 25);
   --warning-foreground: var(--warning);
   --info-foreground: oklch(78% 0.12 255);
+}
+
+/* The app shell's page area (components/app/app-shell). A plain class: `--canvas` isn't a Tailwind colour. */
+.app-canvas {
+  background-color: var(--canvas);
 }
 
 body {

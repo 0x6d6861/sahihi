@@ -117,16 +117,35 @@ re-check with an OKLCH contrast calculator before changing one.
 | Pair | Light | Dark | Needs |
 |---|---|---|---|
 | `foreground` on `background` | 19.7:1 | 16.4:1 | 4.5:1 |
-| `muted-foreground` on `background` / on `muted` | 7.1 / 6.7 | 8.9 / 7.5 | 4.5:1 |
+| `muted-foreground` on `background` / on the canvas / on `muted` | 7.1 / 6.8 / 6.3 | 8.9 / 8.9 / 7.5 | 4.5:1 |
 | White on `destructive` (solid danger fill) | 5.6 | 5.6 | 4.5:1 |
 | `destructive-foreground` / `success-foreground` / `warning-foreground` / `info-foreground` on `background` | 5.6 / 5.5 / 6.2 / 6.6 | 7.0 / 9.9 / 10.7 / 9.2 | 4.5:1 |
 | `primary-foreground` on `primary` (primary button) | 19.7 | 16.4 | 4.5:1 |
-| `input` / `--border-strong` (field edges) against `background` | 3.4 | 3.7 | 3:1 (1.4.11) |
+| `input` / `--border-strong` (field edges) against `background` | 3.6 | 3.7 | 3:1 (1.4.11) |
 | Keyboard focus ring against `background` | 16.5 | 14.1 | 3:1 |
 
 Arc's default field edge (`--border-strong`) is only 1.75:1, so `app.css` raises it to
-`oklch(64% 0 0)` / `oklch(54% 0 0)`, which clears 3:1 on muted and raised surfaces too. Card and
+`oklch(62% 0 0)` / `oklch(54% 0 0)`, which clears 3:1 on muted (3.2) and raised surfaces too. Card and
 divider `border`s are decorative and may stay lighter.
+
+### Surfaces and shadows (ADR 0051)
+
+- **Canvas.** In light mode Arc's page, cards and raised layers are all white, so the app shell paints
+  its page area with `--canvas` (`oklch(98.4% 0 0)`, the `.app-canvas` class in `app.css`) and
+  `Panel`s, tables and folder cards stay white on it. `--background` stays white (fields, the top
+  bar, public pages). Grey fills (`--surface-muted` / `bg-muted`) are one step darker in light mode
+  (`--neutral-3`) so search fields, tiles and tracks still read on the canvas. In dark mode the canvas
+  is the background: Arc's dark surfaces are layered already. The paper (`.on-paper`) is unchanged.
+- **Shadows come from Arc's three levels only**, as `shadow-(--shadow-…)`, never Tailwind's
+  `shadow-sm` / `shadow-lg` (too faint in dark mode):
+  - `--shadow-resting`: the active item of `PillNav`, the stack behind a dragged item.
+  - `--shadow-raised`: the top bar once the page scrolls under it; a waiting question card in the
+    drafting chat; file cards, folder cards and Drafting tiles on hover, only where hover is real
+    (`[@media(hover:hover)]:`).
+  - `--shadow-floating`: things over the page: the selection bar, the drag chip and the drop hint.
+  - Panels have no shadow: they rest on a border (Arc's composition rule).
+- **Unread** is one colour: the Inbox count and the unread dot in Notifications are both info blue.
+  Green and amber mean status.
 
 ## Screen → components map
 
@@ -134,7 +153,7 @@ Arc unless marked coss or Extend.
 
 | Screen | Components |
 |---|---|
-| App shell | Top bar (ADR 0026): Sahihi mark + Arc `DropdownMenu` workspace switcher (check on the current one, "New workspace") on the left; All files / Drafting / Inbox as a segmented pill (ADR 0041; document, envelope, template and bulk-send pages light up All files or Inbox, the AI document pages Drafting, `isNavActive`) in the middle (`PillNav`, shared with the draft editor's steps) (`bg-muted` track, raised `bg-background` active pill gliding with Motion `layoutId`, instant with reduced motion; own full-width row below `md`, labels only below `sm`); an Arc `Badge` with the unread count on the Inbox item (`UnreadCountProvider`, docs/notifications.md) and Arc `UserMenu` avatar on the right (Settings, Light / Dark / System, sign out). Settings is only in the user menu |
+| App shell | Top bar (ADR 0026): Sahihi mark (`LogoMark` in `components/app/logo.tsx`, the website's ※ in the text colour; `app/icon.svg` is the tab icon; the auth pages show it too) + Arc `DropdownMenu` workspace switcher (check on the current one, "New workspace") on the left; All files / Drafting / Inbox as a segmented pill (ADR 0041; document, envelope, template and bulk-send pages light up All files or Inbox, the AI document pages Drafting, `isNavActive`) in the middle (`PillNav`, shared with the draft editor's steps) (`bg-muted` track, raised `bg-background` active pill gliding with Motion `layoutId`, instant with reduced motion; own full-width row below `md`, labels only below `sm`); an Arc `Badge` with the unread count on the Inbox item (`UnreadCountProvider`, docs/notifications.md) and Arc `UserMenu` avatar on the right (Settings, Light / Dark / System, sign out). Settings is only in the user menu |
 | Route states | `EmptyState` (error, not found), `Skeleton` (loading) |
 | Auth pages, onboarding, accept invitation | `Panel`, `Input`, `PasswordField`, `Button`, `Alert` |
 | All files (`/files`, home, ADR 0038) | The first nav item and where sign-in, onboarding and a workspace switch land. Envelope quota `Alert` under the header when close to or at the limit (moved here from the old Envelopes list, ADR 0041). The old Documents, Envelopes and Templates lists redirect here with `?type=`. Header (`FolderBreadcrumb` inside a folder, `FolderHeading` with the folder's colour dot and tags, count line "3 items, 2 folders") with Create folder, New envelope (in the open folder) and Upload document. `FilesToolbar` on `ListSearch`: "Search documents, envelopes, templates and folders", chips Type / Status / People / Added / Tags / Color, List / Grid (`sahihi-files-layout` cookie). Status lists envelope stages, a separator, then document states (`ChipOption.separatorBefore`); picking one sets Type too. Folders: `FolderCards` (grid) or `FolderRows` (list, first page) from `components/app/folders/folder-section.tsx`; only while not filtering, or for a search, tag or colour. Grid: each item's own card (`DocumentCard`, `EnvelopeCard`, `TemplateCard`). List: `Panel` + coss `Table`, one line per row, never a second line in a cell (Name with the type mark, colour dot, status icon and tags; Details from `lg`, truncated with the full text on hover (`DetailsCell`: "Document" / "Envelope · recipients · 2 of 3 signed" / "Template · document", a folder's contents); Owner as `Person`; Added; the type's own ⋮ menu). Empty: the upload drop zone; no matches: `EmptyState` |
@@ -158,7 +177,7 @@ Arc unless marked coss or Extend.
 | Settings / data | `Panel` (retention `Select`, exports coss `Table` + `Badge`, danger zone), `ConfirmDialog` + `Input` (typed confirmation) |
 | Settings / API (and webhooks) | coss `Table` + `Badge` (keys, deliveries), `Dialog` + `Checkbox` list + `RadioGroup` (create key), `Dialog` + `Checkbox` list (webhook events), `Switch` (endpoint active), `DropdownMenu` (test, edit, rotate, delete), `ConfirmDialog` (revoke, rotate, delete), `Alert` + `CopyButton` (secret shown once), `Textarea` (embed origins) |
 | Bulk send | Page header ("Bulk send", from which template), then one `Panel` per step (Prepare a CSV, Upload it with Extend `FileUpload` parsed in the browser and `Alert` problems / ready, Check and send with `Input`, `Textarea`, coss `Table` preview); the send button says why it's disabled. Batch page: "Bulk send: <template>", `Progress` + coss `Table` + `Badge` per row |
-| Inbox (`/inbox`, ADR 0041) | Header `h1` + line linking Settings → Notifications; Arc `Tabs` through `?tab=` (Notifications with the unread count / Workspace activity / Bulk sends). Every tab starts with `ListSearch` (filled search + chips + Clear filters, no List / Grid). Notifications: chips Status (Unread / Read) / Type / Date; `Panel` with a strip ("2 unread" / "All read" from the badge count, hidden while filtering; ghost `Button`s Mark all read / Clear read), a `divide-y` list (tone dot while unread, title, body, time; secondary `Button` "Open …" on wide rows + ⋮ Arc `DropdownMenu`: Open, Mark read/unread, Dismiss), "Load more"; `EmptyState` (nothing yet, or no matches + Clear search and filters). Workspace activity: chips Type (Signing / Sending / System) / People / Date; Arc `Timeline` in a `Panel` (icons and tones shared with the envelope Activity tab, `auditTimelineStyle`; meta = envelope title · by actor; expands to a link), "Load more". Bulk sends: chip Status (In progress / Finished / With failures); Arc `SortableDataTable` (`BulkSendsTable`), or `EmptyState` + Go to templates |
+| Inbox (`/inbox`, ADR 0041) | Header `h1` + line linking Settings → Notifications; Arc `Tabs` through `?tab=` (Notifications with the unread count / Workspace activity / Bulk sends). Every tab starts with `ListSearch` (filled search + chips + Clear filters, no List / Grid). Notifications: chips Status (Unread / Read) / Type / Date; `Panel` with a strip ("2 unread" / "All read" from the badge count, hidden while filtering; ghost `Button`s Mark all read / Clear read), a `divide-y` list (info dot while unread, title, body, time; secondary `Button` "Open …" on wide rows + ⋮ Arc `DropdownMenu`: Open, Mark read/unread, Dismiss), "Load more"; `EmptyState` (nothing yet, or no matches + Clear search and filters). Workspace activity: chips Type (Signing / Sending / System) / People / Date; Arc `Timeline` in a `Panel` (icons and tones shared with the envelope Activity tab, `auditTimelineStyle`; meta = envelope title · by actor; expands to a link), "Load more". Bulk sends: chip Status (In progress / Finished / With failures); Arc `SortableDataTable` (`BulkSendsTable`), or `EmptyState` + Go to templates |
 
 ## Extend specifics
 
@@ -275,7 +294,7 @@ use `DragRow` / `DragCard`, the checkbox column `SelectCell` / `SelectHead`, cru
 rows and cards, so shared folder components work on every page.
 
 - Mouse drags start after 6 px, touch drags after a 250 ms press; a drag on a selected item takes
-  the selection. The overlay chip is `bg-popover` with `shadow-lg`; a dragged item fades to 50 %.
+  the selection. The overlay chip is `bg-popover` with `--shadow-floating`; a dragged item fades to 50 %.
 - Dropping onto a file (not a folder) puts both in a new "New folder" next to it (`POST
   /files/group`); the file highlights like a folder does.
 - A valid drop target shows `ring-2 ring-ring` (plus `bg-accent` on rows). Invalid targets (a

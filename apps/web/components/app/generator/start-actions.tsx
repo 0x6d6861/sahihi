@@ -102,7 +102,8 @@ export function StartCard({
     <li
       className={cn(
         "group relative isolate flex min-h-36 min-w-0 flex-col gap-3 rounded-2xl bg-muted p-4",
-        "transition-[scale] duration-150 ease-out motion-safe:has-[>button:active:not(:disabled)]:scale-[0.985]",
+        "transition-[scale,box-shadow] duration-150 ease-out motion-safe:has-[>button:active:not(:disabled)]:scale-[0.985]",
+        "[@media(hover:hover)]:has-[>button:hover:not(:disabled)]:shadow-(--shadow-raised)",
         // Hover tone: a foreground tint under the content, as on the file cards, in both themes.
         "before:-z-10 before:pointer-events-none before:absolute before:inset-0 before:rounded-2xl before:bg-foreground/0 before:transition-colors has-[>button:hover:not(:disabled)]:before:bg-foreground/5",
         "has-[>button:focus-visible]:ring-2 has-[>button:focus-visible]:ring-ring",

@@ -73,12 +73,6 @@ function filterChips(f: NotificationFilters): SearchChip[] {
   ]
 }
 
-const TONE_DOT = {
-  info: "bg-info",
-  success: "bg-success",
-  warning: "bg-warning",
-} as const
-
 /**
  * The Inbox's notifications (docs/notifications.md → Inbox): yours, in the active workspace, newest
  * first, 50 at a time with "Load more", narrowed by a search (names and titles) and Status / Type /
@@ -302,7 +296,8 @@ export function NotificationList({
                     aria-hidden
                     className={cn(
                       "mt-1.5 size-2 shrink-0 rounded-full",
-                      isUnread ? TONE_DOT[view.tone] : "bg-transparent",
+                      // One colour means unread, as on the Inbox count; green and amber mean status.
+                      isUnread ? "bg-info" : "bg-transparent",
                     )}
                   />
                   <div className="flex min-w-0 flex-1 flex-col gap-0.5">

@@ -211,7 +211,7 @@ function ActiveQuestions({
   return (
     <section
       aria-label="Questions from the assistant"
-      className="overflow-hidden rounded-2xl border border-info/50 bg-card shadow-sm"
+      className="overflow-hidden rounded-2xl border border-info/50 bg-card shadow-(--shadow-raised)"
     >
       <header className="flex flex-col gap-1.5 px-4 pt-3.5 pb-1">
         <div className="flex items-center justify-between gap-3">

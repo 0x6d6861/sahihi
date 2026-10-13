@@ -81,7 +81,7 @@ function PillNavEntry({
         <motion.span
           layoutId={layoutId}
           aria-hidden
-          className="absolute inset-0 -z-10 rounded-full bg-background shadow-sm"
+          className="absolute inset-0 -z-10 rounded-full bg-background shadow-(--shadow-resting)"
           transition={reduced ? { duration: 0 } : motionTokens.spring.snappy}
         />
       )}

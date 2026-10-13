@@ -101,7 +101,7 @@ function TopBar({ active = "All files" }: { active?: string }) {
     ["inbox", "Inbox"],
   ]
   return (
-    <div className="relative flex h-[4.45em] shrink-0 items-center gap-[0.9em] border-b border-(--dm-line) px-[1.65em]">
+    <div className="relative flex h-[4.45em] shrink-0 items-center gap-[0.9em] border-b border-(--dm-line) bg-(--dm-card) px-[1.65em]">
       <Logo />
       <span className="h-[1.4em] w-px bg-(--dm-line)" />
       <span className="flex h-[2.5em] items-center gap-[0.55em] rounded-full border border-(--dm-line) px-[0.85em] text-[0.97em]">
@@ -148,7 +148,7 @@ const stateIcon: Record<string, ReactNode> = {
 
 export function FilesScreen() {
   return (
-    <>
+    <div className="flex h-full flex-col bg-(--dm-canvas)">
       <TopBar />
       <div className="mx-auto flex w-[75.5%] flex-col pt-[2.2em]">
         <div className="flex items-start justify-between">
@@ -188,17 +188,19 @@ export function FilesScreen() {
             <span className="px-[0.85em] py-[0.35em] text-(--dm-text-3)">Grid</span>
           </span>
         </div>
-        <div className="mt-[2.2em] rounded-[1.95em] border border-(--dm-line) px-[0.85em] pb-[0.85em]">
-          <div className="grid h-[3.6em] grid-cols-[2.4em_1fr_10.8em_9.6em_1.6em] items-center px-[0.9em] text-[0.97em] text-(--dm-text-2)">
+        <div className="mt-[2.2em] rounded-[1.95em] border border-(--dm-line) bg-(--dm-card) px-[0.85em] pb-[0.85em]">
+          {/* Font size on the labels, not the row: the columns are in em and must match the rows'. */}
+          <div className="grid h-[3.6em] grid-cols-[2.4em_1fr_15em_10.8em_9.6em_1.6em] items-center px-[0.9em] text-(--dm-text-2) [&>span]:text-[0.97em]">
             <Check />
             <span>Name</span>
+            <span>Details</span>
             <span>Owner</span>
             <span>Added</span>
           </div>
           {sample.files.map((f) => (
             <div
               key={f.name}
-              className="grid h-[3.8em] grid-cols-[2.4em_1fr_10.8em_9.6em_1.6em] items-center border-t border-(--dm-line) px-[0.9em]"
+              className="grid h-[3.5em] grid-cols-[2.4em_1fr_15em_10.8em_9.6em_1.6em] items-center border-t border-(--dm-line) px-[0.9em]"
             >
               <Check />
               <span className="flex min-w-0 items-center gap-[0.85em]">
@@ -209,14 +211,12 @@ export function FilesScreen() {
                 ) : (
                   <Icon name="mail" className="text-[1.2em] text-(--dm-text-2)" />
                 )}
-                <span className="min-w-0">
-                  <span className="flex items-center gap-[0.45em] text-[0.97em]">
-                    <span className="truncate">{f.name}</span>
-                    {stateIcon[f.state]}
-                  </span>
-                  <span className="block truncate text-[0.8em] text-(--dm-text-2)">{f.sub}</span>
+                <span className="flex min-w-0 items-center gap-[0.45em] text-[0.97em]">
+                  <span className="truncate">{f.name}</span>
+                  {stateIcon[f.state]}
                 </span>
               </span>
+              <span className="truncate pe-[1em] text-[0.97em] text-(--dm-text-2)">{f.sub}</span>
               <span className="flex items-center gap-[0.5em] text-[0.97em] text-(--dm-text-2)">
                 <Avatar small />
                 {sample.user.name}
@@ -227,7 +227,7 @@ export function FilesScreen() {
           ))}
         </div>
       </div>
-    </>
+    </div>
   )
 }
 
@@ -258,7 +258,7 @@ function ViewerBar({ page, zoom }: { page: string; zoom: string }) {
 
 export function EnvelopeScreen() {
   return (
-    <>
+    <div className="flex h-full flex-col bg-(--dm-canvas)">
       <TopBar />
       <div className="mx-auto flex w-[75.5%] flex-col pt-[2.6em]">
         <p className="flex items-center gap-[0.6em] text-[0.97em]">
@@ -327,7 +327,7 @@ export function EnvelopeScreen() {
           </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }
 
