@@ -118,12 +118,24 @@ Readers (`packages/pdf/src/import/`) turn a file into neutral blocks; `importCon
   - Left out: tracked deletions (insertions are kept), text boxes, field codes (their result is
     kept), headers, footers, footnotes, comments and images. Alignment, fonts, colours, nesting
     and merged cells have no place in the draft model.
-- **PDF** (`readPageText`, then `pdfTextToBlocks`): headers and footers repeated on most pages and
-  page numbers are dropped; lines that run on are joined and words hyphenated across a line break
-  mended; short numbered lines ("3. Payment"), "Article 4" / "Clause 2" lines and short
-  all-capitals lines are headings, and a title-like first line is the title; sub-clauses ("3.1 …")
-  stay paragraphs with their number; bullets and lettered items are list items. Tables come in as
-  paragraphs.
+- **PDF** (`readPageText(bytes, { styles: true })`, then `pdfTextToBlocks`; ADR 0052):
+  - **Styles:** PDFium reads each text object's font once: bold from its name ("…-Bold",
+    "Semibold", "Black"), weight, ForceBold flag or fill-and-stroke "fake bold"; italic from its
+    name ("Italic", "Oblique"), Italic flag, italic angle or a slanted matrix; and its size.
+    Underline is a thin rule (≤ 1.5 pt) drawn just under the baseline (within 0.4 × the size) and
+    no wider than the words above it plus a character, so table borders and signature lines
+    aren't. Bold, italic and underline stay on their words, through joined lines; a space between
+    two words of one style takes that style.
+  - **Structure:** headers and footers repeated on most pages and page numbers are dropped; lines
+    that run on are joined and words hyphenated across a line break mended. Headings are short
+    numbered lines ("3. Payment"), "Article 4" / "Clause 2" lines, short all-capitals lines, and
+    short lines set at least 15% larger than the text or in bold where the text isn't (not when
+    the next line carries on in lower case, or when the paragraph above runs on into it). A
+    heading keeps its number as its `label` ("3.", "2.1"). The first line is the title when it
+    reads like one, or when it's the largest on the first page and larger than the text.
+    Sub-clauses ("3.1 …") stay paragraphs with their number unless they're styled as headings.
+    Bullets (including Word's Symbol / Wingdings bullets) and lettered items are list items, the
+    letter kept as `label` ("(a)", "ii)"). Tables come in as paragraphs.
 - **Both:** fill-in lines ("Signature: ______") and bare signing captions ("Signature", "Date")
   are dropped, since signature blocks come from the Signers tab. The first short heading is the
   title, unless it carries a number (otherwise the file's name); each heading starts a section,

@@ -144,8 +144,9 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
 ## Later
 
 - [ ] **CA integration** via `SigningProvider` (PAdES-B-LT), see `docs/certificates.md`
-- [x] DOCX → PDF conversion on upload (LibreOffice in the worker; ADR 0052). Word imports into
-  Drafting keep style-based emphasis, Word's numbering and header rows
+- [x] DOCX → PDF conversion on upload (LibreOffice in the worker; ADR 0052). Word and PDF imports
+  into Drafting keep their bold, italic and underline, headings and numbering (Word: also
+  style-based emphasis and header rows)
 - [x] Bulk send, public API + API keys, embedded signing (docs/public-api.md, docs/bulk-send.md,
       docs/embedded-signing.md, ADR 0017)
 - [ ] SMS/WhatsApp delivery of signing links (Africa's Talking)

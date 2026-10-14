@@ -1,4 +1,10 @@
-import { ImportError, type ImportedBlock, MAX_IMPORT_BYTES, pdfTextToBlocks } from "@sahihi/core"
+import {
+  ImportError,
+  type ImportedBlock,
+  MAX_IMPORT_BYTES,
+  type PageText,
+  pdfTextToBlocks,
+} from "@sahihi/core"
 import { inspectPdf, PdfInspectionError } from "../parse/inspect"
 import { readPageText } from "../parse/page-text"
 import { readDocxBlocks } from "./docx"
@@ -44,12 +50,13 @@ export async function readForImport(
     }
     throw new ImportError("unsupported")
   }
-  let pages: string[]
+  let pages: PageText[]
   try {
-    pages = (await readPageText(bytes)).map((p) => p.text)
+    // With styles: bold, italic, underline and sizes come through (docs/ai-documents.md → Import).
+    pages = await readPageText(bytes, { styles: true })
   } catch {
     throw new ImportError("unsupported")
   }
-  if (!pages.some((p) => p.trim())) throw new ImportError("no_text")
+  if (!pages.some((p) => p.text.trim())) throw new ImportError("no_text")
   return { format, blocks: pdfTextToBlocks(pages) }
 }

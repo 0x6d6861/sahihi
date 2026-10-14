@@ -1,4 +1,4 @@
-# 0052: Word documents: converted to PDF on upload, imported as Word shows them
+# 0052: Word documents converted on upload; imports keep their styling
 
 - **Status:** accepted
 - **Date:** 2026-10-14
@@ -53,6 +53,14 @@ item numbered "1." (Sahihi prints "(a)") a paragraph starting with "1.". Merged 
 columns and header rows become header cells. A document with no heading styles gets headings from
 short bold or capitalised lines, and a short centred or bold first line becomes the title.
 
+**PDF imports get the same treatment, from how the text looks.** `readPageText(…, { styles: true })`
+returns style spans: bold and italic from each text object's font (name, weight, flags, italic
+angle, fake bold, a slanted matrix), the size, and underline from thin rules drawn just under the
+words. `pdfTextToBlocks` keeps the marks on their words, takes headings from text set larger or
+in bold (where the body isn't), the title from the largest first line, and keeps heading numbers
+and list letters as labels, so the same "the source's number stays" rule applies. Styles cost
+about a second for 400,000 characters, well past the import's 60,000-character limit.
+
 ## Consequences
 - The worker image needs LibreOffice and metric-compatible fonts (docs/pdf-pipeline.md → Word
   uploads); without them Word uploads fail with "can't be converted right now".
@@ -64,4 +72,8 @@ short bold or capitalised lines, and a short centred or bold first line becomes 
 - Imported documents keep more literal numbers in their text; those don't renumber when the person
   reorders clauses. That's the price of cross-references staying true to the source.
 - The draft model still has no alignment, fonts, colours, nested lists or merged cells: those stay
-  out of an import.
+  out of an import. A PDF's tables still come in as paragraphs, and its paragraph breaks are
+  still guessed from line lengths.
+- PDF styles are inferred: a font that doesn't name or flag its weight reads as regular, and a
+  rule drawn tight under a short word (a hand-made underline or a narrow table cell) reads as
+  underline.

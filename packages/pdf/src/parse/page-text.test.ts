@@ -138,3 +138,55 @@ describe("text rules on a real signature block", () => {
     expect(Math.abs((sig?.width ?? 0) * 612 - 180)).toBeLessThanOrEqual(3)
   })
 })
+
+describe("readPageText: styles (document import)", () => {
+  /** The style of the first character of `word` on the page. */
+  const styleOf = (
+    page: Awaited<ReturnType<typeof readPageText>>[number] | undefined,
+    word: string,
+  ) => {
+    const at = page?.text.indexOf(word) ?? -1
+    const span = page?.spans?.find((s) => s.start <= at && at < s.end)
+    return (
+      span && { bold: span.bold, italic: span.italic, underline: span.underline, size: span.size }
+    )
+  }
+
+  test("bold and italic from the font, size, and underline from a rule under the words", async () => {
+    const doc = await PDFDocument.create()
+    const regular = await doc.embedFont(StandardFonts.Helvetica)
+    const bold = await doc.embedFont(StandardFonts.HelveticaBold)
+    const italic = await doc.embedFont(StandardFonts.HelveticaOblique)
+    const page = doc.addPage([612, 792])
+    page.drawText("Heading", { x: 72, y: 720, size: 18, font: bold })
+    page.drawText("plain", { x: 72, y: 680, size: 11, font: regular })
+    page.drawText("slanted", { x: 72, y: 660, size: 11, font: italic })
+    const width = regular.widthOfTextAtSize("marked", 11)
+    page.drawText("marked", { x: 72, y: 640, size: 11, font: regular })
+    page.drawLine({ start: { x: 72, y: 638.5 }, end: { x: 72 + width, y: 638.5 }, thickness: 0.6 })
+    // A table border just under a short word, much wider than it: not an underline.
+    page.drawText("cell", { x: 72, y: 600, size: 11, font: regular })
+    page.drawLine({ start: { x: 60, y: 598 }, end: { x: 400, y: 598 }, thickness: 0.5 })
+    // A rule above the text (a signature line over its caption): not an underline either.
+    page.drawLine({ start: { x: 72, y: 572 }, end: { x: 110, y: 572 }, thickness: 0.5 })
+    page.drawText("caption", { x: 72, y: 560, size: 11, font: regular })
+    const [p] = await readPageText(await doc.save(), { styles: true })
+
+    expect(styleOf(p, "Heading")).toEqual({ bold: true, italic: false, underline: false, size: 18 })
+    expect(styleOf(p, "plain")).toEqual({ bold: false, italic: false, underline: false, size: 11 })
+    expect(styleOf(p, "slanted")).toMatchObject({ italic: true, bold: false })
+    expect(styleOf(p, "marked")).toMatchObject({ underline: true })
+    expect(styleOf(p, "cell")).toMatchObject({ underline: false })
+    expect(styleOf(p, "caption")).toMatchObject({ underline: false })
+    // Spans cover the text, in order, without gaps.
+    const spans = p?.spans ?? []
+    expect(spans[0]?.start).toBe(0)
+    expect(spans.at(-1)?.end).toBe(p?.text.length)
+    for (let i = 1; i < spans.length; i++) expect(spans[i]?.start).toBe(spans[i - 1]?.end)
+  })
+
+  test("styles only when asked", async () => {
+    const [p] = await readPageText(await anchoredPdf())
+    expect(p?.spans).toBeUndefined()
+  })
+})
