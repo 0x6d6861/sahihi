@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils"
  * tile (ADR 0033, 0034, 0036): a tonal card with no border; a title row (type icon, title, ⋮
  * menu); the top of the document's first page in a 4:3 window (the page image, a PDF mark on white
  * paper until the worker has rendered it); and one quiet footer line. The whole card is a link; the
- * menu sits above it. Hover darkens the card's tone.
+ * menu sits above it. Hover darkens the card's tone and lifts it with Arc's raised shadow.
  */
 export function ListCard({
   href,
@@ -41,6 +41,8 @@ export function ListCard({
         // Hover tone: a foreground tint under the content, so it works on the muted card in both themes.
         "before:-z-10 before:pointer-events-none before:absolute before:inset-0 before:rounded-2xl before:bg-foreground/0 before:transition-colors has-[a:hover]:before:bg-foreground/5",
         "has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring",
+        // …and lifts a little, only where hover is real (docs/ui.md → Surfaces).
+        "[@media(hover:hover)]:has-[a:hover]:shadow-(--shadow-raised)",
       )}
     >
       <div className="flex h-11 min-w-0 items-center gap-2.5 ps-2 pe-0">

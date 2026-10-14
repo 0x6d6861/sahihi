@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { DetailsCell } from "@/components/app/files/details-cell"
 import { DragCard, DragRow, SelectCell } from "@/components/app/files/drag-items"
 import { CreateFolderButton } from "@/components/app/folders/create-folder-button"
 import {
@@ -176,10 +177,10 @@ export function FolderCards({
 }
 
 /**
- * List layout: folders as the first rows of the table, like Drive's list. `columns` is how many
- * cells sit between the name and the ⋮ menu on that page. With the Documents layout (2: person,
- * date) the folder fills them with its creator and date; any other table has its own columns, so
- * the name cell spans them instead.
+ * List layout: folders as the first rows of the table, like Drive's list, one line each. `columns`
+ * is how many cells sit between the name and the ⋮ menu on that page. With the All files layout
+ * (3: details, person, date) the folder fills them with its contents, creator and date; any other
+ * table has its own columns, so the name cell spans them instead.
  */
 export function FolderRows({
   folders,
@@ -189,7 +190,7 @@ export function FolderRows({
   allTags,
   hrefFor,
   rootLabel,
-  columns = 2,
+  columns = 3,
 }: {
   folders: FolderCardData[]
   current: Ref | null
@@ -208,36 +209,29 @@ export function FolderRows({
         <SelectCell {...folderDrag(f, current, path, searching)} />
         <TableCell
           className="w-full max-w-0 ps-3"
-          colSpan={columns === 2 ? undefined : columns + 1}
+          colSpan={columns === 3 ? undefined : columns + 1}
         >
           <div className="flex min-w-0 items-center gap-3">
             <FolderIcon aria-hidden className="size-5 shrink-0 text-muted-foreground" />
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <div className="flex min-w-0 items-center gap-2">
-                {f.color && <ColorDot color={f.color} className="size-2.5" />}
-                <Link
-                  href={hrefFor(f.id)}
-                  title={f.name}
-                  className="truncate font-medium underline-offset-4 hover:underline"
-                >
-                  {f.name}
-                  <ColorName color={f.color} />
-                </Link>
-                <div className="hidden shrink-0 sm:flex">
-                  <TagBadges tags={f.tags} max={2} />
-                </div>
-              </div>
-              <span className="truncate text-muted-foreground text-xs tabular-nums">
-                {folderMeta(f, rootLabel)}
-              </span>
-              <div className="sm:hidden">
-                <TagBadges tags={f.tags} />
+            <div className="flex min-w-0 items-center gap-2">
+              {f.color && <ColorDot color={f.color} className="size-2.5" />}
+              <Link
+                href={hrefFor(f.id)}
+                title={f.name}
+                className="truncate font-medium underline-offset-4 hover:underline"
+              >
+                {f.name}
+                <ColorName color={f.color} />
+              </Link>
+              <div className="hidden shrink-0 sm:flex">
+                <TagBadges tags={f.tags} max={2} />
               </div>
             </div>
           </div>
         </TableCell>
-        {columns === 2 && (
+        {columns === 3 && (
           <>
+            <DetailsCell text={folderMeta(f, rootLabel)} />
             <TableCell className="whitespace-nowrap text-muted-foreground max-md:hidden">
               {f.createdBy && <Person person={f.createdBy} />}
             </TableCell>

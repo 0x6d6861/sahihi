@@ -478,10 +478,10 @@ export function FilesDnd({
               {dragged.length > 1 && (
                 <div
                   aria-hidden
-                  className="-z-10 absolute inset-0 translate-x-1 translate-y-1 rounded-lg border bg-popover shadow-sm"
+                  className="-z-10 absolute inset-0 translate-x-1 translate-y-1 rounded-lg border bg-popover shadow-(--shadow-resting)"
                 />
               )}
-              <div className="inline-flex min-w-0 items-center gap-2 rounded-lg border bg-popover px-3 py-2 font-medium text-popover-foreground text-sm shadow-lg">
+              <div className="inline-flex min-w-0 items-center gap-2 rounded-lg border bg-popover px-3 py-2 font-medium text-popover-foreground text-sm shadow-(--shadow-floating)">
                 {first.kind === "folder" && dragged.length === 1 ? (
                   <FolderIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
                 ) : (
@@ -504,7 +504,7 @@ export function FilesDnd({
           />
           <div
             role="status"
-            className="pointer-events-none fixed inset-x-0 bottom-6 z-50 mx-auto flex w-fit max-w-[calc(100%-2rem)] items-center gap-2 rounded-full bg-primary px-4 py-2 font-medium text-primary-foreground text-sm shadow-lg transition-[opacity,translate] duration-(--duration-fast) ease-(--ease-enter) starting:translate-y-2 starting:opacity-0 motion-reduce:starting:translate-y-0"
+            className="pointer-events-none fixed inset-x-0 bottom-6 z-50 mx-auto flex w-fit max-w-[calc(100%-2rem)] items-center gap-2 rounded-full bg-primary px-4 py-2 font-medium text-primary-foreground text-sm shadow-(--shadow-floating) transition-[opacity,translate] duration-(--duration-fast) ease-(--ease-enter) starting:translate-y-2 starting:opacity-0 motion-reduce:starting:translate-y-0"
           >
             <UploadIcon aria-hidden className="size-4 shrink-0" />
             <span className="truncate">

@@ -3,13 +3,14 @@
 import { useRouter } from "next/navigation"
 import { createContext, useContext, useState } from "react"
 import { ConfirmDialog } from "@/components/app/confirm-dialog"
-import { ChevronRightIcon, LoaderIcon, Trash2Icon } from "@/components/app/icons"
+import { ChevronRightIcon, LoaderIcon, PlusIcon, Trash2Icon } from "@/components/app/icons"
 import { Button } from "@/components/arc/button/button"
 import { Tooltip } from "@/components/arc/tooltip/tooltip"
 import { Button as IconButton } from "@/components/ui/button"
 import { ApiError, api } from "@/lib/api"
+import { cn } from "@/lib/utils"
 
-/** Which card is creating its document: one at a time, so a double click can't make two. */
+/** Which start is creating its document: one at a time, so a double click can't make two. */
 const Starting = createContext<{
   starting: string | null
   setStarting: (key: string | null) => void
@@ -18,6 +19,11 @@ const Starting = createContext<{
 export function StartGroup({ children }: { children: React.ReactNode }) {
   const [starting, setStarting] = useState<string | null>(null)
   return <Starting.Provider value={{ starting, setStarting }}>{children}</Starting.Provider>
+}
+
+/** Whether any start in the group is creating its document. */
+export function useStarting() {
+  return useContext(Starting)?.starting != null
 }
 
 /** What a new document starts from (`POST /generated-documents`). */
@@ -33,34 +39,13 @@ export async function startDocument(router: ReturnType<typeof useRouter>, from: 
   router.push(`/generate/${id}`)
 }
 
-/**
- * A way to start a document as one pressable card: the whole card creates a document from `from`
- * and opens it in the generator, or calls `onPress` (to open a dialog first). `actions` (e.g.
- * delete) sit above the card's press surface.
- */
-export function StartCard({
-  from,
-  onPress,
-  name,
-  description,
-  meta,
-  actions,
-}: {
-  name: string
-  description?: string | null
-  meta?: string
-  actions?: React.ReactNode
-} & ({ from: StartFrom; onPress?: never } | { from?: never; onPress: () => void })) {
+/** Starts a document from `from` inside the group: busy for this one, blocked for the others. */
+function useStart(from: StartFrom) {
   const router = useRouter()
   const group = useContext(Starting)
-  const key = from ? JSON.stringify(from) : `press:${name}`
+  const key = JSON.stringify(from)
   const [error, setError] = useState<string | null>(null)
-  const busy = group?.starting === key
   const start = async () => {
-    if (!from) {
-      onPress?.()
-      return
-    }
     group?.setStarting(key)
     setError(null)
     try {
@@ -70,10 +55,62 @@ export function StartCard({
       group?.setStarting(null)
     }
   }
+  return { start, error, busy: group?.starting === key, blocked: group?.starting != null }
+}
+
+/** "Blank document": the page's primary action, beside Import in the header. */
+export function StartBlankButton() {
+  const { start, error, busy, blocked } = useStart({ blank: true })
   return (
-    <li className="group relative flex flex-col gap-1 rounded-xl border p-4 transition-[background-color,scale] duration-150 ease-out hover:bg-muted/40 has-[>button:active:not(:disabled)]:scale-[0.98]">
-      <div className="flex items-start justify-between gap-2">
-        <span className="min-w-0 font-medium">{name}</span>
+    <>
+      <Button loading={busy} disabled={blocked && !busy} onClick={() => void start()}>
+        <PlusIcon aria-hidden />
+        Blank document
+      </Button>
+      {error && (
+        <span className="basis-full text-destructive-foreground text-sm sm:text-end" role="alert">
+          {error}
+        </span>
+      )}
+    </>
+  )
+}
+
+/**
+ * A starter or template as one pressable tile, in the tone of the file cards on All files (ADR 0033):
+ * a muted card with no border, the type mark, the name and what it's for. The whole tile creates a
+ * document from `from` and opens it in the generator. `actions` (e.g. delete) sit above the tile's
+ * press surface.
+ */
+export function StartCard({
+  from,
+  icon,
+  name,
+  description,
+  meta,
+  actions,
+}: {
+  from: StartFrom
+  icon: React.ReactNode
+  name: string
+  description?: string | null
+  meta?: string
+  actions?: React.ReactNode
+}) {
+  const { start, error, busy, blocked } = useStart(from)
+  return (
+    <li
+      className={cn(
+        "group relative isolate flex min-h-36 min-w-0 flex-col gap-3 rounded-2xl bg-muted p-4",
+        "transition-[scale,box-shadow] duration-150 ease-out motion-safe:has-[>button:active:not(:disabled)]:scale-[0.985]",
+        "[@media(hover:hover)]:has-[>button:hover:not(:disabled)]:shadow-(--shadow-raised)",
+        // Hover tone: a foreground tint under the content, as on the file cards, in both themes.
+        "before:-z-10 before:pointer-events-none before:absolute before:inset-0 before:rounded-2xl before:bg-foreground/0 before:transition-colors has-[>button:hover:not(:disabled)]:before:bg-foreground/5",
+        "has-[>button:focus-visible]:ring-2 has-[>button:focus-visible]:ring-ring",
+      )}
+    >
+      <div className="flex h-6 items-center justify-between gap-2">
+        {icon}
         <span className="flex shrink-0 items-center gap-1">
           {/* Above the press surface, so they stay their own buttons. */}
           {actions && <span className="relative z-10">{actions}</span>}
@@ -82,26 +119,31 @@ export function StartCard({
           ) : (
             <ChevronRightIcon
               aria-hidden
-              className="size-4 text-muted-foreground transition-transform duration-150 ease-out group-hover:translate-x-0.5"
+              className="size-4 text-muted-foreground transition-[translate] duration-150 ease-out group-has-[>button:hover:not(:disabled)]:translate-x-0.5"
             />
           )}
         </span>
       </div>
-      {description && <span className="text-muted-foreground text-sm">{description}</span>}
-      {meta && <span className="text-muted-foreground text-xs">{meta}</span>}
+      <div className="flex min-w-0 flex-col gap-1">
+        <span className="truncate font-medium text-sm">{name}</span>
+        {description && (
+          <span className="line-clamp-3 text-muted-foreground text-sm">{description}</span>
+        )}
+      </div>
+      {meta && <span className="mt-auto truncate text-muted-foreground text-xs">{meta}</span>}
       {error && (
         <span className="relative z-10 text-destructive-foreground text-sm" role="alert">
           {error}
         </span>
       )}
-      {/* The card's press surface: one button stretched over it. */}
+      {/* The tile's press surface: one button stretched over it. */}
       <button
         type="button"
-        aria-label={from ? `Start “${name}”` : name}
+        aria-label={`Start “${name}”`}
         aria-busy={busy}
-        disabled={group?.starting != null}
+        disabled={blocked}
         onClick={() => void start()}
-        className="absolute inset-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-progress"
+        className="absolute inset-0 rounded-2xl outline-none disabled:cursor-progress"
       />
     </li>
   )

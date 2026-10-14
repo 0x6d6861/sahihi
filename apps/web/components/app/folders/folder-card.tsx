@@ -61,7 +61,7 @@ export function FolderCard({
   rootLabel?: string
 }) {
   return (
-    <div className="relative flex min-h-16 items-center gap-3 rounded-xl border bg-card py-2.5 ps-4 pe-2.5 press-subtle has-[a:hover]:bg-muted has-[a:focus-visible]:bg-muted">
+    <div className="relative flex min-h-16 items-center gap-3 rounded-xl border bg-card py-2.5 ps-4 pe-2.5 press-subtle has-[a:hover]:bg-muted has-[a:focus-visible]:bg-muted [@media(hover:hover)]:has-[a:hover]:shadow-(--shadow-raised)">
       <FolderIcon aria-hidden className="shrink-0 text-muted-foreground" />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex min-w-0 flex-col gap-0.5">

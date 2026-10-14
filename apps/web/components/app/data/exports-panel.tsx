@@ -83,6 +83,7 @@ export function ExportsPanel({ exports }: { exports: ExportRow[] }) {
           <TableHeader>
             <TableRow>
               <TableHead>Requested</TableHead>
+              <TableHead className="max-md:hidden">By</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Contents</TableHead>
               <TableHead className="w-10">
@@ -95,9 +96,11 @@ export function ExportsPanel({ exports }: { exports: ExportRow[] }) {
               const status = exportStatus(x, new Date())
               return (
                 <TableRow key={x.id}>
-                  <TableCell>
-                    <div>{formatDateTime(new Date(x.createdAt))}</div>
-                    <div className="text-muted-foreground text-xs">by {x.requestedBy.name}</div>
+                  <TableCell className="whitespace-nowrap">
+                    {formatDateTime(new Date(x.createdAt))}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground max-md:hidden">
+                    {x.requestedBy.name}
                   </TableCell>
                   <TableCell>
                     <Badge tone={status.tone} size="sm">

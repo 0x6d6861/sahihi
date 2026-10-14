@@ -86,7 +86,7 @@ rotate, delete or reorder pages, fill existing form fields, or flatten. On save:
    lineage only.
 
 Web: `/documents/[id]/prepare` (`components/app/prepare-document/`). The detail page has a
-"Prepare" button and shows "Prepared from …"; the list shows the source under the name.
+"Prepare" button and shows "Prepared from …"; the list shows the source in its Details column.
 
 ### Sending
 

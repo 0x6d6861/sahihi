@@ -1,9 +1,11 @@
 "use client"
 
-import { AiMagicIcon, Folder01Icon, InboxIcon, SignatureIcon } from "@hugeicons/core-free-icons"
-import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react"
+import { AiMagicIcon, Folder01Icon, InboxIcon } from "@hugeicons/core-free-icons"
+import type { IconSvgElement } from "@hugeicons/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useEffect, useState } from "react"
+import { LogoMark } from "@/components/app/logo"
 import { Separator } from "@/components/ui/separator"
 import { APP_NAV, type AppNavHref, HOME_HREF, isFullPage, isNavActive } from "@/lib/nav"
 import { UnreadCountProvider, useUnreadCount } from "../inbox/unread-count"
@@ -63,23 +65,21 @@ function Shell({
 }) {
   const pathname = usePathname()
   const { count: unread } = useUnreadCount()
+  const scrolled = useScrolled()
   return (
-    <div className="flex min-h-svh flex-col">
-      <header className="sticky top-0 z-30 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b bg-background px-4 py-2.5 md:grid md:grid-cols-[1fr_auto_1fr] md:px-6">
+    <div className="app-canvas flex min-h-svh flex-col">
+      {/* A hairline at the top of the page; a soft shadow once content scrolls under the bar. */}
+      <header
+        data-scrolled={scrolled || undefined}
+        className="sticky top-0 z-30 flex shrink-0 transition-shadow duration-(--duration-fast) ease-(--ease-standard) data-scrolled:shadow-(--shadow-raised) flex-wrap items-center gap-x-3 gap-y-2 border-b bg-background px-4 py-2.5 md:grid md:grid-cols-[1fr_auto_1fr] md:px-6"
+      >
         <div className="flex min-w-0 items-center gap-3">
           <Link
             href={HOME_HREF}
             aria-label="Sahihi home"
             className="flex shrink-0 items-center gap-2 rounded-md font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <HugeiconsIcon
-              icon={SignatureIcon}
-              size={22}
-              strokeWidth={2}
-              aria-hidden
-              // Arc's accent: the mark is the one coloured thing in the bar besides the active item.
-              style={{ color: "var(--accent)" }}
-            />
+            <LogoMark className="size-[1.1rem]" />
             <span className="max-sm:hidden">Sahihi</span>
           </Link>
           <Separator orientation="vertical" className="h-5" />
@@ -113,4 +113,16 @@ function Shell({
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 md:px-8 md:py-8">{children}</main>
     </div>
   )
+}
+
+/** Whether the window has scrolled at all: the top bar's shadow (docs/ui.md → Surfaces). */
+function useScrolled() {
+  const [scrolled, setScrolled] = useState(false)
+  useEffect(() => {
+    const update = () => setScrolled(window.scrollY > 0)
+    update()
+    window.addEventListener("scroll", update, { passive: true })
+    return () => window.removeEventListener("scroll", update)
+  }, [])
+  return scrolled
 }

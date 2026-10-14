@@ -263,12 +263,41 @@ describe("drafting", () => {
     expect(res.status).toBe(403)
   })
 
+  test("only its creator, an admin or the owner delete a draft; a finalised one stays", async () => {
+    const id = await createNda(alice)
+    const bob = await joinOrganization(alice, "bob", "member")
+    const list = await json<{ items: { id: string; canEdit: boolean }[] }>(
+      await request(bob, "/api/generated-documents"),
+    )
+    expect(list.items.find((d) => d.id === id)?.canEdit).toBe(false)
+    const del = (sender: Sender, docId: string) =>
+      request(sender, `/api/generated-documents/${docId}`, { method: "DELETE" })
+    expect((await del(bob, id)).status).toBe(403)
+
+    expect((await del(alice, id)).status).toBe(204)
+    expect(await prisma.generatedDocument.findUnique({ where: { id } })).toBeNull()
+    expect(
+      await prisma.generatedDocumentVersion.count({ where: { generatedDocumentId: id } }),
+    ).toBe(0)
+    expect((await del(alice, id)).status).toBe(404)
+
+    const finalised = await createNda(alice)
+    await prisma.generatedDocument.update({
+      where: { id: finalised },
+      data: { status: "FINALIZED" },
+    })
+    expect((await del(alice, finalised)).status).toBe(409)
+  })
+
   test("another workspace can't see it", async () => {
     const id = await createNda(alice)
     const eve = await createSender("eve")
     await enableAssistant(eve)
     expect((await request(eve, `/api/generated-documents/${id}`)).status).toBe(404)
     expect((await request(eve, `/api/generated-documents/${id}/preview`)).status).toBe(404)
+    expect(
+      (await request(eve, `/api/generated-documents/${id}`, { method: "DELETE" })).status,
+    ).toBe(404)
   })
 
   test("the preview is a PDF with the blanks highlighted", async () => {

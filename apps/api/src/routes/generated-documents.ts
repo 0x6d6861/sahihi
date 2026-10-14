@@ -220,10 +220,17 @@ export const generatedDocuments = new Hono<AppEnv>()
         status: true,
         envelopeId: true,
         updatedAt: true,
-        createdBy: { select: { name: true } },
+        createdById: true,
+        createdBy: { select: { name: true, image: true } },
       },
     })
-    return c.json({ items })
+    const who = actor(c)
+    return c.json({
+      items: items.map(({ createdById, ...d }) => ({
+        ...d,
+        canEdit: canEditGeneratedDocument(who, { createdById }),
+      })),
+    })
   })
 
   .post("/", async (c) => {
@@ -329,6 +336,26 @@ export const generatedDocuments = new Hono<AppEnv>()
     assertCanManageTemplate(c, template)
     // Documents started from it keep their own copy of the data; only the link goes.
     await prisma.generationTemplate.delete({ where: { id: template.id } })
+    return c.body(null, 204)
+  })
+
+  /**
+   * Deletes a draft with its versions, events and conversation (they cascade). Only while it's a
+   * DRAFT: a finalised one belongs to its envelope and goes when that is purged. The status is part
+   * of the delete, so a finalise that lands first wins.
+   */
+  .delete("/:id", async (c) => {
+    const organizationId = c.get("organizationId")
+    const doc = await prisma.generatedDocument.findFirst({
+      where: forOrganization(organizationId).generatedDocument({ id: c.req.param("id") }),
+      select: { id: true, createdById: true, status: true },
+    })
+    if (!doc) notFound("Document")
+    assertCanEdit(c, doc)
+    const { count } = await prisma.generatedDocument.deleteMany({
+      where: { id: doc.id, organizationId, status: "DRAFT" },
+    })
+    if (count === 0) conflict("This document is finalised and can't change")
     return c.body(null, 204)
   })
 

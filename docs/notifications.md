@@ -97,8 +97,8 @@ switch per type, saved as soon as it changes. Members don't see workspace types 
   "Load more" follows `nextCursor` (`INBOX_PAGE_SIZE`). Search (envelope, recipient or member
   name) and the Status (Unread / Read), Type (each notification type) and Date chips go to the
   API. Rows
-  show a tone dot while unread, the title, body and time ("5m", "3h"), text and tone from
-  `describeNotification`. Each row has **Open …** (`openLabelFor`; marks it read and goes to its
+  show an info-blue dot while unread (one colour for unread, as on the Inbox count), the title,
+  body and time ("5m", "3h"), text from `describeNotification`. Each row has **Open …** (`openLabelFor`; marks it read and goes to its
   page) and a menu with **Mark read / Mark unread** and **Dismiss**. The header has **Mark all
   read** (`{ all: true }`, so unloaded unread ones are cleared too; with a search or filter set it
   becomes **Mark these read** and sends only the unread ones shown, `unreadIdsToMark`) and **Clear

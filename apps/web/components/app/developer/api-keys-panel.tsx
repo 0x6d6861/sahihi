@@ -18,6 +18,7 @@ import { Checkbox } from "@/components/arc/checkbox/checkbox"
 import { Dialog, DialogContent, DialogTrigger } from "@/components/arc/dialog/dialog"
 import { Input } from "@/components/arc/input/input"
 import { RadioGroup } from "@/components/arc/radio-group/radio-group"
+import { Tooltip } from "@/components/arc/tooltip/tooltip"
 import {
   Table,
   TableBody,
@@ -68,6 +69,7 @@ export function ApiKeysPanel({ keys }: { keys: ApiKeyRow[] }) {
           <TableHeader>
             <TableRow>
               <TableHead>Key</TableHead>
+              <TableHead className="max-md:hidden">Created</TableHead>
               <TableHead>Permissions</TableHead>
               <TableHead>Last used</TableHead>
               <TableHead>Status</TableHead>
@@ -81,21 +83,34 @@ export function ApiKeysPanel({ keys }: { keys: ApiKeyRow[] }) {
               const status = keyStatus(k)
               return (
                 <TableRow key={k.id}>
-                  <TableCell>
-                    <div className="font-medium">{k.name}</div>
-                    <div className="font-mono text-muted-foreground text-xs">{k.hint}</div>
-                    <div className="text-muted-foreground text-xs">
-                      by {k.createdBy.name}, {formatDate(new Date(k.createdAt))}
-                      {k.expiresAt ? ` · expires ${formatDate(new Date(k.expiresAt))}` : ""}
-                    </div>
+                  <TableCell className="whitespace-nowrap">
+                    <span className="font-medium">{k.name}</span>{" "}
+                    <span className="font-mono text-muted-foreground text-xs">{k.hint}</span>
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap text-muted-foreground max-md:hidden">
+                    {formatDate(new Date(k.createdAt))} by {k.createdBy.name}
+                    {k.expiresAt ? ` · expires ${formatDate(new Date(k.expiresAt))}` : ""}
                   </TableCell>
                   <TableCell>
-                    <div className="flex max-w-72 flex-wrap gap-1">
-                      {k.scopes.map((s) => (
+                    {/* Two scopes, then "+N" naming the rest, so the row stays one line. */}
+                    <div className="flex gap-1 whitespace-nowrap">
+                      {k.scopes.slice(0, 2).map((s) => (
                         <Badge key={s} size="sm">
                           <span className="font-mono">{s}</span>
                         </Badge>
                       ))}
+                      {k.scopes.length > 2 && (
+                        <Tooltip content={k.scopes.slice(2).join(", ")}>
+                          {/* Badge takes no ref, so a named span is the trigger, as in StatusIcon. */}
+                          <span
+                            role="img"
+                            aria-label={`Also ${k.scopes.slice(2).join(", ")}`}
+                            className="inline-flex"
+                          >
+                            <Badge size="sm">+{k.scopes.length - 2}</Badge>
+                          </span>
+                        </Tooltip>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs">

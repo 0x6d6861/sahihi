@@ -337,8 +337,10 @@ body {
 .demo {
   container-type: inline-size;
   --dm-bg: #ffffff;
+  /* The app's page canvas (its ADR 0051): pages under the top bar; editors stay on --dm-bg. */
+  --dm-canvas: #fafafa;
   --dm-card: #ffffff;
-  --dm-muted: #f5f5f5;
+  --dm-muted: #f1f1f1;
   --dm-line: #ececec;
   --dm-strong: #d1d1d1;
   --dm-text: #141414;
@@ -362,6 +364,7 @@ body {
 }
 [data-theme="dark"] .demo {
   --dm-bg: #141414;
+  --dm-canvas: #141414;
   --dm-card: #1b1b1b;
   --dm-muted: #262626;
   --dm-line: #2e2e2e;

@@ -40,7 +40,7 @@ export function SelectionBar() {
         aria-hidden={!open}
         inert={!open}
         className={cn(
-          "fixed inset-x-0 bottom-6 z-40 mx-auto flex w-fit max-w-[calc(100%-2rem)] items-center gap-1 rounded-xl border bg-popover py-1.5 ps-4 pe-1.5 text-popover-foreground shadow-lg",
+          "fixed inset-x-0 bottom-6 z-40 mx-auto flex w-fit max-w-[calc(100%-2rem)] items-center gap-1 rounded-xl border bg-popover py-1.5 ps-4 pe-1.5 text-popover-foreground shadow-(--shadow-floating)",
           "transition-[opacity,translate] motion-reduce:translate-y-0",
           open
             ? "duration-(--duration-fast) ease-(--ease-enter)"

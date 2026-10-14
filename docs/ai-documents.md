@@ -379,9 +379,13 @@ ADR 0009).
 
 ## Web (`/generate`, `components/app/generator/`)
 
-- `/generate` (**Drafting**, its own tab in the top bar): your drafts (first once there are any,
-  with when each was last edited), then "Blank document", "Import a document", the starters and
-  workspace templates as pressable cards (the whole card starts a document; one at a time; delete
+- `/generate` (**Drafting**, its own tab in the top bar): "Import a document" and "Blank
+  document" in the header; your drafts (first once there are any) as a one-line-per-row table
+  (status, owner, when last edited) with a ⋮ menu: Open, Open envelope once finalised, and Delete
+  while it's a DRAFT for its creator, an admin or the owner (`DELETE /generated-documents/:id`:
+  the draft, its versions, events and conversation; 409 once finalised, as a finalised one goes
+  with its envelope; `canEdit` per row in `GET /generated-documents`); then the starters and
+  workspace templates as pressable tiles (the whole tile starts a document; one at a time; delete
   for those who may); the switch for owners and admins while it's off. "Draft with AI" on All
   files links here, and a READY document's row menu in Files has "Draft from this document".
 - **Import a document:** an Arc dialog with "Your documents" (the library search shared with the

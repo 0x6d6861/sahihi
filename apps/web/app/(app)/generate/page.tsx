@@ -1,18 +1,31 @@
 import { STARTERS } from "@sahihi/core"
 import Link from "next/link"
-import { ImportCard } from "@/components/app/generator/import-dialog"
+import { DraftRowActions } from "@/components/app/generator/draft-row-actions"
+import { ImportButton } from "@/components/app/generator/import-dialog"
 import {
   DeleteTemplate,
   EnableAssistant,
+  StartBlankButton,
   StartCard,
   StartGroup,
 } from "@/components/app/generator/start-actions"
+import { FileTextIcon, SparklesIcon } from "@/components/app/icons"
 import { Panel } from "@/components/app/panel"
-import { Badge } from "@/components/arc/badge/badge"
+import { Person } from "@/components/app/people"
+import { DraftStatusIcon } from "@/components/app/status-icon"
+import { TemplateTypeIcon } from "@/components/app/type-icons"
 import { EmptyState } from "@/components/arc/empty-state/empty-state"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { apiServer } from "@/lib/api-server"
+import { formatDate, formatDateTime } from "@/lib/format"
 import type { GenerationTemplateItem } from "@/lib/generator"
-import { timeAgo } from "@/lib/notifications"
 
 interface Settings {
   configured: boolean
@@ -24,13 +37,15 @@ interface DraftItem {
   id: string
   title: string
   status: "DRAFT" | "FINALIZED"
+  envelopeId: string | null
   updatedAt: string
-  createdBy: { name: string }
+  canEdit: boolean
+  createdBy: { name: string; image: string | null }
 }
 
 /**
- * AI drafts (docs/ai-documents.md): start a document from a starter with the assistant, or carry
- * on with one. When the assistant is off, owners and admins can turn it on here.
+ * AI drafts (docs/ai-documents.md): carry on with a draft, or start one blank, from an imported
+ * file, a starter or a workspace template. When the assistant is off, owners and admins can turn it on here.
  */
 export default async function GeneratePage() {
   const { data: settings } = await apiServer<Settings>("/generated-documents/settings")
@@ -62,97 +77,136 @@ export default async function GeneratePage() {
   ])
   const drafts = data?.items ?? []
   const templates = templateData?.items ?? []
-  const now = new Date()
-  const draftList = (
-    <Panel title="Your drafts">
-      {drafts.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          Nothing drafted yet. Pick a starter above to begin.
-        </p>
-      ) : (
-        <ul className="flex flex-col divide-y">
-          {drafts.map((d) => (
-            <li key={d.id} className="flex items-center justify-between gap-3 py-3">
-              <Link href={`/generate/${d.id}`} className="min-w-0 truncate font-medium">
-                {d.title}
-              </Link>
-              <span className="flex shrink-0 items-center gap-3 text-muted-foreground text-sm">
-                <span className="max-sm:hidden">{d.createdBy.name}</span>
-                <time dateTime={d.updatedAt} className="tabular-nums">
-                  {edited(timeAgo(d.updatedAt, now))}
-                </time>
-                <Badge tone={d.status === "FINALIZED" ? "success" : "neutral"} size="sm">
-                  {d.status === "FINALIZED" ? "Finalised" : "Draft"}
-                </Badge>
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Panel>
-  )
   return (
-    <div className="flex flex-col gap-8">
-      <header className="flex flex-col gap-2">
-        <h1 className="font-medium text-2xl tracking-tight">Drafting</h1>
-        <p className="text-muted-foreground text-sm">
-          Start blank, bring in your own document, or pick a starter or one of your workspace's
-          templates. The assistant asks for every detail it needs and never fills in what it doesn't
-          know. Review the result before you send it.
-        </p>
-      </header>
+    <StartGroup>
+      <div className="flex flex-col gap-10">
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex min-w-0 flex-col gap-2">
+            <h1 className="font-medium text-2xl tracking-tight">Drafting</h1>
+            <p className="max-w-2xl text-muted-foreground text-sm">
+              The assistant asks for every detail it needs and never fills in what it doesn't know.
+              Review the result before you send it.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <ImportButton />
+            <StartBlankButton />
+          </div>
+        </header>
 
-      {/* Coming back is mostly to carry on: drafts first once there are some. */}
-      {drafts.length > 0 && draftList}
+        {/* Coming back is mostly to carry on, so drafts come first. */}
+        {drafts.length > 0 && (
+          <section aria-labelledby="drafts-heading" className="flex flex-col gap-4">
+            <h2 id="drafts-heading" className="font-medium text-base">
+              Your drafts
+            </h2>
+            {/* The table of All files in list view, without selection. */}
+            <Panel className="gap-0 p-2 sm:p-3">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="ps-3">Name</TableHead>
+                    <TableHead className="max-md:hidden">Owner</TableHead>
+                    <TableHead className="max-md:hidden">Edited</TableHead>
+                    <TableHead className="w-0">
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {drafts.map((d) => (
+                    <TableRow key={d.id}>
+                      {/* w-full + max-w-0: the name takes the spare width and truncates. */}
+                      <TableCell className="w-full max-w-0 ps-3">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <SparklesIcon
+                            aria-hidden
+                            className="size-5 shrink-0 text-muted-foreground"
+                          />
+                          <Link
+                            href={`/generate/${d.id}`}
+                            title={d.title}
+                            className="truncate font-medium underline-offset-4 hover:underline"
+                          >
+                            {d.title}
+                          </Link>
+                          <DraftStatusIcon status={d.status} />
+                        </div>
+                      </TableCell>
+                      <TableCell className="max-w-44 whitespace-nowrap text-muted-foreground max-md:hidden">
+                        <Person person={d.createdBy} />
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums max-md:hidden">
+                        <time dateTime={d.updatedAt} title={formatDateTime(d.updatedAt)}>
+                          {formatDate(d.updatedAt)}
+                        </time>
+                      </TableCell>
+                      <TableCell className="pe-1">
+                        <DraftRowActions draft={d} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Panel>
+          </section>
+        )}
 
-      <StartGroup>
-        <Panel title="Start a document">
-          <ul className="grid gap-3 sm:grid-cols-2">
+        <StartSection
+          title="Starters"
+          description="Reviewed wording with every specific left blank for you to fill in."
+        >
+          {STARTERS.map((s) => (
             <StartCard
-              from={{ blank: true }}
-              name="Blank document"
-              description="Describe what you need and the assistant drafts it, section by section."
+              key={s.key}
+              from={{ starter: s.key }}
+              icon={<FileTextIcon aria-hidden className="size-5 shrink-0 text-muted-foreground" />}
+              name={s.name}
+              description={s.description}
             />
-            <ImportCard />
-            {STARTERS.map((s) => (
-              <StartCard
-                key={s.key}
-                from={{ starter: s.key }}
-                name={s.name}
-                description={s.description}
-              />
-            ))}
-          </ul>
-        </Panel>
+          ))}
+        </StartSection>
 
         {templates.length > 0 && (
-          <Panel
+          <StartSection
             title="Workspace templates"
             description="Saved from documents drafted here, with their wording, blanks and signers."
           >
-            <ul className="grid gap-3 sm:grid-cols-2">
-              {templates.map((t) => (
-                <StartCard
-                  key={t.id}
-                  from={{ templateId: t.id }}
-                  name={t.name}
-                  description={t.description}
-                  meta={`Saved by ${t.createdBy.name}`}
-                  actions={t.canManage ? <DeleteTemplate id={t.id} name={t.name} /> : undefined}
-                />
-              ))}
-            </ul>
-          </Panel>
+            {templates.map((t) => (
+              <StartCard
+                key={t.id}
+                from={{ templateId: t.id }}
+                icon={<TemplateTypeIcon />}
+                name={t.name}
+                description={t.description}
+                meta={`Saved by ${t.createdBy.name}`}
+                actions={t.canManage ? <DeleteTemplate id={t.id} name={t.name} /> : undefined}
+              />
+            ))}
+          </StartSection>
         )}
-      </StartGroup>
-
-      {drafts.length === 0 && draftList}
-    </div>
+      </div>
+    </StartGroup>
   )
 }
 
-/** "Edited 3h ago", or "Edited 4 Mar 2026" past a week (`timeAgo` gives the date then). */
-function edited(age: string): string {
-  if (age === "now") return "Edited just now"
-  return /^\d+[mhd]$/.test(age) ? `Edited ${age} ago` : `Edited ${age}`
+/** A titled grid of start tiles, unboxed like the card grids on All files. */
+function StartSection({
+  title,
+  description,
+  children,
+}: {
+  title: string
+  description: string
+  children: React.ReactNode
+}) {
+  return (
+    <section className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <h2 className="font-medium text-base">{title}</h2>
+        <p className="text-muted-foreground text-sm">{description}</p>
+      </div>
+      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{children}</ul>
+    </section>
+  )
 }
