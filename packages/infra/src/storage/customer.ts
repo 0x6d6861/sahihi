@@ -1,4 +1,7 @@
+import { type LookupAddress, lookup as lookupCb } from "node:dns"
 import { lookup } from "node:dns/promises"
+import { Agent as HttpAgent } from "node:http"
+import { Agent as HttpsAgent } from "node:https"
 import { S3Client, type S3ClientConfig } from "@aws-sdk/client-s3"
 import { AssumeRoleCommand, STSClient } from "@aws-sdk/client-sts"
 import { getEnv } from "@sahihi/config"
@@ -83,6 +86,32 @@ export async function assertPublicEndpoint(endpoint: string) {
   }
 }
 
+/**
+ * Agents that validate the address at connect time, so a hostname can't pass `assertPublicEndpoint`
+ * and then resolve to a private address when the SDK connects (DNS rebinding).
+ */
+function guardedLookup(
+  host: string,
+  options: { all?: boolean; family?: number },
+  cb: (err: Error | null, address: string | LookupAddress[], family?: number) => void,
+) {
+  lookupCb(host, { ...options, all: true }, (err, addresses) => {
+    if (err) return cb(err, [])
+    if (addresses.some((a) => isPrivateAddress(a.address))) {
+      return cb(new Error("The endpoint resolves to a private address"), [])
+    }
+    if (options.all) return cb(null, addresses)
+    const first = addresses[0]
+    if (!first) return cb(new Error("No address found"), [])
+    cb(null, first.address, first.family)
+  })
+}
+
+function guardedAgents() {
+  const opts = { lookup: guardedLookup as never, keepAlive: true }
+  return { httpAgent: new HttpAgent(opts), httpsAgent: new HttpsAgent(opts) }
+}
+
 /** A connection problem the settings page can show as is (no secrets, no stack). */
 export class StorageConnectionError extends Error {
   constructor(
@@ -155,6 +184,7 @@ async function customerClient(conn: StorageConnectionConfig): Promise<S3Client> 
     requestChecksumCalculation: "WHEN_REQUIRED",
     responseChecksumValidation: "WHEN_REQUIRED",
     maxAttempts: 3,
+    ...(getEnv().STORAGE_ALLOW_PRIVATE_ENDPOINTS ? {} : { requestHandler: guardedAgents() }),
   })
 }
 
