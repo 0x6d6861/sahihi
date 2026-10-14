@@ -1,6 +1,6 @@
 import { draftFromTemplate, type UseTemplateInput } from "@sahihi/core"
 import { appendAuditEvent, prisma } from "@sahihi/db"
-import { copyObject, keys } from "@sahihi/infra"
+import { keys, storageFor } from "@sahihi/infra"
 import { attachDocuments } from "./documents"
 import { EnvelopeError, notFound } from "./errors"
 import { type Actor, actorData } from "./send"
@@ -122,7 +122,7 @@ export async function createEnvelopeFromTemplate(input: {
         select: { id: true },
       })
       const key = keys.attachment(input.organizationId, created.id, row.id)
-      await copyObject(a.s3Key, key)
+      await (await storageFor(input.organizationId)).copy(a.s3Key, key)
       await tx.envelopeAttachment.update({ where: { id: row.id }, data: { s3Key: key } })
     }
     const recipientIdByRole = new Map<string, string>()

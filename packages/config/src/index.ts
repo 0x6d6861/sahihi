@@ -27,6 +27,31 @@ const EnvSchema = z.object({
     .default("false")
     .transform((v) => v === "true"),
 
+  // ── Bring your own storage (docs/storage.md, ADR 0051) ──
+  /**
+   * Development/tests only: let storage endpoints use http:// and private addresses (e.g. MinIO on
+   * localhost). Never in production: it turns off the endpoint SSRF protection.
+   */
+  STORAGE_ALLOW_PRIVATE_ENDPOINTS: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+  /**
+   * IAM role access to customers' S3 buckets: Sahihi's AWS account id (shown in the trust policy)
+   * and the credentials that call sts:AssumeRole. Role access is offered only when all three are set.
+   */
+  STORAGE_AWS_ACCOUNT_ID: z
+    .string()
+    .regex(/^\d{12}$/)
+    .optional(),
+  STORAGE_AWS_ACCESS_KEY_ID: z.string().min(1).optional(),
+  STORAGE_AWS_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+  /** OAuth apps for sync to Google Drive and OneDrive. Each provider is offered only when set. */
+  GOOGLE_DRIVE_CLIENT_ID: z.string().min(1).optional(),
+  GOOGLE_DRIVE_CLIENT_SECRET: z.string().min(1).optional(),
+  MICROSOFT_CLIENT_ID: z.string().min(1).optional(),
+  MICROSOFT_CLIENT_SECRET: z.string().min(1).optional(),
+
   EMAIL_TRANSPORT: z.enum(["smtp", "postmark"]).default("smtp"),
   SMTP_HOST: z.string().default("localhost"),
   SMTP_PORT: z.coerce.number().default(1025),
@@ -112,6 +137,8 @@ export const QUEUES = {
   maintenance: "maintenance",
   webhooks: "webhooks",
   documents: "documents",
+  /** Own storage: sync deliveries, migrations, health checks (docs/storage.md) */
+  storage: "storage",
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]

@@ -22,6 +22,7 @@ export const NOTIFICATION_TYPES = [
   "member.joined",
   "billing.quota_warning",
   "billing.quota_reached",
+  "storage.failing",
 ] as const
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number]
 
@@ -127,6 +128,13 @@ export const NOTIFICATION_CATALOG: Record<NotificationType, NotificationKind> = 
     description: "The workspace has used every envelope in this month's plan.",
     defaultEnabled: true,
   },
+  "storage.failing": {
+    group: "workspace",
+    audience: "admins",
+    label: "Storage not working",
+    description: "Sahihi can't reach the workspace's own storage (docs/storage.md).",
+    defaultEnabled: true,
+  },
 }
 
 /** Notifications are deleted after this many days, read or not. */
@@ -206,6 +214,7 @@ export const NOTIFICATION_SEARCH_KEYS = [
   "memberName",
   "bulkSendTitle",
   "reason",
+  "storageName",
 ] as const satisfies readonly (keyof NotificationData)[]
 
 const NotificationIds = z.array(z.string().min(1).max(64)).min(1).max(100)
@@ -278,6 +287,8 @@ export interface NotificationData {
   planName?: string
   used?: number
   limit?: number
+  /** Own storage (ADR 0051): the connection's name and what went wrong */
+  storageName?: string
 }
 
 export interface NotificationView {
@@ -396,6 +407,15 @@ export function describeNotification(n: {
         body: `No more envelopes can be sent until next month${d.limit !== undefined ? ` (${d.limit} a month${d.planName ? ` on the ${d.planName} plan` : ""})` : ""}.`,
         tone: "warning",
         href: "/settings/billing",
+      }
+    case "storage.failing":
+      return {
+        title: `${d.storageName ? `“${d.storageName}”` : "Your storage"} isn't working`,
+        body: d.reason
+          ? `${d.reason} Check it in Settings → Storage.`
+          : "Check it in Settings → Storage.",
+        tone: "warning",
+        href: "/settings/storage",
       }
     default:
       return { title: "Notification", body: "Something changed.", tone: "info", href: envelopeHref }

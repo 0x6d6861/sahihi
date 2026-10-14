@@ -1,8 +1,10 @@
 import { getEnv, QUEUES } from "@sahihi/config"
 import { webhookRetryDelayMs } from "@sahihi/core"
+import { createStorageRegistry, prisma } from "@sahihi/db"
 import { processBulkSend } from "@sahihi/envelopes"
 import {
   captureError,
+  configureStorage,
   createLogger,
   type DocumentJobs,
   type FinalizeJobs,
@@ -12,6 +14,7 @@ import {
   type MaintenanceJobs,
   type NotificationJobs,
   redis,
+  type StorageJobs,
   type WebhookJobs,
 } from "@sahihi/infra"
 import { type Job, Worker } from "bullmq"
@@ -27,10 +30,17 @@ import {
   purgeUserStorage,
   retentionSweep,
 } from "./jobs/retention"
+import {
+  checkStorageConnections,
+  deliverToStorage,
+  migrateStorage,
+  sweepStorageOutbox,
+} from "./jobs/storage"
 import { renderDocumentThumbnail, sweepThumbnails } from "./jobs/thumbnails"
 import { deliverWebhook, sweepWebhookOutbox } from "./jobs/webhooks"
 
 getEnv() // fail fast on bad config
+configureStorage(createStorageRegistry(prisma))
 const log = createLogger("worker")
 const tracking = initErrorTracking("worker")
 const connection = redis()
@@ -95,6 +105,25 @@ const workers = [
     (job: Job<DocumentJobs["document.thumbnail"]>) => renderDocumentThumbnail(job.data.documentId),
     { connection, concurrency: 2 },
   ),
+  // Own storage (docs/storage.md): deliveries, migrations, checks and the outbox sweep.
+  new Worker<StorageJobs[keyof StorageJobs]>(
+    QUEUES.storage,
+    async (job) => {
+      if (job.name === "storage.deliver") {
+        const data = job.data as StorageJobs["storage.deliver"]
+        return deliverToStorage(data.deliveryId, {
+          isFinal: job.attemptsMade + 1 >= (job.opts.attempts ?? 1),
+        })
+      }
+      if (job.name === "storage.migrate") {
+        return migrateStorage((job.data as StorageJobs["storage.migrate"]).connectionId)
+      }
+      if (job.name === "storage.check") return checkStorageConnections()
+      if (job.name === "storage.sweep") return sweepStorageOutbox()
+      throw new Error(`Unknown storage job ${job.name}`)
+    },
+    { connection, concurrency: 4 },
+  ),
 ]
 
 // Job lifecycle (docs/observability.md): ids and timings only, never job data (it can carry raw
@@ -126,7 +155,17 @@ for (const w of workers) {
 }
 
 // Repeatable schedules (idempotent — same key replaces the previous schedule)
-const { maintenance } = getQueues()
+const { maintenance, storage } = getQueues()
+await storage.raw.upsertJobScheduler(
+  "storage-check-6h",
+  { pattern: "40 */6 * * *" },
+  { name: "storage.check", data: {} },
+)
+await storage.raw.upsertJobScheduler(
+  "storage-sweep-5m",
+  { pattern: "*/5 * * * *" },
+  { name: "storage.sweep", data: {} },
+)
 await maintenance.raw.upsertJobScheduler(
   "expire-hourly",
   { pattern: "5 * * * *" },

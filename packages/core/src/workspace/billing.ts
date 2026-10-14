@@ -4,7 +4,7 @@ import { z } from "zod"
  * Plans and quotas (docs/billing.md, ADR 0014). No payment provider yet: a workspace's plan is
  * set by the Sahihi team (`bun run billing:set-plan`). Limits are enforced by the API:
  * envelopes sent per month (Send → 402), seats (members + pending invitations) and AI assistant
- * replies per month (chat → 402).
+ * replies per month (chat → 402), and own storage (docs/storage.md, ADR 0051).
  */
 
 export const PLAN_IDS = ["free", "starter", "business", "enterprise"] as const
@@ -20,6 +20,13 @@ export interface Plan {
   seats: number | null
   /** AI assistant replies per billing period (docs/ai-documents.md); null = unlimited. */
   assistantTurnsPerMonth: number | null
+  /**
+   * Bring your own storage (ADR 0051): `sync` copies completed envelopes to the workspace's storage,
+   * `primary` also keeps every file there.
+   */
+  ownStorage: "none" | "sync" | "primary"
+  /** Sync destinations the workspace may connect. */
+  storageDestinations: number
   description: string
 }
 
@@ -30,6 +37,8 @@ export const PLANS: Record<PlanId, Plan> = {
     envelopesPerMonth: 5,
     seats: 2,
     assistantTurnsPerMonth: 30,
+    ownStorage: "none",
+    storageDestinations: 0,
     description: "Try Sahihi with a few envelopes a month.",
   },
   starter: {
@@ -38,6 +47,8 @@ export const PLANS: Record<PlanId, Plan> = {
     envelopesPerMonth: 50,
     seats: 5,
     assistantTurnsPerMonth: 300,
+    ownStorage: "none",
+    storageDestinations: 0,
     description: "For small teams sending agreements every week.",
   },
   business: {
@@ -46,6 +57,8 @@ export const PLANS: Record<PlanId, Plan> = {
     envelopesPerMonth: 300,
     seats: 20,
     assistantTurnsPerMonth: 1500,
+    ownStorage: "sync",
+    storageDestinations: 1,
     description: "For busy teams, with templates and webhooks at volume.",
   },
   enterprise: {
@@ -54,6 +67,8 @@ export const PLANS: Record<PlanId, Plan> = {
     envelopesPerMonth: null,
     seats: null,
     assistantTurnsPerMonth: null,
+    ownStorage: "primary",
+    storageDestinations: 5,
     description: "Unlimited envelopes and seats, agreed terms.",
   },
 }
@@ -114,6 +129,45 @@ export function checkAssistantQuota(plan: Plan, turnsThisPeriod: number): QuotaC
   if (turnsThisPeriod >= limit) return { ok: false, limit, used: turnsThisPeriod }
   return { ok: true, remaining: limit - turnsThisPeriod - 1 }
 }
+
+/**
+ * May the workspace connect storage for this purpose (ADR 0051)? Sync needs Business or above and a
+ * free destination slot; primary storage needs Enterprise and allows one.
+ */
+export function canConnectStorage(
+  plan: Plan,
+  purpose: "SYNC" | "PRIMARY",
+  existing: { sync: number; primary: number },
+): { ok: true } | { ok: false; message: string } {
+  if (purpose === "PRIMARY") {
+    if (plan.ownStorage !== "primary") {
+      return {
+        ok: false,
+        message: "Keeping every file in your own storage needs the Enterprise plan.",
+      }
+    }
+    if (existing.primary > 0) {
+      return {
+        ok: false,
+        message: "This workspace already has primary storage. Disconnect it first.",
+      }
+    }
+    return { ok: true }
+  }
+  if (plan.ownStorage === "none") {
+    return { ok: false, message: "Syncing to your own storage needs the Business plan or above." }
+  }
+  if (existing.sync >= plan.storageDestinations) {
+    return {
+      ok: false,
+      message: `Your ${plan.name} plan allows ${plan.storageDestinations} sync ${plan.storageDestinations === 1 ? "destination" : "destinations"}. Remove one first.`,
+    }
+  }
+  return { ok: true }
+}
+
+/** Sync deliveries run only while the plan includes sync (a downgrade pauses them). */
+export const canSyncStorage = (plan: Plan) => plan.ownStorage !== "none"
 
 /** May another person be invited/added? Pending invitations hold a seat. */
 export function canAddSeat(plan: Plan, members: number, pendingInvitations: number): boolean {

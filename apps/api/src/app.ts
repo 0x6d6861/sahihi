@@ -5,7 +5,9 @@ import {
   MAX_IMPORT_BYTES,
   MAX_UPLOAD_BYTES,
 } from "@sahihi/core"
+import { createStorageRegistry, prisma } from "@sahihi/db"
 import { EnvelopeError } from "@sahihi/envelopes"
+import { configureStorage } from "@sahihi/infra"
 import { Hono } from "hono"
 import { bodyLimit } from "hono/body-limit"
 import { cors } from "hono/cors"
@@ -32,6 +34,8 @@ import { generatedDocuments } from "./routes/generated-documents"
 import { me } from "./routes/me"
 import { notifications } from "./routes/notifications"
 import { signing } from "./routes/signing"
+import { storage } from "./routes/storage"
+import { storageObjects } from "./routes/storage-objects"
 import { templates } from "./routes/templates"
 import { v1 } from "./routes/v1"
 import { verify } from "./routes/verify"
@@ -81,6 +85,7 @@ const brandingHeaders = secureHeaders({ crossOriginResourcePolicy: "cross-origin
 
 export function createApp() {
   const env = getEnv()
+  configureStorage(createStorageRegistry(prisma))
 
   const app = new Hono()
     .use(requestLog)
@@ -127,6 +132,9 @@ export function createApp() {
     .route("/api/embedding", embedding)
     .route("/api/v1", v1)
     .route("/api/webhooks", webhooks)
+    // Public, ticket-authorised; before /api/storage, whose middleware needs a session.
+    .route("/api/storage/objects", storageObjects)
+    .route("/api/storage", storage)
     .route("/api/sign", signing)
     .route("/api/verify", verify)
 

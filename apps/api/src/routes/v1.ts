@@ -18,7 +18,7 @@ import {
   startBulkSend,
   voidEnvelope,
 } from "@sahihi/envelopes"
-import { deleteObject, keys, putObject } from "@sahihi/infra"
+import { keys, releaseObject, storageFor } from "@sahihi/infra"
 import { inspectPdf, PdfInspectionError } from "@sahihi/pdf"
 import { type Context, Hono } from "hono"
 import {
@@ -128,7 +128,7 @@ export const v1 = new Hono<ApiKeyEnv>()
     const orgId = c.get("organizationId")
     const id = crypto.randomUUID()
     const s3Key = keys.original(orgId, id)
-    await putObject(s3Key, bytes, "application/pdf")
+    await (await storageFor(orgId)).put(s3Key, bytes, "application/pdf")
     try {
       const doc = await prisma.document.create({
         data: {
@@ -147,7 +147,7 @@ export const v1 = new Hono<ApiKeyEnv>()
       await queueThumbnail(doc.id)
       return c.json({ document: docView(doc) }, 201)
     } catch (err) {
-      await deleteObject(s3Key).catch(() => {})
+      await releaseObject(orgId, s3Key, "UPLOAD_REJECTED").catch(() => {})
       throw err
     }
   })

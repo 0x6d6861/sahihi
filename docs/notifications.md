@@ -24,6 +24,7 @@ member whose role can manage members (owners and admins, `receivesAdminNotificat
 | `member.joined` | admins, except the new member | better-auth `afterAcceptInvitation` (best effort, see below) | on |
 | `billing.quota_warning` | admins | `sendEnvelope`, the send that reaches 80% of the monthly quota | on |
 | `billing.quota_reached` | admins | `sendEnvelope`, the send that uses the last envelope | on |
+| `storage.failing` | admins | a sync delivery's last attempt or the 6-hourly check, when a connection turns FAILING (once, docs/storage.md) | on |
 
 The last signature isn't reported as `recipient.signed`: `envelope.completed` follows once the
 signed PDF is ready, so the sender gets one notification instead of two. Nobody is told about their

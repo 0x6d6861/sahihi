@@ -40,7 +40,7 @@ import {
 } from "@sahihi/core"
 import { countAssistantTurns, forOrganization, getOrgPlan, prisma } from "@sahihi/db"
 import { createEnvelopeFromDocument } from "@sahihi/envelopes"
-import { getObjectBytes, keys, putObject } from "@sahihi/infra"
+import { keys, storageFor } from "@sahihi/infra"
 import { composeGeneratedDocument, inspectPdf, readForImport, sniffImportFormat } from "@sahihi/pdf"
 import { Hono } from "hono"
 import { createMiddleware } from "hono/factory"
@@ -250,7 +250,8 @@ export const generatedDocuments = new Hono<AppEnv>()
         select: { id: true, name: true, s3Key: true },
       })
       if (!document) notFound("Document")
-      origin = await imported(await getObjectBytes(document.s3Key), document.name, document.id)
+      const bytes = await (await storageFor(organizationId)).get(document.s3Key)
+      origin = await imported(bytes, document.name, document.id)
     } else if ("starter" in input) {
       const starter = findStarter(input.starter)
       if (!starter) badRequest("Unknown starter")
@@ -892,7 +893,7 @@ export const generatedDocuments = new Hono<AppEnv>()
           sizeBytes: composed.bytes.byteLength,
         },
       })
-      await putObject(s3Key, composed.bytes, "application/pdf")
+      await (await storageFor(orgId)).put(s3Key, composed.bytes, "application/pdf")
       const info = await inspectPdf(composed.bytes)
       const sha256 = await sha256Hex(composed.bytes)
       await prisma.$transaction(async (tx) => {

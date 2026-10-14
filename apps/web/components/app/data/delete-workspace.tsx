@@ -50,7 +50,7 @@ export function DeleteWorkspace({ id, name }: { id: string; name: string }) {
           if (!o) setTyped("")
         }}
         title={`Delete ${name}?`}
-        description="All documents, envelopes, signed PDFs, certificates, templates, webhooks and members are deleted permanently, including their audit trails. Certificates stop verifying. Export first if you need a copy. This can't be undone."
+        description="All documents, envelopes, signed PDFs, certificates, templates, webhooks and members are deleted permanently, including their audit trails. Certificates stop verifying. Files in storage you connected (Settings → Storage) stay there: Sahihi never deletes them. Export first if you need a copy. This can't be undone."
         confirmLabel="Delete workspace"
         disabled={typed !== name}
         onConfirm={remove}

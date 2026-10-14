@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test"
 import { prisma } from "@sahihi/db"
-import { headObject, keys, putObject } from "@sahihi/infra"
+import { keys, platformStorage } from "@sahihi/infra"
 import { sweepAbandonedUploads } from "../src/jobs/maintenance"
 
 // Runs via `bun run test:integration` (apps/api/test/preload.ts sets a *_test DATABASE_URL).
@@ -36,7 +36,8 @@ beforeEach(async () => {
 async function doc(status: "UPLOADING" | "READY" | "FAILED", ageMs: number, withObject = false) {
   const id = crypto.randomUUID()
   const s3Key = keys.original(orgId, id)
-  if (withObject) await putObject(s3Key, new TextEncoder().encode("%PDF-1.7"), "application/pdf")
+  if (withObject)
+    await platformStorage().put(s3Key, new TextEncoder().encode("%PDF-1.7"), "application/pdf")
   return prisma.document.create({
     data: {
       id,
@@ -63,7 +64,7 @@ describe("sweepAbandonedUploads", () => {
       expect(row.failureReason).toBe("Upload was not completed")
       expect(row.deletedAt).toEqual(now)
     }
-    expect(await headObject(stale.s3Key)).toBeNull()
+    expect(await platformStorage().head(stale.s3Key)).toBeNull()
   })
 
   test("leaves recent uploads and finished documents alone", async () => {
@@ -75,8 +76,8 @@ describe("sweepAbandonedUploads", () => {
 
     const rows = await prisma.document.findMany({ where: { id: { in: [recent.id, ready.id] } } })
     expect(rows.every((r) => r.deletedAt === null)).toBe(true)
-    expect(await headObject(recent.s3Key)).not.toBeNull()
-    expect(await headObject(ready.s3Key)).not.toBeNull()
+    expect(await platformStorage().head(recent.s3Key)).not.toBeNull()
+    expect(await platformStorage().head(ready.s3Key)).not.toBeNull()
     const failedRow = await prisma.document.findUniqueOrThrow({ where: { id: failed.id } })
     expect(failedRow.deletedAt).toBeNull()
   })

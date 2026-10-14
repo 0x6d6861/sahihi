@@ -14,6 +14,8 @@ export const WEBHOOK_EVENT_TYPES = [
   "envelope.declined",
   "envelope.voided",
   "envelope.expired",
+  "storage.delivery_failed",
+  "storage.objects_released",
 ] as const
 export type WebhookEventType = (typeof WEBHOOK_EVENT_TYPES)[number]
 
@@ -27,7 +29,18 @@ export const WEBHOOK_EVENT_DESCRIPTIONS: Record<WebhookEventType, string> = {
   "envelope.declined": "A recipient declined to sign",
   "envelope.voided": "The sender voided an envelope",
   "envelope.expired": "An envelope expired before everyone signed",
+  "storage.delivery_failed": "Completed files couldn't be copied to your storage (docs/storage.md)",
+  "storage.objects_released":
+    "Files in your bucket are no longer used by Sahihi and can be deleted",
 }
+
+/** Events about the workspace's own storage rather than one envelope (ADR 0051). */
+export const STORAGE_WEBHOOK_EVENTS = [
+  "storage.delivery_failed",
+  "storage.objects_released",
+] as const
+export type StorageWebhookEvent = (typeof STORAGE_WEBHOOK_EVENTS)[number]
+export type EnvelopeWebhookEvent = Exclude<WebhookEventType, StorageWebhookEvent>
 
 export const WEBHOOK_SIGNATURE_HEADER = "Sahihi-Signature"
 /** Receivers should reject signatures older than this (replay protection). */

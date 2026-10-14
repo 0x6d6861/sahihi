@@ -232,7 +232,12 @@ export const site = {
         name: "Business",
         price: "300",
         unit: "envelopes / month",
-        features: ["20 seats", "1,500 assistant replies a month", "API, webhooks and embedding"],
+        features: [
+          "20 seats",
+          "1,500 assistant replies a month",
+          "API, webhooks and embedding",
+          "Sync to your own storage",
+        ],
         cta: "Talk to us",
         href: contact,
         featured: false,
@@ -245,6 +250,7 @@ export const site = {
           "Unlimited seats",
           "Unlimited assistant replies",
           "Retention set to your policy",
+          "Every file in your own bucket",
         ],
         cta: "Talk to us",
         href: contact,
@@ -277,6 +283,10 @@ export const site = {
       {
         q: "Can we connect Sahihi to our own systems?",
         a: "Yes. There is a public API with scoped keys, signed webhooks, bulk send from a CSV, and embedded signing inside your own site.",
+      },
+      {
+        q: "Can we keep our files in our own storage?",
+        a: "Yes. On Business, every completed envelope (signed PDFs, certificate and audit trail) is copied to your Amazon S3, Cloudflare R2, Backblaze B2 or other S3-compatible bucket, Google Drive or OneDrive. On Enterprise, every file can live in your own bucket instead of ours. Either way, Sahihi never deletes anything in your storage.",
       },
       {
         q: "What happens to our data over time?",

@@ -28,13 +28,7 @@ import {
   queueEnvelopeWebhook,
 } from "@sahihi/db"
 import { activateNextRecipients } from "@sahihi/envelopes"
-import {
-  enqueueWebhookDeliveries,
-  getQueues,
-  keys,
-  presignDownload,
-  putObject,
-} from "@sahihi/infra"
+import { enqueueWebhookDeliveries, getQueues, keys, objectVersion, storageFor } from "@sahihi/infra"
 import { pngFromDataUrl } from "@sahihi/pdf"
 import { type Context, Hono } from "hono"
 import { getSignedCookie, setSignedCookie } from "hono/cookie"
@@ -388,7 +382,9 @@ export const signing = new Hono<SigningEnv>()
       })
     }
     return c.json({
-      url: await presignDownload(doc.document.s3Key, { fileName: doc.document.name }),
+      url: await (await storageFor(s.envelope.organizationId)).presignDownload(doc.document.s3Key, {
+        fileName: doc.document.name,
+      }),
     })
   })
 
@@ -416,7 +412,7 @@ export const signing = new Hono<SigningEnv>()
       })
     })
     return c.json({
-      url: await presignDownload(a.s3Key, {
+      url: await (await storageFor(s.envelope.organizationId)).presignDownload(a.s3Key, {
         fileName: safeFileName(a.name),
         disposition: "attachment",
       }),
@@ -466,8 +462,13 @@ export const signing = new Hono<SigningEnv>()
           } catch {
             badRequest(`Field ${f.id}: signature must be a valid PNG`)
           }
-          const key = keys.fieldImage(s.envelope.organizationId, s.envelopeId, f.id)
-          await putObject(key, png, "image/png")
+          const key = keys.fieldImage(
+            s.envelope.organizationId,
+            s.envelopeId,
+            f.id,
+            objectVersion(),
+          )
+          await (await storageFor(s.envelope.organizationId)).put(key, png, "image/png")
           updates.push({ id: f.id, value: null, imageS3Key: key })
           break
         }

@@ -8,7 +8,7 @@ import {
   sha256Hex,
 } from "@sahihi/core"
 import { prisma } from "@sahihi/db"
-import { getObjectBytes } from "@sahihi/infra"
+import { platformStorage } from "@sahihi/infra"
 import { simulateReadableStream } from "ai"
 import { MockLanguageModelV4 } from "ai/test"
 import { strToU8, zipSync } from "fflate"
@@ -450,7 +450,9 @@ describe("finalize", () => {
     expect(document.status).toBe("READY")
     expect(document.name).toBe("Mutual Non-Disclosure Agreement.pdf")
     expect(document.uploadedById).toBe(alice.userId)
-    expect(await sha256Hex(await getObjectBytes(document.s3Key))).toBe(document.sha256 as string)
+    expect(await sha256Hex(await platformStorage().get(document.s3Key))).toBe(
+      document.sha256 as string,
+    )
 
     const envelope = await prisma.envelope.findUniqueOrThrow({
       where: { id: envelopeId },

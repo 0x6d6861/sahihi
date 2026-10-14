@@ -54,6 +54,7 @@ model User {
   notificationPreferences NotificationPreference[]
   generatedDocuments      GeneratedDocument[]
   generationTemplates     GenerationTemplate[]
+  storageConnections      StorageConnection[]
 
   @@map("user")
 }
@@ -167,6 +168,9 @@ model Organization {
   notificationPreferences NotificationPreference[]
   generatedDocuments      GeneratedDocument[]
   generationTemplates     GenerationTemplate[]
+  storageConnections      StorageConnection[]
+  storageDeliveries       StorageDelivery[]
+  storageReleases         StorageRelease[]
 
   @@map("organization")
 }
@@ -379,16 +383,18 @@ model Envelope {
   updatedAt      DateTime       @updatedAt
 
   /// The documents to sign, in `order` (ADR 0037).
-  documents     EnvelopeDocument[]
+  documents         EnvelopeDocument[]
   /// Supporting files: shared with recipients, never signed.
-  attachments   EnvelopeAttachment[]
-  recipients    Recipient[]
-  fields        Field[]
-  auditEvents   AuditEvent[]
-  certificate   Certificate?
-  notifications Notification[]
+  attachments       EnvelopeAttachment[]
+  recipients        Recipient[]
+  fields            Field[]
+  auditEvents       AuditEvent[]
+  certificate       Certificate?
+  notifications     Notification[]
   /// Set when this draft was created by finalising an AI-generated document.
-  generatedFrom GeneratedDocument[]
+  generatedFrom     GeneratedDocument[]
+  /// Copies to the workspace's sync destinations (docs/storage.md)
+  storageDeliveries StorageDelivery[]
 
   @@index([organizationId, status])
   @@index([organizationId, createdAt])
@@ -966,10 +972,10 @@ model GeneratedDocument {
   createdAt          DateTime                @default(now())
   updatedAt          DateTime                @updatedAt
 
-  versions  GeneratedDocumentVersion[]
-  savedAsTemplates GenerationTemplate[] @relation("SavedFrom")
-  events    GeneratedDocumentEvent[]
-  proposals GeneratedDocumentProposal[]
+  versions         GeneratedDocumentVersion[]
+  savedAsTemplates GenerationTemplate[]        @relation("SavedFrom")
+  events           GeneratedDocumentEvent[]
+  proposals        GeneratedDocumentProposal[]
 
   @@index([organizationId, createdAt])
   @@index([documentId])
@@ -981,20 +987,20 @@ model GeneratedDocument {
 /// A generated document saved to start others from (docs/ai-documents.md → Templates): its
 /// `GeneratedDocumentData` with values and contacts cleared except the ones the person kept.
 model GenerationTemplate {
-  id                        String              @id @default(cuid())
+  id                        String             @id @default(cuid())
   organizationId            String
-  organization              Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization              Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdById               String
-  createdBy                 User                @relation(fields: [createdById], references: [id])
+  createdBy                 User               @relation(fields: [createdById], references: [id])
   name                      String
   description               String?
   /// Starter of the document it was saved from (`STARTERS` in @sahihi/core)
   starter                   String
   data                      Json
   sourceGeneratedDocumentId String?
-  sourceGeneratedDocument   GeneratedDocument?  @relation("SavedFrom", fields: [sourceGeneratedDocumentId], references: [id], onDelete: SetNull)
-  createdAt                 DateTime            @default(now())
-  updatedAt                 DateTime            @updatedAt
+  sourceGeneratedDocument   GeneratedDocument? @relation("SavedFrom", fields: [sourceGeneratedDocumentId], references: [id], onDelete: SetNull)
+  createdAt                 DateTime           @default(now())
+  updatedAt                 DateTime           @updatedAt
 
   documents GeneratedDocument[] @relation("StartedFromTemplate")
 
@@ -1058,4 +1064,145 @@ model GeneratedDocumentProposal {
   createdAt           DateTime          @default(now())
 
   @@index([generatedDocumentId, createdAt])
+}
+
+// ── Bring your own storage (docs/storage.md, ADR 0051) ──────────────────────
+
+enum StorageProvider {
+  AWS_S3
+  CLOUDFLARE_R2
+  BACKBLAZE_B2
+  WASABI
+  DIGITALOCEAN_SPACES
+  GOOGLE_CLOUD_STORAGE
+  S3_COMPATIBLE
+  GOOGLE_DRIVE
+  ONEDRIVE
+}
+
+enum StoragePurpose {
+  SYNC
+  PRIMARY
+}
+
+enum StorageAuthMethod {
+  ACCESS_KEYS
+  AWS_ROLE
+  OAUTH
+}
+
+enum StorageConnectionStatus {
+  PENDING
+  ACTIVE
+  FAILING
+}
+
+enum StoragePrimaryState {
+  MIGRATING_IN
+  ACTIVE
+  MIGRATING_OUT
+}
+
+enum StorageDeliveryStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+enum StorageReleaseReason {
+  DELETED
+  REPLACED
+  UPLOAD_REJECTED
+  RETENTION
+  EXPIRED
+  WORKSPACE_DELETED
+}
+
+/// Storage the workspace connected. SYNC: completed envelopes are copied there. PRIMARY (at most
+/// one per workspace, Enterprise): every `org/<id>/` file lives there. Sahihi never deletes in it.
+model StorageConnection {
+  id              String                  @id @default(cuid())
+  organizationId  String
+  organization    Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdById     String
+  createdBy       User                    @relation(fields: [createdById], references: [id])
+  purpose         StoragePurpose
+  provider        StorageProvider
+  name            String
+  /// S3-compatible: endpoint (null = AWS's regional default), region, bucket and key prefix
+  endpoint        String?
+  region          String?
+  bucket          String?
+  /// "" or ends with "/". Objects are stored at `<prefix><key>`.
+  prefix          String                  @default("")
+  forcePathStyle  Boolean                 @default(false)
+  auth            StorageAuthMethod
+  accessKeyId     String?
+  /// Secret access key or OAuth refresh token, AES-GCM encrypted (encryptSecret). Never returned.
+  secretEncrypted String?
+  /// Last 4 characters of the access key id, to tell keys apart in the UI
+  secretHint      String?
+  /// AWS_ROLE: the customer's role and the ExternalId it must be assumed with
+  roleArn         String?
+  externalId      String?
+  /// OAUTH (Google Drive, OneDrive): the signed-in account and the top folder
+  accountEmail    String?
+  rootFolder      String?
+  /// SYNC: where each envelope's files go, e.g. "{yyyy}/{mm}/{title} ({id})"
+  folderTemplate  String                  @default("{yyyy}/{mm}/{title} ({id})")
+  status          StorageConnectionStatus @default(PENDING)
+  /// PRIMARY only: files moving in, in use, or moving back out
+  primaryState    StoragePrimaryState?
+  /// Migration progress (objects copied / to copy)
+  migratedCount   Int                     @default(0)
+  migrateTotal    Int                     @default(0)
+  lastCheckedAt   DateTime?
+  lastError       String?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  deliveries      StorageDelivery[]
+  releases        StorageRelease[]
+
+  @@index([organizationId, purpose])
+}
+
+/// One completed envelope copied to one sync destination (outbox: created in the completion
+/// transaction, enqueued after it). Write-once: files already there with the same bytes are skipped.
+model StorageDelivery {
+  id             String                @id @default(cuid())
+  organizationId String
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  connectionId   String
+  connection     StorageConnection     @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  envelopeId     String
+  envelope       Envelope              @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+  status         StorageDeliveryStatus @default(PENDING)
+  attempts       Int                   @default(0)
+  lastAttemptAt  DateTime?
+  lastError      String?
+  /// The folder the files went to, and how many
+  path           String?
+  fileCount      Int?
+  deliveredAt    DateTime?
+  createdAt      DateTime              @default(now())
+
+  @@unique([connectionId, envelopeId])
+  @@index([organizationId, createdAt])
+  @@index([status, createdAt])
+}
+
+/// A file (or, for a key ending in "/", every file under a prefix) in a customer's bucket that
+/// Sahihi no longer uses. Sahihi never deletes it; the customer cleans up (ADR 0051).
+model StorageRelease {
+  id             String               @id @default(cuid())
+  organizationId String
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  connectionId   String?
+  connection     StorageConnection?   @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  /// Full object key in the bucket, prefix included
+  key            String
+  reason         StorageReleaseReason
+  releasedAt     DateTime             @default(now())
+
+  @@index([organizationId, releasedAt])
 }

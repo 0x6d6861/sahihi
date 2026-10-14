@@ -34,15 +34,7 @@ import {
   sendEnvelope,
   voidEnvelope,
 } from "@sahihi/envelopes"
-import {
-  deleteObject,
-  getObjectBytes,
-  getQueues,
-  headObject,
-  keys,
-  presignDownload,
-  presignUpload,
-} from "@sahihi/infra"
+import { getQueues, keys, releaseObject, storageFor } from "@sahihi/infra"
 import { type Context, Hono } from "hono"
 import { HTTPException } from "hono/http-exception"
 import type { AppEnv } from "../lib/env"
@@ -473,7 +465,8 @@ export const envelopes = new Hono<AppEnv>()
       },
       select: envelopeAttachmentsSelect.select,
     })
-    const uploadUrl = await presignUpload(s3Key, input.contentType, input.sizeBytes)
+    const storage = await storageFor(c.get("organizationId"))
+    const uploadUrl = await storage.presignUpload(s3Key, input.contentType, input.sizeBytes)
     return c.json({ attachment: attachmentView(attachment), uploadUrl }, 201)
   })
 
@@ -486,13 +479,17 @@ export const envelopes = new Hono<AppEnv>()
     if (!row) notFound("File")
     const a = row as NonNullable<typeof row>
     if (a.status !== "UPLOADING") conflict(`File is already ${a.status}`)
-    const head = await headObject(a.s3Key)
+    const orgId = c.get("organizationId")
+    const storage = await storageFor(orgId)
+    const head = await storage.uploaded(a.s3Key)
     if (!head || head.sizeBytes !== a.sizeBytes || head.sizeBytes > MAX_UPLOAD_BYTES) {
       await prisma.envelopeAttachment.update({ where: { id: a.id }, data: { status: "FAILED" } })
-      await deleteObject(a.s3Key).catch(() => {})
+      await storage.discardUpload(a.s3Key).catch(() => {})
       badRequest("Upload not found in storage, or it doesn't match the announced size")
     }
-    const sha256 = await sha256Hex(await getObjectBytes(a.s3Key))
+    const bytes = await storage.readUpload(a.s3Key)
+    const sha256 = await sha256Hex(bytes)
+    await storage.commitUpload(a.s3Key, bytes, a.contentType)
     const saved = await prisma.$transaction(async (tx) => {
       const updated = await tx.envelopeAttachment.update({
         where: { id: a.id },
@@ -531,7 +528,7 @@ export const envelopes = new Hono<AppEnv>()
         })
       }
     })
-    await deleteObject(a.s3Key).catch(() => {})
+    await releaseObject(c.get("organizationId"), a.s3Key, "DELETED").catch(() => {})
     return c.body(null, 204)
   })
 
@@ -550,7 +547,10 @@ export const envelopes = new Hono<AppEnv>()
     const a = row as NonNullable<typeof row>
     if (a.envelope.purgedAt) gone()
     return c.json({
-      url: await presignDownload(a.s3Key, { fileName: a.name, disposition: "attachment" }),
+      url: await (await storageFor(c.get("organizationId"))).presignDownload(a.s3Key, {
+        fileName: a.name,
+        disposition: "attachment",
+      }),
     })
   })
 

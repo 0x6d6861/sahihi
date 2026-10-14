@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test"
 import { generateCertificateCode } from "@sahihi/core"
 import { issueSigningLink, prisma } from "@sahihi/db"
-import { keys, putObject } from "@sahihi/infra"
+import { keys, platformStorage } from "@sahihi/infra"
 import { createSender, minimalPdf, request, resetDb, type Sender, uploadDocument } from "./helpers"
 
 let alice: Sender
@@ -45,8 +45,8 @@ async function seedCompleted(finalized: boolean) {
     envelope.documents[0]?.id as string,
   )
   const certKey = keys.certificate(alice.organizationId, envelope.id)
-  await putObject(signedKey, signedBytes, "application/pdf")
-  await putObject(certKey, certBytes, "application/pdf")
+  await platformStorage().put(signedKey, signedBytes, "application/pdf")
+  await platformStorage().put(certKey, certBytes, "application/pdf")
   await prisma.envelopeDocument.updateMany({
     where: { envelopeId: envelope.id },
     data: { signedS3Key: signedKey, signedSha256: "5".repeat(64) },

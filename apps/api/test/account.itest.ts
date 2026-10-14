@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test"
 import { prisma } from "@sahihi/db"
-import { getQueues, headObject } from "@sahihi/infra"
+import { getQueues, platformStorage } from "@sahihi/infra"
 import { purgeUserStorage } from "../../worker/src/jobs/retention"
 import { auth } from "../src/auth"
 import {
@@ -276,7 +276,7 @@ describe("deleting an account (ADR 0040)", () => {
     ).toBe(amina.userId)
     expect(await getQueues().maintenance.raw.getJob(`purge-user-${amina.userId}`)).toBeTruthy()
     expect((await purgeUserStorage(amina.userId)).deleted).toBeGreaterThanOrEqual(1)
-    expect(await headObject(signatureKey)).toBeNull()
+    expect(await platformStorage().head(signatureKey)).toBeNull()
 
     // The old session is gone, the link works once, and the old password signs nobody in.
     expect((await request(amina, "/api/me/signatures")).status).toBe(401)

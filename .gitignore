@@ -21,3 +21,6 @@ apps/e2e/playwright-report/
 apps/e2e/showcase/out/
 # JUnit reports for the CI job summary (scripts/test-summary.ts)
 reports/
+
+# Local run output (.claude/skills/run-sahihi)
+.run/

@@ -9,7 +9,7 @@ import {
 } from "@sahihi/core"
 import { forOrganization, prisma } from "@sahihi/db"
 import { createEnvelopeFromTemplate } from "@sahihi/envelopes"
-import { copyObject, deleteObject, keys } from "@sahihi/infra"
+import { keys, releaseObject, storageFor } from "@sahihi/infra"
 import { Hono } from "hono"
 import type { AppEnv } from "../lib/env"
 import { assertFolderInOrg } from "../lib/folder-tree"
@@ -111,7 +111,7 @@ export const templates = new Hono<AppEnv>()
       for (const [i, a] of envelope.attachments.entries()) {
         const id = crypto.randomUUID()
         const key = keys.templateAttachment(orgId, created.id, id)
-        await copyObject(a.s3Key, key)
+        await (await storageFor(orgId)).copy(a.s3Key, key)
         await tx.templateAttachment.create({
           data: {
             id,
@@ -273,7 +273,9 @@ export const templates = new Hono<AppEnv>()
     // Envelopes created from it are independent copies; only the template and its own copies of
     // supporting files go.
     await prisma.template.delete({ where: { id: template.id } })
-    for (const a of template.attachments) await deleteObject(a.s3Key).catch(() => {})
+    for (const a of template.attachments) {
+      await releaseObject(template.organizationId, a.s3Key, "DELETED").catch(() => {})
+    }
     return c.body(null, 204)
   })
 

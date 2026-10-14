@@ -6,12 +6,16 @@ no payment provider yet: the Sahihi team sets plans (ADR 0014).
 
 ## Plans (`packages/core/src/workspace/billing.ts`)
 
-| Plan | Envelopes / month | Seats | AI replies / month |
-|---|---|---|---|
-| Free (default) | 5 | 2 | 30 |
-| Starter | 50 | 5 | 300 |
-| Business | 300 | 20 | 1,500 |
-| Enterprise | unlimited | unlimited | unlimited |
+| Plan | Envelopes / month | Seats | AI replies / month | Own storage (docs/storage.md) |
+|---|---|---|---|---|
+| Free (default) | 5 | 2 | 30 | none |
+| Starter | 50 | 5 | 300 | none |
+| Business | 300 | 20 | 1,500 | sync, 1 destination |
+| Enterprise | unlimited | unlimited | unlimited | primary storage + sync, 5 destinations |
+
+`canConnectStorage` gates new connections (402 `plan_required`). A downgrade pauses sync (no new
+deliveries; queued ones fail as "Paused"), and `billing:set-plan` refuses to move a workspace below
+Enterprise while its files are in its own bucket.
 
 A workspace's plan is in `Subscription.plan` (a `PlanId` string). No row means Free, and an
 unknown value also falls back to Free (`planFor`), never to unlimited. `provider*` columns are

@@ -1,7 +1,7 @@
 import { getEnv } from "@sahihi/config"
 import { canEditWorkspace, logoProblem, WorkspaceLogoSchema, workspaceLogoUrl } from "@sahihi/core"
 import { prisma } from "@sahihi/db"
-import { createLogger, deleteObject, keys, putObject } from "@sahihi/infra"
+import { createLogger, keys, releaseObject, storageFor } from "@sahihi/infra"
 import { pngFromDataUrl } from "@sahihi/pdf"
 import { Hono } from "hono"
 import { createMiddleware } from "hono/factory"
@@ -42,7 +42,7 @@ export const workspace = new Hono<AppEnv>()
     const organizationId = c.get("organizationId")
     const version = crypto.randomUUID().slice(0, 8)
     const key = keys.logo(organizationId, version)
-    await putObject(key, png, "image/png")
+    await (await storageFor(organizationId)).put(key, png, "image/png")
 
     const logo = workspaceLogoUrl(getEnv().WEB_URL, organizationId, version)
     const previous = await prisma.$transaction(async (tx) => {
@@ -58,7 +58,11 @@ export const workspace = new Hono<AppEnv>()
       await tx.organization.update({ where: { id: organizationId }, data: { logo } })
       return before?.logoKey ?? null
     })
-    if (previous) await deleteObject(previous).catch((err) => log.warn("old logo kept", { err }))
+    if (previous) {
+      await releaseObject(organizationId, previous, "REPLACED").catch((err) =>
+        log.warn("old logo kept", { err }),
+      )
+    }
     return c.json({ logo })
   })
 
@@ -75,6 +79,10 @@ export const workspace = new Hono<AppEnv>()
       await tx.organization.update({ where: { id: organizationId }, data: { logo: null } })
       return before?.logoKey ?? null
     })
-    if (previous) await deleteObject(previous).catch((err) => log.warn("logo kept", { err }))
+    if (previous) {
+      await releaseObject(organizationId, previous, "DELETED").catch((err) =>
+        log.warn("logo kept", { err }),
+      )
+    }
     return c.body(null, 204)
   })

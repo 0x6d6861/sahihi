@@ -44,6 +44,16 @@ transaction with the audit event, then removes the original if it's unused. It's
   stored either: a document's extracted text is part of the conversation (and goes with it), and
   images are dropped when the conversation is saved.
 
+### Workspaces with their own storage (docs/storage.md, ADR 0051)
+
+Sahihi never deletes anything in a customer's storage. For a workspace with **primary storage**, a
+purge, an expired export, a deleted document and workspace deletion delete Sahihi's records (and any
+copy in Sahihi's bucket) but leave the files in the workspace's bucket: they're logged as released
+(Settings → Storage, CSV, `storage.objects_released`, tagged `sahihi=released` on Amazon S3). Files
+copied to **sync** destinations are never touched either. Retention settings therefore cover
+Sahihi's copy only; erasing files in the workspace's own storage, including signers' personal data
+in signed PDFs, is the workspace's job. The retention form and the delete-workspace dialog say so.
+
 ## On request
 
 `POST /api/envelopes/:id/purge` (owner/admin, closed envelopes only) queues the same purge now,
@@ -76,8 +86,9 @@ better-auth's `organization.delete`:
   templates, webhooks, exports, settings, notifications, AI-generated documents and their
   templates.
 - The `afterDeleteOrganization` hook queues `organization.purge-storage`, which deletes everything
-  under `org/<id>/` in storage (`deletePrefix`, which refuses any prefix that isn't a workspace
-  folder).
+  under `org/<id>/` in Sahihi's storage (`releasePrefix`, which refuses any prefix outside the
+  workspace's folder; ADR 0051). The workspace's storage connections go with it; files in its own
+  bucket or sync destinations stay.
 - Certificates stop verifying. The dialog says so and suggests exporting first.
 
 ## Deleting an account

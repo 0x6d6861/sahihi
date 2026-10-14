@@ -136,6 +136,9 @@ signed JSON `POST` whenever one happens:
 - `envelope.declined` — a recipient declined.
 - `envelope.voided` — the sender voided it.
 - `envelope.expired` — it expired unsigned.
+- `storage.delivery_failed` — a completed envelope couldn't be copied to your own storage.
+- `storage.objects_released` — a file in your own bucket is no longer used by Sahihi; clean it up
+  when you like (Sahihi never deletes it).
 
 ```http
 POST /your/webhook

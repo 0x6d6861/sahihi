@@ -7,7 +7,7 @@ import {
   prisma,
   queueEnvelopeWebhook,
 } from "@sahihi/db"
-import { createLogger, deleteObject, enqueueWebhookDeliveries, getQueues } from "@sahihi/infra"
+import { createLogger, enqueueWebhookDeliveries, getQueues, storageFor } from "@sahihi/infra"
 
 const log = createLogger("worker")
 
@@ -96,7 +96,7 @@ export async function sweepAbandonedUploads(now = new Date()) {
   for (;;) {
     const stale = await prisma.document.findMany({
       where: { status: "UPLOADING", createdAt: { lt: cutoff }, deletedAt: null },
-      select: { id: true, s3Key: true },
+      select: { id: true, organizationId: true, s3Key: true },
       orderBy: { createdAt: "asc" },
       take: SWEEP_BATCH,
     })
@@ -109,9 +109,11 @@ export async function sweepAbandonedUploads(now = new Date()) {
       swept += 1
       // Missing keys are a no-op in S3, so an error here is a real outage. The row is already
       // swept; log the key so the orphaned (private) object can be removed by hand.
-      await deleteObject(doc.s3Key).catch((err: unknown) =>
-        log.error("could not delete abandoned upload", { key: doc.s3Key, err }),
-      )
+      await (await storageFor(doc.organizationId))
+        .discardUpload(doc.s3Key)
+        .catch((err: unknown) =>
+          log.error("could not delete abandoned upload", { key: doc.s3Key, err }),
+        )
     }
     if (stale.length < SWEEP_BATCH) break
   }
@@ -119,7 +121,7 @@ export async function sweepAbandonedUploads(now = new Date()) {
   // PUT landed. Nothing was audited for them (only `complete` audits).
   const staleFiles = await prisma.envelopeAttachment.findMany({
     where: { status: "UPLOADING", createdAt: { lt: cutoff } },
-    select: { id: true, s3Key: true },
+    select: { id: true, s3Key: true, envelope: { select: { organizationId: true } } },
     take: SWEEP_BATCH,
   })
   for (const a of staleFiles) {
@@ -128,9 +130,11 @@ export async function sweepAbandonedUploads(now = new Date()) {
     })
     if (res.count === 0) continue
     swept += 1
-    await deleteObject(a.s3Key).catch((err: unknown) =>
-      log.error("could not delete abandoned file upload", { key: a.s3Key, err }),
-    )
+    await (await storageFor(a.envelope.organizationId))
+      .discardUpload(a.s3Key)
+      .catch((err: unknown) =>
+        log.error("could not delete abandoned file upload", { key: a.s3Key, err }),
+      )
   }
   return { swept }
 }

@@ -99,6 +99,11 @@ jobs:
             -e AWS_ACCESS_KEY_ID=sahihi -e AWS_SECRET_ACCESS_KEY=sahihi-secret \
             -e AWS_DEFAULT_REGION=us-east-1 \
             amazon/aws-cli --endpoint-url http://localhost:9000 s3 mb s3://sahihi-documents
+          # A second bucket stands in for a customer's own storage (storage.itest.ts).
+          docker run --rm --network host \
+            -e AWS_ACCESS_KEY_ID=sahihi -e AWS_SECRET_ACCESS_KEY=sahihi-secret \
+            -e AWS_DEFAULT_REGION=us-east-1 \
+            amazon/aws-cli --endpoint-url http://localhost:9000 s3 mb s3://sahihi-customer
 
       - name: Install
         run: bun install --frozen-lockfile
@@ -176,6 +181,11 @@ jobs:
             -e AWS_ACCESS_KEY_ID=sahihi -e AWS_SECRET_ACCESS_KEY=sahihi-secret \
             -e AWS_DEFAULT_REGION=us-east-1 \
             amazon/aws-cli --endpoint-url http://localhost:9000 s3 mb s3://sahihi-documents
+          # A second bucket stands in for a customer's own storage (storage.itest.ts).
+          docker run --rm --network host \
+            -e AWS_ACCESS_KEY_ID=sahihi -e AWS_SECRET_ACCESS_KEY=sahihi-secret \
+            -e AWS_DEFAULT_REGION=us-east-1 \
+            amazon/aws-cli --endpoint-url http://localhost:9000 s3 mb s3://sahihi-customer
 
       - name: Install
         run: bun install --frozen-lockfile

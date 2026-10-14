@@ -13,6 +13,8 @@ Per-organization HTTPS endpoints that receive **signed JSON events** when envelo
 | `envelope.declined` | A recipient declined (`data.recipientId`) | `POST /sign/:token/decline` |
 | `envelope.voided` | The sender voided it | `POST /envelopes/:id/void` |
 | `envelope.expired` | It expired unsigned | hourly expiry job |
+| `storage.delivery_failed` | Copying a completed envelope to a sync destination failed for good (`data`: `connectionId`, `connectionName`, `deliveryId`, `envelopeId`, `error`) | `storage.deliver` job, last attempt |
+| `storage.objects_released` | A file (or, `prefix: true`, everything under a key) in the workspace's own bucket is no longer used; Sahihi never deletes it (`data`: `connectionId`, `key`, `prefix`, `reason`, `releasedAt`) | `releaseObject` / `releasePrefix` (docs/storage.md) |
 | `webhook.test` | "Send test event" | `POST /webhooks/:id/test` |
 
 `envelope.completed` fires after finalize, not at the last signature, so a receiver can fetch the

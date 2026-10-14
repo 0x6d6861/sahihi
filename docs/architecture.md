@@ -34,7 +34,7 @@
 | `@sahihi/core` | Pure domain logic: enums, state machines, routing, coordinates, crypto, audit chain, zod schemas. No I/O. Runs in the browser too. | zod |
 | `@sahihi/config` | Env parsing (`getEnv()`), queue names | core |
 | `@sahihi/db` | Prisma client, `forOrganization`, `appendAuditEvent`, `issueSigningLink` | core |
-| `@sahihi/infra` | S3 (`presignUpload`, `putObject`, …, `keys`), typed queues, Redis | config |
+| `@sahihi/infra` | Storage (`storageFor`, `userStorage`, `releaseObject`, `keys`), typed queues, Redis | config |
 | `@sahihi/pdf` | `inspectPdf`, `stampFields`, `renderCertificate` (pdf-lib, server only) | core |
 | `apps/api` | HTTP | all packages |
 | `apps/worker` | Jobs | all packages |
@@ -157,26 +157,44 @@ Preview them all with `bun run emails:dev` (http://localhost:3030).
 
 ## Storage
 
-Private bucket. The browser only ever sees short-lived presigned URLs. Key layout
-(`packages/infra/src/storage.ts` → `keys`):
+Private bucket. The browser only ever sees short-lived presigned URLs, or, for files in a
+workspace's own bucket, tickets to our own origin (docs/storage.md). Key layout
+(`packages/infra/src/storage/keys.ts` → `keys`; `-{v}` is a version new on every write, below):
 
 ```
 org/{orgId}/documents/{documentId}/original.pdf
-org/{orgId}/documents/{documentId}/thumbnail.png   (first page for the grid, ADR 0033)
-org/{orgId}/envelopes/{envelopeId}/fields/{fieldId}.png
+org/{orgId}/documents/{documentId}/thumbnail-{v}.png   (first page for the grid, ADR 0033)
+org/{orgId}/envelopes/{envelopeId}/fields/{fieldId}-{v}.png
 org/{orgId}/envelopes/{envelopeId}/signed.pdf            (single-document envelopes signed before ADR 0037)
-org/{orgId}/envelopes/{envelopeId}/signed/{envelopeDocumentId}.pdf
+org/{orgId}/envelopes/{envelopeId}/signed/{envelopeDocumentId}-{v}.pdf
 org/{orgId}/envelopes/{envelopeId}/attachments/{attachmentId}   (supporting files, ADR 0037)
-org/{orgId}/envelopes/{envelopeId}/bundle.zip            ("Download all")
+org/{orgId}/envelopes/{envelopeId}/bundle-{v}.zip        ("Download all")
 org/{orgId}/templates/{templateId}/attachments/{attachmentId}
-org/{orgId}/envelopes/{envelopeId}/certificate.pdf
-org/{orgId}/exports/{exportId}.zip
+org/{orgId}/envelopes/{envelopeId}/certificate-{v}.pdf
+org/{orgId}/exports/{exportId}-{v}.zip
 org/{orgId}/branding/logo-{version}.png      (public via /api/branding, docs/auth.md → Logos)
 user/{userId}/{signature|initials}-{version}.png   (saved signature, not workspace data)
 user/{userId}/avatar-{version}.png               (profile picture, via /api/avatars)
+staging/org/{orgId}/…                            (uploads waiting for validation, own storage only)
 ```
 
-Objects are write-once. `original.pdf` is never overwritten, because its SHA-256 is on the certificate.
+Keys stored before versions keep their old, unversioned form.
+
+Objects are write-once. `original.pdf` is never overwritten, because its SHA-256 is on the
+certificate, and every key a job or request can write twice carries a version (`objectVersion()`),
+so a retry writes a new object instead of replacing one.
+
+Code reaches storage through a driver (ADR 0051), never the S3 client:
+- `storageFor(orgId)` for a workspace's files (`org/{orgId}/…`): Sahihi's bucket, or the
+  workspace's own with primary storage (docs/storage.md). Resolved per call through the registry
+  the api, worker and test preload pass to `configureStorage`.
+- `userStorage()` for a person's own files (`user/{userId}/…`), which always stay in Sahihi's bucket.
+- `releaseObject(orgId, key, reason)` / `releasePrefix(…)` when a workspace file is no longer
+  needed. Sahihi's bucket deletes it; a customer's bucket keeps it and logs it as released, because
+  Sahihi never deletes there. Only Sahihi's driver (`DeletableStorage`) has `delete`.
+- Browser uploads go `presignUpload` → `uploaded` / `readUpload` (validate) → `commitUpload` or
+  `discardUpload`, so a rejected upload never reaches a customer's bucket.
+- `platformStorage()` is Sahihi's bucket itself, for tests that check what it holds.
 
 ## Configuration
 

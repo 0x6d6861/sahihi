@@ -34,6 +34,13 @@ Object.assign(process.env, {
   EMAIL_FROM: "Sahihi Test <test@example.com>",
   // Webhook itests use a local receiver; SSRF rules are covered by core unit tests.
   WEBHOOKS_ALLOW_PRIVATE_URLS: "true",
+  // Own-storage itests use a second MinIO bucket on localhost as the customer's (storage.itest.ts).
+  STORAGE_ALLOW_PRIVATE_ENDPOINTS: "true",
+  // Cloud drive OAuth apps; their APIs are mocked in storage-drives.itest.ts.
+  GOOGLE_DRIVE_CLIENT_ID: "google-client",
+  GOOGLE_DRIVE_CLIENT_SECRET: "google-secret",
+  MICROSOFT_CLIENT_ID: "microsoft-client",
+  MICROSOFT_CLIENT_SECRET: "microsoft-secret",
   // Queue dashboard on, so its auth and redaction are tested (docs/observability.md).
   ADMIN_DASHBOARD_USER: "ops",
   ADMIN_DASHBOARD_PASSWORD: "test-dashboard-password-1234",
@@ -69,3 +76,11 @@ function migrate() {
 
 await ensureDatabase()
 migrate()
+
+// Storage resolves workspace backends from the database (docs/storage.md). The app does this in
+// createApp and the worker at startup; worker job tests call jobs directly, so configure it here.
+const [{ configureStorage }, { createStorageRegistry, prisma }] = await Promise.all([
+  import("@sahihi/infra"),
+  import("@sahihi/db"),
+])
+configureStorage(createStorageRegistry(prisma))

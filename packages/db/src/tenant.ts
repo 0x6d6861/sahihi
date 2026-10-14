@@ -53,5 +53,14 @@ export function forOrganization(organizationId: string) {
     generationTemplate: (
       where: Prisma.GenerationTemplateWhereInput = {},
     ): Prisma.GenerationTemplateWhereInput => ({ ...where, organizationId }),
+    storageConnection: (
+      where: Prisma.StorageConnectionWhereInput = {},
+    ): Prisma.StorageConnectionWhereInput => ({ ...where, organizationId }),
+    storageDelivery: (
+      where: Prisma.StorageDeliveryWhereInput = {},
+    ): Prisma.StorageDeliveryWhereInput => ({ ...where, organizationId }),
+    storageRelease: (
+      where: Prisma.StorageReleaseWhereInput = {},
+    ): Prisma.StorageReleaseWhereInput => ({ ...where, organizationId }),
   }
 }

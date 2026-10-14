@@ -21,16 +21,17 @@ import {
 import { appendAuditEvent, notifyUsers, prisma, toChainedEvent } from "@sahihi/db"
 import {
   createLogger,
-  deleteObject,
-  deletePrefix,
-  getObjectBytes,
   getQueues,
   keys,
-  putObjectStream,
+  objectVersion,
+  releaseObject,
+  releasePrefix,
+  storageFor,
+  userStorage,
 } from "@sahihi/infra"
 import { Zip, ZipPassThrough } from "fflate"
 
-const log = createLogger("retention")
+const log = createLogger("RETENTION")
 
 /**
  * Retention, export and deletion (docs/data-retention.md, ADR 0015).
@@ -54,7 +55,7 @@ export async function purgeEnvelope(envelopeId: string, reason: PurgeReason) {
   if (!isClosed(e.status)) return { skipped: true, reason: "not closed" }
 
   // 1. Files: signed PDFs, certificate PDF, signature images, supporting files, the bundle.
-  await deletePrefix(keys.envelopePrefix(e.organizationId, e.id))
+  await releasePrefix(e.organizationId, keys.envelopePrefix(e.organizationId, e.id), "RETENTION")
 
   // 2. Personal data, in one transaction with the audit event.
   const now = new Date()
@@ -133,8 +134,10 @@ export async function purgeEnvelope(envelopeId: string, reason: PurgeReason) {
       select: { s3Key: true, thumbnailKey: true, deletedAt: true },
     })
     if (!doc) continue
-    await deleteObject(doc.s3Key).catch(() => {})
-    if (doc.thumbnailKey) await deleteObject(doc.thumbnailKey).catch(() => {})
+    await releaseObject(e.organizationId, doc.s3Key, "RETENTION").catch(() => {})
+    if (doc.thumbnailKey) {
+      await releaseObject(e.organizationId, doc.thumbnailKey, "RETENTION").catch(() => {})
+    }
     await prisma.document.update({
       where: { id: documentId },
       data: { name: REDACTED.documentName, deletedAt: doc.deletedAt ?? now, thumbnailKey: null },
@@ -200,6 +203,7 @@ const json = (value: unknown) => new TextEncoder().encode(`${JSON.stringify(valu
 export async function buildExport(exportId: string) {
   const job = await prisma.dataExport.findUnique({ where: { id: exportId } })
   if (job?.status !== "PENDING") return { skipped: true }
+  const storage = await storageFor(job.organizationId)
   const dir = await mkdtemp(join(tmpdir(), "sahihi-export-"))
   const path = join(dir, "export.zip")
   let result: { envelopes: number; sizeBytes: number }
@@ -318,24 +322,24 @@ export async function buildExport(exportId: string) {
             if (!d.document.deletedAt) {
               add(
                 `${folder}/documents/${numberedFileName(i, d.document.name)}`,
-                await getObjectBytes(d.document.s3Key),
+                await storage.get(d.document.s3Key),
               )
             }
             if (d.signedS3Key) {
               add(
                 `${folder}/documents/${numberedFileName(i, signedDocumentFileName(d.document.name))}`,
-                await getObjectBytes(d.signedS3Key),
+                await storage.get(d.signedS3Key),
               )
             }
           }
           for (const [i, a] of e.attachments.entries()) {
             add(
               `${folder}/supporting-files/${numberedFileName(i, a.name)}`,
-              await getObjectBytes(a.s3Key),
+              await storage.get(a.s3Key),
             )
           }
           if (e.certificate) {
-            add(`${folder}/certificate.pdf`, await getObjectBytes(e.certificate.s3Key))
+            add(`${folder}/certificate.pdf`, await storage.get(e.certificate.s3Key))
           }
           manifest.push({ folder, id: e.id, title: e.title, status: e.status })
         }
@@ -401,9 +405,9 @@ export async function buildExport(exportId: string) {
     await writer.end()
     if (failed) throw failed
 
-    const key = keys.export(job.organizationId, job.id)
+    const key = keys.export(job.organizationId, job.id, objectVersion())
     const { size } = await stat(path)
-    await putObjectStream(key, createReadStream(path), size, "application/zip")
+    await storage.putStream(key, createReadStream(path), size, "application/zip")
     const now = new Date()
     await prisma.dataExport.update({
       where: { id: job.id },
@@ -460,10 +464,10 @@ async function notifyExport(
 export async function cleanupExports(now: Date = new Date()) {
   const expired = await prisma.dataExport.findMany({
     where: { status: "READY", s3Key: { not: null }, expiresAt: { lt: now } },
-    select: { id: true, s3Key: true },
+    select: { id: true, organizationId: true, s3Key: true },
   })
   for (const x of expired) {
-    await deleteObject(x.s3Key as string).catch(() => {})
+    await releaseObject(x.organizationId, x.s3Key as string, "EXPIRED").catch(() => {})
     await prisma.dataExport.update({ where: { id: x.id }, data: { s3Key: null } })
   }
   return { deleted: expired.length }
@@ -471,12 +475,18 @@ export async function cleanupExports(now: Date = new Date()) {
 
 /** After a workspace is deleted (DB rows cascade): remove its stored files. */
 export async function purgeOrganizationStorage(organizationId: string) {
-  return { deleted: await deletePrefix(keys.orgPrefix(organizationId)) }
+  return {
+    deleted: await releasePrefix(
+      organizationId,
+      keys.orgPrefix(organizationId),
+      "WORKSPACE_DELETED",
+    ),
+  }
 }
 
 /** After an account is deleted (ADR 0040): remove its picture and saved signatures. */
 export async function purgeUserStorage(userId: string) {
-  return { deleted: await deletePrefix(keys.userPrefix(userId)) }
+  return { deleted: await userStorage().deletePrefix(keys.userPrefix(userId)) }
 }
 
 // ── Notifications ────────────────────────────────────────────────────────────

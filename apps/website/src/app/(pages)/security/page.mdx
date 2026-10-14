@@ -64,12 +64,28 @@ evidence and protects it. Everything here describes how the product works today.
   your server can check they came from Sahihi. Webhook secrets are stored encrypted and shown once.
 - Embedded signing only works on the website origins you allow.
 
+## Your own storage
+
+- On Business, completed envelopes are copied to storage you connect: an S3-compatible bucket
+  (Amazon S3, Cloudflare R2, Backblaze B2 and others), Google Drive or OneDrive. On Enterprise,
+  every file of the workspace can live in your own bucket instead of ours.
+- Sahihi never deletes anything in your storage. It asks only for permission to write, read and
+  list, so your bucket's own permissions guarantee it. Files Sahihi stops using are listed for you
+  to clean up.
+- Your browser never talks to your bucket: files are served through short-lived links on Sahihi's
+  own address, so your bucket needs no public access and its address stays private.
+- Storage keys and drive sign-ins are stored encrypted and never shown again. On Amazon S3 you can
+  use an IAM role instead of keys, tied to your workspace with its own external ID.
+- Uploads are checked before they reach your bucket, and the fingerprints stay with Sahihi, so a
+  file changed in your storage no longer verifies.
+
 ## Your data, on your schedule
 
 - Owners and admins choose how long completed envelopes are kept, and can export the workspace's
   data at any time.
 - Deleting an envelope removes its files and the signers' personal data, but keeps the hashes and
-  the audit trail, so its certificate still verifies.
+  the audit trail, so its certificate still verifies. Files in storage you connected stay there
+  until you remove them.
 - The drafting assistant is off until an owner or admin turns it on, because document text is sent
   to the model provider while it's on.
 - Logs mask signing links and personal details before they are written.

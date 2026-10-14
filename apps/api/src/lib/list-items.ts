@@ -1,6 +1,6 @@
 import { type Actor, canManageEnvelope, canManageTemplate, canMoveDocument } from "@sahihi/core"
 import type { Prisma } from "@sahihi/db"
-import { presignCacheable } from "@sahihi/infra"
+import { storageFor } from "@sahihi/infra"
 import { TAG_SELECT } from "./labels"
 
 /**
@@ -55,7 +55,8 @@ type EnvelopeRow = Prisma.EnvelopeGetPayload<{ include: typeof envelopeListInclu
 type TemplateRow = Prisma.TemplateGetPayload<{ include: typeof templateListInclude }>
 
 /** Cacheable presigned URL (ADR 0033); null until the worker has rendered it. */
-const thumbnail = (key: string | null | undefined) => (key ? presignCacheable(key) : null)
+const thumbnail = async (orgId: string, key: string | null | undefined) =>
+  key ? (await storageFor(orgId)).presignCacheable(key) : null
 
 /** The documents in order with the first one apart (rows show it and "+ N more"; ADR 0037). */
 function documentsOf(rows: EnvelopeRow["documents"]) {
@@ -67,7 +68,7 @@ export async function documentListItem(d: DocumentRow, me: Actor) {
   const mine = canMoveDocument(me, d)
   return {
     ...d,
-    thumbnailUrl: await thumbnail(d.thumbnailKey),
+    thumbnailUrl: await thumbnail(d.organizationId, d.thumbnailKey),
     permissions: { move: mine, label: mine, rename: mine && d._count.envelopeDocuments === 0 },
   }
 }
@@ -76,7 +77,7 @@ export async function envelopeListItem({ documents, ...e }: EnvelopeRow, me: Act
   return {
     ...e,
     ...documentsOf(documents),
-    thumbnailUrl: await thumbnail(documents[0]?.document.thumbnailKey),
+    thumbnailUrl: await thumbnail(e.organizationId, documents[0]?.document.thumbnailKey),
     permissions: { manage: canManageEnvelope(me, e) },
   }
 }
@@ -85,7 +86,7 @@ export async function templateListItem({ createdById, documents, ...t }: Templat
   return {
     ...t,
     ...documentsOf(documents),
-    thumbnailUrl: await thumbnail(documents[0]?.document.thumbnailKey),
+    thumbnailUrl: await thumbnail(t.organizationId, documents[0]?.document.thumbnailKey),
     permissions: { manage: canManageTemplate(me, { createdById }) },
   }
 }

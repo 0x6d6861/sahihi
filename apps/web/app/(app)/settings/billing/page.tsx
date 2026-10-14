@@ -14,6 +14,7 @@ import {
 import { apiServer } from "@/lib/api-server"
 import { limitLabel } from "@/lib/billing"
 import { formatDayMonth } from "@/lib/format"
+import { ownStorageLabel } from "@/lib/storage"
 
 interface BillingResponse {
   plan: Plan
@@ -95,6 +96,7 @@ export default async function BillingPage() {
               <TableHead>Envelopes a month</TableHead>
               <TableHead>Seats</TableHead>
               <TableHead>AI replies a month</TableHead>
+              <TableHead>Own storage</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -116,6 +118,7 @@ export default async function BillingPage() {
                 <TableCell>{limitLabel(p.envelopesPerMonth, "envelopes")}</TableCell>
                 <TableCell>{limitLabel(p.seats, "seats")}</TableCell>
                 <TableCell>{limitLabel(p.assistantTurnsPerMonth, "replies")}</TableCell>
+                <TableCell>{ownStorageLabel(p)}</TableCell>
               </TableRow>
             ))}
           </TableBody>

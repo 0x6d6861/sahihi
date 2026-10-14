@@ -86,7 +86,10 @@ Files are named `*.itest.ts`, so a bare `bun test` never discovers them. Run the
   name doesn't end in `_test`
 - creates that database if it's missing and runs `prisma migrate deploy`. Never `migrate reset`
 - uses Redis DB 15 (`TEST_REDIS_URL`), so a running dev worker never picks up test jobs
-- uses the local MinIO bucket. Test objects live under their own random `org/<id>/` prefixes
+- uses the local MinIO bucket. Test objects live under their own random `org/<id>/` prefixes. A
+  second bucket, `sahihi-customer` (created by `infra:up` and CI), plays a workspace's own storage
+  in `storage.itest.ts`; `STORAGE_ALLOW_PRIVATE_ENDPOINTS` lets it be on localhost
+- configures storage with the database registry (`configureStorage`), as the api and worker do
 
 Conventions (`test/helpers.ts`):
 - `helpers.ts` throws on import unless `DATABASE_URL` ends in `_test`. `resetDb()` in `beforeEach`

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test"
 import { prisma } from "@sahihi/db"
-import { getQueues, headObject } from "@sahihi/infra"
+import { getQueues, platformStorage } from "@sahihi/infra"
 import { renderDocumentThumbnail, sweepThumbnails } from "../../worker/src/jobs/thumbnails"
 import { createSender, minimalPdf, request, resetDb, type Sender, uploadDocument } from "./helpers"
 
@@ -32,8 +32,11 @@ describe("document thumbnails (ADR 0033)", () => {
 
     expect(await renderDocumentThumbnail(document.id)).toMatchObject({ rendered: true })
     const row = await prisma.document.findUniqueOrThrow({ where: { id: document.id } })
-    expect(row.thumbnailKey).toBe(
-      `org/${alice.organizationId}/documents/${document.id}/thumbnail.png`,
+    // Versioned, so a retry never rewrites an object (ADR 0051).
+    expect(row.thumbnailKey).toMatch(
+      new RegExp(
+        `^org/${alice.organizationId}/documents/${document.id}/thumbnail-[0-9a-f]{8}\\.png$`,
+      ),
     )
     expect(await renderDocumentThumbnail(document.id)).toEqual({ skipped: true })
 
@@ -53,8 +56,7 @@ describe("document thumbnails (ADR 0033)", () => {
     const { document } = await uploadDocument(alice, minimalPdf())
     // Corrupt the stored original after it was accepted.
     const row = await prisma.document.findUniqueOrThrow({ where: { id: document.id } })
-    const { putObject } = await import("@sahihi/infra")
-    await putObject(row.s3Key, new TextEncoder().encode("garbage"), "application/pdf")
+    await platformStorage().put(row.s3Key, new TextEncoder().encode("garbage"), "application/pdf")
 
     expect(await renderDocumentThumbnail(document.id)).toEqual({ rendered: false })
     const after = await prisma.document.findUniqueOrThrow({ where: { id: document.id } })
@@ -77,11 +79,11 @@ describe("document thumbnails (ADR 0033)", () => {
 
     const key = (await prisma.document.findUniqueOrThrow({ where: { id: document.id } }))
       .thumbnailKey as string
-    expect(await headObject(key)).not.toBeNull()
+    expect(await platformStorage().head(key)).not.toBeNull()
     expect(
       (await request(alice, `/api/documents/${document.id}`, { method: "DELETE" })).status,
     ).toBe(204)
-    expect(await headObject(key)).toBeNull()
+    expect(await platformStorage().head(key)).toBeNull()
     const row = await prisma.document.findUniqueOrThrow({ where: { id: document.id } })
     expect(row.thumbnailKey).toBeNull()
   })
