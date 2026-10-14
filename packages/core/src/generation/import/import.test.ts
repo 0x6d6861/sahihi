@@ -142,3 +142,102 @@ describe("blankDocument", () => {
     expect(issues.sort()).toEqual(["invalid_email", "missing_name"])
   })
 })
+
+describe("importContent: the source's numbers (Word)", () => {
+  const text = (t: string) => [{ text: t }]
+
+  test("a heading keeps its number when its section's would differ", () => {
+    const data = importContent(
+      [
+        { type: "heading", level: 1, text: "Definitions", numbered: true, label: "1." },
+        { type: "paragraph", runs: text("Words mean things.") },
+        { type: "heading", level: 2, text: "Scope", numbered: true, label: "1.1" },
+        { type: "paragraph", runs: text("This applies.") },
+        { type: "heading", level: 1, text: "Payment", numbered: true, label: "2." },
+        { type: "heading", level: 1, text: "Notices", numbered: true, label: "Article 3" },
+      ],
+      "terms.docx",
+    )
+    // The first heading is numbered, so it isn't taken for the title.
+    expect(data.title).toBe("Terms")
+    expect(data.content.content.map((s) => [s.attrs.title, s.attrs.numbered])).toEqual([
+      ["Definitions", true],
+      ["1.1 Scope", false],
+      ["Payment", true],
+      ["Article 3 Notices", false],
+    ])
+  })
+
+  test("numbered items stay a list only where the renderer prints the same number", () => {
+    const data = importContent(
+      [
+        { type: "heading", level: 1, text: "Terms", numbered: false },
+        { type: "heading", level: 1, text: "Fees", numbered: false },
+        { type: "listItem", ordered: true, runs: text("first"), label: "(a)" },
+        { type: "listItem", ordered: true, runs: text("second"), label: "(b)" },
+        { type: "listItem", ordered: true, runs: text("one"), label: "1." },
+        { type: "listItem", ordered: true, runs: text("plain") },
+        { type: "listItem", ordered: false, runs: text("dot"), label: "•" },
+      ],
+      "x",
+    )
+    const [fees] = data.content.content
+    expect(fees?.content).toEqual([
+      {
+        type: "orderedList",
+        content: [
+          {
+            type: "listItem",
+            content: [{ type: "paragraph", content: [{ type: "text", text: "first" }] }],
+          },
+          {
+            type: "listItem",
+            content: [{ type: "paragraph", content: [{ type: "text", text: "second" }] }],
+          },
+        ],
+      },
+      { type: "paragraph", content: [{ type: "text", text: "1. one" }] },
+      {
+        type: "orderedList",
+        content: [
+          {
+            type: "listItem",
+            content: [{ type: "paragraph", content: [{ type: "text", text: "plain" }] }],
+          },
+        ],
+      },
+      {
+        type: "bulletList",
+        content: [
+          {
+            type: "listItem",
+            content: [{ type: "paragraph", content: [{ type: "text", text: "dot" }] }],
+          },
+        ],
+      },
+    ])
+  })
+
+  test("header rows become header cells", () => {
+    const data = importContent(
+      [
+        { type: "heading", level: 1, text: "Fees", numbered: false },
+        {
+          type: "table",
+          rows: [
+            [text("Item"), text("Price")],
+            [text("Rent"), text("100")],
+          ],
+          headerRows: 1,
+        },
+      ],
+      "x",
+    )
+    const table = data.content.content[0]?.content[0]
+    if (table?.type !== "table") throw new Error("expected a table")
+    expect(table.content.map((r) => r.content.map((c) => c.type))).toEqual([
+      ["tableHeader", "tableHeader"],
+      ["tableCell", "tableCell"],
+    ])
+  })
+})

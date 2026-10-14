@@ -15,12 +15,19 @@ export interface ImportedRun {
 export type ImportedBlock =
   /**
    * A heading. `numbered`: the source numbered it ("3. Payment"); the number itself is dropped
-   * from `text`, since sections are numbered by their position.
+   * from `text`, since sections are numbered by their position. `label`, when the reader knows
+   * it, is that number as the source printed it ("3.", "2.1", "Article 4"): `importContent` keeps
+   * it in the title when the section's own number would differ.
    */
-  | { type: "heading"; level: number; text: string; numbered: boolean }
+  | { type: "heading"; level: number; text: string; numbered: boolean; label?: string }
   | { type: "paragraph"; runs: ImportedRun[] }
-  | { type: "listItem"; ordered: boolean; runs: ImportedRun[] }
-  | { type: "table"; rows: ImportedRun[][][] }
+  /**
+   * `label`: a numbered item's number as the source printed it ("1.", "(a)", "ii)"). An item the
+   * renderer would number differently becomes a paragraph that starts with it.
+   */
+  | { type: "listItem"; ordered: boolean; runs: ImportedRun[]; label?: string }
+  /** `headerRows`: how many rows at the top are headings (Word's repeating header rows). */
+  | { type: "table"; rows: ImportedRun[][][]; headerRows?: number }
 
 /** A file larger than this is refused before it's read. */
 export const MAX_IMPORT_BYTES = 10 * 1024 * 1024
@@ -64,23 +71,24 @@ export function runsText(runs: readonly ImportedRun[]): string {
 export function blocksLength(blocks: readonly ImportedBlock[]): number {
   let n = 0
   for (const b of blocks) {
-    if (b.type === "heading") n += b.text.length
+    if (b.type === "heading") n += b.text.length + (b.label?.length ?? 0)
     else if (b.type === "table") {
       for (const row of b.rows) for (const cell of row) n += runsText(cell).length
-    } else n += runsText(b.runs).length
+    } else n += runsText(b.runs).length + (b.type === "listItem" ? (b.label?.length ?? 0) : 0)
   }
   return n
 }
 
 /**
  * Blocks as plain text, one block per line: what a chat attachment gives the assistant. Headings
- * keep their place, list items get a bullet, table cells are joined with " | ".
+ * keep their place (and number), list items get their number or a bullet, table cells are joined
+ * with " | ".
  */
 export function blocksToText(blocks: readonly ImportedBlock[]): string {
   return blocks
     .map((b) => {
-      if (b.type === "heading") return b.text
-      if (b.type === "listItem") return `• ${runsText(b.runs)}`
+      if (b.type === "heading") return b.label ? `${b.label} ${b.text}` : b.text
+      if (b.type === "listItem") return `${b.label ?? "•"} ${runsText(b.runs)}`
       if (b.type === "table") {
         return b.rows
           .map((row) => row.map((cell) => runsText(cell).replace(/\n/g, " ")).join(" | "))

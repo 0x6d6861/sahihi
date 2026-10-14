@@ -4,6 +4,7 @@ import { join } from "node:path"
 import { applyVariableUpdates, findStarter, ImportError, importContent } from "@sahihi/core"
 import { strToU8, zipSync } from "fflate"
 import { composeGeneratedDocument } from "../compose/document"
+import { docx } from "./docx-fixture"
 import { readForImport, sniffImportFormat } from "./import"
 
 const DATE = new Date("2026-10-09T12:00:00.000Z")
@@ -15,23 +16,6 @@ async function code(promise: Promise<unknown>): Promise<string> {
   } catch (err) {
     return err instanceof ImportError ? err.code : String(err)
   }
-}
-
-/** A minimal Word file: the body, plus styles and numbering when given. */
-function docx(body: string, extra: { styles?: string; numbering?: string } = {}): Uint8Array {
-  const w = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
-  return zipSync({
-    "[Content_Types].xml": strToU8("<Types/>"),
-    "word/document.xml": strToU8(
-      `<?xml version="1.0"?><w:document ${w}><w:body>${body}</w:body></w:document>`,
-    ),
-    ...(extra.styles
-      ? { "word/styles.xml": strToU8(`<w:styles ${w}>${extra.styles}</w:styles>`) }
-      : {}),
-    ...(extra.numbering
-      ? { "word/numbering.xml": strToU8(`<w:numbering ${w}>${extra.numbering}</w:numbering>`) }
-      : {}),
-  })
 }
 
 const styles = `<w:style w:styleId="Title"><w:name w:val="Title"/></w:style><w:style w:styleId="Heading1"><w:name w:val="heading 1"/></w:style>`
@@ -54,7 +38,7 @@ describe("Word import", () => {
     expect(format).toBe("docx")
     expect(blocks).toEqual([
       { type: "heading", level: 1, text: "Lease & Licence", numbered: false },
-      { type: "heading", level: 1, text: "Premises", numbered: true },
+      { type: "heading", level: 1, text: "Premises", numbered: true, label: "1." },
       {
         type: "paragraph",
         runs: [{ text: "The tenant is " }, { text: "Jane Doe", marks: ["bold"] }, { text: "." }],
