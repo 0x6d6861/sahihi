@@ -37,7 +37,10 @@ envelope (matched by email).
   `data` (a snapshot of names and counts, `NotificationData`) and `readAt`.
 - Written with `notifyEnvelopeOwner`, `notifyWorkspaceAdmins` or `notifyUsers` (`@sahihi/db`)
   **inside the same transaction** as the change, like audit events and the webhook outbox. If the
-  change rolls back, so does the notification. Nothing is enqueued.
+  change rolls back, so does the notification. Nothing is enqueued: each write also sends a
+  Postgres `NOTIFY` on `sahihi_notifications` with `<organizationId>:<userId>`
+  (`signalNotifications`), which Postgres delivers only on commit. The API listens and pushes the
+  new count to the user's open tabs (ADR 0057, "The Inbox (web)" below).
 - Two exceptions, where the change is already committed when we learn of it and a failed
   notification must not undo or fail it: `member.joined` (better-auth has added the member) and
   `export.ready` / `export.failed` (the archive is in storage, the status saved). These are written
@@ -60,8 +63,9 @@ Every query is scoped to the signed-in user **and** the active workspace.
 | Route | |
 |---|---|
 | `GET /` | Newest first. `?limit` (1–50, default 20), `?cursor` (the previous page's `nextCursor`: the last item's position, `createdAt` and id, so paging survives that item being dismissed), `?unread=1` or `?read=1`, `?type` (a notification type), `?period` (`7d`, `30d`, `90d`, `year`), `?q` (any case, over the names and titles it quotes: `NOTIFICATION_SEARCH_KEYS`). Returns `{ items, nextCursor, unreadCount }`; `unreadCount` ignores the filters |
-| `GET /unread-count` | `{ count }`, for the badge |
-| `POST /read` | `{ ids: [...] }` or `{ all: true }`. Ids that aren't yours are ignored. Returns `{ updated }` |
+| `GET /unread-count` | `{ count }`, for the badge while its stream is down |
+| `GET /stream` | Server-sent events: `count` `{ count }` on open and after each change to your notifications in this workspace (debounced 250 ms), a `: ping` comment every 20 s. Ends after 10 minutes (the browser reconnects and is re-authorised). 429 beyond 10 open streams per user and workspace |
+| `POST /read` | `{ ids: [...] }` or `{ all: true }`. Ids that aren't yours are ignored. Returns `{ updated }`. Signals your streams when something changed, as do the two below |
 | `POST /unread` | `{ ids: [...] }`, back to unread. Returns `{ updated }` |
 | `POST /dismiss` | `{ ids: [...] }`, deletes them. Returns `{ deleted }` |
 | `GET /preferences` | `{ items: [{ type, enabled }] }`, only the types this member can receive |
@@ -91,9 +95,13 @@ switch per type, saved as soon as it changes. Members don't see workspace types 
 `lib/inbox.ts`. An empty result says "No matching …" with "Clear search and filters".
 
 - **Unread badge:** the Inbox pill in the top bar shows how many are unread. `UnreadCountProvider`
-  (`components/app/inbox/unread-count.tsx`) polls `GET /notifications/unread-count` every 60 s
-  (`NOTIFICATIONS_POLL_MS`) while the tab is visible, and on focus, and starts over on a workspace
-  switch. There's no websocket or SSE (ADR 0029).
+  (`components/app/inbox/unread-count.tsx`) opens an EventSource on `GET /notifications/stream`
+  and shows each `count` it pushes (ADR 0057). While the stream isn't open it polls
+  `GET /notifications/unread-count` every 60 s (`NOTIFICATIONS_POLL_MS`) while the tab is visible,
+  and on focus, and reopens the stream if the browser gave up on it. A workspace switch starts it
+  over. The listener behind the stream needs a direct Postgres connection (no transaction-mode
+  pooler). Over plain HTTP/1.1 (localhost) the browser allows 6 connections per origin, so many
+  open tabs can run out; production is HTTP/2.
 - **Notifications** (`components/app/inbox/notification-list.tsx`): the first 50 come with the page,
   "Load more" follows `nextCursor` (`INBOX_PAGE_SIZE`). Search (envelope, recipient or member
   name) and the Status (Unread / Read), Type (each notification type) and Date chips go to the
@@ -109,7 +117,7 @@ switch per type, saved as soon as it changes. Members don't see workspace types 
   any other reason than a change made here (`refresh` resolves to the new count), the first page
   reloads to show the new ones. Only the newest list request's answer is applied, so a slow page
   can't land on a newer search. Times count from the server render's clock, then tick each minute.
-- The badge skips a poll while one is in flight (focus and visibilitychange often fire together)
+- The badge skips a fallback poll while one is in flight (focus and visibilitychange often fire together)
   and applies only the newest answer.
 - **Workspace activity** (`components/app/inbox/activity-feed.tsx`): `GET /api/activity`, audit
   events of every envelope in the workspace, newest first, 30 a page, as an Arc `Timeline` with
@@ -134,8 +142,11 @@ switch per type, saved as soon as it changes. Members don't see workspace types 
 
 `packages/core/src/notifications/notifications.test.ts` (catalog, preferences, quota thresholds,
 display), `apps/web/lib/notifications.test.ts`, `apps/api/test/notifications.itest.ts` (each event
-from the real routes, preferences, paging, isolation between users and workspaces) and
-`apps/worker/test/notifications.itest.ts` (expiry, purge, cleanup). The routes are classified in
+from the real routes, preferences, paging, isolation between users and workspaces, and the stream:
+a signature pushes the new count, a rollback sends nothing, other users and workspaces hear
+nothing, reading in one tab updates the others, the per-user cap),
+`apps/api/src/lib/notification-fanout.test.ts` (the stream fan-out) and
+`apps/worker/test/notifications.itest.ts` (expiry, purge, cleanup, a worker write signals). The routes are classified in
 `tenant-isolation.itest.ts`.
 
 ## Not in v1

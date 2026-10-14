@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test"
 import { NOTIFICATION_TTL_DAYS } from "@sahihi/core"
-import { prisma } from "@sahihi/db"
+import { createListenClient, NOTIFICATIONS_CHANNEL, prisma } from "@sahihi/db"
 import { expireEnvelopes } from "../src/jobs/maintenance"
 import { cleanupNotifications, purgeEnvelope } from "../src/jobs/retention"
 
@@ -78,6 +78,24 @@ describe("worker notifications", () => {
       organizationId: orgId,
       data: { envelopeTitle: "Lease" },
     })
+  })
+
+  test("a notification written by the worker signals the API's listener (ADR 0057)", async () => {
+    const client = createListenClient()
+    const payloads: string[] = []
+    client.on("notification", (msg) => {
+      if (msg.channel === NOTIFICATIONS_CHANNEL && msg.payload) payloads.push(msg.payload)
+    })
+    await client.connect()
+    try {
+      await client.query(`LISTEN ${NOTIFICATIONS_CHANNEL}`)
+      await envelope({ status: "SENT", expiresAt: new Date(Date.now() - DAY) })
+      await expireEnvelopes()
+      for (let i = 0; i < 20 && payloads.length === 0; i++) await Bun.sleep(50)
+      expect(payloads).toEqual([`${orgId}:${userId}`])
+    } finally {
+      await client.end()
+    }
   })
 
   test("purging an envelope deletes its notifications (they quote names)", async () => {

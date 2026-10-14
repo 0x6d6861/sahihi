@@ -6,7 +6,7 @@ import { formatDate } from "./format"
  * (docs/notifications.md). Titles, text and tones come from `describeNotification` in @sahihi/core.
  */
 
-/** How often the Inbox badge reloads the unread count while the tab is visible. */
+/** How often the Inbox badge reloads the unread count while its stream is down and the tab shows. */
 export const NOTIFICATIONS_POLL_MS = 60_000
 
 export interface NotificationItem {

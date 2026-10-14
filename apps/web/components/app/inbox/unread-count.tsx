@@ -20,11 +20,12 @@ const UnreadCountContext = createContext<UnreadCount>({
 })
 
 /**
- * The Inbox badge in the top bar (docs/notifications.md → Inbox): polls the unread count every
- * minute while the tab is visible, and on focus. A workspace switch starts it over. The Inbox page
- * calls `refresh` after its own changes so the badge follows at once. Polls are skipped while a
- * request is in flight (focus and visibilitychange often fire together), and only the newest
- * request's answer is applied.
+ * The Inbox badge in the top bar (docs/notifications.md → Inbox). The API pushes the unread count
+ * over a stream (ADR 0057). While the stream is down, it polls every minute while the tab is
+ * visible, and on focus, and tries to reopen the stream. A workspace switch starts it over. The
+ * Inbox page calls `refresh` after its own changes so the badge follows at once. Polls are skipped
+ * while a request is in flight (focus and visibilitychange often fire together), and only the
+ * newest request's answer is applied.
  */
 export function UnreadCountProvider({
   workspaceId,
@@ -57,13 +58,26 @@ export function UnreadCountProvider({
     void workspaceId
     setCount(null)
     void refresh()
+    let stream: EventSource | null = null
+    const open = () => {
+      stream = new EventSource("/api/notifications/stream")
+      stream.addEventListener("count", (e) => {
+        const { count } = JSON.parse((e as MessageEvent<string>).data) as { count: number }
+        setCount(count)
+      })
+    }
+    open()
     const tick = () => {
-      if (document.visibilityState === "visible" && !inFlight.current) void refresh()
+      if (document.visibilityState !== "visible" || stream?.readyState === EventSource.OPEN) return
+      // The browser retries a dropped stream itself, but gives up on an error response.
+      if (stream?.readyState === EventSource.CLOSED) open()
+      if (!inFlight.current) void refresh()
     }
     const timer = window.setInterval(tick, NOTIFICATIONS_POLL_MS)
     document.addEventListener("visibilitychange", tick)
     window.addEventListener("focus", tick)
     return () => {
+      stream?.close()
       window.clearInterval(timer)
       document.removeEventListener("visibilitychange", tick)
       window.removeEventListener("focus", tick)

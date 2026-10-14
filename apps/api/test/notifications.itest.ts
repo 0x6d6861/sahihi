@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { CONSENT_VERSION } from "@sahihi/core"
-import { notifyUsers, prisma } from "@sahihi/db"
+import { notifyUsers, prisma, signalNotifications } from "@sahihi/db"
 import { getQueues } from "@sahihi/infra"
 import { auth } from "../src/auth"
 import {
@@ -500,5 +500,126 @@ describe("Inbox search and filters", () => {
     // The badge's count ignores the filters.
     expect((await list(alice, "?type=export.ready")).unreadCount).toBe(2)
     expect((await request(alice, "/api/notifications?type=nope")).status).toBe(400)
+  })
+})
+
+describe("live stream", () => {
+  const open: (() => Promise<void>)[] = []
+  afterEach(async () => {
+    await Promise.all(open.splice(0).map((close) => close()))
+  })
+
+  /**
+   * Opens `/api/notifications/stream` as `s` and reads its first count. Extra counts sent while
+   * the listener connects are drained, so `next` only sees what a test causes.
+   */
+  async function openStream(s: Sender) {
+    const res = await request(s, "/api/notifications/stream")
+    expect(res.status).toBe(200)
+    expect(res.headers.get("content-type")).toContain("text/event-stream")
+    expect(res.headers.get("cache-control")).toBe("no-cache, no-transform")
+    const reader = (res.body as ReadableStream<Uint8Array>).getReader()
+    open.push(() => reader.cancel())
+    const decoder = new TextDecoder()
+    let buffer = ""
+    let pending: ReturnType<typeof reader.read> | null = null
+    /** The next `count` event within `ms`, or null. */
+    const next = async (ms = 3_000): Promise<number | null> => {
+      const deadline = Date.now() + ms
+      for (;;) {
+        const end = buffer.indexOf("\n\n")
+        if (end >= 0) {
+          const event = buffer.slice(0, end)
+          buffer = buffer.slice(end + 2)
+          const data = event.match(/^event: count\ndata: (.*)$/m)?.[1]
+          if (data) return (JSON.parse(data) as { count: number }).count
+          continue
+        }
+        const left = deadline - Date.now()
+        if (left <= 0) return null
+        pending ??= reader.read()
+        const read = await Promise.race([pending, Bun.sleep(left).then(() => "timeout" as const)])
+        if (read === "timeout") return null
+        pending = null
+        if (read.done) return null
+        buffer += decoder.decode(read.value, { stream: true })
+      }
+    }
+    const first = await next()
+    while ((await next(600)) !== null) {}
+    return { first, next }
+  }
+
+  const seed = (s: Sender) =>
+    notifyUsers(prisma, {
+      organizationId: s.organizationId,
+      userIds: [s.userId],
+      type: "export.ready",
+      data: { envelopeCount: 1 },
+    })
+
+  test("sends the count on open and again when a recipient signs", async () => {
+    await seed(alice)
+    const stream = await openStream(alice)
+    expect(stream.first).toBe(1)
+    const { signers } = await sentEnvelope(alice, ["Amina", "Baraka"])
+    const [amina] = signers
+    if (!amina) throw new Error("no signer")
+    expect((await sign(amina.token, amina.fieldId)).status).toBe(200)
+    expect(await stream.next()).toBe(2)
+  })
+
+  test("a rolled-back notification sends nothing", async () => {
+    const stream = await openStream(alice)
+    expect(stream.first).toBe(0)
+    await prisma
+      .$transaction(async (tx) => {
+        await notifyUsers(tx, {
+          organizationId: alice.organizationId,
+          userIds: [alice.userId],
+          type: "export.ready",
+        })
+        throw new Error("roll back")
+      })
+      .catch(() => {})
+    expect(await stream.next(1_000)).toBeNull()
+  })
+
+  test("other users and other workspaces of yours hear nothing", async () => {
+    const bob = await createSender("bob")
+    const carol = await joinOrganization(alice, "carol", "member")
+    const bobs = await openStream(bob)
+    const carols = await openStream(carol)
+    const alices = await openStream(alice)
+    await seed(alice)
+    expect(await alices.next()).toBe(1)
+    // A signal for Alice in Bob's workspace doesn't reach Alice's stream in hers.
+    await signalNotifications(prisma, bob.organizationId, [alice.userId])
+    expect(await alices.next(1_000)).toBeNull()
+    expect(await bobs.next(500)).toBeNull()
+    expect(await carols.next(500)).toBeNull()
+  })
+
+  test("reading in one tab updates the others", async () => {
+    await seed(alice)
+    const [tabA, tabB] = [await openStream(alice), await openStream(alice)]
+    expect([tabA.first, tabB.first]).toEqual([1, 1])
+    const read = await request(alice, "/api/notifications/read", {
+      method: "POST",
+      json: { all: true },
+    })
+    expect(read.status).toBe(200)
+    expect([await tabA.next(), await tabB.next()]).toEqual([0, 0])
+  })
+
+  test("needs a session, and caps the streams one user holds", async () => {
+    expect((await request(null, "/api/notifications/stream")).status).toBe(401)
+    for (let i = 0; i < 10; i++) {
+      const res = await request(alice, "/api/notifications/stream")
+      expect(res.status).toBe(200)
+      const reader = (res.body as ReadableStream<Uint8Array>).getReader()
+      open.push(() => reader.cancel())
+    }
+    expect((await request(alice, "/api/notifications/stream")).status).toBe(429)
   })
 })

@@ -11,7 +11,14 @@ export {
   lockOrgQuota,
 } from "./billing"
 export * from "./generated/prisma/client"
-export { notifyEnvelopeOwner, notifyUsers, notifyWorkspaceAdmins } from "./notifications"
+export { createListenClient } from "./listen"
+export {
+  NOTIFICATIONS_CHANNEL,
+  notifyEnvelopeOwner,
+  notifyUsers,
+  notifyWorkspaceAdmins,
+  signalNotifications,
+} from "./notifications"
 export { issueSigningLink } from "./signing-links"
 export {
   createStorageRegistry,

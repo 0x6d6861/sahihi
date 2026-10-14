@@ -13,7 +13,8 @@ type Db = PrismaClient | Prisma.TransactionClient
 /**
  * In-app notifications (docs/notifications.md). Call inside the SAME transaction as the change
  * being reported, so a notification exists if and only if the change committed. Nothing is
- * enqueued: the web app polls.
+ * enqueued: each write also signals `NOTIFICATIONS_CHANNEL` (`signalNotifications`), which
+ * Postgres delivers on commit, and the API pushes the new count to the user's open tabs (ADR 0057).
  *
  * Users who are no longer members of the workspace, and users who turned the type off in
  * Settings → Notifications, are skipped. Returns how many rows were written.
@@ -40,7 +41,26 @@ export async function notifyUsers(
       data,
     })),
   })
+  await signalNotifications(db, input.organizationId, userIds)
   return res.count
+}
+
+/** Postgres NOTIFY channel the API listens on to push Inbox changes (ADR 0057). */
+export const NOTIFICATIONS_CHANNEL = "sahihi_notifications"
+
+/**
+ * Tells listeners that these users' notifications in the workspace changed. The payload is
+ * `<organizationId>:<userId>`, ids only: listeners re-read through the authenticated API. Inside a
+ * transaction Postgres sends it on commit and drops it on rollback.
+ */
+export async function signalNotifications(
+  db: Db,
+  organizationId: string,
+  userIds: readonly string[],
+): Promise<void> {
+  const payloads = [...new Set(userIds)].map((userId) => `${organizationId}:${userId}`)
+  if (payloads.length === 0) return
+  await db.$executeRaw`SELECT pg_notify(${NOTIFICATIONS_CHANNEL}, p) FROM unnest(${payloads}::text[]) AS p`
 }
 
 /** The users among `userIds` who are members of the workspace and have the type turned on. */
@@ -134,6 +154,7 @@ export async function notifyEnvelopeOwner(
       data,
     },
   })
+  await signalNotifications(db, envelope.organizationId, [userId])
   return 1
 }
 

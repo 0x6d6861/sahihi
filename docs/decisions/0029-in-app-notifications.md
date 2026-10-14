@@ -1,6 +1,6 @@
 # 0029: In-app notifications written in the transaction, polled by the web app
 
-- **Status:** accepted; the bell was replaced by the Inbox (ADR 0041)
+- **Status:** accepted; the bell was replaced by the Inbox (ADR 0041); decision 5 superseded by ADR 0057 (pushed over SSE)
 - **Date:** 2026-10-07
 
 ## Context
