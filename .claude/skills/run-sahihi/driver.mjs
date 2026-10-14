@@ -3,7 +3,7 @@
  * Drives a running Sahihi (start.sh) as a signed-in user. Run from the repo root:
  *
  *   bun .claude/skills/run-sahihi/driver.mjs session [--plan enterprise]   new user + workspace
- *   bun .claude/skills/run-sahihi/driver.mjs api GET /storage                authenticated API call
+ *   bun .claude/skills/run-sahihi/driver.mjs api GET /storage [--json]       authenticated API call
  *   bun .claude/skills/run-sahihi/driver.mjs api POST /storage/connections '{"…":…}'
  *   bun .claude/skills/run-sahihi/driver.mjs upload fixtures/coords-cropbox.pdf "Lease.pdf"
  *   bun .claude/skills/run-sahihi/driver.mjs shot /settings/storage [--theme dark] [--out name] [--wait "Text"]
@@ -158,6 +158,12 @@ switch (cmd) {
   case "api": {
     const [method, path, body] = positional
     const res = await api(method.toUpperCase(), path, body)
+    // --json: the body only, for piping into jq / python (status goes to stderr).
+    if (rest.includes("--json")) {
+      console.error(res.status)
+      console.log(typeof res.data === "string" ? res.data : JSON.stringify(res.data))
+      break
+    }
     console.log(
       res.status,
       typeof res.data === "string" ? res.data : JSON.stringify(res.data, null, 2),

@@ -172,8 +172,8 @@ export function ConnectionFormDialog({
         {failure ? (
           <div className="flex flex-col gap-4">
             <Alert tone="warning" title="Sahihi couldn't use the bucket">
-              {failure}. The connection is saved: fix the bucket or its permissions, then use Test
-              connection on its card.
+              {failure.replace(/\.$/, "")}. The connection is saved: fix the bucket or its
+              permissions, then use Test connection on its card.
             </Alert>
             <DialogActions>
               <Button onClick={() => onOpenChange(false)}>Done</Button>
@@ -375,12 +375,7 @@ function PolicyBlock({ title, text }: { title: string; text: string }) {
         <span className="font-medium text-sm">{title}</span>
         <CopyButton value={text} label={`Copy ${title.toLowerCase()}`} />
       </div>
-      <pre
-        className="max-h-48 overflow-auto rounded-lg bg-muted p-3 text-xs"
-        style={{ fontFamily: "var(--font-mono)" }}
-      >
-        {text}
-      </pre>
+      <pre className="max-h-48 overflow-auto rounded-lg bg-muted p-3 font-mono text-xs">{text}</pre>
     </div>
   )
 }

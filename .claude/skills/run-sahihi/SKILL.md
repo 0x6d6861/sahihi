@@ -29,6 +29,8 @@ bun .claude/skills/run-sahihi/driver.mjs flow .claude/skills/run-sahihi/flows/co
   later command uses it; run `session` again for a fresh user/workspace (e.g. another plan).
 - `api METHOD /path [json]` calls `/api/<path>` through the web origin with the session cookie and
   pretty-prints the response. Use it to set state up quickly (create envelopes, connections…).
+  Add `--json` to print only the body (status on stderr) for piping:
+  `bun .claude/skills/run-sahihi/driver.mjs api GET /documents --json | python3 -c 'import json,sys; print(json.load(sys.stdin)["items"][0]["id"])'`.
 - `shot` waits for network idle, or for `--wait "<visible text>"` (more reliable on pages that
   poll). `--out` names the file; default `<path>-<theme>`.
 - `flow <file.mjs>` runs a module exporting `default async ({ page, goto, shot, api, session })`

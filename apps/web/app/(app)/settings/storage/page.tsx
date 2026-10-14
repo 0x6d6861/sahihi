@@ -1,5 +1,5 @@
 import { ButtonLink } from "@/components/app/button-link"
-import { PackageIcon } from "@/components/app/icons"
+import { DownloadIcon, PackageIcon } from "@/components/app/icons"
 import { Panel } from "@/components/app/panel"
 import { AddConnectionButton } from "@/components/app/storage/add-connection-button"
 import { CloudDriveButton } from "@/components/app/storage/cloud-drive-button"
@@ -48,7 +48,13 @@ export default async function StoragePage({
     )
   }
   const data = overview.data
-  if (!data) return <Alert tone="danger" title="Storage settings didn't load" />
+  if (!data) {
+    return (
+      <Alert tone="danger" title="Storage settings didn't load">
+        Refresh the page to try again.
+      </Alert>
+    )
+  }
   const { plan } = data
   const sync = data.connections.filter((c) => c.purpose === "SYNC")
   const primary = data.connections.find((c) => c.purpose === "PRIMARY") ?? null
@@ -57,7 +63,7 @@ export default async function StoragePage({
   const connected = typeof query.connected === "string"
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       {error && (
         <Alert tone="danger" title="Not connected">
           {error}
@@ -77,7 +83,7 @@ export default async function StoragePage({
               When everyone has signed, Sahihi copies the signed PDFs, the certificate and the audit
               trail to your own storage. Sahihi never deletes anything there.
               {plan.ownStorage !== "none" &&
-                ` ${sync.length} of ${plan.storageDestinations} ${plan.storageDestinations === 1 ? "destination" : "destinations"} on the ${plan.name} plan.`}
+                ` ${sync.length} of ${plan.storageDestinations} ${plan.storageDestinations === 1 ? "destination" : "destinations"} in use on the ${plan.name} plan${syncFull ? ": disconnect one to connect another" : ""}.`}
             </p>
           </div>
           {plan.ownStorage !== "none" && (
@@ -89,33 +95,24 @@ export default async function StoragePage({
               <AddConnectionButton
                 purpose="SYNC"
                 awsRole={data.awsRole}
-                label="Add a bucket"
+                label="Connect a bucket"
                 disabled={syncFull}
               />
             </div>
           )}
         </div>
         {plan.ownStorage === "none" ? (
-          <Panel>
-            <EmptyState
-              className="md:py-10"
-              icon={<PackageIcon aria-hidden />}
-              title="Keep a copy in your own storage"
-              description="Sync to Amazon S3, Cloudflare R2, Backblaze B2, Google Drive, OneDrive and more on the Business plan."
-              action={
-                <ButtonLink href="/settings/billing" variant="secondary">
-                  See plans
-                </ButtonLink>
-              }
-            />
-          </Panel>
+          <PlanRequired
+            title="Sync is on the Business plan"
+            description="Copy every signed agreement to Amazon S3, Cloudflare R2, Backblaze B2, Google Drive, OneDrive and more."
+          />
         ) : sync.length === 0 ? (
           <Panel>
             <EmptyState
               className="md:py-10"
               icon={<PackageIcon aria-hidden />}
               title="No sync destinations yet"
-              description="Add a bucket or a cloud drive to keep every signed agreement in your own system of record."
+              description="Connect a bucket or a cloud drive to keep every signed agreement in your own system of record."
             />
           </Panel>
         ) : (
@@ -142,37 +139,60 @@ export default async function StoragePage({
           )}
         </div>
         {plan.ownStorage !== "primary" ? (
-          <Alert tone="info" title="Enterprise plan">
-            Primary storage in your own bucket is part of the Enterprise plan. Ask the Sahihi team.
-          </Alert>
+          <PlanRequired
+            title="Primary storage is on the Enterprise plan"
+            description="Keep every document, signed PDF and certificate in your own bucket instead of Sahihi's."
+          />
         ) : primary ? (
           <ConnectionCard connection={primary} />
         ) : null}
       </section>
 
       {(primary || data.releasedCount > 0) && (
-        <Panel
-          title="Released files"
-          description="Files in your bucket that Sahihi no longer uses (deleted drafts, purged envelopes, expired exports). Sahihi never deletes them: remove them with a lifecycle rule or a script from this list. On Amazon S3 they're also tagged sahihi=released."
-          actions={
-            data.releasedCount > 0 ? (
-              <ButtonLink
-                href="/api/storage/releases.csv"
-                prefetch={false}
-                variant="secondary"
-                size="sm"
-              >
+        <section className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-col gap-1">
+              <h2 className="font-medium text-lg">Released files</h2>
+              <p className="text-muted-foreground text-sm">
+                Files in your bucket that Sahihi no longer uses. Sahihi never deletes them: clean up
+                with a lifecycle rule (they're tagged sahihi=released on Amazon S3) or a script from
+                the CSV.
+              </p>
+            </div>
+            {data.releasedCount > 0 && (
+              <ButtonLink href="/api/storage/releases.csv" prefetch={false} variant="secondary">
+                <DownloadIcon aria-hidden />
                 Download CSV
               </ButtonLink>
-            ) : undefined
-          }
-        >
-          <ReleasedFiles
-            initial={releases.data?.items ?? []}
-            nextCursor={releases.data?.nextCursor ?? null}
-          />
-        </Panel>
+            )}
+          </div>
+          <Panel>
+            <ReleasedFiles
+              initial={releases.data?.items ?? []}
+              nextCursor={releases.data?.nextCursor ?? null}
+            />
+          </Panel>
+        </section>
       )}
     </div>
+  )
+}
+
+/** A section the plan doesn't include: the same empty state for both tiers, one way forward. */
+function PlanRequired({ title, description }: { title: string; description: string }) {
+  return (
+    <Panel>
+      <EmptyState
+        className="md:py-10"
+        icon={<PackageIcon aria-hidden />}
+        title={title}
+        description={description}
+        action={
+          <ButtonLink href="/settings/billing" variant="secondary">
+            See plans
+          </ButtonLink>
+        }
+      />
+    </Panel>
   )
 }

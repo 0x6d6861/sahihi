@@ -1,11 +1,13 @@
 import { describe, expect, test } from "bun:test"
 import {
-  connectionAuth,
+  connectionBadge,
+  connectionDetails,
   connectionWhere,
   deliveryOutcome,
   formProviders,
   ownStorageLabel,
   primaryStatus,
+  releasedKeyLabel,
   type StorageConnectionRow,
 } from "./storage"
 
@@ -33,31 +35,35 @@ const base: StorageConnectionRow = {
 }
 
 describe("storage settings helpers", () => {
-  test("where the files go", () => {
-    expect(connectionWhere(base)).toBe("acme-contracts/sahihi · Amazon S3 (eu-west-1)")
-    expect(
-      connectionWhere({ ...base, provider: "CLOUDFLARE_R2", region: "auto", prefix: "" }),
-    ).toBe("acme-contracts · Cloudflare R2")
-    expect(
-      connectionWhere({
-        ...base,
-        provider: "GOOGLE_DRIVE",
-        auth: "OAUTH",
-        accountEmail: "ann@acme.test",
-        rootFolder: "Sahihi",
-      }),
-    ).toBe("Google Drive · ann@acme.test › Sahihi")
+  test("where the files go, and the rest of the line", () => {
+    expect(connectionWhere(base)).toBe("acme-contracts/sahihi")
+    expect(connectionDetails(base)).toBe("Amazon S3 (eu-west-1) · Access key …WXYZ")
+    const r2 = { ...base, provider: "CLOUDFLARE_R2" as const, region: "auto", prefix: "" }
+    expect(connectionWhere(r2)).toBe("acme-contracts")
+    expect(connectionDetails(r2)).toBe("Cloudflare R2 · Access key …WXYZ")
+    const drive = {
+      ...base,
+      provider: "GOOGLE_DRIVE" as const,
+      auth: "OAUTH" as const,
+      accountEmail: "ann@acme.test",
+      rootFolder: "Contracts",
+    }
+    expect(connectionWhere(drive)).toBe("Contracts")
+    expect(connectionDetails(drive)).toBe("Google Drive · Signed in as ann@acme.test")
+    const role = {
+      ...base,
+      auth: "AWS_ROLE" as const,
+      roleArn: "arn:aws:iam::123456789012:role/sahihi-storage",
+    }
+    expect(connectionDetails(role)).toBe("Amazon S3 (eu-west-1) · IAM role sahihi-storage")
   })
 
-  test("how it signs in, without the secret", () => {
-    expect(connectionAuth(base)).toBe("Access key …WXYZ")
-    expect(
-      connectionAuth({
-        ...base,
-        auth: "AWS_ROLE",
-        roleArn: "arn:aws:iam::123456789012:role/sahihi-storage",
-      }),
-    ).toBe("IAM role sahihi-storage")
+  test("a failed first test isn't shown as untested", () => {
+    expect(connectionBadge({ status: "PENDING", lastError: null }).label).toBe("Not tested")
+    expect(connectionBadge({ status: "PENDING", lastError: "Access denied" }).label).toBe(
+      "Test failed",
+    )
+    expect(connectionBadge({ status: "FAILING", lastError: "x" }).tone).toBe("danger")
   })
 
   test("primary storage progress", () => {
@@ -101,12 +107,24 @@ describe("storage settings helpers", () => {
 
 describe("ownStorageLabel", () => {
   test("per tier", () => {
-    expect(ownStorageLabel({ ownStorage: "none", storageDestinations: 0 })).toBe("—")
+    expect(ownStorageLabel({ ownStorage: "none", storageDestinations: 0 })).toBe("Not included")
     expect(ownStorageLabel({ ownStorage: "sync", storageDestinations: 1 })).toBe(
       "Sync to 1 destination",
     )
     expect(ownStorageLabel({ ownStorage: "primary", storageDestinations: 5 })).toBe(
       "Your own bucket, sync to 5 destinations",
     )
+  })
+})
+
+describe("releasedKeyLabel", () => {
+  test("keeps the end of the key, where the file name is", () => {
+    const prefix = "sahihi/org/mNXk7QOsFd2p2tPBVWMddZG4IDqx485C/documents/afd5b871-645a-42ec"
+    expect(releasedKeyLabel(`${prefix}/original.pdf`)).toBe("…/documents/afd5b871…/original.pdf")
+    expect(releasedKeyLabel(`${prefix}/thumbnail-1a2b3c4d.png`)).toBe(
+      "…/documents/afd5b871…/thumbnail-1a2b3c4d.png",
+    )
+    expect(releasedKeyLabel("org/o1/envelopes/e1/")).toBe("…/o1/envelopes/e1/")
+    expect(releasedKeyLabel("a/b.pdf")).toBe("a/b.pdf")
   })
 })

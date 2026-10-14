@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table"
 import { api } from "@/lib/api"
 import { formatDateTime } from "@/lib/format"
+import { releasedKeyLabel } from "@/lib/storage"
 
 export interface ReleaseRow {
   id: string
@@ -73,11 +74,8 @@ export function ReleasedFiles({
         <TableBody>
           {rows.map((r) => (
             <TableRow key={r.id}>
-              <TableCell
-                className="max-w-96 truncate text-xs"
-                style={{ fontFamily: "var(--font-mono)" }}
-              >
-                {r.key}
+              <TableCell className="max-w-96 truncate font-mono text-xs" title={r.key}>
+                {releasedKeyLabel(r.key)}
                 {r.key.endsWith("/") && " (everything under it)"}
               </TableCell>
               <TableCell className="text-muted-foreground text-xs">

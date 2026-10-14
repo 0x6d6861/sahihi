@@ -3,6 +3,7 @@
 import { DEFAULT_SYNC_FOLDER, STORAGE_PROVIDER_INFO } from "@sahihi/core"
 import { useState } from "react"
 import { DialogActions } from "@/components/app/confirm-dialog"
+import { PlusIcon } from "@/components/app/icons"
 import { toastManager } from "@/components/app/toast"
 import { Button } from "@/components/arc/button/button"
 import { Dialog, DialogContent } from "@/components/arc/dialog/dialog"
@@ -49,6 +50,7 @@ export function CloudDriveButton({
   return (
     <>
       <Button variant="secondary" disabled={disabled} onClick={() => setOpen(true)}>
+        <PlusIcon aria-hidden />
         Connect {label}
       </Button>
       <Dialog open={open} onOpenChange={(o) => !pending && setOpen(o)}>

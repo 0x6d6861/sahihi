@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { PlusIcon } from "@/components/app/icons"
 import { Button } from "@/components/arc/button/button"
 import { type AwsRoleSetup, ConnectionFormDialog } from "./connection-form-dialog"
 
@@ -8,7 +9,7 @@ export function AddConnectionButton({
   purpose,
   awsRole,
   label,
-  variant = "primary",
+  variant = "secondary",
   disabled,
 }: {
   purpose: "SYNC" | "PRIMARY"
@@ -21,6 +22,7 @@ export function AddConnectionButton({
   return (
     <>
       <Button variant={variant} disabled={disabled} onClick={() => setOpen(true)}>
+        <PlusIcon aria-hidden />
         {label}
       </Button>
       <ConnectionFormDialog

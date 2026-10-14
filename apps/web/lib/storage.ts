@@ -45,12 +45,17 @@ export interface StorageDeliveryRow {
   envelope: { id: string; title: string }
 }
 
-export const CONNECTION_BADGE: Record<StorageConnectionStatus, { label: string; tone: BadgeTone }> =
-  {
-    ACTIVE: { label: "Working", tone: "success" },
-    FAILING: { label: "Not working", tone: "danger" },
-    PENDING: { label: "Not tested", tone: "warning" },
-  }
+/** The connection's badge. A first test that failed reads "Test failed", not "Not tested". */
+export function connectionBadge(c: { status: StorageConnectionStatus; lastError: string | null }): {
+  label: string
+  tone: BadgeTone
+} {
+  if (c.status === "ACTIVE") return { label: "Working", tone: "success" }
+  if (c.status === "FAILING") return { label: "Not working", tone: "danger" }
+  return c.lastError
+    ? { label: "Test failed", tone: "warning" }
+    : { label: "Not tested", tone: "warning" }
+}
 
 export const DELIVERY_BADGE: Record<StorageDeliveryStatus, { label: string; tone: BadgeTone }> = {
   SUCCEEDED: { label: "Copied", tone: "success" },
@@ -58,22 +63,25 @@ export const DELIVERY_BADGE: Record<StorageDeliveryStatus, { label: string; tone
   PENDING: { label: "Waiting", tone: "info" },
 }
 
-/** Where the files go, in a line: "s3://acme-contracts/sahihi/ · Amazon S3", "Google Drive · ann@acme.co". */
+/** Where the files go, shown in mono: "acme-contracts/sahihi", or a drive's top folder. */
 export function connectionWhere(c: StorageConnectionRow): string {
-  const provider = STORAGE_PROVIDER_INFO[c.provider].label
-  if (c.auth === "OAUTH") {
-    const folder = c.rootFolder ? ` › ${c.rootFolder}` : ""
-    return `${provider}${c.accountEmail ? ` · ${c.accountEmail}` : ""}${folder}`
-  }
-  return `${c.bucket ?? ""}${c.prefix ? `/${c.prefix.replace(/\/$/, "")}` : ""} · ${provider}${
-    c.region && c.region !== "auto" ? ` (${c.region})` : ""
-  }`
+  if (c.auth === "OAUTH") return c.rootFolder || "Sahihi"
+  return `${c.bucket ?? ""}${c.prefix ? `/${c.prefix.replace(/\/$/, "")}` : ""}`
 }
 
-/** How the connection signs in: "Access key …WXYZ", "IAM role", "Signed in with Google". */
-export function connectionAuth(c: StorageConnectionRow): string {
+/**
+ * The rest of the connection in one line: provider (and region), how Sahihi signs in, never the
+ * secret: "Amazon S3 (eu-west-1) · Access key …WXYZ", "Google Drive · Signed in as ann@acme.co".
+ */
+export function connectionDetails(c: StorageConnectionRow): string {
+  const provider = STORAGE_PROVIDER_INFO[c.provider].label
+  const region = c.auth !== "OAUTH" && c.region && c.region !== "auto" ? ` (${c.region})` : ""
+  return `${provider}${region} · ${connectionAuth(c)}`
+}
+
+function connectionAuth(c: StorageConnectionRow): string {
   if (c.auth === "AWS_ROLE") return `IAM role ${c.roleArn?.split("/").pop() ?? ""}`.trim()
-  if (c.auth === "OAUTH") return "Signed in with the account above"
+  if (c.auth === "OAUTH") return c.accountEmail ? `Signed in as ${c.accountEmail}` : "Signed in"
   return c.secretHint ? `Access key …${c.secretHint}` : "Access key"
 }
 
@@ -115,12 +123,26 @@ export function formProviders(purpose: "SYNC" | "PRIMARY") {
     .map((p) => ({ value: p, label: STORAGE_PROVIDER_INFO[p].label }))
 }
 
-/** A plan's own-storage tier, for the plans table: "—", "Sync to 1 destination", … */
+/** A plan's own-storage tier, for the plans table: "Not included", "Sync to 1 destination", … */
 export function ownStorageLabel(plan: {
   ownStorage: "none" | "sync" | "primary"
   storageDestinations: number
 }): string {
-  if (plan.ownStorage === "none") return "—"
+  if (plan.ownStorage === "none") return "Not included"
   const sync = `sync to ${plan.storageDestinations} ${plan.storageDestinations === 1 ? "destination" : "destinations"}`
   return plan.ownStorage === "primary" ? `Your own bucket, ${sync}` : `S${sync.slice(1)}`
+}
+
+/**
+ * A released key short enough for a table cell, keeping the end (which file it was), not the
+ * shared prefix: "…/documents/afd5b871…/original.pdf". The full key is in the CSV and the title.
+ */
+export function releasedKeyLabel(key: string): string {
+  const parts = key.replace(/\/$/, "").split("/")
+  const tail = parts
+    .slice(-3)
+    // Shorten the folders (long ids), never the file name.
+    .map((p, i, all) => (i < all.length - 1 && p.length > 14 ? `${p.slice(0, 8)}…` : p))
+  const label = `${parts.length > 3 ? "…/" : ""}${tail.join("/")}`
+  return key.endsWith("/") ? `${label}/` : label
 }

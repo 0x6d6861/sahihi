@@ -32,8 +32,8 @@ import {
 import { api } from "@/lib/api"
 import { formatDateTime } from "@/lib/format"
 import {
-  CONNECTION_BADGE,
-  connectionAuth,
+  connectionBadge,
+  connectionDetails,
   connectionWhere,
   DELIVERY_BADGE,
   deliveryOutcome,
@@ -53,7 +53,7 @@ export function ConnectionCard({ connection: c }: { connection: StorageConnectio
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const [dialog, setDialog] = useState<"edit" | "backfill" | "disconnect" | "activate" | null>(null)
-  const badge = CONNECTION_BADGE[c.status]
+  const badge = connectionBadge(c)
   const primary = c.purpose === "PRIMARY" ? primaryStatus(c) : null
   const migrating = c.primaryState === "MIGRATING_IN" || c.primaryState === "MIGRATING_OUT"
 
@@ -92,12 +92,27 @@ export function ConnectionCard({ connection: c }: { connection: StorageConnectio
     }
   }
 
-  const retryFailed = () =>
-    run(
-      () => api(`/storage/connections/${c.id}/retry-failed`, { method: "POST" }),
-      "Failed copies queued again",
-      "Not retried",
-    )
+  async function retryFailed() {
+    setBusy(true)
+    try {
+      const { retried } = await api<{ retried: number }>(
+        `/storage/connections/${c.id}/retry-failed`,
+        { method: "POST" },
+      )
+      toastManager.add({
+        title:
+          retried === 0
+            ? "No failed copies to retry"
+            : `${retried} ${retried === 1 ? "copy" : "copies"} queued again`,
+        type: "success",
+      })
+      router.refresh()
+    } catch (err) {
+      fail("Not retried", err)
+    } finally {
+      setBusy(false)
+    }
+  }
   const retryDelivery = (id: string) =>
     run(
       () => api(`/storage/connections/${c.id}/deliveries/${id}/retry`, { method: "POST" }),
@@ -168,16 +183,19 @@ export function ConnectionCard({ connection: c }: { connection: StorageConnectio
               </Badge>
             )}
           </div>
-          <p className="truncate text-muted-foreground text-sm">
-            <span style={{ fontFamily: "var(--font-mono)" }}>{connectionWhere(c)}</span>
+          <p
+            className="truncate font-mono text-muted-foreground text-sm"
+            title={connectionWhere(c)}
+          >
+            {connectionWhere(c)}
           </p>
           <p className="text-muted-foreground text-sm">
-            {connectionAuth(c)}
+            {connectionDetails(c)}
             {c.lastCheckedAt && ` · Checked ${formatDateTime(new Date(c.lastCheckedAt))}`}
             {c.purpose === "SYNC" && (
               <>
                 {" "}
-                · Folders <span style={{ fontFamily: "var(--font-mono)" }}>{c.folderTemplate}</span>
+                · Folders <span className="font-mono">{c.folderTemplate}</span>
               </>
             )}
           </p>
@@ -186,7 +204,10 @@ export function ConnectionCard({ connection: c }: { connection: StorageConnectio
       </header>
 
       {c.lastError && c.status !== "ACTIVE" && (
-        <Alert tone={c.status === "FAILING" ? "danger" : "warning"} title="Sahihi can't use it">
+        <Alert
+          tone={c.status === "FAILING" ? "danger" : "warning"}
+          title={c.status === "FAILING" ? "Sahihi can't reach it" : "The last test failed"}
+        >
           {c.lastError}
         </Alert>
       )}
@@ -219,7 +240,7 @@ export function ConnectionCard({ connection: c }: { connection: StorageConnectio
         onOpenChange={(o) => !o && setDialog(null)}
         title="Keep every file in this bucket?"
         description="New files go to your bucket straight away and existing ones are copied over in the background, then removed from Sahihi's storage. Files stay readable throughout."
-        confirmLabel="Start using it"
+        confirmLabel="Use this bucket"
         tone="primary"
         onConfirm={activate}
       />
@@ -269,7 +290,7 @@ function PrimaryBody({
         <div>
           <Button variant="ghost" size="sm" disabled={busy} onClick={onRetry}>
             <RotateCwIcon aria-hidden />
-            Restart if it's stuck
+            Restart moving files
           </Button>
         </div>
       </div>
@@ -280,11 +301,11 @@ function PrimaryBody({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-muted-foreground text-sm">
           {c.status === "ACTIVE"
-            ? "The bucket works. Start using it to move the workspace's files there."
+            ? "The bucket works. Use it to move the workspace's files there."
             : "Test the connection successfully before using it."}
         </p>
         <Button disabled={busy || c.status !== "ACTIVE"} onClick={onActivate}>
-          Start using it
+          Use this bucket
         </Button>
       </div>
     )
@@ -321,7 +342,7 @@ function Deliveries({
           <TableHead>Envelope</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Result</TableHead>
-          <TableHead>Completed</TableHead>
+          <TableHead>Created</TableHead>
           <TableHead className="w-10">
             <span className="sr-only">Actions</span>
           </TableHead>
@@ -525,7 +546,7 @@ function BackfillDialog({
               Cancel
             </Button>
             <Button loading={pending} onClick={submit}>
-              Copy them
+              Copy envelopes
             </Button>
           </DialogActions>
         </div>
