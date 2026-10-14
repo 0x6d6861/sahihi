@@ -1,4 +1,5 @@
 import { prisma } from "@sahihi/db"
+import { strToU8, zipSync } from "fflate"
 import { createApp } from "../src/app"
 import { auth } from "../src/auth"
 
@@ -174,6 +175,22 @@ function buildPdf(objects: string[]): Uint8Array {
   return new TextEncoder().encode(body)
 }
 
+/** A one-paragraph Word file (.docx), enough to be sniffed and converted. */
+export function minimalDocx(text = "Hello from Word"): Uint8Array {
+  const w = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+  return zipSync({
+    "[Content_Types].xml": strToU8(
+      '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>',
+    ),
+    "_rels/.rels": strToU8(
+      '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>',
+    ),
+    "word/document.xml": strToU8(
+      `<?xml version="1.0"?><w:document ${w}><w:body><w:p><w:r><w:t>${text}</w:t></w:r></w:p></w:body></w:document>`,
+    ),
+  })
+}
+
 export async function sha256(bytes: Uint8Array) {
   const digest = await crypto.subtle.digest("SHA-256", bytes)
   return Buffer.from(digest).toString("hex")
@@ -181,6 +198,7 @@ export async function sha256(bytes: Uint8Array) {
 
 interface UploadedDocument {
   id: string
+  name: string
   status: string
   sha256: string | null
   pageCount: number | null
@@ -192,11 +210,11 @@ export async function uploadDocument(
   sender: Sender,
   bytes: Uint8Array = minimalPdf(),
   name = "contract.pdf",
-  { folderId }: { folderId?: string } = {},
+  { folderId, contentType = "application/pdf" }: { folderId?: string; contentType?: string } = {},
 ): Promise<{ status: number; document: UploadedDocument }> {
   const created = await request(sender, "/api/documents/uploads", {
     method: "POST",
-    json: { name, sizeBytes: bytes.byteLength, contentType: "application/pdf", folderId },
+    json: { name, sizeBytes: bytes.byteLength, contentType, folderId },
   })
   if (created.status !== 201) throw new Error(`create upload: ${created.status}`)
   const { document, uploadUrl } = (await created.json()) as {
@@ -206,7 +224,7 @@ export async function uploadDocument(
   const put = await fetch(uploadUrl, {
     method: "PUT",
     body: bytes,
-    headers: { "content-type": "application/pdf" },
+    headers: { "content-type": contentType },
   })
   if (!put.ok) throw new Error(`PUT to storage: ${put.status}`)
   const completed = await request(sender, `/api/documents/${document.id}/complete`, {

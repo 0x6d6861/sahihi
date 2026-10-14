@@ -210,8 +210,14 @@ model Invitation {
 
 enum DocumentStatus {
   UPLOADING // presigned URL issued, bytes not yet confirmed
+  CONVERTING // a Word file waiting for the worker to make it a PDF (ADR 0052)
   READY // hashed + inspected, usable in envelopes
-  FAILED // invalid / encrypted / corrupt PDF
+  FAILED // invalid / encrypted / corrupt PDF, or a Word file that didn't convert
+}
+
+/// What a document was converted from (ADR 0052).
+enum DocumentSourceFormat {
+  DOCX
 }
 
 enum EnvelopeStatus {
@@ -266,22 +272,25 @@ enum SigningProviderKind {
 
 /// An uploaded source PDF. Immutable once READY — never overwrite `s3Key`.
 model Document {
-  id                String              @id @default(cuid())
+  id                String                @id @default(cuid())
   organizationId    String
-  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization      Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   uploadedById      String
-  uploadedBy        User                @relation(fields: [uploadedById], references: [id])
+  uploadedBy        User                  @relation(fields: [uploadedById], references: [id])
   name              String
-  s3Key             String              @unique
-  status            DocumentStatus      @default(UPLOADING)
+  s3Key             String                @unique
+  status            DocumentStatus        @default(UPLOADING)
   sizeBytes         Int?
   sha256            String?
   pageCount         Int?
   /// PageBox[] from @sahihi/core — unrotated crop box + rotation per page
   pages             Json?
   failureReason     String?
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  /// Set when the upload was a Word file the worker converted to this PDF (ADR 0052). The Word
+  /// file itself isn't kept.
+  convertedFrom     DocumentSourceFormat?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
   deletedAt         DateTime?
   /// Envelopes and templates that use this document (ADR 0037: an envelope can hold several).
   envelopeDocuments EnvelopeDocument[]
@@ -291,11 +300,11 @@ model Document {
   /// Set when this document was produced by "Prepare document" from another one (same org).
   /// The source is never modified; this is lineage only.
   sourceDocumentId  String?
-  source            Document?           @relation("DocumentLineage", fields: [sourceDocumentId], references: [id], onDelete: SetNull)
-  derived           Document[]          @relation("DocumentLineage")
+  source            Document?             @relation("DocumentLineage", fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  derived           Document[]            @relation("DocumentLineage")
   /// Folder on the Documents page (null = workspace root). Organisation only, no effect on signing.
   folderId          String?
-  folder            Folder?             @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  folder            Folder?               @relation(fields: [folderId], references: [id], onDelete: SetNull)
   /// Label colour (`#RRGGBB`, `LabelColorSchema`) and tags on the Documents page (ADR 0025).
   /// Organisation only, like folders.
   color             String?

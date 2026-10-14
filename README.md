@@ -50,7 +50,7 @@ Run four services from this repo, each with a start command, plus Postgres and R
 | Service | Build | Start |
 |---|---|---|
 | api | `bun install && bun run db:generate` | `bun run --filter @sahihi/db migrate:deploy && bun apps/api/src/index.ts` |
-| worker | `bun install && bun run db:generate` | `bun apps/worker/src/index.ts` |
+| worker | `bun install && bun run db:generate` (plus LibreOffice and fonts for Word uploads, see `docs/pdf-pipeline.md` → Word uploads) | `bun apps/worker/src/index.ts` |
 | web | `bun install && bun run --filter @sahihi/web build` | `bun run --filter @sahihi/web start` |
 | website | `bun install && bun run --filter @sahihi/website build` | `bun run --filter @sahihi/website start` |
 

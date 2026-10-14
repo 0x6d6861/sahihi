@@ -3,6 +3,7 @@
  * short-lived presigned URLs, or tickets for files in a customer's bucket (docs/storage.md).
  *
  *   org/{orgId}/documents/{documentId}/original.pdf
+ *   org/{orgId}/documents/{documentId}/source.docx                  (upload, until converted)
  *   org/{orgId}/documents/{documentId}/thumbnail[-{v}].png
  *   org/{orgId}/envelopes/{envelopeId}/fields/{fieldId}[-{v}].png
  *   org/{orgId}/envelopes/{envelopeId}/signed.pdf                  (single-document, before ADR 0037)
@@ -25,6 +26,12 @@ const v = (version?: string) => (version ? `-${version}` : "")
 export const keys = {
   original: (orgId: string, documentId: string) =>
     `org/${orgId}/documents/${documentId}/original.pdf`,
+  /**
+   * A Word upload waiting to be converted (ADR 0052). It's an upload, never committed: the worker
+   * reads it with `readUpload`, stores the PDF at `original` and discards it.
+   */
+  wordUpload: (orgId: string, documentId: string) =>
+    `org/${orgId}/documents/${documentId}/source.docx`,
   /** First-page preview for the Documents grid (ADR 0033). Same access rules as the original. */
   thumbnail: (orgId: string, documentId: string, version?: string) =>
     `org/${orgId}/documents/${documentId}/thumbnail${v(version)}.png`,
@@ -74,3 +81,13 @@ export const keys = {
 
 /** A fresh version for a key (8 characters). */
 export const objectVersion = () => crypto.randomUUID().replace(/-/g, "").slice(0, 8)
+
+/** Where a document's browser upload lands: the Word file for a conversion, else the PDF itself. */
+export function documentUploadKey(doc: {
+  id: string
+  organizationId: string
+  s3Key: string
+  convertedFrom: string | null
+}): string {
+  return doc.convertedFrom === "DOCX" ? keys.wordUpload(doc.organizationId, doc.id) : doc.s3Key
+}

@@ -18,6 +18,11 @@ Runner: **`bun test`** (Jest-compatible `bun:test` API). No vitest or jest.
 The root `bun run test` script covers `packages`, `apps/api/src`, `apps/worker` and `apps/web/lib`.
 Integration tests are named `*.itest.ts`, so neither it nor a bare `bun test` picks them up.
 
+Word → PDF conversion (ADR 0052) needs LibreOffice: the tests that run a real conversion
+(`packages/pdf/src/convert/docx-to-pdf.test.ts`, `apps/worker/test/conversions.itest.ts`) skip
+when `soffice` isn't on the `PATH`, as in CI. Everything else about Word uploads (sanitising,
+refusals, time limit, the API flow, the sweep) runs everywhere.
+
 ## CI
 
 `.github/workflows/ci.yml` runs on pushes to `main` and on every PR:

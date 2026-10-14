@@ -52,6 +52,12 @@ const EnvSchema = z.object({
   MICROSOFT_CLIENT_ID: z.string().min(1).optional(),
   MICROSOFT_CLIENT_SECRET: z.string().min(1).optional(),
 
+  /**
+   * LibreOffice's command on the worker, for Word → PDF conversion on upload (ADR 0052). Word
+   * uploads fail with a clear reason when it isn't installed.
+   */
+  LIBREOFFICE_PATH: z.string().min(1).default("soffice"),
+
   EMAIL_TRANSPORT: z.enum(["smtp", "postmark"]).default("smtp"),
   SMTP_HOST: z.string().default("localhost"),
   SMTP_PORT: z.coerce.number().default(1025),
@@ -139,6 +145,8 @@ export const QUEUES = {
   documents: "documents",
   /** Own storage: sync deliveries, migrations, health checks (docs/storage.md) */
   storage: "storage",
+  /** Word → PDF conversion with LibreOffice, one at a time per worker (ADR 0052) */
+  conversions: "document-conversions",
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]

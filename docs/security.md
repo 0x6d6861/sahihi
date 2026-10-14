@@ -172,6 +172,14 @@ them for malware yet; that needs an external scanner.
   (below).
 - Uploads are re-validated on the server (size, PDF parse, not encrypted). The original's SHA-256 is
   re-checked before stamping.
+- **Word uploads (ADR 0052)** are untrusted input to LibreOffice in the worker. Before it opens one,
+  `sanitizeDocx` refuses macro-enabled, encrypted and old .doc files and zip bombs, drops external
+  relationships other than hyperlinks and blanks content-fetching fields (INCLUDEPICTURE,
+  INCLUDETEXT, DDE…), so the conversion can't be turned into requests from our network.
+  LibreOffice then runs with a fresh profile (macros off, links from documents blocked), an
+  environment holding none of the worker's secrets, a temporary `HOME`, its own process group and
+  a 90-second limit. Files with tracked changes are refused, so what's signed is one version the
+  sender chose. Only the PDF is kept; the Word file is discarded.
 - Signature PNGs are validated as PNGs (magic bytes) and size-limited (≤ ~500 KB each, 8 MB per body).
 
 ## Consent & evidence (ESIGN / UETA / Kenya)

@@ -1,4 +1,5 @@
 export * from "./compose/document"
+export * from "./convert/docx-to-pdf"
 export * from "./import/import"
 export * from "./parse/form"
 export * from "./parse/inspect"

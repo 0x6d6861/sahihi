@@ -1,4 +1,9 @@
-import { type CreateUploadInput, CreateUploadSchema, MAX_UPLOAD_BYTES } from "@sahihi/core"
+import {
+  type CreateUploadInput,
+  CreateUploadSchema,
+  documentUploadType,
+  MAX_UPLOAD_BYTES,
+} from "@sahihi/core"
 
 /** The parts of a browser `File` the upload flow looks at. */
 export interface UploadCandidate {
@@ -14,13 +19,24 @@ export type PrepareUploadResult =
 const MAX_NAME_LENGTH = 200
 
 /**
- * Client-side pre-check for `POST /documents/uploads`, using the same schema as the API.
- * Some browsers and OSes report an empty MIME type for PDFs, so a `.pdf` extension also counts.
- * The server still re-validates the bytes on `complete`.
+ * Client-side pre-check for `POST /documents/uploads`, using the same schema as the API: a PDF,
+ * or a Word file (.docx) the worker converts to one (ADR 0052). Some browsers and OSes report an
+ * empty MIME type, so the extension also counts. The server still re-checks the bytes on
+ * `complete`. `prepareUpload(file, { pdfOnly: true })` is for flows that need the PDF at once.
  */
-export function prepareUpload(file: UploadCandidate): PrepareUploadResult {
-  const isPdf = file.type === "application/pdf" || (!file.type && /\.pdf$/i.test(file.name))
-  if (!isPdf) return { ok: false, message: "Only PDF files are supported." }
+export function prepareUpload(
+  file: UploadCandidate,
+  { pdfOnly = false }: { pdfOnly?: boolean } = {},
+): PrepareUploadResult {
+  const contentType = documentUploadType(file.name, file.type)
+  if (!contentType || (pdfOnly && contentType !== "application/pdf")) {
+    return {
+      ok: false,
+      message: pdfOnly
+        ? "Only PDF files are supported."
+        : "Only PDF and Word (.docx) files are supported.",
+    }
+  }
   if (file.size === 0) return { ok: false, message: "This file is empty." }
   if (file.size > MAX_UPLOAD_BYTES) {
     return {
@@ -31,13 +47,13 @@ export function prepareUpload(file: UploadCandidate): PrepareUploadResult {
   const parsed = CreateUploadSchema.safeParse({
     name: file.name.trim().slice(0, MAX_NAME_LENGTH) || "document.pdf",
     sizeBytes: file.size,
-    contentType: "application/pdf",
+    contentType,
   })
   if (!parsed.success) return { ok: false, message: "This file can't be uploaded." }
   return { ok: true, input: parsed.data }
 }
 
-export type UploadStage = "creating" | "uploading" | "checking" | "done"
+export type UploadStage = "creating" | "uploading" | "checking" | "converting" | "done"
 
 /**
  * Overall progress (0–100) across the three requests. The S3 PUT gets most of the bar;
@@ -52,7 +68,9 @@ export function uploadPercent(stage: UploadStage, fraction = 0): number {
       return Math.round(5 + f * 85)
     }
     case "checking":
-      return 95
+      return 92
+    case "converting":
+      return 96
     case "done":
       return 100
   }
@@ -61,7 +79,8 @@ export function uploadPercent(stage: UploadStage, fraction = 0): number {
 export const UPLOAD_STAGE_LABEL: Record<UploadStage, string> = {
   creating: "Preparing upload…",
   uploading: "Uploading…",
-  checking: "Checking the PDF…",
+  checking: "Checking the file…",
+  converting: "Converting to PDF…",
   done: "Done",
 }
 

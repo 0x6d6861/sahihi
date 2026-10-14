@@ -64,6 +64,12 @@ export interface DocumentJobs {
   "document.thumbnail": { documentId: string }
 }
 
+/** Word → PDF with LibreOffice (ADR 0052), on its own queue: one at a time per worker. */
+export interface ConversionJobs {
+  /** Convert a CONVERTING document's Word upload. Enqueue with enqueueDocumentConversion. */
+  "document.convert": { documentId: string }
+}
+
 export interface WebhookJobs {
   /** Retries and backoff: WEBHOOK_MAX_ATTEMPTS / webhookRetryDelayMs (@sahihi/core). */
   "webhook.deliver": { deliveryId: string }
@@ -119,6 +125,7 @@ let queues:
       webhooks: TypedQueue<WebhookJobs>
       documents: TypedQueue<DocumentJobs>
       storage: TypedQueue<StorageJobs>
+      conversions: TypedQueue<ConversionJobs>
     }
   | undefined
 
@@ -130,6 +137,7 @@ export function getQueues() {
     webhooks: new TypedQueue<WebhookJobs>(QUEUES.webhooks),
     documents: new TypedQueue<DocumentJobs>(QUEUES.documents),
     storage: new TypedQueue<StorageJobs>(QUEUES.storage),
+    conversions: new TypedQueue<ConversionJobs>(QUEUES.conversions),
   }
   return queues
 }
@@ -168,6 +176,25 @@ export async function enqueueDocumentThumbnail(documentId: string) {
     "document.thumbnail",
     { documentId },
     { jobId: `thumb-${documentId}`, attempts: 3 },
+  )
+}
+
+/** Attempts per conversion: a crash or a lost worker gets one more go; a bad file fails at once. */
+export const CONVERSION_ATTEMPTS = 2
+
+/**
+ * Queue a Word upload's conversion AFTER the update that made it CONVERTING has committed. The
+ * job id is the document id, so a retried `complete` and the sweep never convert it twice at once.
+ */
+export async function enqueueDocumentConversion(documentId: string) {
+  await getQueues().conversions.add(
+    "document.convert",
+    { documentId },
+    {
+      jobId: `convert-${documentId}`,
+      attempts: CONVERSION_ATTEMPTS,
+      backoff: { type: "fixed", delay: 10_000 },
+    },
   )
 }
 

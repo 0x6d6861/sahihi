@@ -212,4 +212,5 @@ The api service runs `prisma migrate deploy` before starting, as the schema owne
 in `sahihi_app`, which can't run DDL or rewrite the audit trail (see `security.md`). Set `WEB_URL`, `API_URL` and
 `BETTER_AUTH_URL` (= web origin) per environment. The web service needs `API_URL` for the rewrite.
 Workers scale horizontally. The finalize job is deduped by `jobId`, and audit writes are serialised
-with a Postgres advisory lock.
+with a Postgres advisory lock. The worker needs LibreOffice and Word-compatible fonts for Word
+uploads (docs/pdf-pipeline.md → Word uploads, ADR 0052).

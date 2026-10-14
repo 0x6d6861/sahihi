@@ -7,6 +7,7 @@ import { ButtonLink } from "@/components/app/button-link"
 import { DocumentCard, type DocumentCardData } from "@/components/app/documents/document-card"
 import { DocumentRowActions } from "@/components/app/documents/document-row-actions"
 import { DocumentTypeIcon } from "@/components/app/documents/document-type-icon"
+import { RefreshWhileConverting } from "@/components/app/documents/refresh-while-converting"
 import { EnvelopeCard, type EnvelopeItem } from "@/components/app/envelope/envelope-card"
 import { EnvelopeRowActions } from "@/components/app/envelope/envelope-row-actions"
 import {
@@ -207,6 +208,9 @@ export default async function FilesPage({
       hideMoved={!searching}
     >
       <div className="flex flex-col gap-8">
+        {items.some((item) => item.kind === "document" && item.status === "CONVERTING") && (
+          <RefreshWhileConverting />
+        )}
         <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex min-w-0 flex-col gap-2">
             {path.length > 0 && (

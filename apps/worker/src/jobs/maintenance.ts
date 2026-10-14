@@ -7,7 +7,15 @@ import {
   prisma,
   queueEnvelopeWebhook,
 } from "@sahihi/db"
-import { createLogger, enqueueWebhookDeliveries, getQueues, storageFor } from "@sahihi/infra"
+import {
+  createLogger,
+  documentUploadKey,
+  enqueueWebhookDeliveries,
+  getQueues,
+  keys,
+  storageFor,
+} from "@sahihi/infra"
+import { requeueLostConversions } from "./conversions"
 
 const log = createLogger("worker")
 
@@ -87,8 +95,10 @@ const SWEEP_BATCH = 500
 
 /**
  * Every 15 min: uploads never completed within an hour become FAILED + soft-deleted, and their
- * storage object (if the PUT landed) is removed. Abandoned supporting-file uploads are deleted. Idempotent: the conditional update skips rows a
- * late `complete` already moved on, and deleting a missing object is a no-op in S3.
+ * storage object (if the PUT landed) is removed. Abandoned supporting-file uploads are deleted.
+ * Word conversions still waiting after an hour fail (their Word file is removed); lost ones are
+ * queued again (ADR 0052). Idempotent: the conditional update skips rows a late `complete` already
+ * moved on, and deleting a missing object is a no-op in S3.
  */
 export async function sweepAbandonedUploads(now = new Date()) {
   const cutoff = abandonedUploadCutoff(now)
@@ -96,7 +106,7 @@ export async function sweepAbandonedUploads(now = new Date()) {
   for (;;) {
     const stale = await prisma.document.findMany({
       where: { status: "UPLOADING", createdAt: { lt: cutoff }, deletedAt: null },
-      select: { id: true, organizationId: true, s3Key: true },
+      select: { id: true, organizationId: true, s3Key: true, convertedFrom: true },
       orderBy: { createdAt: "asc" },
       take: SWEEP_BATCH,
     })
@@ -109,14 +119,36 @@ export async function sweepAbandonedUploads(now = new Date()) {
       swept += 1
       // Missing keys are a no-op in S3, so an error here is a real outage. The row is already
       // swept; log the key so the orphaned (private) object can be removed by hand.
+      const key = documentUploadKey(doc)
       await (await storageFor(doc.organizationId))
-        .discardUpload(doc.s3Key)
-        .catch((err: unknown) =>
-          log.error("could not delete abandoned upload", { key: doc.s3Key, err }),
-        )
+        .discardUpload(key)
+        .catch((err: unknown) => log.error("could not delete abandoned upload", { key, err }))
     }
     if (stale.length < SWEEP_BATCH) break
   }
+  // Word conversions (ADR 0052) still waiting after an hour: the document fails, visibly.
+  const stuck = await prisma.document.findMany({
+    where: { status: "CONVERTING", updatedAt: { lt: cutoff } },
+    select: { id: true, organizationId: true },
+    take: SWEEP_BATCH,
+  })
+  for (const doc of stuck) {
+    const res = await prisma.document.updateMany({
+      where: { id: doc.id, status: "CONVERTING" },
+      data: {
+        status: "FAILED",
+        failureReason: "Converting this Word document took too long. Upload it again, or as a PDF.",
+      },
+    })
+    if (res.count === 0) continue
+    swept += 1
+    const key = keys.wordUpload(doc.organizationId, doc.id)
+    await (await storageFor(doc.organizationId))
+      .discardUpload(key)
+      .catch((err: unknown) => log.error("could not delete abandoned upload", { key, err }))
+  }
+  const requeued = await requeueLostConversions(now, cutoff)
+  if (requeued) log.info("conversions queued again", { count: requeued })
   // Supporting files (ADR 0037) left UPLOADING the same way: the row goes, and the object if the
   // PUT landed. Nothing was audited for them (only `complete` audits).
   const staleFiles = await prisma.envelopeAttachment.findMany({

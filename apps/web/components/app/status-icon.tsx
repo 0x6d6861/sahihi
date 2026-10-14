@@ -48,6 +48,7 @@ export const ENVELOPE_STAGE_ICON: Record<EnvelopeStage, Glyph> = {
 
 const DOCUMENT_STATUS_ICON: Record<DocumentStatus, Glyph> = {
   UPLOADING: LoaderIcon,
+  CONVERTING: LoaderIcon,
   READY: CircleCheckIcon,
   FAILED: CircleAlertIcon,
 }

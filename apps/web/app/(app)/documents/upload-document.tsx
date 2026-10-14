@@ -1,6 +1,6 @@
 "use client"
 
-import { MAX_UPLOAD_BYTES } from "@sahihi/core"
+import { DOCUMENT_UPLOAD_ACCEPT, MAX_UPLOAD_BYTES } from "@sahihi/core"
 import { useState } from "react"
 import { FileTextIcon, UploadIcon } from "@/components/app/icons"
 import { Button } from "@/components/arc/button/button"
@@ -10,7 +10,10 @@ import { FileUpload } from "@/components/extend/file-upload"
 import { UPLOAD_STAGE_LABEL } from "@/lib/upload"
 import { useDocumentUpload } from "./use-document-upload"
 
-const PDF_ONLY = [{ label: "PDF", icon: FileTextIcon }]
+const UPLOAD_TYPES = [
+  { label: "PDF", icon: FileTextIcon },
+  { label: "Word", icon: FileTextIcon },
+]
 
 /** Extend FileUpload drop zone, replaced by an Arc Progress while an upload runs. */
 export function UploadDropzone({
@@ -34,12 +37,12 @@ export function UploadDropzone({
   return (
     <FileUpload
       className="w-full"
-      accept=".pdf,application/pdf"
-      acceptedFileTypes={PDF_ONLY}
+      accept={DOCUMENT_UPLOAD_ACCEPT}
+      acceptedFileTypes={UPLOAD_TYPES}
       multiple={false}
       showFileList={false}
-      title="Click to upload or drop a PDF"
-      description={`PDF up to ${MAX_UPLOAD_BYTES / 1024 / 1024} MB`}
+      title="Click to upload or drop a PDF or Word file"
+      description={`PDF or Word (.docx) up to ${MAX_UPLOAD_BYTES / 1024 / 1024} MB. Word files are converted to PDF.`}
       onFilesAccepted={(files) => {
         const file = files[0]
         if (file) void upload(file)
@@ -62,7 +65,7 @@ export function UploadDocument({ folderId }: { folderId?: string }) {
       </DialogTrigger>
       <DialogContent
         title="Upload a document"
-        description="The original PDF is stored unchanged and fingerprinted (SHA-256)."
+        description="A PDF is stored unchanged and fingerprinted (SHA-256); a Word file is converted to a PDF first."
       >
         <UploadDropzone folderId={folderId} onDone={() => setOpen(false)} />
       </DialogContent>

@@ -34,6 +34,11 @@ export interface StorageDriver {
   /** The upload the browser made for `key`, before it's committed. */
   uploaded(key: string): Promise<ObjectInfo | null>
   readUpload(key: string): Promise<Uint8Array>
+  /**
+   * An upload the server received itself (the public API's Word upload): it waits where a
+   * browser's would, for `readUpload` and then `discardUpload`.
+   */
+  stageUpload(key: string, bytes: Uint8Array, contentType: string): Promise<void>
   /** Validated: store it under `key`. A no-op for Sahihi's bucket (it's already there). */
   commitUpload(key: string, bytes: Uint8Array, contentType: string): Promise<void>
   /** Rejected or abandoned: remove the waiting upload (always in Sahihi's bucket). */

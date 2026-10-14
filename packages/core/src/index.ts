@@ -50,6 +50,7 @@ export * from "./shared/enums"
 export * from "./shared/observability"
 export * from "./shared/png"
 export * from "./shared/schemas"
+export * from "./shared/uploads"
 
 export * from "./signing/consent"
 export * from "./signing/downloads"

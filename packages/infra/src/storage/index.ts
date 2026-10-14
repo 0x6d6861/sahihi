@@ -27,7 +27,7 @@ export {
   oauthRedirectUri,
   oauthSlug,
 } from "./drives"
-export { keys, objectVersion } from "./keys"
+export { documentUploadKey, keys, objectVersion } from "./keys"
 export { platformStorage } from "./platform"
 export { primaryStorage, STORAGE_OBJECTS_PATH, ticketUrl } from "./primary"
 export { CACHEABLE_URL_WINDOW_SECONDS } from "./s3"
