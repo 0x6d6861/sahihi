@@ -305,6 +305,10 @@ const TENANT: Record<string, Case> = {
   "GET /api/generated-documents/:id": () => ({
     path: `/api/generated-documents/${ids.generatedDocument}`,
   }),
+  "DELETE /api/generated-documents/:id": () => ({
+    path: `/api/generated-documents/${ids.generatedDocument}`,
+    init: { method: "DELETE" },
+  }),
   "GET /api/generated-documents/:id/preview": () => ({
     path: `/api/generated-documents/${ids.generatedDocument}/preview`,
   }),
