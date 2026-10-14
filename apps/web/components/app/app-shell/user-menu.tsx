@@ -17,7 +17,8 @@ export interface ShellUser {
 }
 
 /**
- * Account menu at the right of the top bar (avatar only): Settings (the only way in, ADR 0026),
+ * Account menu at the right of the top bar (avatar only): Settings (opens Profile; the workspace
+ * menu links the workspace's own pages, ADR 0054),
  * appearance (light, dark, system) and sign out.
  */
 export function UserMenu({ user }: { user: ShellUser }) {

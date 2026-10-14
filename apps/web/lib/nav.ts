@@ -28,19 +28,25 @@ const NAV_SECTION_FOR: readonly { prefix: string; href: AppNavHref }[] = [
 export const HOME_HREF = "/files"
 
 /**
- * Settings pages: the tab bar on every settings page. Your account first (profile, security,
- * notifications), then the active workspace. The user menu links to the first one.
+ * Settings pages: your account first (profile, security, notifications), then the active
+ * workspace. The side nav groups them and may use `navLabel` under its group heading; the tab bar
+ * (narrow screens) uses `label`. The user menu links to the first one.
  */
 export const SETTINGS_NAV = [
-  { href: "/settings/profile", label: "Profile" },
-  { href: "/settings/security", label: "Security" },
-  { href: "/settings/notifications", label: "Notifications" },
-  { href: "/settings/workspace", label: "Workspace" },
-  { href: "/settings/members", label: "Members" },
-  { href: "/settings/billing", label: "Plan & usage" },
-  { href: "/settings/data", label: "Data" },
-  { href: "/settings/storage", label: "Storage" },
-  { href: "/settings/api", label: "API" },
+  { href: "/settings/profile", label: "Profile", group: "account" },
+  { href: "/settings/security", label: "Security", group: "account" },
+  { href: "/settings/notifications", label: "Notifications", group: "account" },
+  { href: "/settings/workspace", label: "Workspace", navLabel: "General", group: "workspace" },
+  { href: "/settings/members", label: "Members", group: "workspace" },
+  { href: "/settings/billing", label: "Plan & usage", group: "workspace" },
+  { href: "/settings/data", label: "Data", group: "workspace" },
+  { href: "/settings/storage", label: "Storage", group: "workspace" },
+  { href: "/settings/api", label: "API", group: "workspace" },
+] as const
+
+export const SETTINGS_GROUPS = [
+  { id: "account", label: "Account" },
+  { id: "workspace", label: "Workspace" },
 ] as const
 
 /** True when `pathname` is `href` itself or a page below it (`/inbox/x` → `/inbox`). */
