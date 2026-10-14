@@ -5,7 +5,6 @@ import pg from "pg"
  * Postgres: a transaction-mode pooler (PgBouncer) doesn't deliver notifications. The caller
  * connects it, handles `error`/`end` and closes it.
  */
-export function createListenClient(connectionString = process.env.DATABASE_URL): pg.Client {
-  if (!connectionString) throw new Error("DATABASE_URL is not set")
+export function openListenClient(connectionString: string): pg.Client {
   return new pg.Client({ connectionString })
 }

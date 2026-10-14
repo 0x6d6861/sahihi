@@ -1,5 +1,6 @@
 import { PrismaPg } from "@prisma/adapter-pg"
 import { PrismaClient } from "./generated/prisma/client"
+import { openListenClient } from "./listen"
 import { createSerializedPool } from "./pg-pool"
 
 export { type AppendAuditInput, appendAuditEvent, toChainedEvent } from "./audit"
@@ -11,7 +12,6 @@ export {
   lockOrgQuota,
 } from "./billing"
 export * from "./generated/prisma/client"
-export { createListenClient } from "./listen"
 export {
   NOTIFICATIONS_CHANNEL,
   notifyEnvelopeOwner,
@@ -30,6 +30,11 @@ export { forOrganization } from "./tenant"
 export { queueEnvelopeWebhook, queueWorkspaceWebhook } from "./webhooks"
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient }
+
+export function createListenClient(connectionString = process.env.DATABASE_URL) {
+  if (!connectionString) throw new Error("DATABASE_URL is not set")
+  return openListenClient(connectionString)
+}
 
 export function createPrismaClient(connectionString = process.env.DATABASE_URL) {
   if (!connectionString) throw new Error("DATABASE_URL is not set")
