@@ -212,7 +212,7 @@ export default async function FilesPage({
         {items.some((item) => item.kind === "document" && item.status === "CONVERTING") && (
           <RefreshWhileConverting />
         )}
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 flex-col gap-2">
             {path.length > 0 && (
               <BreadcrumbDrops targets={crumbs}>
@@ -224,7 +224,7 @@ export default async function FilesPage({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <CreateFolderButton parentId={current?.id} allTags={allTags} />
-            <ButtonLink variant="secondary" href="/generate">
+            <ButtonLink variant="ghost" href="/generate">
               <SparklesIcon aria-hidden />
               Draft with AI
             </ButtonLink>

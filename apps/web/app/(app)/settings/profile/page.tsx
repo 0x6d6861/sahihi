@@ -22,22 +22,16 @@ export default async function ProfilePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Panel title="Profile">
+      <Panel title="Your details">
         <ProfilePicture name={user.name} email={user.email} image={user.image ?? null} />
         <ProfileForm name={user.name} />
       </Panel>
 
-      <Panel
-        title="Email"
-        description="Where you sign in and receive notifications about envelopes you send."
-      >
+      <Panel title="Email">
         <ChangeEmail email={user.email} verified={user.emailVerified} />
       </Panel>
 
-      <Panel
-        title="Signature"
-        description={`Save your signature and initials once. When a document is sent to ${user.email} and you're signed in, you can place them with one click.`}
-      >
+      <Panel title="Signature" description="Place them with one click on documents sent to you.">
         <SavedSignaturesEditor
           name={user.name}
           initial={signatures.data ?? { signature: null, initials: null }}

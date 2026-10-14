@@ -1,6 +1,13 @@
 "use client"
 
-import { Building03Icon, PlusSignIcon, Tick02Icon } from "@hugeicons/core-free-icons"
+import {
+  Building03Icon,
+  CreditCardIcon,
+  PlusSignIcon,
+  Settings02Icon,
+  Tick02Icon,
+  UserGroupIcon,
+} from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
@@ -14,9 +21,17 @@ export interface ShellOrganization {
   name: string
 }
 
+/** Settings that belong to the active workspace, reachable from its own menu (ADR 0054). */
+const WORKSPACE_LINKS = [
+  { label: "Workspace settings", href: "/settings/workspace", icon: Settings02Icon },
+  { label: "Members", href: "/settings/members", icon: UserGroupIcon },
+  { label: "Plan & usage", href: "/settings/billing", icon: CreditCardIcon },
+] as const
+
 /**
- * Workspace switcher. Changing the active org updates the session on the API, then
- * sends the user to /documents: the current page may belong to the previous org.
+ * Workspace menu: switch workspace, open the active workspace's settings, or create one.
+ * Changing the active org updates the session on the API, then sends the user home: the
+ * current page may belong to the previous org.
  */
 export function OrgSwitcher({
   organizations,
@@ -46,8 +61,11 @@ export function OrgSwitcher({
     router.refresh()
   }
 
-  // Arc items are keyed by label, so two workspaces with the same name get a short suffix.
-  const seen = new Map<string, number>()
+  // Arc items are keyed by label, so two workspaces with the same name get a short suffix. The
+  // fixed items are seeded so a workspace called "Members" can't collide with the link.
+  const seen = new Map<string, number>(
+    [...WORKSPACE_LINKS.map((l) => l.label), "New workspace"].map((label) => [label, 1]),
+  )
   const items: DropdownItem[] = organizations.map((o) => {
     const n = (seen.get(o.name) ?? 0) + 1
     seen.set(o.name, n)
@@ -60,6 +78,14 @@ export function OrgSwitcher({
       onSelect: () => void switchTo(o.id),
     }
   })
+  for (const [i, link] of WORKSPACE_LINKS.entries()) {
+    items.push({
+      label: link.label,
+      icon: <HugeiconsIcon icon={link.icon} size={16} />,
+      separatorBefore: i === 0,
+      onSelect: () => router.push(link.href),
+    })
+  }
   items.push({
     label: "New workspace",
     icon: <HugeiconsIcon icon={PlusSignIcon} size={16} />,
@@ -70,6 +96,7 @@ export function OrgSwitcher({
   // The shell hides this in the icon rail, so the trigger always has room for the name.
   return (
     <DropdownMenu
+      align="start"
       label={active?.name ?? "Select a workspace"}
       icon={<HugeiconsIcon icon={Building03Icon} size={16} />}
       items={items}

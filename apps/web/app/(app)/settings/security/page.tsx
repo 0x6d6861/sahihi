@@ -42,24 +42,18 @@ export default async function SecurityPage() {
         <ChangePasswordForm />
       </Panel>
 
-      <Panel
-        title="Passkeys"
-        description="Sign in with your fingerprint, face or screen lock instead of a password. Passkeys can't be phished."
-      >
+      <Panel title="Passkeys" description="Sign in with your fingerprint, face or screen lock.">
         <PasskeySettings passkeys={(passkeys.data ?? []).map(toRow)} />
       </Panel>
 
-      <Panel
-        title="Two-factor authentication"
-        description="A second step at sign-in, so a stolen password isn't enough."
-      >
+      <Panel title="Two-factor authentication">
         <TwoFactorSettings
           enabled={Boolean(session.user.twoFactorEnabled)}
           email={session.user.email}
         />
       </Panel>
 
-      <Panel title="Sessions" description="Devices where you're signed in to Sahihi.">
+      <Panel title="Sessions">
         <SessionsList sessions={sessions.data ?? []} currentId={session.session.id} />
       </Panel>
 

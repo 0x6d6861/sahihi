@@ -47,12 +47,7 @@ export default async function MembersPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h2 className="font-medium text-lg">Members</h2>
-          <p className="text-muted-foreground text-sm">
-            People in {org.name}. Everyone can send envelopes; admins and owners manage members.
-          </p>
-        </div>
+        <h2 className="font-medium text-lg">Members</h2>
         {roles.length > 0 && <InviteDialog roles={roles} />}
       </div>
 

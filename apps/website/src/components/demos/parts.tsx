@@ -1,7 +1,7 @@
 /**
  * Building blocks for the coded product demos. Sizes are in `em` off `.demo-root`
  * (globals.css), colours come from the `--dm-*` palette, which follows the theme.
- * They copy the app's own cards (Arc): rounded surfaces, hairline borders, pill buttons.
+ * They copy the app's own cards (Arc): rounded surfaces, hairline borders, crisp buttons and fields (ADR 0053).
  */
 import type { CSSProperties, ReactNode } from "react"
 
@@ -42,7 +42,7 @@ export function Card({
   return (
     <div
       data-s={at?.["data-s"]}
-      className={`rounded-[1.4em] border border-(--dm-line) bg-(--dm-card) shadow-(--dm-shadow) ${className}`}
+      className={`rounded-[0.8em] border border-(--dm-line) bg-(--dm-card) shadow-(--dm-shadow) ${className}`}
       style={{ ...at?.style, ...style }}
     >
       {children}
@@ -67,7 +67,7 @@ export function Pill({
   }[kind]
   return (
     <span
-      className={`inline-flex items-center justify-center gap-[0.35em] whitespace-nowrap rounded-full px-[1.1em] py-[0.45em] text-[0.85em] ${look} ${className}`}
+      className={`inline-flex items-center justify-center gap-[0.35em] whitespace-nowrap rounded-[0.55em] px-[1.1em] py-[0.45em] text-[0.85em] ${look} ${className}`}
     >
       {children}
     </span>
@@ -107,7 +107,7 @@ export function Field({
   return (
     <div className={`flex min-w-0 flex-col gap-[0.35em] ${className}`}>
       {label && <span className="text-[0.8em]">{label}</span>}
-      <span className="truncate rounded-full border border-(--dm-strong) px-[0.9em] py-[0.45em] text-[0.85em]">
+      <span className="truncate rounded-[0.55em] border border-(--dm-strong) px-[0.9em] py-[0.45em] text-[0.85em]">
         {value ?? " "}
       </span>
     </div>

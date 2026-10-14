@@ -43,7 +43,7 @@ export default async function UseTemplatePage({ params }: { params: Promise<{ id
           From <span className="text-foreground">{t.name}</span>:{" "}
           {documentsSummary(t.documents.map((d) => d.name))} ({documentsLine(t.documents)}),{" "}
           {fields}
-          {files}. You can still adjust fields and recipients before sending.
+          {files}.
         </p>
       </header>
       <UseTemplateForm

@@ -29,12 +29,7 @@ export default function AcceptInvitationPage() {
 
   return (
     <main className="flex min-h-dvh items-center justify-center p-4">
-      <Panel
-        title="Join workspace"
-        description="You've been invited to a Sahihi workspace."
-        headingLevel={1}
-        className="w-full max-w-sm"
-      >
+      <Panel title="Join workspace" headingLevel={1} className="w-full max-w-sm">
         {error && <Alert tone="danger" title={error} />}
         <Button className="w-full" onClick={accept} loading={pending}>
           Accept invitation

@@ -54,17 +54,18 @@ function Button({
 }: {
   icon?: string
   children?: ReactNode
-  kind?: "outline" | "primary" | "danger"
+  kind?: "outline" | "ghost" | "primary" | "danger"
   className?: string
 }) {
   const look = {
     outline: "border border-(--dm-line) bg-(--dm-card)",
+    ghost: "text-(--dm-text-2)",
     primary: "bg-(--dm-accent) text-(--dm-on-accent)",
     danger: "border border-(--dm-danger)/30 text-(--dm-danger)",
   }[kind]
   return (
     <span
-      className={`inline-flex h-[3.05em] shrink-0 items-center gap-[0.55em] rounded-full px-[1.15em] text-[0.97em] ${look} ${className}`}
+      className={`inline-flex h-[3.05em] shrink-0 items-center gap-[0.55em] rounded-[0.7em] px-[1.15em] text-[0.97em] ${look} ${className}`}
     >
       {icon && <Icon name={icon} className="text-[1.15em]" />}
       {children}
@@ -101,15 +102,15 @@ function TopBar({ active = "All files" }: { active?: string }) {
     ["inbox", "Inbox"],
   ]
   return (
-    <div className="relative flex h-[4.45em] shrink-0 items-center gap-[0.9em] border-b border-(--dm-line) bg-(--dm-card) px-[1.65em]">
+    <div className="flex h-[4.45em] shrink-0 items-center gap-[0.9em] border-b border-(--dm-line) bg-(--dm-card) px-[1.65em]">
       <Logo />
       <span className="h-[1.4em] w-px bg-(--dm-line)" />
-      <span className="flex h-[2.5em] items-center gap-[0.55em] rounded-full border border-(--dm-line) px-[0.85em] text-[0.97em]">
+      <span className="flex h-[2.5em] items-center gap-[0.55em] rounded-[0.7em] border border-(--dm-line) px-[0.85em] text-[0.97em]">
         <Icon name="building" className="text-(--dm-text-2)" />
         {sample.workspace}
         <Icon name="chevronDown" className="text-[0.8em] text-(--dm-text-2)" />
       </span>
-      <nav className="absolute left-1/2 flex -translate-x-1/2 items-center rounded-full bg-(--dm-muted) p-[0.25em]">
+      <nav className="ml-[1.3em] flex shrink-0 items-center rounded-full bg-(--dm-muted) p-[0.25em]">
         {nav.map(([icon, label]) => (
           <span
             key={label}
@@ -127,7 +128,18 @@ function TopBar({ active = "All files" }: { active?: string }) {
           </span>
         ))}
       </nav>
-      <span className="ml-auto">
+      {/* Global search (the app's ADR 0056), ending on the page content's right edge (87.75%). */}
+      <span className="flex min-w-0 flex-1 justify-end">
+        <span className="flex h-[2.5em] w-full max-w-[26.7em] items-center gap-[0.55em] rounded-full bg-(--dm-muted) ps-[0.85em] pe-[0.4em] text-[0.97em] text-(--dm-text-3)">
+          <Icon name="search" className="text-[1.05em]" />
+          <span className="flex-1">Search</span>
+          <span className="rounded-[0.35em] border border-(--dm-line) bg-(--dm-card) px-[0.4em] py-[0.1em] text-[0.75em] text-(--dm-text-2)">
+            ⌘K
+          </span>
+        </span>
+      </span>
+      {/* The page's right margin less the bar's padding and the gap before it. */}
+      <span className="flex w-[calc(12.25%-2.15em)] shrink-0 justify-end">
         <Avatar />
       </span>
     </div>
@@ -158,16 +170,20 @@ export function FilesScreen() {
               {sample.files.length} items
             </p>
           </div>
-          <div className="mt-[0.9em] flex gap-[0.55em]">
-            <Button icon="folderPlus">Create folder</Button>
-            <Button icon="sparkles">Draft with AI</Button>
+          <div className="flex gap-[0.55em]">
+            <Button icon="folderPlus" kind="ghost">
+              Create folder
+            </Button>
+            <Button icon="sparkles" kind="ghost">
+              Draft with AI
+            </Button>
             <Button icon="plus">New envelope</Button>
             <Button icon="upload" kind="primary">
               Upload document
             </Button>
           </div>
         </div>
-        <div className="mt-[2.2em] flex h-[3.3em] w-[70.5%] items-center gap-[0.75em] rounded-full bg-(--dm-muted) px-[1.1em] text-[0.97em] text-(--dm-text-3)">
+        <div className="mt-[2.2em] flex h-[3.3em] w-full items-center gap-[0.75em] rounded-full bg-(--dm-muted) px-[1.1em] text-[0.97em] text-(--dm-text-3)">
           <Icon name="search" className="text-[1.15em]" />
           Search documents, envelopes, templates and folders
         </div>
@@ -181,14 +197,14 @@ export function FilesScreen() {
               <Icon name="chevronDown" className="text-[0.8em] text-(--dm-text-2)" />
             </span>
           ))}
-          <span className="ml-auto flex rounded-full border border-(--dm-line) bg-(--dm-muted) p-[0.2em] text-[0.97em]">
-            <span className="rounded-full bg-(--dm-card) px-[0.85em] py-[0.35em] shadow-sm">
+          <span className="ml-auto flex rounded-[0.7em] border border-(--dm-line) bg-(--dm-muted) p-[0.2em] text-[0.97em]">
+            <span className="rounded-[0.5em] bg-(--dm-card) px-[0.85em] py-[0.35em] shadow-sm">
               List
             </span>
             <span className="px-[0.85em] py-[0.35em] text-(--dm-text-3)">Grid</span>
           </span>
         </div>
-        <div className="mt-[2.2em] rounded-[1.95em] border border-(--dm-line) bg-(--dm-card) px-[0.85em] pb-[0.85em]">
+        <div className="mt-[2.2em] rounded-[1.25em] border border-(--dm-line) bg-(--dm-card) px-[0.85em] pb-[0.85em]">
           {/* Font size on the labels, not the row: the columns are in em and must match the rows'. */}
           <div className="grid h-[3.6em] grid-cols-[2.4em_1fr_15em_10.8em_9.6em_1.6em] items-center px-[0.9em] text-(--dm-text-2) [&>span]:text-[0.97em]">
             <Check />
@@ -243,7 +259,7 @@ function ViewerBar({ page, zoom }: { page: string; zoom: string }) {
         <Icon name="rotateCcw" />
         <span className="h-[1.1em] w-px bg-(--dm-line)" />
         <Icon name="zoomOut" />
-        <span className="flex w-[6.5em] items-center justify-between rounded-full border border-(--dm-strong) px-[0.6em] py-[0.25em] text-(--dm-text)">
+        <span className="flex w-[6.5em] items-center justify-between rounded-[0.7em] border border-(--dm-strong) px-[0.6em] py-[0.25em] text-(--dm-text)">
           {zoom}
           <Icon name="updown" className="text-[0.8em]" />
         </span>
@@ -286,7 +302,7 @@ export function EnvelopeScreen() {
         </div>
         <div
           {...settle(0, 200)}
-          className="mt-[1.7em] rounded-[1.8em] border border-(--dm-line) bg-(--dm-card) p-[1.65em]"
+          className="mt-[1.7em] rounded-[1.25em] border border-(--dm-line) bg-(--dm-card) p-[1.65em]"
         >
           <p className="text-[1.1em]">Signed and certified</p>
           <p className="mt-[0.3em] text-[0.97em] text-(--dm-text-2)">
@@ -304,19 +320,19 @@ export function EnvelopeScreen() {
             </span>
           </div>
         </div>
-        <div className="mt-[2.3em] inline-flex w-fit rounded-[1.1em] bg-(--dm-muted) p-[0.3em] text-[0.97em]">
-          <span className="rounded-[0.8em] bg-(--dm-card) px-[1em] py-[0.45em] shadow-sm">
+        <div className="mt-[2.3em] inline-flex w-fit rounded-[0.7em] border border-(--dm-line) bg-(--dm-muted) p-[0.3em] text-[0.97em]">
+          <span className="rounded-[0.5em] bg-(--dm-card) px-[1em] py-[0.45em] text-(--dm-ink) shadow-sm">
             Documents
           </span>
           <span className="px-[1em] py-[0.45em] text-(--dm-text-2)">Recipients 3</span>
           <span className="px-[1em] py-[0.45em] text-(--dm-text-2)">Activity 13</span>
         </div>
-        <div className="mt-[3em] rounded-[1.8em] border border-(--dm-line) bg-(--dm-card) p-[1.65em]">
+        <div className="mt-[3em] rounded-[1.25em] border border-(--dm-line) bg-(--dm-card) p-[1.65em]">
           <p className="text-[1.1em]">{sample.ndaFile}</p>
           <p className="mt-[0.3em] text-[0.97em] text-(--dm-text-2)">
             3 pages · 6 fields · the originals, as sent for signing
           </p>
-          <div className="mt-[1.4em] overflow-hidden rounded-[1.2em] border border-(--dm-line)">
+          <div className="mt-[1.4em] overflow-hidden rounded-[0.7em] border border-(--dm-line)">
             <ViewerBar page="Page 1 of 3" zoom="166%" />
             <div className="bg-(--dm-muted) px-[1.6em] pt-[1.6em]">
               <div className="h-[20em] bg-(--dm-paper) px-[8%] pt-[5%] text-(--dm-paper-ink)">
@@ -353,7 +369,7 @@ export function DraftingScreen() {
         <Icon name="chevronLeft" className="text-(--dm-text-2)" />
         <span className="text-[1.1em]">{d.title}</span>
         <Badge>{d.version}</Badge>
-        <span className="ml-auto flex h-[3.05em] items-center rounded-full bg-(--dm-accent) text-[0.97em] text-(--dm-on-accent)">
+        <span className="ml-auto flex h-[3.05em] items-center rounded-[0.7em] bg-(--dm-accent) text-[0.97em] text-(--dm-on-accent)">
           <span className="px-[1.1em]">Finalise</span>
           <span className="flex h-full items-center border-l border-(--dm-on-accent)/20 px-[0.8em]">
             <Icon name="chevronDown" className="text-[0.85em]" />
@@ -364,7 +380,7 @@ export function DraftingScreen() {
         {/* The assistant. */}
         <div className="flex w-[40%] shrink-0 flex-col border-r border-(--dm-line)">
           <div className="flex min-h-0 flex-1 flex-col gap-[1em] overflow-hidden p-[1.4em]">
-            <p className="ml-auto w-[88%] rounded-[1.4em] bg-(--dm-muted) px-[1.1em] py-[0.8em] text-[0.97em] leading-[1.5]">
+            <p className="ml-auto w-[88%] rounded-[1.25em] bg-(--dm-muted) px-[1.1em] py-[0.8em] text-[0.97em] leading-[1.5]">
               {sample.chat.ask}
             </p>
             <p className="flex gap-[0.5em] text-[0.8em] text-(--dm-text-3)">
@@ -375,7 +391,7 @@ export function DraftingScreen() {
             {/* The focus of this screen: it lands, then its choices (only where a Settle wraps it). */}
             <div
               {...settle(0, 200)}
-              className="overflow-hidden rounded-[1.4em] border border-(--dm-tone-0)/40 bg-(--dm-card)"
+              className="overflow-hidden rounded-[1.25em] border border-(--dm-tone-0)/40 bg-(--dm-card)"
             >
               <div className="flex flex-col gap-[0.3em] px-[1.1em] pt-[1em] pb-[0.9em]">
                 <div className="flex items-center gap-[0.6em] text-(--dm-text-3)">
@@ -392,7 +408,7 @@ export function DraftingScreen() {
                     <span
                       key={o}
                       {...settle(i, 380)}
-                      className="flex h-[2.75em] items-center gap-[1em] rounded-full border border-(--dm-strong) px-[1em] text-[0.97em]"
+                      className="flex h-[2.75em] items-center gap-[1em] rounded-[0.7em] border border-(--dm-strong) px-[1em] text-[0.97em]"
                     >
                       <span className="text-[0.8em] text-(--dm-text-3)">{i + 1}</span>
                       {o}
@@ -403,10 +419,10 @@ export function DraftingScreen() {
               </div>
               <div className="flex flex-col gap-[0.6em] border-t border-(--dm-line) bg-(--dm-muted)/60 px-[1.1em] py-[0.9em]">
                 <span className="text-[0.88em]">Or type your own answer</span>
-                <span className="h-[2.7em] rounded-full border border-(--dm-text) bg-(--dm-card)" />
+                <span className="h-[2.7em] rounded-[0.7em] border border-(--dm-text) bg-(--dm-card)" />
                 <div className="flex items-center justify-between text-[0.97em]">
                   <span className="px-[0.4em] text-(--dm-text-2)">Skip</span>
-                  <span className="flex items-center gap-[0.3em] rounded-full bg-(--dm-disabled) px-[1.1em] py-[0.5em] text-white">
+                  <span className="flex items-center gap-[0.3em] rounded-[0.7em] bg-(--dm-disabled) px-[1.1em] py-[0.5em] text-white">
                     Answer <Icon name="chevronRight" className="text-[0.8em]" />
                   </span>
                 </div>
@@ -421,8 +437,8 @@ export function DraftingScreen() {
         {/* The document, as Preview shows it. */}
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex h-[6.5em] shrink-0 items-center border-b border-(--dm-line) px-[1.4em]">
-            <span className="flex rounded-[1.2em] border border-(--dm-line) bg-(--dm-muted) p-[0.3em] text-[0.97em]">
-              <span className="rounded-[0.9em] bg-(--dm-card) px-[1em] py-[0.45em] shadow-sm">
+            <span className="flex rounded-[0.7em] border border-(--dm-line) bg-(--dm-muted) p-[0.3em] text-[0.97em]">
+              <span className="rounded-[0.5em] bg-(--dm-card) px-[1em] py-[0.45em] shadow-sm">
                 Preview
               </span>
               {["Editing", "Signers", "PDF"].map((t) => (
@@ -543,7 +559,7 @@ export function EditorScreen() {
             </span>
           ))}
         </span>
-        <span className="ml-auto flex h-[2.75em] items-center rounded-full border border-(--dm-line) text-[0.9em]">
+        <span className="ml-auto flex h-[2.75em] items-center rounded-[0.75em] border border-(--dm-line) text-[0.9em]">
           <span className="flex items-center gap-[0.5em] px-[0.9em]">
             <Icon name="template" /> Save as template
           </span>
@@ -551,7 +567,7 @@ export function EditorScreen() {
             <Icon name="chevronDown" className="text-[0.85em]" />
           </span>
         </span>
-        <span className="flex h-[2.75em] items-center gap-[0.5em] rounded-full bg-(--dm-accent) px-[1.1em] text-[0.97em] text-(--dm-on-accent)">
+        <span className="flex h-[2.75em] items-center gap-[0.5em] rounded-[0.7em] bg-(--dm-accent) px-[1.1em] text-[0.97em] text-(--dm-on-accent)">
           <Icon name="send" /> Send
         </span>
       </div>
@@ -565,7 +581,7 @@ export function EditorScreen() {
               <Icon name="redo" />
               <span className="h-[1.1em] w-px bg-(--dm-line)" />
               <Icon name="zoomOut" />
-              <span className="flex w-[6.5em] items-center justify-between rounded-full border border-(--dm-strong) px-[0.6em] py-[0.25em] text-(--dm-text)">
+              <span className="flex w-[6.5em] items-center justify-between rounded-[0.7em] border border-(--dm-strong) px-[0.6em] py-[0.25em] text-(--dm-text)">
                 100%
                 <Icon name="updown" className="text-[0.8em]" />
               </span>
@@ -603,7 +619,7 @@ export function EditorScreen() {
         <div className="flex w-[20.8%] shrink-0 flex-col border-l border-(--dm-line) text-[0.97em]">
           <div className="border-b border-(--dm-line) p-[1.1em]">
             <p>Recipient</p>
-            <span className="mt-[0.6em] flex h-[2.5em] items-center justify-between rounded-full border border-(--dm-strong) px-[0.85em]">
+            <span className="mt-[0.6em] flex h-[2.5em] items-center justify-between rounded-[0.7em] border border-(--dm-strong) px-[0.85em]">
               {sample.user.name}
               <Icon name="updown" className="text-[0.8em] text-(--dm-text-2)" />
             </span>
@@ -614,7 +630,7 @@ export function EditorScreen() {
               {tools.map(([icon, label]) => (
                 <span
                   key={label}
-                  className={`flex h-[2.4em] items-center gap-[0.45em] rounded-full border px-[0.65em] text-[0.9em] ${
+                  className={`flex h-[2.4em] items-center gap-[0.45em] rounded-[0.75em] border px-[0.65em] text-[0.9em] ${
                     label === "Select"
                       ? "border-transparent bg-(--dm-strong)"
                       : "border-(--dm-strong)"
@@ -628,7 +644,7 @@ export function EditorScreen() {
             <p className="mt-[0.7em] text-[0.8em] leading-[1.45] text-(--dm-text-2)">
               Pick a type, then click or drag on a page. Hold ⇧ to place several.
             </p>
-            <span className="mt-[0.8em] flex h-[2.5em] items-center justify-center gap-[0.5em] rounded-full border border-(--dm-line) text-[0.9em]">
+            <span className="mt-[0.8em] flex h-[2.5em] items-center justify-center gap-[0.5em] rounded-[0.75em] border border-(--dm-line) text-[0.9em]">
               <Icon name="detect" /> Detect fields
             </span>
           </div>

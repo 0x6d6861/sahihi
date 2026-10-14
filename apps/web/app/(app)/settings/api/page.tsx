@@ -35,9 +35,7 @@ export default async function ApiSettingsPage() {
         title="API keys"
         description={
           <>
-            Call the Sahihi API from your own systems: upload documents, create and send envelopes,
-            bulk send and embedded signing. Send the key as{" "}
-            <span className="font-mono">Authorization: Bearer sahihi_sk_…</span> to{" "}
+            Send it as <span className="font-mono">Authorization: Bearer sahihi_sk_…</span> to{" "}
             <span className="font-mono">/api/v1</span>.
           </>
         }
@@ -46,7 +44,7 @@ export default async function ApiSettingsPage() {
       </Panel>
       <Panel
         title="Embedded signing"
-        description="Let recipients sign inside your own site. Request a signing URL with the API and show it in an iframe; the page posts sahihi:ready, sahihi:signed and sahihi:declined to your window."
+        description="Show a signing URL from the API in an iframe on these sites."
       >
         <EmbedOriginsForm initial={embedding.data?.origins ?? []} />
       </Panel>
@@ -55,8 +53,7 @@ export default async function ApiSettingsPage() {
           <div className="flex flex-col gap-1">
             <h2 className="font-medium text-lg">Webhooks</h2>
             <p className="text-muted-foreground text-sm">
-              Get signed HTTPS callbacks when envelopes are sent, signed, completed, declined,
-              voided or expire. Failed deliveries are retried for about two days.
+              Failed deliveries are retried for about two days.
             </p>
           </div>
           <AddWebhookButton />

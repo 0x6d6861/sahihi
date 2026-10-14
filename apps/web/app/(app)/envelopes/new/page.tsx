@@ -41,10 +41,7 @@ export default async function NewEnvelopePage({
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
       <h1 className="font-medium text-2xl tracking-tight">New envelope</h1>
-      <Panel
-        title="Envelope details"
-        description="You'll add recipients and place fields on the next screen."
-      >
+      <Panel title="Envelope details">
         {documents.length === 0 ? (
           <EmptyState
             className="md:py-8"

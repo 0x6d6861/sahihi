@@ -35,16 +35,13 @@ export default async function DataPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Panel
-        title="Retention"
-        description="How long signed agreements are kept (Kenya Data Protection Act: keep personal data only as long as needed). With your own storage (Settings → Storage), this covers Sahihi's copy: files in your bucket stay until you remove them."
-      >
+      <Panel title="Retention" description="Files in your own storage stay until you remove them.">
         <RetentionForm initial={settings.data?.retentionYears ?? null} />
       </Panel>
 
       <Panel
         title="Export"
-        description="A ZIP with every sent envelope: details and recipients (JSON), the audit trail with its verification, the original, signed PDF and certificate. Downloads are kept for 7 days."
+        description="Every sent envelope with its audit trail, PDFs and certificate, as a ZIP. Kept for 7 days."
       >
         <ExportsPanel exports={exports.data?.items ?? []} />
       </Panel>

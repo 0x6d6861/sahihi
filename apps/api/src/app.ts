@@ -33,6 +33,7 @@ import { folders } from "./routes/folders"
 import { generatedDocuments } from "./routes/generated-documents"
 import { me } from "./routes/me"
 import { notifications } from "./routes/notifications"
+import { search } from "./routes/search"
 import { signing } from "./routes/signing"
 import { storage } from "./routes/storage"
 import { storageObjects } from "./routes/storage-objects"
@@ -114,6 +115,7 @@ export function createApp() {
     .route("/api/documents", documents)
     .route("/api/folders", folders)
     .route("/api/files", files)
+    .route("/api/search", search)
     .route("/api/envelopes", envelopes)
     .route("/api/templates", templates)
     .route("/api/generated-documents", generatedDocuments)
