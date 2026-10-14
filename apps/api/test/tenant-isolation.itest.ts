@@ -410,6 +410,8 @@ const LISTS = [
   "GET /api/documents",
   "GET /api/folders",
   "GET /api/files",
+  // The global search index (search.itest.ts).
+  "GET /api/search",
   "GET /api/envelopes",
   "GET /api/templates",
   "GET /api/webhooks",

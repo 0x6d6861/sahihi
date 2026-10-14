@@ -70,7 +70,7 @@ import { requireOrg } from "../middleware/session"
  * an admin or the owner). Everything but the settings needs the assistant to be available.
  */
 
-async function workspaceAiEnabled(organizationId: string) {
+export async function workspaceAiEnabled(organizationId: string) {
   const settings = await prisma.workspaceSettings.findUnique({
     where: { organizationId },
     select: { aiEnabled: true },

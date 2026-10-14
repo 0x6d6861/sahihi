@@ -95,6 +95,7 @@ Error body shape: `{ error: string, message?: string, issues?: {path, message}[]
 | POST | `/api/documents/:id/complete` | org | Server downloads, validates, hashes → `READY`/`FAILED` |
 | GET | `/api/documents` · `/:id` · `/:id/file` | org | List / detail / presigned GET |
 | DELETE | `/api/documents/:id` | org | Soft delete |
+| GET | `/api/search` | org | Global search index: newest 100 folders, documents, envelopes (with recipients), templates and, with the assistant on, drafts (ADR 0056) |
 | POST | `/api/envelopes` | org | Create draft |
 | GET | `/api/envelopes` · `/:id` | org | List / detail (no token hashes) |
 | PUT | `/api/envelopes/:id/document` | org | Switch a draft to another READY document; removes fields, audited (ADR 0024) |
