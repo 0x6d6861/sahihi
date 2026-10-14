@@ -45,7 +45,7 @@ export function CreateFolderButton({
           </span>
         </button>
       ) : (
-        <Button variant="secondary" onClick={() => setOpen(true)}>
+        <Button variant="ghost" onClick={() => setOpen(true)}>
           <FolderPlusIcon aria-hidden />
           Create folder
         </Button>

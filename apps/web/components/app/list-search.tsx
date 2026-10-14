@@ -184,7 +184,7 @@ export function ListSearch({
 
   return (
     <search aria-label={label} className="flex flex-col gap-3" aria-busy={pending}>
-      <div className="max-w-3xl">
+      <div>
         <SearchField
           appearance="filled"
           label={label}

@@ -1,4 +1,5 @@
-import Link from "next/link"
+import { ButtonLink } from "@/components/app/button-link"
+import { SettingsIcon } from "@/components/app/icons"
 import { ActivityFeed, type ActivityPage } from "@/components/app/inbox/activity-feed"
 import { BulkSendsPanel } from "@/components/app/inbox/bulk-sends-panel"
 import { InboxTabs } from "@/components/app/inbox/inbox-tabs"
@@ -36,16 +37,12 @@ export default async function InboxPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-2">
+      <header className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="font-medium text-2xl tracking-tight">Inbox</h1>
-        <p className="max-w-2xl text-muted-foreground text-sm">
-          What recipients did with your envelopes, everything happening in this workspace, and your
-          bulk sends. Choose what you're told about in{" "}
-          <Link href="/settings/notifications" className="underline underline-offset-4">
-            Settings → Notifications
-          </Link>
-          .
-        </p>
+        <ButtonLink variant="ghost" href="/settings/notifications">
+          <SettingsIcon aria-hidden />
+          Notification settings
+        </ButtonLink>
       </header>
       <InboxTabs
         panels={{

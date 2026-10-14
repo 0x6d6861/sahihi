@@ -65,7 +65,7 @@ function Floating({
   return (
     <div
       {...at}
-      className={`absolute rounded-[1.1em] border border-(--dm-line) bg-(--dm-card) p-[1em] shadow-(--dm-shadow) ${className}`}
+      className={`absolute rounded-[0.7em] border border-(--dm-line) bg-(--dm-card) p-[1em] shadow-(--dm-shadow) ${className}`}
     >
       {children}
     </div>

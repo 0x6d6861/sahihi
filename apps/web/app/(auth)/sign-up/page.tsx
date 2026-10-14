@@ -43,12 +43,7 @@ export default function SignUpPage() {
   }
 
   return (
-    <Panel
-      title="Create your account"
-      description="Start sending documents for signature."
-      headingLevel={1}
-      className="w-full max-w-sm"
-    >
+    <Panel title="Create your account" headingLevel={1} className="w-full max-w-sm">
       <form className="flex flex-col gap-4" onSubmit={onSubmit}>
         {error && <Alert tone="danger" title={error} />}
         <Input label="Full name" name="name" autoComplete="name" required />

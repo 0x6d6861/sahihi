@@ -52,6 +52,7 @@ export default async function GeneratePage() {
   if (!settings?.configured) {
     return (
       <EmptyState
+        icon={<SparklesIcon aria-hidden />}
         title="The AI assistant isn't set up"
         description="This Sahihi server has no AI model configured. Ask your administrator to set AI_MODEL."
       />
@@ -60,6 +61,7 @@ export default async function GeneratePage() {
   if (!settings.enabled || !settings.canUse) {
     return (
       <EmptyState
+        icon={<SparklesIcon aria-hidden />}
         title="Draft documents with AI"
         description={
           settings.canManage
@@ -80,14 +82,8 @@ export default async function GeneratePage() {
   return (
     <StartGroup>
       <div className="flex flex-col gap-10">
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div className="flex min-w-0 flex-col gap-2">
-            <h1 className="font-medium text-2xl tracking-tight">Drafting</h1>
-            <p className="max-w-2xl text-muted-foreground text-sm">
-              The assistant asks for every detail it needs and never fills in what it doesn't know.
-              Review the result before you send it.
-            </p>
-          </div>
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="font-medium text-2xl tracking-tight">Drafting</h1>
           <div className="flex flex-wrap items-center gap-2">
             <ImportButton />
             <StartBlankButton />
@@ -152,10 +148,7 @@ export default async function GeneratePage() {
           </section>
         )}
 
-        <StartSection
-          title="Starters"
-          description="Reviewed wording with every specific left blank for you to fill in."
-        >
+        <StartSection title="Starters">
           {STARTERS.map((s) => (
             <StartCard
               key={s.key}
@@ -168,10 +161,7 @@ export default async function GeneratePage() {
         </StartSection>
 
         {templates.length > 0 && (
-          <StartSection
-            title="Workspace templates"
-            description="Saved from documents drafted here, with their wording, blanks and signers."
-          >
+          <StartSection title="Workspace templates">
             {templates.map((t) => (
               <StartCard
                 key={t.id}
@@ -191,21 +181,10 @@ export default async function GeneratePage() {
 }
 
 /** A titled grid of start tiles, unboxed like the card grids on All files. */
-function StartSection({
-  title,
-  description,
-  children,
-}: {
-  title: string
-  description: string
-  children: React.ReactNode
-}) {
+function StartSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <h2 className="font-medium text-base">{title}</h2>
-        <p className="text-muted-foreground text-sm">{description}</p>
-      </div>
+      <h2 className="font-medium text-base">{title}</h2>
       <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{children}</ul>
     </section>
   )

@@ -74,12 +74,7 @@ function SignInForm() {
   }
 
   return (
-    <Panel
-      title="Sign in"
-      description="Welcome back to Sahihi."
-      headingLevel={1}
-      className="w-full max-w-sm"
-    >
+    <Panel title="Sign in" headingLevel={1} className="w-full max-w-sm">
       <form className="flex flex-col gap-4" onSubmit={onSubmit}>
         {error && <Alert tone="danger" title={error} />}
         <Input label="Email" name="email" type="email" autoComplete="email webauthn" required />

@@ -57,7 +57,14 @@
   --code-foreground: var(--foreground);
   --code-highlight: var(--accent-subtle);
 
-  /* coss radius scale: lg = Arc control, xl ≈ panel, 2xl ≈ surface. */
+  /* Three shapes (ADR 0053): pill for chips, nav and avatars; control for buttons, fields and menus;
+     panel for sections, dialogs and cards. Arc's defaults (18 / 26 / 34px) read soft and in-between
+     on 44px controls; these are crisper, as a product that holds signatures should be. */
+  --radius-control: 0.625rem;
+  --radius-panel: 1rem;
+  --radius-surface: 1.25rem;
+
+  /* coss radius scale: lg = Arc control (10px), xl = 14px, 2xl = 18px ≈ panel. */
   --radius: var(--radius-control);
 
   /* Flat sidebar on the page background with a hairline edge; hover is a faint fill, and the active
@@ -74,8 +81,16 @@
 
 .dark,
 :root[data-theme="dark"] {
+  /* Arc's dark ramp is pure grey. A trace of the accent's hue (blue, 260) keeps it from reading flat;
+     lightness is unchanged, so the contrast table in docs/ui.md still holds. Borders step up 2% so
+     panels separate from the page (ADR 0053). */
+  --background: oklch(19% 0.006 260);
+  --surface: oklch(21.5% 0.006 260);
+  --surface-raised: oklch(24% 0.006 260);
+  --border: oklch(31% 0.006 260);
+  --border-subtle: oklch(26% 0.006 260);
   --canvas: var(--background);
-  --surface-muted: oklch(26% 0 0);
+  --surface-muted: oklch(26% 0.006 260);
   --border-strong: oklch(54% 0 0);
   --destructive: oklch(54% 0.21 25);
   --warning-foreground: var(--warning);
@@ -91,7 +106,6 @@ body {
   letter-spacing: var(--tracking-body);
   line-height: var(--leading-body);
 }
-
 /*
  * Field overlays drawn on a PDF page. The page is white paper in both themes, so anything on it uses
  * the light values (Arc's neutral ramp doesn't change with the theme). Popovers and dialogs opened

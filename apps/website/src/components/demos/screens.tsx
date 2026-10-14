@@ -26,7 +26,7 @@ export function QuestionsDemo() {
               <span
                 key={o}
                 {...settle(i, 300)}
-                className="flex items-center gap-[0.9em] rounded-full border border-(--dm-strong) px-[1em] py-[0.55em] text-[0.88em]"
+                className="flex items-center gap-[0.9em] rounded-[0.55em] border border-(--dm-strong) px-[1em] py-[0.55em] text-[0.88em]"
               >
                 <span className="text-[0.8em] text-(--dm-text-3)">{i + 1}</span>
                 {o}
@@ -37,7 +37,7 @@ export function QuestionsDemo() {
         </div>
         <div className="flex flex-col gap-[0.6em] border-t border-(--dm-line) bg-(--dm-muted)/60 px-[1.3em] py-[0.9em]">
           <span className="text-[0.82em]">Or type your own answer</span>
-          <span className="h-[2.3em] rounded-full border border-(--dm-text) bg-(--dm-card)" />
+          <span className="h-[2.3em] rounded-[0.55em] border border-(--dm-text) bg-(--dm-card)" />
           <div className="flex items-center justify-between">
             <Pill kind="ghost" className="px-[0.3em]">
               Skip
@@ -62,7 +62,7 @@ export function ProposalDemo() {
           <Badge>Waiting for you</Badge>
         </div>
         <p className="mt-[0.4em] text-[0.75em] leading-[1.45] text-(--dm-text-2)">{p.why}</p>
-        <div className="mt-[0.8em] rounded-[1em] border border-(--dm-line) p-[0.9em] text-[0.75em] leading-[1.6]">
+        <div className="mt-[0.8em] rounded-[0.6em] border border-(--dm-line) p-[0.9em] text-[0.75em] leading-[1.6]">
           <p>
             {p.title[0]}
             <ins
@@ -120,7 +120,7 @@ export function SignersDemo() {
           Initials on every page
         </div>
         <p className="mt-[0.8em] text-[0.8em]">Fields</p>
-        <div className="mt-[0.35em] divide-y divide-(--dm-line) rounded-[1em] border border-(--dm-line)">
+        <div className="mt-[0.35em] divide-y divide-(--dm-line) rounded-[0.6em] border border-(--dm-line)">
           {s.fields.map((f, i) => (
             <div
               key={f}
@@ -166,7 +166,7 @@ export function SigningDemo() {
         <div className="flex-1 rounded-[0.9em] bg-(--dm-paper) p-[1em] text-(--dm-paper-ink) shadow-sm">
           <p className="text-[0.55em]">{o.accept}</p>
           <p className="mt-[0.2em] text-[0.55em] font-semibold">{o.signer}</p>
-          <span className="mt-[0.4em] flex h-[2em] w-[60%] items-center justify-center rounded-full border-[0.15em] border-(--dm-tone-2) bg-[#fdf1e2] text-[0.75em] ring-[0.15em] ring-[#9a9a9a]">
+          <span className="mt-[0.4em] flex h-[2em] w-[60%] items-center justify-center rounded-[0.3em] border-[0.15em] border-(--dm-tone-2) bg-[#fdf1e2] text-[0.75em] ring-[0.15em] ring-[#9a9a9a]">
             Sign *
           </span>
           <span className="mt-[0.5em] block w-[60%] rounded-full border border-dashed border-[#bdbdbd] px-[0.6em] py-[0.15em] text-[0.62em]">
@@ -191,12 +191,14 @@ export function SigningDemo() {
             <Icon name="x" className="text-[0.8em]" />
           </span>
         </div>
-        <div className="mt-[0.9em] inline-flex rounded-full bg-(--dm-muted) p-[0.2em] text-[0.75em]">
-          <span className="rounded-full bg-(--dm-card) px-[1em] py-[0.25em] shadow-sm">Draw</span>
+        <div className="mt-[0.9em] inline-flex rounded-[0.55em] bg-(--dm-muted) p-[0.2em] text-[0.75em]">
+          <span className="rounded-[0.4em] bg-(--dm-card) px-[1em] py-[0.25em] text-(--dm-ink) shadow-sm">
+            Draw
+          </span>
           <span className="px-[1em] py-[0.25em] text-(--dm-text-2)">Type</span>
           <span className="px-[1em] py-[0.25em] text-(--dm-text-2)">Upload</span>
         </div>
-        <div className="relative mt-[0.8em] h-[7.5em] rounded-[1.1em] border border-(--dm-line) bg-(--dm-paper)">
+        <div className="relative mt-[0.8em] h-[7.5em] rounded-[0.7em] border border-(--dm-line) bg-(--dm-paper)">
           <Scrawl className="absolute left-[16%] top-[14%] w-[66%] text-[#1a1a1a]" />
           <span className="absolute bottom-[1.6em] left-[1.2em] text-[0.7em] text-[#9a9a9a]">
             ×
@@ -239,7 +241,7 @@ export function OtpDemo() {
               key={i}
               // Typed digits appear one by one, at typing pace (slower than a list stagger).
               {...(d ? settle(0, 380 + i * 140, "pop") : {})}
-              className={`grid h-[2.2em] w-[1.95em] place-items-center rounded-[0.7em] border text-[0.9em] ${
+              className={`grid h-[2.2em] w-[1.95em] place-items-center rounded-[0.45em] border text-[0.9em] ${
                 d
                   ? "border-(--dm-text-2) bg-(--dm-muted)"
                   : i === sample.otp.typed.length
@@ -290,7 +292,7 @@ export function RoutingDemo() {
             </div>
             <div className="mt-[0.5em] flex items-center gap-[0.5em]">
               <span className="text-[0.75em] text-(--dm-text-2)">Signing step</span>
-              <span className="flex items-center gap-[1em] rounded-full border border-(--dm-line) px-[0.8em] py-[0.25em] text-[0.8em]">
+              <span className="flex items-center gap-[1em] rounded-[0.55em] border border-(--dm-line) px-[0.8em] py-[0.25em] text-[0.8em]">
                 <span className="text-(--dm-text-3)">−</span>
                 {r.step}
                 <span>+</span>
