@@ -27,21 +27,39 @@ function putWithProgress(
 
 export class UploadRejectedError extends Error {}
 
+/** How long the upload waits for a Word file's conversion before leaving it to the worker. */
+const CONVERSION_WAIT_MS = 3 * 60_000
+const CONVERSION_POLL_MS = 1_500
+
+interface UploadedDocument {
+  id: string
+  name: string
+  status: "UPLOADING" | "CONVERTING" | "READY" | "FAILED"
+  failureReason: string | null
+}
+
 /**
  * The upload flow (docs/pdf-pipeline.md → Upload): create → PUT to the presigned URL → complete.
- * The server validates and hashes the bytes on `complete`. Returns the new document's id.
- * Throws `UploadRejectedError` when the file fails the client pre-check (nothing is sent).
+ * The server validates and hashes a PDF on `complete`; a Word file goes CONVERTING and, with
+ * `waitForConversion` (the default), this waits until the worker has made it a READY PDF (ADR
+ * 0052). Returns the new document; `converting` when it stopped waiting first. Throws
+ * `UploadRejectedError` when the file fails the client pre-check (nothing is sent), and an error
+ * with the reason when the conversion fails.
  */
-export async function uploadPdf(
+export async function uploadDocument(
   file: File,
   opts: {
     sourceDocumentId?: string
     /** Folder the document lands in (ADR 0022); omitted = workspace root. */
     folderId?: string
+    /** Refuse Word files (flows that need the PDF at once). */
+    pdfOnly?: boolean
+    /** Wait for a Word file's conversion (default true); a batch upload doesn't. */
+    waitForConversion?: boolean
     onStage?: (stage: UploadStage, fraction?: number) => void
   } = {},
-): Promise<{ id: string; name: string }> {
-  const prepared = prepareUpload(file)
+): Promise<{ id: string; name: string; converting: boolean }> {
+  const prepared = prepareUpload(file, { pdfOnly: opts.pdfOnly })
   if (!prepared.ok) throw new UploadRejectedError(prepared.message)
   const input = {
     ...prepared.input,
@@ -50,16 +68,35 @@ export async function uploadPdf(
   }
 
   opts.onStage?.("creating")
-  const { document, uploadUrl } = await api<{ document: { id: string }; uploadUrl: string }>(
+  const { document, uploadUrl } = await api<{ document: UploadedDocument; uploadUrl: string }>(
     "/documents/uploads",
     { method: "POST", json: input },
   )
   opts.onStage?.("uploading", 0)
-  await putWithProgress(uploadUrl, file, (f) => opts.onStage?.("uploading", f))
+  await putWithProgress(uploadUrl, file, (f) => opts.onStage?.("uploading", f), input.contentType)
   opts.onStage?.("checking")
-  await api(`/documents/${document.id}/complete`, { method: "POST" })
+  let done = (
+    await api<{ document: UploadedDocument }>(`/documents/${document.id}/complete`, {
+      method: "POST",
+    })
+  ).document
+  if (done.status === "CONVERTING" && opts.waitForConversion !== false) {
+    opts.onStage?.("converting")
+    done = await waitForConversion(document.id)
+  }
+  if (done.status === "FAILED") throw new Error(done.failureReason ?? "The file couldn't be used.")
   opts.onStage?.("done")
-  return { id: document.id, name: input.name }
+  return { id: done.id, name: done.name, converting: done.status === "CONVERTING" }
+}
+
+/** Polls the document until the worker has converted it (or given up), up to a few minutes. */
+async function waitForConversion(id: string): Promise<UploadedDocument> {
+  const until = Date.now() + CONVERSION_WAIT_MS
+  for (;;) {
+    await new Promise((resolve) => setTimeout(resolve, CONVERSION_POLL_MS))
+    const { document } = await api<{ document: UploadedDocument }>(`/documents/${id}`)
+    if (document.status !== "CONVERTING" || Date.now() > until) return document
+  }
 }
 
 /**

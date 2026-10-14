@@ -3,6 +3,7 @@ import { webhookRetryDelayMs } from "@sahihi/core"
 import { createStorageRegistry, prisma } from "@sahihi/db"
 import { processBulkSend } from "@sahihi/envelopes"
 import {
+  type ConversionJobs,
   captureError,
   configureStorage,
   createLogger,
@@ -18,6 +19,7 @@ import {
   type WebhookJobs,
 } from "@sahihi/infra"
 import { type Job, Worker } from "bullmq"
+import { convertDocument } from "./jobs/conversions"
 import { finalizeEnvelope } from "./jobs/finalize"
 import { expireEnvelopes, remindRecipients, sweepAbandonedUploads } from "./jobs/maintenance"
 import { handleNotification } from "./jobs/notifications"
@@ -104,6 +106,15 @@ const workers = [
     QUEUES.documents,
     (job: Job<DocumentJobs["document.thumbnail"]>) => renderDocumentThumbnail(job.data.documentId),
     { connection, concurrency: 2 },
+  ),
+  // Word → PDF (ADR 0052): LibreOffice is heavy, so one conversion at a time per worker.
+  new Worker<ConversionJobs["document.convert"]>(
+    QUEUES.conversions,
+    (job: Job<ConversionJobs["document.convert"]>) =>
+      convertDocument(job.data.documentId, {
+        isFinal: job.attemptsMade + 1 >= (job.opts.attempts ?? 1),
+      }),
+    { connection, concurrency: 1, lockDuration: 180_000 },
   ),
   // Own storage (docs/storage.md): deliveries, migrations, checks and the outbox sweep.
   new Worker<StorageJobs[keyof StorageJobs]>(

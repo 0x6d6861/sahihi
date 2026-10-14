@@ -1,5 +1,7 @@
 import { ImportError, type ImportedBlock, type ImportedRun, type MarkType } from "@sahihi/core"
 import { unzipSync } from "fflate"
+import { DocxNumbering } from "./docx-numbering"
+import { DocxStyles, type NumPr, type RunProps, readRunProp } from "./docx-styles"
 import { xmlEvents } from "./xml"
 
 /** A part bigger than this once unzipped is refused (a zip bomb, or not a document worth drafting). */
@@ -7,10 +9,22 @@ const MAX_PART_BYTES = 30 * 1024 * 1024
 const PARTS = ["word/document.xml", "word/styles.xml", "word/numbering.xml"] as const
 
 /**
- * A Word file's body as import blocks (docs/ai-documents.md → Import): paragraphs with bold,
- * italic and underline, headings from the heading and title styles (or an outline level), list
- * items from Word's numbering (bullets vs numbered), and tables cell by cell. Deleted tracked
- * changes, text boxes, field codes, headers, footers, footnotes and images are left out.
+ * A Word file's body as import blocks (docs/ai-documents.md → Import), styled as Word shows it:
+ *
+ * - bold, italic and underline, whether set on the text or by its paragraph or character style
+ *   (Strong, Emphasis, a custom "Defined term"…), following `basedOn` chains; text formatted as
+ *   capitals comes in as capitals; hidden text is left out;
+ * - headings from the heading and title styles (and styles based on them) or an outline level;
+ *   with no heading styles at all, short bold or capitalised lines are headings, and a short
+ *   centred or bold first line is the title;
+ * - Word's numbering, counted as Word counts it, including lists set by a paragraph style (List
+ *   Number, List Bullet) and numbered headings: each item and heading carries the number Word
+ *   prints ("3.", "2.1", "(a)") as its `label`;
+ * - tables cell by cell, merged cells keeping their columns, header rows marked;
+ * - line breaks inside a paragraph split it, so addresses and signature captions keep their lines.
+ *
+ * Deleted tracked changes, text boxes, field codes, headers, footers, footnotes and images are
+ * left out.
  */
 export function readDocxBlocks(bytes: Uint8Array): ImportedBlock[] {
   let files: Record<string, Uint8Array>
@@ -28,74 +42,34 @@ export function readDocxBlocks(bytes: Uint8Array): ImportedBlock[] {
   }
   const document = read("word/document.xml")
   if (!document) throw new ImportError("unsupported")
-  const headings = headingStyles(read("word/styles.xml"))
-  const bullets = bulletLists(read("word/numbering.xml"))
-  return bodyBlocks(document, headings, bullets)
-}
-
-/** Style id → heading level, from styles named "heading n" or "Title" (or with an outline level). */
-function headingStyles(xml: string | null): Map<string, number> {
-  const levels = new Map<string, number>()
-  if (!xml) return levels
-  let id: string | null = null
-  for (const e of xmlEvents(xml)) {
-    if (e.kind === "open" && e.name === "w:style") id = e.attrs["w:styleId"] ?? null
-    else if (e.kind === "close" && e.name === "w:style") id = null
-    else if (e.kind === "open" && id) {
-      if (e.name === "w:name") {
-        const name = (e.attrs["w:val"] ?? "").toLowerCase()
-        const heading = /^heading\s*(\d)$/.exec(name)
-        if (heading) levels.set(id, Number(heading[1]))
-        else if (name === "title") levels.set(id, 0)
-      } else if (e.name === "w:outlineLvl" && !levels.has(id)) {
-        const level = Number(e.attrs["w:val"])
-        if (level >= 0 && level < 9) levels.set(id, level + 1)
-      }
-    }
-  }
-  return levels
-}
-
-/** `numId:ilvl` pairs whose list format is a bullet (everything else counts as numbered). */
-function bulletLists(xml: string | null): Set<string> {
-  const bullets = new Set<string>()
-  if (!xml) return bullets
-  const abstractBullets = new Map<string, Set<string>>()
-  const numToAbstract = new Map<string, string>()
-  let abstract: string | null = null
-  let level: string | null = null
-  let num: string | null = null
-  for (const e of xmlEvents(xml)) {
-    if (e.kind === "open") {
-      if (e.name === "w:abstractNum") abstract = e.attrs["w:abstractNumId"] ?? null
-      else if (e.name === "w:lvl") level = e.attrs["w:ilvl"] ?? "0"
-      else if (e.name === "w:numFmt" && abstract && level && e.attrs["w:val"] === "bullet") {
-        const set = abstractBullets.get(abstract) ?? new Set<string>()
-        set.add(level)
-        abstractBullets.set(abstract, set)
-      } else if (e.name === "w:num") num = e.attrs["w:numId"] ?? null
-      else if (e.name === "w:abstractNumId" && num) numToAbstract.set(num, e.attrs["w:val"] ?? "")
-    } else if (e.kind === "close") {
-      if (e.name === "w:abstractNum") abstract = null
-      else if (e.name === "w:lvl") level = null
-      else if (e.name === "w:num") num = null
-    }
-  }
-  for (const [numId, abstractId] of numToAbstract) {
-    for (const lvl of abstractBullets.get(abstractId) ?? []) bullets.add(`${numId}:${lvl}`)
-  }
-  return bullets
+  const styles = new DocxStyles(read("word/styles.xml"))
+  const numbering = new DocxNumbering(read("word/numbering.xml"), styles)
+  return bodyBlocks(document, styles, numbering)
 }
 
 interface Paragraph {
   runs: ImportedRun[]
   style: string | null
   outline: number | null
-  numId: string | null
-  ilvl: string
+  num: NumPr
+  centered: boolean
 }
 
-/** Elements whose content never reaches the body text. */
+interface Run {
+  style: string | null
+  direct: RunProps
+  resolved: RunProps | null
+}
+
+interface Table {
+  rows: ImportedRun[][][]
+  /** Rows marked to repeat as a header, counted from the top. */
+  headerRows: number
+  style: string | null
+  firstRowLook: boolean
+}
+
+/** Elements whose content never reaches the body text (or is a past version of its formatting). */
 const SKIPPED = new Set([
   "w:del",
   "w:moveFrom",
@@ -105,39 +79,55 @@ const SKIPPED = new Set([
   "w:delText",
   "w:footnoteReference",
   "w:endnoteReference",
+  "w:pPrChange",
+  "w:rPrChange",
+  "w:tblPrChange",
+  "w:trPrChange",
+  "w:tcPrChange",
 ])
 
-function bodyBlocks(
-  xml: string,
-  headings: Map<string, number>,
-  bullets: Set<string>,
-): ImportedBlock[] {
-  const blocks: ImportedBlock[] = []
+/** A top-level paragraph, with what's needed to promote it to a heading after the pass. */
+interface Entry {
+  block: ImportedBlock
+  hint?: { centered: boolean; emphasised: boolean }
+}
+
+function bodyBlocks(xml: string, styles: DocxStyles, numbering: DocxNumbering): ImportedBlock[] {
+  const entries: Entry[] = []
   // Tables, innermost last. Text of a table inside a cell joins that cell.
-  const tables: { rows: ImportedRun[][][] }[] = []
+  const tables: Table[] = []
   let skip = 0
   let para: Paragraph | null = null
-  let marks: { bold: boolean; italic: boolean; underline: boolean } | null = null
+  let run: Run | null = null
   let inRunProps = false
   let inParaProps = false
+  let inRowProps = false
+  let inTableProps = false
   let inText = false
+  let span = 1
 
+  const table = () => tables[tables.length - 1]
+  const row = () => {
+    const t = table()
+    return t?.rows[t.rows.length - 1]
+  }
   const cell = () => {
-    const table = tables[tables.length - 1]
-    const row = table?.rows[table.rows.length - 1]
-    return row?.[row.length - 1]
+    const r = row()
+    return r?.[r.length - 1]
   }
   const push = (text: string) => {
     if (!para || !text) return
-    const runMarks: MarkType[] = []
-    if (marks?.bold) runMarks.push("bold")
-    if (marks?.italic) runMarks.push("italic")
-    if (marks?.underline) runMarks.push("underline")
-    para.runs.push({ text, ...(runMarks.length ? { marks: runMarks } : {}) })
-  }
-  const on = (attrs: Record<string, string>) => {
-    const v = attrs["w:val"]
-    return v === undefined || !["0", "false", "none"].includes(v)
+    if (run && !run.resolved) run.resolved = styles.effective(para.style, run.style, run.direct)
+    const props = run?.resolved ?? null
+    if (props?.hidden) return
+    const marks: MarkType[] = []
+    if (props?.bold) marks.push("bold")
+    if (props?.italic) marks.push("italic")
+    if (props?.underline) marks.push("underline")
+    para.runs.push({
+      text: props?.caps ? text.toLocaleUpperCase() : text,
+      ...(marks.length ? { marks } : {}),
+    })
   }
 
   for (const e of xmlEvents(xml)) {
@@ -156,69 +146,109 @@ function bodyBlocks(
       continue
     }
     if (e.kind === "open") {
+      const val = e.attrs["w:val"]
       switch (e.name) {
         case "w:tbl":
-          tables.push({ rows: [] })
+          tables.push({ rows: [], headerRows: 0, style: null, firstRowLook: false })
           break
-        case "w:tr":
-          tables[tables.length - 1]?.rows.push([])
+        case "w:tblPr":
+          inTableProps = true
           break
-        case "w:tc": {
-          const table = tables[tables.length - 1]
-          table?.rows[table.rows.length - 1]?.push([])
+        case "w:tblStyle":
+          if (inTableProps && table()) (table() as Table).style = val ?? null
+          break
+        case "w:tblLook": {
+          const t = table()
+          if (!inTableProps || !t) break
+          // Either the attribute (2010+) or the bit mask of the 2007 format.
+          const flag = e.attrs["w:firstRow"]
+          t.firstRowLook =
+            flag !== undefined
+              ? flag === "1" || flag === "true"
+              : (Number.parseInt(val ?? "0", 16) & 0x20) !== 0
           break
         }
+        case "w:tr":
+          table()?.rows.push([])
+          break
+        case "w:trPr":
+          inRowProps = true
+          break
+        case "w:tblHeader": {
+          // A repeating header row; only an unbroken run of them from the top counts.
+          const t = table()
+          if (inRowProps && t && t.headerRows === t.rows.length - 1 && val !== "0") t.headerRows++
+          break
+        }
+        case "w:gridBefore":
+          // Cells missing at the start of a row: keep the rest in their columns.
+          if (inRowProps) for (let i = 0; i < (Number(val) || 0); i++) row()?.push([])
+          break
+        case "w:tc":
+          row()?.push([])
+          span = 1
+          break
+        case "w:gridSpan":
+          span = Math.max(1, Math.min(12, Number(val) || 1))
+          break
         case "w:p":
-          para = { runs: [], style: null, outline: null, numId: null, ilvl: "0" }
+          para = { runs: [], style: null, outline: null, num: {}, centered: false }
           break
         case "w:pPr":
           inParaProps = true
           break
         case "w:pStyle":
-          if (para && inParaProps) para.style = e.attrs["w:val"] ?? null
+          if (para && inParaProps) para.style = val ?? null
           break
         case "w:outlineLvl":
-          if (para && inParaProps) para.outline = Number(e.attrs["w:val"])
+          if (para && inParaProps) para.outline = Number(val)
           break
         case "w:numId":
-          if (para && inParaProps) para.numId = e.attrs["w:val"] ?? null
+          if (para && inParaProps) para.num.numId = val
           break
         case "w:ilvl":
-          if (para && inParaProps) para.ilvl = e.attrs["w:val"] ?? "0"
+          if (para && inParaProps) para.num.ilvl = Number(val) || 0
+          break
+        case "w:jc":
+          if (para && inParaProps) para.centered = val === "center"
           break
         case "w:r":
-          marks = { bold: false, italic: false, underline: false }
+          run = { style: null, direct: {}, resolved: null }
           break
         case "w:rPr":
           inRunProps = true
           break
-        case "w:b":
-          if (marks && inRunProps) marks.bold = on(e.attrs)
-          break
-        case "w:i":
-          if (marks && inRunProps) marks.italic = on(e.attrs)
-          break
-        case "w:u":
-          if (marks && inRunProps) marks.underline = on(e.attrs)
+        case "w:rStyle":
+          if (run && inRunProps) run.style = val ?? null
           break
         case "w:t":
           inText = !e.selfClosing
           break
         case "w:tab":
+        case "w:ptab":
           if (!inParaProps) push(" ")
           break
         case "w:br":
         case "w:cr":
-          push(tables.length ? "\n" : " ")
+          push("\n")
           break
         case "w:noBreakHyphen":
           push("-")
           break
+        default:
+          // The run's own bold, italic, underline, capitals, hidden (never the paragraph mark's).
+          if (run && inRunProps) readRunProp(run.direct, e.name, e.attrs)
       }
       continue
     }
     // close
     switch (e.name) {
+      case "w:tblPr":
+        inTableProps = false
+        break
+      case "w:trPr":
+        inRowProps = false
+        break
       case "w:pPr":
         inParaProps = false
         break
@@ -226,74 +256,199 @@ function bodyBlocks(
         inRunProps = false
         break
       case "w:r":
-        marks = null
+        run = null
         break
       case "w:t":
         inText = false
+        break
+      case "w:tc":
+        // A merged cell spans several columns: empty cells keep the next ones in place.
+        for (let i = 1; i < span; i++) row()?.push([])
+        span = 1
         break
       case "w:p": {
         const done = para
         para = null
         if (!done) break
+        const numbered = numberOf(done, styles, numbering)
         const target = cell()
         if (target) {
-          // A cell's paragraphs, one per line.
-          if (target.length && done.runs.length) target.push({ text: "\n" })
-          target.push(...done.runs)
+          // A cell's paragraphs, one per line, numbered items with their number.
+          const runs = numbered?.label ? [{ text: `${numbered.label} ` }, ...done.runs] : done.runs
+          if (target.length && runsText(runs)) target.push({ text: "\n" })
+          target.push(...runs)
         } else {
-          const block = toBlock(done, headings, bullets)
-          if (block) blocks.push(block)
+          entries.push(...toEntries(done, numbered, styles))
         }
         break
       }
       case "w:tbl": {
-        const table = tables.pop()
-        if (!table) break
+        const t = tables.pop()
+        if (!t) break
         const outer = cell()
         if (outer) {
           // A table inside a cell: its text joins the cell, row by row.
-          for (const row of table.rows) {
+          for (const r of t.rows) {
             if (outer.length) outer.push({ text: "\n" })
-            row.forEach((c, i) => {
+            r.forEach((c, i) => {
               if (i) outer.push({ text: " " })
               outer.push(...c)
             })
           }
-        } else if (table.rows.length) blocks.push({ type: "table", rows: table.rows })
+        } else if (t.rows.length) {
+          const headerRows =
+            t.headerRows || (t.firstRowLook && styles.firstRowBold(t.style) ? 1 : 0)
+          entries.push({
+            block: { type: "table", rows: t.rows, ...(headerRows ? { headerRows } : {}) },
+          })
+        }
         break
       }
     }
   }
-  return blocks
+  return finish(entries)
 }
 
-const NUMBER_PREFIX = /^\s*(\d{1,3}(?:\.\d+)*)[.)]?\s+/
+const runsText = (runs: readonly ImportedRun[]) => runs.map((r) => r.text).join("")
 
-function toBlock(
+/** The paragraph's list and level (its own, else its style's), counted; null if not numbered. */
+function numberOf(
   p: Paragraph,
-  headings: Map<string, number>,
-  bullets: Set<string>,
-): ImportedBlock | null {
-  const text = p.runs.map((r) => r.text).join("")
-  if (!text.trim()) return null
-  const styleLevel = p.style ? headings.get(p.style) : undefined
-  const level = styleLevel ?? (p.outline !== null && p.outline < 9 ? p.outline + 1 : undefined)
-  const listed = p.numId !== null && p.numId !== "0"
+  styles: DocxStyles,
+  numbering: DocxNumbering,
+): { label: string; bullet: boolean } | null {
+  const fromStyle = styles.numbering(p.style)
+  const numId = p.num.numId ?? fromStyle.numId
+  if (!numId || numId === "0") return null
+  // The paragraph's own level, else the level the list links to its style (Heading 2 → 1.1),
+  // else the level its style (or the style it's based on) sets.
+  const ilvl =
+    p.num.ilvl ??
+    numbering.levelForStyle(numId, styles.paragraphStyle(p.style)) ??
+    (p.num.numId === undefined ? fromStyle.ilvl : undefined) ??
+    0
+  return numbering.next(numId, ilvl)
+}
+
+const NUMBER_PREFIX = /^\s*(\d{1,3}(?:\.\d+)*[.)]?)\s+/
+
+/** One top-level paragraph as blocks: a heading, a list item, or paragraphs (one per line). */
+function toEntries(
+  p: Paragraph,
+  numbered: { label: string; bullet: boolean } | null,
+  styles: DocxStyles,
+): Entry[] {
+  const text = runsText(p.runs)
+  if (!text.trim()) return []
+  // Outline level 9 is Word's "body text": explicitly not a heading.
+  const level =
+    p.outline !== null
+      ? p.outline < 9
+        ? p.outline + 1
+        : undefined
+      : styles.headingLevel(styles.paragraphStyle(p.style))
   if (level !== undefined) {
-    const prefix = NUMBER_PREFIX.exec(text)
-    return {
+    const flat = text.replace(/\s+/g, " ").trim()
+    if (numbered && !numbered.bullet && numbered.label) {
+      return [heading(level, flat, numbered.label)]
+    }
+    const prefix = NUMBER_PREFIX.exec(flat)
+    return [heading(level, prefix ? flat.slice(prefix[0].length) : flat, prefix?.[1])]
+  }
+  if (numbered) {
+    const runs = p.runs.map((r) => ({ ...r, text: r.text.replace(/\n/g, " ") }))
+    if (numbered.bullet) return [{ block: { type: "listItem", ordered: false, runs } }]
+    return [
+      {
+        block: {
+          type: "listItem",
+          ordered: true,
+          runs,
+          ...(numbered.label ? { label: numbered.label } : {}),
+        },
+      },
+    ]
+  }
+  // A line break splits the paragraph: each line its own paragraph.
+  const lines: ImportedRun[][] = [[]]
+  for (const run of p.runs) {
+    run.text.split("\n").forEach((part, i) => {
+      if (i > 0) lines.push([])
+      if (part) (lines[lines.length - 1] as ImportedRun[]).push({ ...run, text: part })
+    })
+  }
+  return lines
+    .filter((runs) => runsText(runs).trim())
+    .map((runs, _, all) => ({
+      block: { type: "paragraph", runs },
+      // Only a one-line paragraph can be promoted to a heading or the title.
+      ...(all.length === 1 && {
+        hint: {
+          centered: p.centered,
+          emphasised: runs.every(
+            (r) => !r.text.trim() || r.marks?.includes("bold") || r.marks?.includes("underline"),
+          ),
+        },
+      }),
+    }))
+}
+
+function heading(level: number, text: string, label?: string): Entry {
+  return {
+    block: {
       type: "heading",
       level: Math.max(1, level),
-      text: (prefix ? text.slice(prefix[0].length) : text).trim(),
-      numbered: listed || Boolean(prefix),
+      text: text.trim(),
+      numbered: Boolean(label),
+      ...(label ? { label } : {}),
+    },
+  }
+}
+
+/** Short enough to be a heading or a title: a few words, no sentence punctuation at the end. */
+function headingLike(text: string, maxWords: number): boolean {
+  const t = text.trim()
+  return (
+    t.length > 0 &&
+    t.length <= 100 &&
+    t.split(/\s+/).length <= maxWords &&
+    /\p{L}/u.test(t) &&
+    !/[.,;:]$/.test(t)
+  )
+}
+
+const allCaps = (text: string) => /\p{Lu}/u.test(text) && text === text.toLocaleUpperCase()
+
+/**
+ * After the pass: a document styled without headings gets them from its short bold or capitalised
+ * lines (as a PDF's are found), and a short centred or bold first line is the title.
+ */
+function finish(entries: Entry[]): ImportedBlock[] {
+  const styled = entries.some((e) => e.block.type === "heading")
+  if (!styled) {
+    for (const entry of entries) {
+      const b = entry.block
+      if (b.type !== "paragraph" || !entry.hint) continue
+      const text = runsText(b.runs).replace(/\s+/g, " ").trim()
+      const prefix = NUMBER_PREFIX.exec(text)
+      const rest = prefix ? text.slice(prefix[0].length) : text
+      const promoted =
+        headingLike(rest, 10) &&
+        ((entry.hint.emphasised && (prefix !== null || allCaps(rest) || headingLike(rest, 6))) ||
+          (allCaps(rest) && headingLike(rest, 8)))
+      if (promoted) entry.block = heading(1, rest, prefix?.[1]).block
     }
   }
-  if (listed) {
-    return {
-      type: "listItem",
-      ordered: !bullets.has(`${p.numId}:${p.ilvl}`),
-      runs: p.runs,
+  const first = entries[0]
+  if (first?.block.type === "paragraph" && first.hint) {
+    const text = runsText(first.block.runs).replace(/\s+/g, " ").trim()
+    if (
+      (first.hint.centered || first.hint.emphasised || allCaps(text)) &&
+      headingLike(text, 12) &&
+      !NUMBER_PREFIX.test(text)
+    ) {
+      first.block = heading(0, text).block
     }
   }
-  return { type: "paragraph", runs: p.runs }
+  return entries.map((e) => e.block)
 }

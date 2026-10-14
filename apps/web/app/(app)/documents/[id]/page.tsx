@@ -3,6 +3,7 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { ButtonLink } from "@/components/app/button-link"
 import { DocumentViewer } from "@/components/app/document-viewer"
+import { RefreshWhileConverting } from "@/components/app/documents/refresh-while-converting"
 import { FilePenLineIcon, SendIcon } from "@/components/app/icons"
 import { Alert } from "@/components/arc/alert/alert"
 import { Badge } from "@/components/arc/badge/badge"
@@ -20,6 +21,8 @@ interface DocumentDetail {
   pageCount: number | null
   sha256: string | null
   failureReason: string | null
+  /** Uploaded as a Word file and converted to this PDF (ADR 0052). */
+  convertedFrom: "DOCX" | null
   createdAt: string
   source: { id: string; name: string; deletedAt: string | null } | null
 }
@@ -66,6 +69,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
               </span>
             )}
             <span>Uploaded {formatDate(doc.createdAt)}</span>
+            {doc.convertedFrom && <span>Converted from Word</span>}
             {doc.source && (
               <span>
                 Prepared from{" "}
@@ -106,12 +110,25 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
         <DocumentViewer src={file.data.url} fileName={doc.name} />
       ) : (
         <Alert
-          tone={doc.status === "FAILED" ? "danger" : "warning"}
-          title={doc.status === "FAILED" ? "This PDF could not be processed" : "Not ready yet"}
+          tone={
+            doc.status === "FAILED" ? "danger" : doc.status === "CONVERTING" ? "info" : "warning"
+          }
+          title={
+            doc.status === "FAILED"
+              ? doc.convertedFrom
+                ? "This Word document could not be converted"
+                : "This PDF could not be processed"
+              : doc.status === "CONVERTING"
+                ? "Converting to PDF"
+                : "Not ready yet"
+          }
         >
           {doc.status === "FAILED"
             ? (doc.failureReason ?? "Upload a new copy of the file.")
-            : "The upload hasn't finished. Upload the file again if this persists."}
+            : doc.status === "CONVERTING"
+              ? "The Word document is being converted to a PDF. This page updates when it's ready."
+              : "The upload hasn't finished. Upload the file again if this persists."}
+          {doc.status === "CONVERTING" && <RefreshWhileConverting />}
         </Alert>
       )}
     </div>

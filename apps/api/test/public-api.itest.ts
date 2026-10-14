@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, test } from "bun:test"
+import { DOCX_CONTENT_TYPE } from "@sahihi/core"
 import { prisma } from "@sahihi/db"
-import { getQueues } from "@sahihi/infra"
+import { getQueues, keys, platformStorage } from "@sahihi/infra"
 import {
   app,
   createSender,
   joinOrganization,
+  minimalDocx,
   minimalPdf,
   request,
   resetDb,
@@ -102,6 +104,41 @@ describe("keys", () => {
     })
     const whoami = (await (await api(key, "")).json()) as { key: { scopes: string[] } }
     expect(whoami.key.scopes).toEqual(["envelopes:read"])
+  })
+})
+
+describe("Word uploads (ADR 0052)", () => {
+  test("a .docx comes back CONVERTING (202) and is queued; other bytes are refused", async () => {
+    const { key } = await createKey(alice)
+    const res = await api(key, "/documents?name=Lease.docx", {
+      method: "POST",
+      headers: { "content-type": DOCX_CONTENT_TYPE },
+      body: minimalDocx(),
+    })
+    expect(res.status).toBe(202)
+    const { document } = (await res.json()) as {
+      document: { id: string; status: string; name: string }
+    }
+    expect(document).toMatchObject({ status: "CONVERTING", name: "Lease.pdf" })
+    expect(
+      await platformStorage().head(keys.wordUpload(alice.organizationId, document.id)),
+    ).not.toBeNull()
+    const job = await getQueues().conversions.raw.getJob(`convert-${document.id}`)
+    expect(job?.data).toEqual({ documentId: document.id })
+    await job?.remove()
+
+    const junk = await api(key, "/documents?name=x.docx", {
+      method: "POST",
+      headers: { "content-type": DOCX_CONTENT_TYPE },
+      body: minimalPdf(),
+    })
+    expect(junk.status).toBe(422)
+    const other = await api(key, "/documents", {
+      method: "POST",
+      headers: { "content-type": "application/msword" },
+      body: minimalPdf(),
+    })
+    expect(other.status).toBe(415)
   })
 })
 

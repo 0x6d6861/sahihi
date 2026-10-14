@@ -5,7 +5,7 @@
 ```
 browser                         api                                  S3
   │ POST /documents/uploads ───▶ validate CreateUploadSchema
-  │                              (pdf only, ≤ 25 MB)
+  │                              (PDF or .docx, ≤ 25 MB)
   │                              Document(UPLOADING, s3Key)
   │ ◀──────── { document, uploadUrl } (presigned PUT, 5 min)
   │ PUT bytes ───────────────────────────────────────────────────▶ original.pdf
@@ -15,12 +15,62 @@ browser                         api                                  S3
   │                              or FAILED {failureReason} + release object (422)
 ```
 
-Web side (`app/(app)/documents/`): Extend `FileUpload` (PDF only, single file) in the empty state
-and in the "Upload PDF" dialog. `lib/upload.ts#prepareUpload` pre-checks the file against
-`CreateUploadSchema`: PDF MIME type or a `.pdf` name with an empty MIME, 1 byte to 25 MB, and the
-name trimmed to 200 characters. `useDocumentUpload` then runs the three calls. The S3 PUT uses XHR,
-because fetch has no upload progress, and progress shows in coss `Progress` (`uploadPercent`). The
-bucket's CORS must allow `PUT` with `Content-Type` from `WEB_URL`. Results and errors show as toasts.
+A Word file takes a detour through the worker; see **Word uploads** below.
+
+Web side (`app/(app)/documents/`): Extend `FileUpload` (a PDF or a Word file, single file) in the
+empty state and in the "Upload document" dialog. `lib/upload.ts#prepareUpload` pre-checks the file
+against `CreateUploadSchema`: a PDF or .docx by MIME type, or by extension when the MIME type is
+empty (`documentUploadType`), 1 byte to 25 MB, and the name trimmed to 200 characters ("Prepare
+document" passes `pdfOnly`). `useDocumentUpload` then runs the three calls (`uploadDocument`). The
+S3 PUT uses XHR, because fetch has no upload progress, and progress shows in Arc `Progress`
+(`uploadPercent`). The bucket's CORS must allow `PUT` with `Content-Type` from `WEB_URL`. Results
+and errors show as toasts.
+
+### Word uploads (ADR 0052)
+
+```
+browser                         api                          worker (LibreOffice)
+  │ POST /documents/uploads ───▶ contentType = .docx MIME
+  │                              Document(UPLOADING, convertedFrom DOCX, name "Lease.pdf")
+  │ ◀──── presigned PUT for documents/<id>/source.docx (staged for own storage)
+  │ POST /documents/:id/complete ▶ sniff: a Word body? else FAILED (422)
+  │                              CONVERTING (202) ──── document.convert ───▶ sanitizeDocx
+  │ GET /documents/:id (polls)                                   soffice --convert-to pdf
+  │                                                              inspectPdf, sha256
+  │                                                              put original.pdf → READY
+  │                                                              discard source.docx, thumbnail
+```
+
+- **What's refused** (FAILED, with the reason shown to the sender): bytes that aren't a Word body
+  (on `complete`); macro-enabled, password-protected and old .doc files, zip bombs (over 200 MB or
+  5,000 parts unzipped); files with **tracked changes** (LibreOffice prints them with their markup,
+  so the sender accepts or rejects them in Word first); anything LibreOffice can't open or takes
+  over 90 seconds on; a PDF result over 25 MB or that fails `inspectPdf`.
+- **Safety** (`packages/pdf/src/convert/docx-to-pdf.ts`): `sanitizeDocx` drops external
+  relationships other than hyperlinks (linked images, templates, OLE links) and blanks fields that
+  pull content in (INCLUDEPICTURE, INCLUDETEXT, DDE, LINK…). LibreOffice runs headless with a
+  fresh profile per conversion (macros off, links from documents blocked), `HOME`/`TMPDIR` in a
+  temporary folder, an environment without the worker's (no database URL, no keys), in its own
+  process group, killed after 90 seconds. Comments aren't printed.
+- **Queue:** `document-conversions`, `jobId: convert-<documentId>`, 2 attempts, one conversion at
+  a time per worker. A refused file fails at once; other errors retry once, then fail. The uploads
+  sweep (every 15 minutes) re-queues conversions waiting over 5 minutes and fails those waiting
+  over an hour, removing their Word file. Idempotent: a PDF a crashed attempt already stored is
+  used as it is.
+- **What's kept:** the PDF only, as `original.pdf`, exactly like an uploaded PDF (hashed, immutable
+  once READY). The Word file is discarded. `Document.convertedFrom = DOCX` says where it came
+  from; the document page shows "Converted from Word".
+- **Web:** a single upload waits for the conversion (stage "Converting to PDF…", up to 3 minutes,
+  then "Still converting"); a dropped batch doesn't wait. Files and the document page refresh
+  every few seconds while a document is CONVERTING (`RefreshWhileConverting`). The public API
+  returns 202 with `status: "CONVERTING"`; poll `GET /api/v1/documents/:id`.
+- **Installing LibreOffice on the worker:** headless Writer and fonts metric-compatible with
+  Word's (Carlito for Calibri, Caladea for Cambria, Liberation for Arial / Times New Roman /
+  Courier New), e.g. on Debian/Ubuntu `libreoffice-writer-nogui fonts-crosextra-carlito
+  fonts-crosextra-caladea fonts-liberation2 fonts-noto-core`. On Railway, add them to the worker
+  service's build (`RAILPACK_DEPLOY_APT_PACKAGES`). `LIBREOFFICE_PATH` (default `soffice`) is
+  looked up on a fixed `PATH` (`/usr/local/bin:/usr/bin:/bin`); set an absolute path otherwise.
+  Without it, Word uploads fail with "Word documents can't be converted right now".
 
 List (`GET /documents?page=N&folderId=&q=&tag=&color=&status=&senderId=&period=`): validated with
 `ListDocumentsQuerySchema` (`parseQuery`, 400 on bad input). It returns
@@ -61,7 +111,6 @@ The list returns `thumbnailUrl` per item: `presignCacheable` (signed at the star
 window, valid 30 minutes, `Cache-Control: private, max-age=900`), so repeat visits hit the browser
 cache. The web grid (List / Grid saved in the `sahihi-files-layout` cookie, `DocumentCard`) shows it in Extend `FileThumbnail`.
 
-Planned: optional DOCX→PDF conversion (LibreOffice in the worker).
 
 ### Field detection (ADR 0020)
 

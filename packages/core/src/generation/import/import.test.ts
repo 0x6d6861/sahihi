@@ -3,7 +3,7 @@ import { generationPreflight } from "../preflight"
 import { blankDocument } from "../starters/blank"
 import { ImportError, type ImportedBlock, MAX_IMPORT_CHARS } from "./blocks"
 import { importContent } from "./content"
-import { pdfTextToBlocks } from "./pdf-text"
+import { type PdfTextSpan, pdfTextToBlocks } from "./pdf-text"
 
 const page = (...lines: string[]) => lines.join("\r\n")
 
@@ -22,7 +22,7 @@ describe("pdfTextToBlocks", () => {
     ])
     expect(blocks).toEqual([
       { type: "heading", level: 1, text: "SERVICES AGREEMENT", numbered: false },
-      { type: "heading", level: 1, text: "Definitions", numbered: true },
+      { type: "heading", level: 1, text: "Definitions", numbered: true, label: "1." },
       {
         type: "paragraph",
         runs: [
@@ -31,7 +31,7 @@ describe("pdfTextToBlocks", () => {
           },
         ],
       },
-      { type: "heading", level: 1, text: "Payment", numbered: true },
+      { type: "heading", level: 1, text: "Payment", numbered: true, label: "2." },
       { type: "paragraph", runs: [{ text: "The Client pays within 30 days." }] },
     ])
   })
@@ -50,6 +50,7 @@ describe("pdfTextToBlocks", () => {
       type: "listItem",
       ordered: true,
       runs: [{ text: "on the due date;" }],
+      label: "(a)",
     })
     expect(blocks[3]).toEqual({
       type: "listItem",
@@ -140,5 +141,194 @@ describe("blankDocument", () => {
   test("is valid, with one signer whose only open problems are contacts", () => {
     const issues = generationPreflight(blankDocument()).map((i) => i.code)
     expect(issues.sort()).toEqual(["invalid_email", "missing_name"])
+  })
+})
+
+describe("importContent: the source's numbers (Word)", () => {
+  const text = (t: string) => [{ text: t }]
+
+  test("a heading keeps its number when its section's would differ", () => {
+    const data = importContent(
+      [
+        { type: "heading", level: 1, text: "Definitions", numbered: true, label: "1." },
+        { type: "paragraph", runs: text("Words mean things.") },
+        { type: "heading", level: 2, text: "Scope", numbered: true, label: "1.1" },
+        { type: "paragraph", runs: text("This applies.") },
+        { type: "heading", level: 1, text: "Payment", numbered: true, label: "2." },
+        { type: "heading", level: 1, text: "Notices", numbered: true, label: "Article 3" },
+      ],
+      "terms.docx",
+    )
+    // The first heading is numbered, so it isn't taken for the title.
+    expect(data.title).toBe("Terms")
+    expect(data.content.content.map((s) => [s.attrs.title, s.attrs.numbered])).toEqual([
+      ["Definitions", true],
+      ["1.1 Scope", false],
+      ["Payment", true],
+      ["Article 3 Notices", false],
+    ])
+  })
+
+  test("numbered items stay a list only where the renderer prints the same number", () => {
+    const data = importContent(
+      [
+        { type: "heading", level: 1, text: "Terms", numbered: false },
+        { type: "heading", level: 1, text: "Fees", numbered: false },
+        { type: "listItem", ordered: true, runs: text("first"), label: "(a)" },
+        { type: "listItem", ordered: true, runs: text("second"), label: "(b)" },
+        { type: "listItem", ordered: true, runs: text("one"), label: "1." },
+        { type: "listItem", ordered: true, runs: text("plain") },
+        { type: "listItem", ordered: false, runs: text("dot"), label: "•" },
+      ],
+      "x",
+    )
+    const [fees] = data.content.content
+    expect(fees?.content).toEqual([
+      {
+        type: "orderedList",
+        content: [
+          {
+            type: "listItem",
+            content: [{ type: "paragraph", content: [{ type: "text", text: "first" }] }],
+          },
+          {
+            type: "listItem",
+            content: [{ type: "paragraph", content: [{ type: "text", text: "second" }] }],
+          },
+        ],
+      },
+      { type: "paragraph", content: [{ type: "text", text: "1. one" }] },
+      {
+        type: "orderedList",
+        content: [
+          {
+            type: "listItem",
+            content: [{ type: "paragraph", content: [{ type: "text", text: "plain" }] }],
+          },
+        ],
+      },
+      {
+        type: "bulletList",
+        content: [
+          {
+            type: "listItem",
+            content: [{ type: "paragraph", content: [{ type: "text", text: "dot" }] }],
+          },
+        ],
+      },
+    ])
+  })
+
+  test("header rows become header cells", () => {
+    const data = importContent(
+      [
+        { type: "heading", level: 1, text: "Fees", numbered: false },
+        {
+          type: "table",
+          rows: [
+            [text("Item"), text("Price")],
+            [text("Rent"), text("100")],
+          ],
+          headerRows: 1,
+        },
+      ],
+      "x",
+    )
+    const table = data.content.content[0]?.content[0]
+    if (table?.type !== "table") throw new Error("expected a table")
+    expect(table.content.map((r) => r.content.map((c) => c.type))).toEqual([
+      ["tableHeader", "tableHeader"],
+      ["tableCell", "tableCell"],
+    ])
+  })
+})
+
+describe("pdfTextToBlocks: styles from the PDF", () => {
+  /** A page from styled pieces: [text, style] in order, lines split by "\n" inside the text. */
+  const styled = (...parts: [string, Omit<PdfTextSpan, "start" | "end">?][]) => {
+    let text = ""
+    const spans: PdfTextSpan[] = []
+    for (const [part, style = {}] of parts) {
+      spans.push({ start: text.length, end: text.length + part.length, size: 10, ...style })
+      text += part
+    }
+    return { text, spans }
+  }
+
+  test("bold, italic and underline stay on their words, across a joined line", () => {
+    const blocks = pdfTextToBlocks([
+      styled(
+        ["The Tenant, "],
+        ["Jane Doe", { bold: true }],
+        [", pays the rent to "],
+        ["the Landlord", { italic: true }],
+        [" by the "],
+        ["first", { underline: true }],
+        [" "],
+        ["day", { underline: true }],
+        ["\r\n"],
+        ["of each month.", {}],
+      ),
+    ])
+    expect(blocks).toEqual([
+      {
+        type: "paragraph",
+        runs: [
+          { text: "The Tenant, " },
+          { text: "Jane Doe", marks: ["bold"] },
+          { text: ", pays the rent to " },
+          { text: "the Landlord", marks: ["italic"] },
+          { text: " by the " },
+          { text: "first day", marks: ["underline"] },
+          { text: " of each month." },
+        ],
+      },
+    ])
+  })
+
+  test("larger and bold lines are headings, keeping their number; the largest first line is the title", () => {
+    const blocks = pdfTextToBlocks([
+      styled(
+        ["Tenancy Agreement", { size: 18 }],
+        ["\r\n"],
+        ["Rent", { size: 13 }],
+        ["\r\nThe rent is due monthly.\r\n"],
+        ["2.1 Deposit", { bold: true }],
+        ["\r\nA deposit is paid.\r\n"],
+        ["Payable by", { bold: true }],
+        ["\r\nthe tenant on signing.\r\n"],
+        ["• ", {}],
+        ["Water", { bold: true }],
+      ),
+    ])
+    expect(blocks).toEqual([
+      { type: "heading", level: 1, text: "Tenancy Agreement", numbered: false },
+      { type: "heading", level: 1, text: "Rent", numbered: false },
+      { type: "paragraph", runs: [{ text: "The rent is due monthly." }] },
+      { type: "heading", level: 1, text: "Deposit", numbered: true, label: "2.1" },
+      { type: "paragraph", runs: [{ text: "A deposit is paid." }] },
+      // The next line carries on in lower case: a bold phrase, not a heading.
+      {
+        type: "paragraph",
+        runs: [{ text: "Payable by", marks: ["bold"] }, { text: " the tenant on signing." }],
+      },
+      { type: "listItem", ordered: false, runs: [{ text: "Water", marks: ["bold"] }] },
+    ])
+  })
+
+  test("where all the text is bold, bold says nothing about headings", () => {
+    const blocks = pdfTextToBlocks([
+      styled(["Payment terms\r\nThe rent is due monthly.\r\nLate fees apply.", { bold: true }]),
+    ])
+    expect(blocks.map((b) => b.type)).toEqual(["heading", "paragraph", "paragraph"])
+    // Only the first line, as the title (by its words, like an unstyled PDF).
+    expect(blocks[0]).toMatchObject({ text: "Payment terms" })
+  })
+
+  test("bullets drawn from Symbol or Wingdings are bullets", () => {
+    expect(pdfTextToBlocks([" Deliver on time.\r\nKeep records."])).toEqual([
+      { type: "listItem", ordered: false, runs: [{ text: "Deliver on time." }] },
+      { type: "listItem", ordered: false, runs: [{ text: "Keep records." }] },
+    ])
   })
 })

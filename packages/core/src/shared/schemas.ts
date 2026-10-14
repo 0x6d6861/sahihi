@@ -16,6 +16,7 @@ import {
   SIGNING_ORDERS,
   VERIFICATION_METHODS,
 } from "./enums"
+import { DOCUMENT_UPLOAD_TYPES } from "./uploads"
 
 /**
  * Request/response validators shared by the API (server-side validation) and
@@ -43,7 +44,8 @@ export const DocumentNameSchema = z
 export const CreateUploadSchema = z.object({
   name: DocumentNameSchema,
   sizeBytes: z.number().int().positive().max(MAX_UPLOAD_BYTES),
-  contentType: z.literal("application/pdf"),
+  /** A PDF, or a Word file the worker converts (ADR 0052). */
+  contentType: z.enum(DOCUMENT_UPLOAD_TYPES),
   /** "Prepare document": the READY document (same org) this upload was derived from. */
   sourceDocumentId: z.string().min(1).max(64).optional(),
   /** Folder (same org) the document lands in; omitted = workspace root. */

@@ -13,6 +13,7 @@ describe("prisma enums match @sahihi/core", () => {
     ["SigningOrder", core.SIGNING_ORDERS, $Enums.SigningOrder],
     ["VerificationMethod", core.VERIFICATION_METHODS, $Enums.VerificationMethod],
     ["DocumentStatus", core.DOCUMENT_STATUSES, $Enums.DocumentStatus],
+    ["DocumentSourceFormat", core.DOCUMENT_SOURCE_FORMATS, $Enums.DocumentSourceFormat],
     ["WebhookDeliveryStatus", core.WEBHOOK_DELIVERY_STATUSES, $Enums.WebhookDeliveryStatus],
     ["ExportStatus", core.EXPORT_STATUSES, $Enums.ExportStatus],
     ["BulkSendStatus", core.BULK_SEND_STATUSES, $Enums.BulkSendStatus],

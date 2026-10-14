@@ -105,7 +105,7 @@ export const site = {
       id: "send",
       eyebrow: "Send & sign",
       headline: ["Place the fields.", "Send the link."],
-      body: "Add recipients, set the signing order and drop signature, date and text fields on the page. Each signer gets their own link and signs in the browser, on any phone, without an account.",
+      body: "Upload a PDF or a Word file, add recipients, set the signing order and drop signature, date and text fields on the page. Each signer gets their own link and signs in the browser, on any phone, without an account.",
       demos: [
         {
           kind: "signing",
@@ -271,6 +271,10 @@ export const site = {
       {
         q: "Is an electronic signature legally binding?",
         a: "Kenyan law recognises electronic signatures, and Sahihi records who signed, when and how they were identified. Some documents need an advanced electronic signature from a licensed provider; support for one is on the way. Ask your lawyer which of your documents Sahihi suits today.",
+      },
+      {
+        q: "Can I send a Word document?",
+        a: "Yes. Upload a .docx and Sahihi turns it into a PDF before you place fields, so everyone signs the same fixed pages. Accept or reject any tracked changes in Word first.",
       },
       {
         q: "How does someone check a signed document?",

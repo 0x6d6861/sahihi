@@ -33,7 +33,7 @@ Authorization: Bearer sahihi_sk_…
 
 The answer names the workspace and the key's scopes. Give each key the fewest scopes it needs:
 
-- `documents:read`, `documents:write`: read and upload PDFs.
+- `documents:read`, `documents:write`: read and upload documents (PDF or Word).
 - `templates:read`: list templates and their roles.
 - `envelopes:read`: list and read envelopes, download signed files, follow bulk sends.
 - `envelopes:write`: create, send and void envelopes, start bulk sends, issue embedded signing links.
@@ -51,6 +51,12 @@ curl -X POST "https://app.sahihi.co.ke/api/v1/documents?name=nda.pdf" \
   -H "Content-Type: application/pdf" \
   --data-binary @nda.pdf
 ```
+
+A Word file works too: send it with
+`Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document`. The answer
+is `202` with `"status": "CONVERTING"` while Sahihi turns it into a PDF; poll
+`GET /documents/:id` until it is `READY` (or `FAILED`, with the reason in the app) before you use
+it in an envelope.
 
 **2. Create the envelope** with its recipients and fields, and send it in the same call.
 Fields point at recipients by their position in the list. Positions are fractions of the page,
@@ -99,7 +105,7 @@ for the `envelope.completed` webhook.
 All paths are under `/api/v1`.
 
 - `GET /` — the workspace and this key's scopes.
-- `POST /documents?name=…` — upload a PDF (`documents:write`).
+- `POST /documents?name=…` — upload a PDF, or a Word file to convert (`documents:write`).
 - `GET /documents/:id` — a document (`documents:read`).
 - `GET /templates` — templates with their roles (`templates:read`).
 - `GET /envelopes?status=&page=` — envelopes, 50 a page (`envelopes:read`).

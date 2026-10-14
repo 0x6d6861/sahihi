@@ -19,6 +19,7 @@ export const ENVELOPE_STATUS_BADGE: Record<EnvelopeStatus, BadgeStyle> = {
 
 export const DOCUMENT_STATUS_BADGE: Record<DocumentStatus, BadgeStyle> = {
   UPLOADING: { label: "Uploading", tone: "neutral" },
+  CONVERTING: { label: "Converting", tone: "info" },
   READY: { label: "Ready", tone: "success" },
   FAILED: { label: "Failed", tone: "danger" },
 }

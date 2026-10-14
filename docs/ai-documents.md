@@ -97,20 +97,56 @@ number of sections, never the text.
 Readers (`packages/pdf/src/import/`) turn a file into neutral blocks; `importContent`
 (`packages/core/src/generation/import/`) turns the blocks into a document. Nothing is reworded.
 
-- **Word** (`readDocxBlocks`, unzipped with fflate): heading and title styles (or an outline
-  level) are headings; Word numbering makes list items (bullets vs numbered); bold, italic and
-  underline are kept; tables come cell by cell. Tracked deletions, text boxes, field codes,
-  headers, footers, footnotes and images are left out.
-- **PDF** (`readPageText`, then `pdfTextToBlocks`): headers and footers repeated on most pages and
-  page numbers are dropped; lines that run on are joined and words hyphenated across a line break
-  mended; short numbered lines ("3. Payment"), "Article 4" / "Clause 2" lines and short
-  all-capitals lines are headings, and a title-like first line is the title; sub-clauses ("3.1 …")
-  stay paragraphs with their number; bullets and lettered items are list items. Tables come in as
-  paragraphs.
+- **Word** (`readDocxBlocks`, unzipped with fflate; ADR 0052), styled as Word shows it:
+  - **Emphasis:** bold, italic and underline from the text's own formatting, its paragraph style
+    and its character style (Strong, Emphasis, a firm's "Defined term"…), following `basedOn`
+    chains from the document defaults; a style toggle set by both cancels, as in Word. Text
+    formatted as capitals comes in as capitals; hidden text is left out.
+  - **Headings:** heading and title styles, styles based on them, or an outline level. A document
+    with no heading styles gets headings from short bold or capitalised lines (≤ 10 words, no
+    closing full stop, colon or comma), and a short centred, bold or capitalised first line is the
+    title.
+  - **Numbering, counted as Word counts it** (`DocxNumbering`): lists set on the paragraph or by
+    its style (List Number, List Bullet, numbered headings), lists sharing a definition continuing
+    their count, restarts (`startOverride`), legal numbering, decimal / letter / roman formats.
+    Each numbered heading or item carries the number Word prints as its `label`.
+  - **Tables** cell by cell: merged cells keep their columns (empty cells fill the span), header
+    rows (repeating header rows, or a table style that bolds the first row) become header cells.
+    Numbered paragraphs in a cell keep their number.
+  - **Lines:** a line break splits a paragraph into one paragraph per line (addresses, captions);
+    in a heading or list item it's a space.
+  - Left out: tracked deletions (insertions are kept), text boxes, field codes (their result is
+    kept), headers, footers, footnotes, comments and images. Alignment, fonts, colours, nesting
+    and merged cells have no place in the draft model.
+- **PDF** (`readPageText(bytes, { styles: true })`, then `pdfTextToBlocks`; ADR 0052):
+  - **Styles:** PDFium reads each text object's font once: bold from its name ("…-Bold",
+    "Semibold", "Black"), weight, ForceBold flag or fill-and-stroke "fake bold"; italic from its
+    name ("Italic", "Oblique"), Italic flag, italic angle or a slanted matrix; and its size.
+    Underline is a thin rule (≤ 1.5 pt) drawn just under the baseline (within 0.4 × the size) and
+    no wider than the words above it plus a character, so table borders and signature lines
+    aren't. Bold, italic and underline stay on their words, through joined lines; a space between
+    two words of one style takes that style.
+  - **Structure:** headers and footers repeated on most pages and page numbers are dropped; lines
+    that run on are joined and words hyphenated across a line break mended. Headings are short
+    numbered lines ("3. Payment"), "Article 4" / "Clause 2" lines, short all-capitals lines, and
+    short lines set at least 15% larger than the text or in bold where the text isn't (not when
+    the next line carries on in lower case, or when the paragraph above runs on into it). A
+    heading keeps its number as its `label` ("3.", "2.1"). The first line is the title when it
+    reads like one, or when it's the largest on the first page and larger than the text.
+    Sub-clauses ("3.1 …") stay paragraphs with their number unless they're styled as headings.
+    Bullets (including Word's Symbol / Wingdings bullets) and lettered items are list items, the
+    letter kept as `label` ("(a)", "ii)"). Tables come in as paragraphs.
 - **Both:** fill-in lines ("Signature: ______") and bare signing captions ("Signature", "Date")
   are dropped, since signature blocks come from the Signers tab. The first short heading is the
-  title (otherwise the file's name); each heading starts a section, numbered only if the source
-  numbered it; text before the first heading goes in an unnumbered "Introduction". The document
+  title, unless it carries a number (otherwise the file's name); each heading starts a section,
+  numbered only if the source numbered it; text before the first heading goes in an unnumbered
+  "Introduction".
+- **The source's numbers stay true** (Word, which knows them): a heading whose number isn't the
+  one its section would get ("2.1 Scope", "Article 4") becomes an unnumbered section with its
+  number in the title, and a numbered item Sahihi would print differently (it prints "(a)",
+  "(b)"…; Word said "1.", "i)") becomes a paragraph starting with Word's number. So "see clause
+  2.1" still points at clause 2.1. A Word "1., 2., 3." heading sequence stays numbered sections,
+  and "(a), (b)" items stay a list. The document
   starts with no blanks and one signer, `Signer 1`, without fields.
 - **Refused** (422 with a code, 413 for size): `no_text` (a scan or an empty file), `encrypted`,
   `unsupported` (anything but a PDF or .docx), `too_large` (over 10 MB or 60,000 characters of

@@ -18,6 +18,18 @@ describe("prepareUpload", () => {
   test("accepts a .pdf with an empty MIME type", () => {
     expect(prepareUpload({ name: "SCAN.PDF", size: 10, type: "" }).ok).toBe(true)
   })
+  test("accepts a Word file (ADR 0052), by type or by .docx name", () => {
+    const docx = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    expect(prepareUpload({ name: "Lease.docx", size: 10, type: docx })).toEqual({
+      ok: true,
+      input: { name: "Lease.docx", sizeBytes: 10, contentType: docx },
+    })
+    expect(prepareUpload({ name: "Lease.docx", size: 10, type: "" }).ok).toBe(true)
+    expect(prepareUpload({ name: "Lease.docx", size: 10, type: docx }, { pdfOnly: true })).toEqual({
+      ok: false,
+      message: "Only PDF files are supported.",
+    })
+  })
   test("rejects other types, even with a .pdf name", () => {
     expect(prepareUpload({ name: "a.docx", size: 10, type: "application/msword" }).ok).toBe(false)
     expect(prepareUpload({ name: "a.pdf", size: 10, type: "image/png" }).ok).toBe(false)
@@ -50,6 +62,7 @@ describe("uploadPercent", () => {
       uploadPercent("uploading", 0.5),
       uploadPercent("uploading", 1),
       uploadPercent("checking"),
+      uploadPercent("converting"),
       uploadPercent("done"),
     ]
     expect(steps).toEqual([...steps].sort((a, b) => a - b))
@@ -69,7 +82,9 @@ describe("splitUploads (ADR 0039)", () => {
     const png = { name: "photo.png", size: 10, type: "image/png" }
     const { accepted, skipped } = splitUploads([pdf("a.pdf"), png, pdf("b.pdf")])
     expect(accepted.map((f) => f.name)).toEqual(["a.pdf", "b.pdf"])
-    expect(skipped).toEqual([{ file: png, message: "Only PDF files are supported." }])
+    expect(skipped).toEqual([
+      { file: png, message: "Only PDF and Word (.docx) files are supported." },
+    ])
   })
 
   test("caps the batch", () => {

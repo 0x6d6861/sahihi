@@ -4,6 +4,8 @@ import {
   ApiCreateEnvelopeSchema,
   ApiListEnvelopesQuerySchema,
   ApiVoidSchema,
+  convertedDocumentName,
+  DOCX_CONTENT_TYPE,
   envelopeEventData,
   MAX_UPLOAD_BYTES,
   sha256Hex,
@@ -18,8 +20,8 @@ import {
   startBulkSend,
   voidEnvelope,
 } from "@sahihi/envelopes"
-import { keys, releaseObject, storageFor } from "@sahihi/infra"
-import { inspectPdf, PdfInspectionError } from "@sahihi/pdf"
+import { enqueueDocumentConversion, keys, releaseObject, storageFor } from "@sahihi/infra"
+import { inspectPdf, PdfInspectionError, sniffImportFormat } from "@sahihi/pdf"
 import { type Context, Hono } from "hono"
 import {
   downloadLinks,
@@ -104,19 +106,28 @@ export const v1 = new Hono<ApiKeyEnv>()
   })
 
   // ── Documents ──────────────────────────────────────────────────────────────
-  /** Upload a PDF: raw `application/pdf` body, `?name=contract.pdf`. Returns it READY. */
+  /**
+   * Upload a PDF: raw `application/pdf` body, `?name=contract.pdf`. Returns it READY. Or a Word
+   * file (the .docx MIME type): returns it CONVERTING (202) and the worker makes the PDF; poll
+   * `GET /documents/:id` until it's READY or FAILED (ADR 0052).
+   */
   .post("/documents", requireScope("documents:write"), async (c) => {
     const type = c.req.header("content-type") ?? ""
-    if (!type.startsWith("application/pdf")) {
+    const word = type.startsWith(DOCX_CONTENT_TYPE)
+    if (!type.startsWith("application/pdf") && !word) {
       return c.json(
-        { error: "unsupported_media_type", message: "Send the PDF as application/pdf" },
+        {
+          error: "unsupported_media_type",
+          message: `Send a PDF as application/pdf, or a Word file as ${DOCX_CONTENT_TYPE}`,
+        },
         415,
       )
     }
     const bytes = new Uint8Array(await c.req.arrayBuffer())
     if (bytes.byteLength === 0 || bytes.byteLength > MAX_UPLOAD_BYTES) {
-      return c.json({ error: "invalid_size", message: "The PDF must be 1 byte to 25 MB" }, 400)
+      return c.json({ error: "invalid_size", message: "The file must be 1 byte to 25 MB" }, 400)
     }
+    if (word) return uploadWord(c, bytes)
     const name = (c.req.query("name") ?? "document.pdf").trim().slice(0, 200) || "document.pdf"
     let info: Awaited<ReturnType<typeof inspectPdf>>
     try {
@@ -326,3 +337,38 @@ export const v1 = new Hono<ApiKeyEnv>()
       return c.json({ url: `${getEnv().WEB_URL}/sign/${token}?embed=1`, expiresAt }, 201)
     },
   )
+
+/** The public API's Word upload: staged like a browser upload, converted by the worker. */
+async function uploadWord(c: Context<ApiKeyEnv>, bytes: Uint8Array) {
+  if (sniffImportFormat(bytes) !== "docx") {
+    return c.json({ error: "INVALID", message: "This isn't a Word document (.docx)" }, 422)
+  }
+  const orgId = c.get("organizationId")
+  const id = crypto.randomUUID()
+  const name = convertedDocumentName(
+    (c.req.query("name") ?? "document.docx").trim() || "document.docx",
+  )
+  const upload = keys.wordUpload(orgId, id)
+  const storage = await storageFor(orgId)
+  await storage.stageUpload(upload, bytes, DOCX_CONTENT_TYPE)
+  try {
+    const doc = await prisma.document.create({
+      data: {
+        id,
+        organizationId: orgId,
+        uploadedById: c.get("apiKey").createdById,
+        name,
+        s3Key: keys.original(orgId, id),
+        status: "CONVERTING",
+        sizeBytes: bytes.byteLength,
+        convertedFrom: "DOCX",
+      },
+    })
+    // Not queued (Redis down): the uploads sweep queues it within 15 minutes.
+    await enqueueDocumentConversion(doc.id).catch(() => {})
+    return c.json({ document: docView(doc) }, 202)
+  } catch (err) {
+    await storage.discardUpload(upload).catch(() => {})
+    throw err
+  }
+}

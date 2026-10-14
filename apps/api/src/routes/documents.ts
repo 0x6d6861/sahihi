@@ -3,8 +3,10 @@ import {
   CreateUploadSchema,
   canDeleteDocument,
   canMoveDocument,
+  convertedDocumentName,
   createTextRuleScanner,
   DOCUMENTS_PAGE_SIZE,
+  DOCX_CONTENT_TYPE,
   ListDocumentsQuerySchema,
   MAX_UPLOAD_BYTES,
   mergeSuggestions,
@@ -16,8 +18,20 @@ import {
   UpdateDocumentSchema,
 } from "@sahihi/core"
 import { forOrganization, prisma } from "@sahihi/db"
-import { keys, releaseObject, storageFor } from "@sahihi/infra"
-import { inspectPdf, PdfInspectionError, readFormWidgets, readPageText } from "@sahihi/pdf"
+import {
+  documentUploadKey,
+  enqueueDocumentConversion,
+  keys,
+  releaseObject,
+  storageFor,
+} from "@sahihi/infra"
+import {
+  inspectPdf,
+  PdfInspectionError,
+  readFormWidgets,
+  readPageText,
+  sniffImportFormat,
+} from "@sahihi/pdf"
 import { Hono } from "hono"
 import type { AppEnv } from "../lib/env"
 import { loadFolderTree } from "../lib/folder-tree"
@@ -34,6 +48,7 @@ import { requireOrg } from "../middleware/session"
  *   1. POST /documents/uploads   → Document(UPLOADING) + presigned PUT URL
  *   2. client PUTs bytes directly to S3
  *   3. POST /documents/:id/complete → server downloads, validates, hashes → READY | FAILED
+ *      A Word file instead goes CONVERTING (202) and the worker makes the PDF (ADR 0052).
  */
 export const documents = new Hono<AppEnv>()
   .use(requireOrg)
@@ -58,20 +73,27 @@ export const documents = new Hono<AppEnv>()
     }
     const id = crypto.randomUUID()
     const s3Key = keys.original(orgId, id)
+    // A Word file lands next to where its PDF will be, and is named as the PDF it becomes.
+    const word = input.contentType === DOCX_CONTENT_TYPE
     const document = await prisma.document.create({
       data: {
         id,
         organizationId: orgId,
         uploadedById: c.get("user").id,
-        name: input.name,
+        name: word ? convertedDocumentName(input.name) : input.name,
         s3Key,
         sizeBytes: input.sizeBytes,
         sourceDocumentId: input.sourceDocumentId ?? null,
         folderId: input.folderId ?? null,
+        convertedFrom: word ? "DOCX" : null,
       },
     })
     const storage = await storageFor(orgId)
-    const uploadUrl = await storage.presignUpload(s3Key, input.contentType, input.sizeBytes)
+    const uploadUrl = await storage.presignUpload(
+      documentUploadKey(document),
+      input.contentType,
+      input.sizeBytes,
+    )
     return c.json({ document, uploadUrl }, 201)
   })
 
@@ -84,11 +106,38 @@ export const documents = new Hono<AppEnv>()
     if (doc.status !== "UPLOADING") conflict(`Document is already ${doc.status}`)
 
     const storage = await storageFor(doc.organizationId)
-    const head = await storage.uploaded(doc.s3Key)
+    const uploadKey = documentUploadKey(doc)
+    const head = await storage.uploaded(uploadKey)
     if (!head) badRequest("Upload not found in storage")
     if (head.sizeBytes > MAX_UPLOAD_BYTES) badRequest("File too large")
 
-    const bytes = await storage.readUpload(doc.s3Key)
+    const bytes = await storage.readUpload(uploadKey)
+    if (doc.convertedFrom === "DOCX") {
+      // The bytes decide: a Word body goes to the worker; anything else fails here.
+      if (sniffImportFormat(bytes) !== "docx") {
+        const failed = await prisma.document.update({
+          where: { id: doc.id },
+          data: {
+            status: "FAILED",
+            failureReason: "This isn't a Word document (.docx). Upload a .docx or a PDF.",
+          },
+        })
+        await storage.discardUpload(uploadKey).catch(() => {})
+        return c.json(
+          { document: failed, error: "unsupported", message: failed.failureReason },
+          422,
+        )
+      }
+      const res = await prisma.document.updateMany({
+        where: { id: doc.id, status: "UPLOADING" },
+        data: { status: "CONVERTING", sizeBytes: bytes.byteLength },
+      })
+      if (res.count === 0) conflict("Document is already being processed")
+      // Not queued (Redis down): the uploads sweep queues it within 15 minutes.
+      await enqueueDocumentConversion(doc.id).catch(() => {})
+      const converting = await prisma.document.findUniqueOrThrow({ where: { id: doc.id } })
+      return c.json({ document: converting }, 202)
+    }
     try {
       const info = await inspectPdf(bytes)
       // Validated: only now does it reach the workspace's storage (docs/storage.md → Uploads).
@@ -111,8 +160,8 @@ export const documents = new Hono<AppEnv>()
         where: { id: doc.id },
         data: { status: "FAILED", failureReason: err.message },
       })
-      await storage.discardUpload(doc.s3Key).catch(() => {})
-      return c.json({ document: failed, error: err.code }, 422)
+      await storage.discardUpload(uploadKey).catch(() => {})
+      return c.json({ document: failed, error: err.code, message: err.message }, 422)
     }
   })
 

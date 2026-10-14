@@ -2,8 +2,12 @@
 // import Prisma (the web app, shared validators) can use them.
 // Kept in sync by packages/db/src/enums.test.ts.
 
-export const DOCUMENT_STATUSES = ["UPLOADING", "READY", "FAILED"] as const
+export const DOCUMENT_STATUSES = ["UPLOADING", "CONVERTING", "READY", "FAILED"] as const
 export type DocumentStatus = (typeof DOCUMENT_STATUSES)[number]
+
+/** What a document was converted from (ADR 0052); null on the row for a PDF uploaded as it is. */
+export const DOCUMENT_SOURCE_FORMATS = ["DOCX"] as const
+export type DocumentSourceFormat = (typeof DOCUMENT_SOURCE_FORMATS)[number]
 
 export const ENVELOPE_STATUSES = [
   "DRAFT",

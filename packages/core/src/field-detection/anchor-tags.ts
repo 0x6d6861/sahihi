@@ -1,3 +1,4 @@
+import type { PdfTextSpan } from "../generation/import/pdf-text"
 import {
   clampRect,
   displayedSize,
@@ -29,6 +30,8 @@ export interface PageText {
   boxes: ReadonlyMap<number, PdfRect>
   /** Bounds of thin horizontal drawn paths (signature lines), when the reader was asked for them. */
   lines?: PdfRect[]
+  /** The text's styles (bold, italic, underline, size), when the reader was asked for them. */
+  spans?: PdfTextSpan[]
 }
 
 const TYPE_ALIASES: Record<string, FieldType> = {

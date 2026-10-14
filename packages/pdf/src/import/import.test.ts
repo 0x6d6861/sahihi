@@ -1,9 +1,16 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { applyVariableUpdates, findStarter, ImportError, importContent } from "@sahihi/core"
+import {
+  applyVariableUpdates,
+  blankDocument,
+  findStarter,
+  ImportError,
+  importContent,
+} from "@sahihi/core"
 import { strToU8, zipSync } from "fflate"
 import { composeGeneratedDocument } from "../compose/document"
+import { docx } from "./docx-fixture"
 import { readForImport, sniffImportFormat } from "./import"
 
 const DATE = new Date("2026-10-09T12:00:00.000Z")
@@ -15,23 +22,6 @@ async function code(promise: Promise<unknown>): Promise<string> {
   } catch (err) {
     return err instanceof ImportError ? err.code : String(err)
   }
-}
-
-/** A minimal Word file: the body, plus styles and numbering when given. */
-function docx(body: string, extra: { styles?: string; numbering?: string } = {}): Uint8Array {
-  const w = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
-  return zipSync({
-    "[Content_Types].xml": strToU8("<Types/>"),
-    "word/document.xml": strToU8(
-      `<?xml version="1.0"?><w:document ${w}><w:body>${body}</w:body></w:document>`,
-    ),
-    ...(extra.styles
-      ? { "word/styles.xml": strToU8(`<w:styles ${w}>${extra.styles}</w:styles>`) }
-      : {}),
-    ...(extra.numbering
-      ? { "word/numbering.xml": strToU8(`<w:numbering ${w}>${extra.numbering}</w:numbering>`) }
-      : {}),
-  })
 }
 
 const styles = `<w:style w:styleId="Title"><w:name w:val="Title"/></w:style><w:style w:styleId="Heading1"><w:name w:val="heading 1"/></w:style>`
@@ -54,7 +44,7 @@ describe("Word import", () => {
     expect(format).toBe("docx")
     expect(blocks).toEqual([
       { type: "heading", level: 1, text: "Lease & Licence", numbered: false },
-      { type: "heading", level: 1, text: "Premises", numbered: true },
+      { type: "heading", level: 1, text: "Premises", numbered: true, label: "1." },
       {
         type: "paragraph",
         runs: [{ text: "The tenant is " }, { text: "Jane Doe", marks: ["bold"] }, { text: "." }],
@@ -99,6 +89,82 @@ describe("PDF import", () => {
     expect(JSON.stringify(data.content)).toContain("Acme Ltd")
     // The page footer ("Page 1 of 2") is gone.
     expect(JSON.stringify(data.content)).not.toMatch(/Page \d+ of \d+/)
+  })
+
+  test("a rendered draft keeps its bold, italic and underline, numbering and lists", async () => {
+    const t = (text: string, ...marks: ("bold" | "italic" | "underline")[]) => ({
+      type: "text" as const,
+      text,
+      ...(marks.length ? { marks: marks.map((type) => ({ type })) } : {}),
+    })
+    const p = (...content: ReturnType<typeof t>[]) => ({ type: "paragraph" as const, content })
+    const data = {
+      ...blankDocument(),
+      title: "Consulting Agreement",
+      content: {
+        type: "doc" as const,
+        content: [
+          {
+            type: "section" as const,
+            attrs: { id: "s1", title: "Parties", numbered: true },
+            content: [
+              p(
+                t("Between "),
+                t("Acme Ltd", "bold"),
+                t(" and "),
+                t("Jane Doe", "italic"),
+                t(", who reads the "),
+                t("whole agreement", "underline"),
+                t("."),
+              ),
+            ],
+          },
+          {
+            type: "section" as const,
+            attrs: { id: "s2", title: "Fees", numbered: true },
+            content: [
+              {
+                type: "orderedList" as const,
+                content: [
+                  {
+                    type: "listItem" as const,
+                    content: [p(t("Pay on time"))] as [ReturnType<typeof p>],
+                  },
+                  {
+                    type: "listItem" as const,
+                    content: [p(t("Pay in KES"))] as [ReturnType<typeof p>],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    }
+    const { bytes } = await composeGeneratedDocument(data, { date: DATE, allowUnresolved: true })
+    const { blocks } = await readForImport(bytes)
+    const back = importContent(blocks, "x.pdf")
+    expect(back.title).toBe("Consulting Agreement")
+    expect(back.content.content.map((s) => [s.attrs.title, s.attrs.numbered])).toEqual([
+      ["Parties", true],
+      ["Fees", true],
+    ])
+    expect(back.content.content[0]?.content[0]).toEqual({
+      type: "paragraph",
+      content: [
+        { type: "text", text: "Between " },
+        { type: "text", text: "Acme Ltd", marks: [{ type: "bold" }] },
+        { type: "text", text: " and " },
+        { type: "text", text: "Jane Doe", marks: [{ type: "italic" }] },
+        { type: "text", text: ", who reads the " },
+        { type: "text", text: "whole agreement", marks: [{ type: "underline" }] },
+        { type: "text", text: "." },
+      ],
+    })
+    expect(back.content.content[1]?.content[0]).toMatchObject({
+      type: "orderedList",
+      content: [{}, {}],
+    })
   })
 
   test("a scan has no text", async () => {

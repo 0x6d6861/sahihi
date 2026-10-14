@@ -120,7 +120,9 @@ Browser uploads never go straight to the customer: `presignUpload` points at
 `staging/<key>` in Sahihi's bucket. `complete` reads the upload from there (`uploaded`,
 `readUpload`), validates it, then `commitUpload` writes it to the customer's bucket and deletes the
 staged copy. A rejected upload is `discardUpload`ed and the abandoned-upload sweep does the same, so
-neither ever reaches the customer.
+neither ever reaches the customer. A Word upload (ADR 0052) never reaches the customer either: it
+waits staged (the public API stages it with `stageUpload`) until the worker has converted it, then
+the PDF is `put` to the workspace's storage and the Word file is discarded.
 
 ### File access
 

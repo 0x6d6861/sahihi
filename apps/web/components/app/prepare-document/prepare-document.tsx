@@ -17,7 +17,7 @@ import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { preparedFileName } from "@/lib/documents"
 import { UPLOAD_STAGE_LABEL, type UploadStage, uploadPercent } from "@/lib/upload"
-import { uploadPdf } from "@/lib/upload-client"
+import { uploadDocument } from "@/lib/upload-client"
 import { cn } from "@/lib/utils"
 
 const PrepareEditor = dynamic(() => import("./prepare-editor"), {
@@ -75,7 +75,8 @@ export function PrepareDocument({
       await editor.applyRedactions()
       const buffer = await editor.getDocumentBuffer()
       const file = new File([buffer], newName, { type: "application/pdf" })
-      const doc = await uploadPdf(file, {
+      const doc = await uploadDocument(file, {
+        pdfOnly: true,
         sourceDocumentId: documentId,
         onStage: (stage, fraction) =>
           setProgress({ stage, percent: uploadPercent(stage, fraction) }),

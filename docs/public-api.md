@@ -50,7 +50,7 @@ Error bodies are `{ "error": "<code>", "message": "…" }`, plus `issues` on val
 | Method & path | Scope | Notes |
 |---|---|---|
 | `GET /api/v1` | any | Who am I: `{ organization, key: { id, name, scopes } }` |
-| `POST /documents?name=nda.pdf` | `documents:write` | Body is the raw PDF (`Content-Type: application/pdf`), max 25 MB. 201 `{ document }` |
+| `POST /documents?name=nda.pdf` | `documents:write` | Body is the raw PDF (`Content-Type: application/pdf`), max 25 MB. 201 `{ document }`. Or a Word file (`Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document`): 202 `{ document }` with `status: "CONVERTING"` and the name as a PDF; poll `GET /documents/:id` until `READY` or `FAILED` (docs/pdf-pipeline.md → Word uploads, ADR 0052). Bytes that aren't Word are a 422 |
 | `GET /documents/:id` | `documents:read` | |
 | `GET /templates` | `templates:read` | With roles (ids + labels), for create-from-template and bulk send |
 | `GET /envelopes?status=&page=` | `envelopes:read` | Paged, 50 per page |

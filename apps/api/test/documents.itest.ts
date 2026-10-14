@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, test } from "bun:test"
-import { MAX_UPLOAD_BYTES } from "@sahihi/core"
+import { DOCX_CONTENT_TYPE, MAX_UPLOAD_BYTES } from "@sahihi/core"
 import { prisma } from "@sahihi/db"
-import { platformStorage } from "@sahihi/infra"
+import { getQueues, keys, platformStorage } from "@sahihi/infra"
 import {
   createSender,
   formPdf,
+  minimalDocx,
   minimalPdf,
   request,
   resetDb,
@@ -72,6 +73,45 @@ describe("documents: upload flow", () => {
     })
     expect(notPdf.status).toBe(400)
     expect(((await notPdf.json()) as { error: string }).error).toBe("validation_error")
+  })
+})
+
+describe("documents: Word uploads (ADR 0052)", () => {
+  test("a .docx goes CONVERTING (202), named as its PDF, and is queued for the worker", async () => {
+    const { status, document } = await uploadDocument(alice, minimalDocx(), "Lease.docx", {
+      contentType: DOCX_CONTENT_TYPE,
+    })
+    expect(status).toBe(202)
+    expect(document.status).toBe("CONVERTING")
+    expect(document.name).toBe("Lease.pdf")
+    const row = await prisma.document.findUniqueOrThrow({ where: { id: document.id } })
+    expect(row.convertedFrom).toBe("DOCX")
+    // The Word file waits beside where the PDF will go; the PDF isn't there yet.
+    expect(
+      await platformStorage().head(keys.wordUpload(alice.organizationId, row.id)),
+    ).not.toBeNull()
+    expect(await platformStorage().head(row.s3Key)).toBeNull()
+    const job = await getQueues().conversions.raw.getJob(`convert-${row.id}`)
+    expect(job?.data).toEqual({ documentId: row.id })
+    await job?.remove()
+
+    // Listed while it converts, but nothing can use it yet.
+    const list = (await (await request(alice, "/api/documents")).json()) as {
+      items: { id: string; status: string }[]
+    }
+    expect(list.items.map((d) => [d.id, d.status])).toEqual([[row.id, "CONVERTING"]])
+    expect((await request(alice, `/api/documents/${row.id}/file`)).status).toBe(404)
+  })
+
+  test("a .docx whose bytes aren't Word ends FAILED (422) and the upload is removed", async () => {
+    const { status, document } = await uploadDocument(alice, minimalPdf(), "sneaky.docx", {
+      contentType: DOCX_CONTENT_TYPE,
+    })
+    expect(status).toBe(422)
+    expect(document.status).toBe("FAILED")
+    const row = await prisma.document.findUniqueOrThrow({ where: { id: document.id } })
+    expect(row.failureReason).toContain("isn't a Word document")
+    expect(await platformStorage().head(keys.wordUpload(alice.organizationId, row.id))).toBeNull()
   })
 })
 

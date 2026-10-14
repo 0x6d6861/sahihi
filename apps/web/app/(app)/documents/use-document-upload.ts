@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation"
 import { useCallback, useState } from "react"
 import { toastManager } from "@/components/app/toast"
 import { batchSummary, splitUploads, type UploadStage, uploadPercent } from "@/lib/upload"
-import { UploadRejectedError, uploadPdf } from "@/lib/upload-client"
+import { UploadRejectedError, uploadDocument } from "@/lib/upload-client"
 
 export interface UploadState {
   fileName: string
@@ -13,8 +13,9 @@ export interface UploadState {
 }
 
 /**
- * Drop-zone upload with progress state and toasts. The flow itself is `uploadPdf`.
- * `onDone` gets the new document. The success toast offers "Create envelope" on it.
+ * Drop-zone upload with progress state and toasts. The flow itself is `uploadDocument`, which
+ * waits for a Word file's conversion. `onDone` gets the new document. The success toast offers
+ * "Create envelope" on it.
  */
 export function useDocumentUpload({
   onDone,
@@ -30,20 +31,28 @@ export function useDocumentUpload({
   const upload = useCallback(
     async (file: File) => {
       try {
-        const doc = await uploadPdf(file, {
+        const doc = await uploadDocument(file, {
           folderId,
           onStage: (stage, fraction) =>
             setState({ fileName: file.name, stage, percent: uploadPercent(stage, fraction) }),
         })
-        toastManager.add({
-          title: "Document uploaded",
-          description: doc.name,
-          type: "success",
-          action: {
-            label: "Create envelope",
-            onClick: () => router.push(`/envelopes/new?documentId=${encodeURIComponent(doc.id)}`),
-          },
-        })
+        if (doc.converting) {
+          toastManager.add({
+            title: "Still converting",
+            description: `${doc.name} appears in your files when it's ready.`,
+            type: "info",
+          })
+        } else {
+          toastManager.add({
+            title: "Document uploaded",
+            description: doc.name,
+            type: "success",
+            action: {
+              label: "Create envelope",
+              onClick: () => router.push(`/envelopes/new?documentId=${encodeURIComponent(doc.id)}`),
+            },
+          })
+        }
         onDone?.(doc)
         router.refresh()
       } catch (err) {
@@ -64,9 +73,10 @@ export function useDocumentUpload({
 }
 
 /**
- * Several PDFs dropped from the desktop (ADR 0039), one after another into `folderId` (null = top
+ * Several files dropped from the desktop (ADR 0039), one after another into `folderId` (null = top
  * level). One toast follows the batch ("Uploading 2 of 5…") and ends with what worked; files that
- * aren't PDFs, or are too big, are skipped before anything is sent.
+ * aren't PDFs or Word files, or are too big, are skipped before anything is sent. Word files don't
+ * hold up the batch: they show as Converting in the list until the worker is done.
  */
 export function useBatchUpload() {
   const router = useRouter()
@@ -88,6 +98,7 @@ export function useBatchUpload() {
       const toast = toastManager.add({ title: `Uploading${where}…`, type: "loading" })
       const failed: string[] = skipped.map((s) => `${s.file.name}: ${s.message}`)
       let uploaded = 0
+      let converting = 0
       for (const [i, file] of accepted.entries()) {
         if (toast) {
           toastManager.update(toast, {
@@ -96,8 +107,12 @@ export function useBatchUpload() {
           })
         }
         try {
-          await uploadPdf(file, { folderId: folderId ?? undefined })
+          const doc = await uploadDocument(file, {
+            folderId: folderId ?? undefined,
+            waitForConversion: false,
+          })
           uploaded += 1
+          if (doc.converting) converting += 1
         } catch (err) {
           failed.push(`${file.name}: ${err instanceof Error ? err.message : "Upload failed"}`)
         }
@@ -105,7 +120,14 @@ export function useBatchUpload() {
       const result = {
         title: batchSummary(uploaded, failed.length),
         description:
-          failed.length > 0 ? failed.join(" · ") : folderId ? `In ${folderName}` : undefined,
+          [
+            failed.length > 0 ? failed.join(" · ") : folderId ? `In ${folderName}` : null,
+            converting > 0
+              ? `${converting === 1 ? "1 Word file is" : `${converting} Word files are`} converting.`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" ") || undefined,
         type:
           failed.length === 0
             ? ("success" as const)

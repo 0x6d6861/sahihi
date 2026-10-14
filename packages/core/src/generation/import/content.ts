@@ -34,10 +34,13 @@ export const IMPORTED_SIGNER = { key: "signer_1", label: "Signer 1" } as const
  * - the first heading, if it's short and comes first, is the title; otherwise `fallbackTitle`
  *   (the file's name);
  * - each heading starts a section, numbered only if the source numbered it; text before the first
- *   heading goes in an unnumbered "Introduction";
+ *   heading goes in an unnumbered "Introduction". A heading whose source number (`label`) isn't
+ *   the one its section would get ("2.1", "Article 4") keeps that number in an unnumbered title,
+ *   so cross-references still point at the right clause;
  * - paragraphs and list items keep their bold, italic and underline; consecutive items form one
- *   list; tables keep their cells (padded to a grid, at most 12 columns, extras joined into the
- *   last);
+ *   list. A numbered item whose source number isn't the renderer's "(a)", "(b)"… for its place
+ *   becomes a paragraph starting with that number. Tables keep their cells (padded to a grid, at
+ *   most 12 columns, extras joined into the last) and their header rows;
  * - no blanks, and one signer without fields: the assistant proposes both afterwards.
  *
  * Throws `ImportError` when there's no text or too much of it.
@@ -52,7 +55,7 @@ export function importContent(
 
   let title = cleanTitle(fallbackTitle) || "Imported document"
   const first = kept[0]
-  if (first?.type === "heading" && first.text.length <= MAX_TITLE) {
+  if (first?.type === "heading" && !first.label && first.text.length <= MAX_TITLE) {
     title = first.text
     kept.shift()
   }
@@ -60,7 +63,9 @@ export function importContent(
   const sections: Section[] = []
   let current: Section | null = null
   let n = 0
+  let numberedCount = 0
   const open = (heading: string, numbered: boolean) => {
+    if (numbered) numberedCount++
     current = {
       type: "section",
       attrs: { id: `s${++n}`, title: heading.slice(0, 200), numbered },
@@ -77,9 +82,12 @@ export function importContent(
 
   for (const block of kept) {
     if (block.type === "heading") {
-      if (sections.length < MAX_SECTIONS) open(block.text, block.numbered)
+      // The source's own number stays when the section's would differ ("2.1", "Article 4").
+      const own = block.label === undefined || sameNumber(block.label, String(numberedCount + 1))
+      const text = own ? block.text : `${block.label} ${block.text}`
+      if (sections.length < MAX_SECTIONS) open(text, own && block.numbered)
       // Past the limit, a heading stays as a bold line in the last section.
-      else target().content.push(paragraph([{ text: block.text, marks: ["bold"] }]))
+      else target().content.push(paragraph([{ text, marks: ["bold"] }]))
       continue
     }
     const section = target()
@@ -87,11 +95,17 @@ export function importContent(
     else if (block.type === "listItem") {
       const type = block.ordered ? "orderedList" : "bulletList"
       const last = section.content[section.content.length - 1]
+      const position = last?.type === type && last.content.length < 100 ? last.content.length : 0
+      if (block.ordered && block.label !== undefined && block.label !== listLabel(position)) {
+        // Numbered differently from what the renderer would print: keep the source's number.
+        section.content.push(paragraph(labelled(block.label, block.runs)))
+        continue
+      }
       const item = { type: "listItem" as const, content: [paragraph(block.runs)] as [Paragraph] }
-      if (last?.type === type && last.content.length < 100) last.content.push(item)
+      if (last?.type === type && position > 0) last.content.push(item)
       else section.content.push({ type, content: [item] })
     } else {
-      const table = tableNode(block.rows)
+      const table = tableNode(block.rows, block.headerRows ?? 0)
       if (table) section.content.push(table)
     }
   }
@@ -175,14 +189,32 @@ const paragraph = (runs: readonly ImportedRun[]): Paragraph => ({
   content: inline(runs),
 })
 
-/** A plain grid: rows padded to the widest, extra columns joined into the last cell. */
-function tableNode(rows: ImportedRun[][][]): BlockNode | null {
+/** How the renderer numbers an ordered list's items: (a), (b)… (packages/pdf compose). */
+function listLabel(index: number): string {
+  return `(${String.fromCharCode(97 + (index % 26))})`
+}
+
+/** "3." and "3" are the same section number; "3.1" and "Article 3" aren't. */
+function sameNumber(label: string, number: string): boolean {
+  return label.replace(/[.)]$/, "") === number
+}
+
+/** A label in front of the runs, plain (the source's number isn't emphasised by its runs). */
+function labelled(label: string, runs: readonly ImportedRun[]): ImportedRun[] {
+  return label ? [{ text: `${label} ` }, ...runs] : [...runs]
+}
+
+/**
+ * A plain grid: rows padded to the widest, extra columns joined into the last cell. The first
+ * `headerRows` rows are header cells (rendered bold).
+ */
+function tableNode(rows: ImportedRun[][][], headerRows: number): BlockNode | null {
   const kept = rows.filter((r) => r.length > 0).slice(0, MAX_TABLE_ROWS)
   if (kept.length === 0) return null
   const width = Math.min(MAX_TABLE_COLUMNS, Math.max(...kept.map((r) => r.length)))
   return {
     type: "table",
-    content: kept.map((row) => {
+    content: kept.map((row, r) => {
       const cells = row.slice(0, width)
       if (row.length > width) {
         cells[width - 1] = row.slice(width - 1).flatMap((c, i) => (i ? [{ text: " " }, ...c] : c))
@@ -192,7 +224,7 @@ function tableNode(rows: ImportedRun[][][]): BlockNode | null {
         type: "tableRow" as const,
         content: cells.map(
           (runs): TableCell => ({
-            type: "tableCell",
+            type: r < headerRows && r < kept.length - 1 ? "tableHeader" : "tableCell",
             attrs: { colspan: 1, rowspan: 1, colwidth: null },
             content: cellParagraphs(runs),
           }),

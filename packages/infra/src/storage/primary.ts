@@ -95,6 +95,11 @@ export function primaryStorage(
       return staging.get(at)
     },
 
+    stageUpload: (key, bytes, contentType) =>
+      writesToPlatform
+        ? platform.put(key, bytes, contentType)
+        : staging.put(keys.staging(key), bytes, contentType),
+
     async commitUpload(key, bytes, contentType) {
       if (writesToPlatform) {
         if (!(await platform.head(key))) await platform.put(key, bytes, contentType)

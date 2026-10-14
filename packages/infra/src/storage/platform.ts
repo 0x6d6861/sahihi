@@ -28,6 +28,7 @@ export function platformStorage(): DeletableStorage {
     presignUpload: bucket.presignPut,
     uploaded: bucket.head,
     readUpload: bucket.get,
+    stageUpload: bucket.put,
     async commitUpload() {
       // The browser uploaded straight to its final key.
     },
