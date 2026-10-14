@@ -111,7 +111,7 @@ function Shell({
                 edge from md (the middle column ends at <main>'s gutter). */}
             <div className="flex min-w-0 flex-1 justify-end">
               <div className="w-full max-w-36 md:max-w-sm">
-                <GlobalSearch />
+                <GlobalSearch workspaceId={activeOrganizationId} />
               </div>
             </div>
           </div>

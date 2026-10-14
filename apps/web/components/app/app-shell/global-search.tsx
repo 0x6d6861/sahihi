@@ -43,24 +43,35 @@ const STALE_MS = 30_000
  * actions are always there; typing adds the workspace's folders, documents, envelopes, templates and drafts
  * (`GET /api/search`, loaded on open) and a full search on All files.
  */
-export function GlobalSearch() {
+export function GlobalSearch({ workspaceId }: { workspaceId: string }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const [items, setItems] = useState<SearchItem[] | null>(null)
   const loadedAt = useRef(0)
+  const current = useRef(workspaceId)
   const triggerRef = useRef<HTMLButtonElement>(null)
+
+  // The index belongs to one workspace: drop it on a switch, so the palette never lists another
+  // workspace's names and a response still in flight for the old one is ignored.
+  useEffect(() => {
+    current.current = workspaceId
+    loadedAt.current = 0
+    setItems(null)
+  }, [workspaceId])
 
   const load = useCallback(async () => {
     if (Date.now() - loadedAt.current < STALE_MS) return
     loadedAt.current = Date.now()
+    const forWorkspace = workspaceId
     try {
-      setItems((await api<SearchIndex>("/search")).items)
+      const index = await api<SearchIndex>("/search")
+      if (current.current === forWorkspace) setItems(index.items)
     } catch {
       // Pages and actions still work; the next open tries again.
-      loadedAt.current = 0
+      if (current.current === forWorkspace) loadedAt.current = 0
     }
-  }, [])
+  }, [workspaceId])
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
