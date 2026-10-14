@@ -11,6 +11,8 @@
   - `/new-endpoint <description>`: add an API route following the house patterns
   - `/add-job <description>`: add a BullMQ job (producer + worker + tests)
   - `/adr <title>`: record an architecture decision
+- To run the app and see a change in it (sign in, click through, screenshot light/dark), use the
+  `run-sahihi` skill (`.claude/skills/run-sahihi/`): `start.sh`, then `driver.mjs`.
 - Prefer reading the relevant `docs/*.md` over exploring the codebase blindly. The docs are kept in
   sync with the code.
 - Never run `prisma migrate reset` or `docker compose down -v` without asking. Both wipe local data.
