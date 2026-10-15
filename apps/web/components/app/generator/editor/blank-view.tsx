@@ -2,8 +2,8 @@
 
 import { type NodeViewProps, NodeViewWrapper } from "@tiptap/react"
 import { useState } from "react"
-import { Button } from "@/components/arc/button/button"
-import { Input } from "@/components/arc/input/input"
+import { Button } from "@/components/app/button"
+import { Input } from "@/components/app/fields"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/arc/popover/popover"
 import { ApiError } from "@/lib/api"
 import { blankState, nextOpenBlank } from "@/lib/generator"

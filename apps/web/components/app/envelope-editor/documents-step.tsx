@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { Button } from "@/components/app/button"
 import { DocumentTypeIcon } from "@/components/app/documents/document-type-icon"
 import { AttachmentsList } from "@/components/app/envelope/attachments-list"
 import { useDraftState } from "@/components/app/envelope/draft-state"
@@ -15,7 +16,6 @@ import {
 } from "@/components/app/icons"
 import { Panel } from "@/components/app/panel"
 import { toastManager } from "@/components/app/toast"
-import { Button } from "@/components/arc/button/button"
 import { type DropdownItem, DropdownMenu } from "@/components/arc/dropdown-menu/dropdown-menu"
 import { api } from "@/lib/api"
 import type { EnvelopeDetail } from "@/lib/envelope-detail"

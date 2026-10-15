@@ -2,10 +2,10 @@
 
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { Button } from "@/components/app/button"
 import { ConfirmDialog } from "@/components/app/confirm-dialog"
 import { EraserIcon } from "@/components/app/icons"
 import { toastManager } from "@/components/app/toast"
-import { Button } from "@/components/arc/button/button"
 import { api } from "@/lib/api"
 
 /** Owner/admin: delete a closed envelope's files and personal data now (docs/data-retention.md). */

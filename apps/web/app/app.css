@@ -11,14 +11,34 @@
  */
 
 :root {
-  /* Field edges must reach 3:1 against every surface (WCAG 1.4.11, docs/ui.md); Arc's default is 1.75:1. */
-  --border-strong: oklch(62% 0 0);
+  /* Taupe neutrals (ADR 0058): Tailwind's taupe scale replaces Arc's pure-grey ramp, so every Arc and
+     coss surface, text and border token inherits the warm base. 0 stays white for cards and fields. */
+  --neutral-0: oklch(100% 0 0);
+  --neutral-1: oklch(98.6% 0.002 67.8); /* taupe-50 */
+  --neutral-2: oklch(97.3% 0.002 40);
+  --neutral-3: oklch(96% 0.002 17.2); /* taupe-100 */
+  --neutral-4: oklch(92.2% 0.005 34.3); /* taupe-200 */
+  --neutral-5: oklch(86.8% 0.007 39.5); /* taupe-300 */
+  --neutral-6: oklch(71.4% 0.014 41.2); /* taupe-400 */
+  --neutral-7: oklch(54.7% 0.021 43.1); /* taupe-500 */
+  --neutral-8: oklch(43.8% 0.017 39.3); /* taupe-600 */
+  --neutral-9: oklch(36.7% 0.016 35.7); /* taupe-700 */
+  --neutral-10: oklch(26.8% 0.011 36.5); /* taupe-800 */
+  --neutral-11: oklch(14.7% 0.004 49.3); /* taupe-950 */
+  --foreground: var(--neutral-11);
+  --text-secondary: var(--neutral-8);
+  --text-muted: var(--neutral-7);
+  --border: var(--neutral-4);
+  --border-subtle: oklch(95% 0.003 30);
+
+  /* Field edges must reach 3:1 against every surface (WCAG 1.4.11, docs/ui.md): taupe-500 is ~5:1 on white. */
+  --border-strong: var(--neutral-7);
 
   /* Depth in light mode (docs/ui.md → Surfaces): Arc's page, cards and raised layers are all white, so
-     the app shell paints its pages on an off-white canvas and white panels sit on it. The grey fills
-     (search, tiles, tracks) step down one so they still read on the canvas. Dark mode is layered
-     already: the canvas is its background. */
-  --canvas: oklch(98.4% 0 0);
+     the app shell paints its pages on an off-white canvas (taupe-50) and white panels sit on it. The
+     muted fills (search, tiles, tracks) are taupe-100. Dark mode is layered already: the canvas is its
+     background. */
+  --canvas: var(--neutral-1);
   --surface-muted: var(--neutral-3);
   --font-sans: var(--font-body);
   --font-heading: var(--font-display);
@@ -27,8 +47,10 @@
   --card-foreground: var(--foreground);
   --popover: var(--surface-raised);
   --popover-foreground: var(--foreground);
-  --primary: var(--foreground);
-  --primary-foreground: var(--background);
+  /* Primary actions are emerald (ADR 0058). Arc's Button reads --foreground/--background for its
+     primary variant, so the app Button wrapper remaps those locally (ADR 0060). */
+  --primary: var(--primary-fill);
+  --primary-foreground: var(--primary-fill-foreground);
   --secondary: var(--surface-muted);
   --secondary-foreground: var(--foreground);
   --muted: var(--surface-muted);
@@ -57,22 +79,28 @@
   --code-foreground: var(--foreground);
   --code-highlight: var(--accent-subtle);
 
-  /* Three shapes (ADR 0053): pill for chips, nav and avatars; control for buttons, fields and menus;
-     panel for sections, dialogs and cards. Arc's defaults (18 / 26 / 34px) read soft and in-between
-     on 44px controls; these are crisper, as a product that holds signatures should be. */
-  --radius-control: 0.625rem;
-  --radius-panel: 1rem;
-  --radius-surface: 1.25rem;
+  /* Small radius (ADR 0058, shadcn "small" = 0.45rem). Tailwind's scale derives from --radius:
+     lg 7px, xl 10px (menu rows), 2xl 13px, 3xl 16px (popovers). Arc's shapes follow the same scale:
+     control 13px (buttons, fields, tabs, alerts), panel and surface 19px (cards, sections, dialogs). */
+  --radius: 0.45rem;
+  --radius-control: 0.8125rem;
+  --radius-panel: 1.1875rem;
+  --radius-surface: 1.1875rem;
+  --radius-item: 0.625rem;
+  --radius-popover: 1rem;
 
-  /* coss radius scale: lg = Arc control (10px), xl = 14px, 2xl = 18px ≈ panel. */
-  --radius: var(--radius-control);
+  /* Compact controls (ADR 0058, shadcn Rhea): 32px by default, 28px small, 36px large. Phones get
+     larger targets below. */
+  --control-height-sm: 1.75rem;
+  --control-height-md: 2rem;
+  --control-height-lg: 2.25rem;
 
   /* Flat sidebar on the page background with a hairline edge; hover is a faint fill, and the active
      item's indicator uses --accent-subtle (components/app/app-shell). */
   --sidebar: var(--background);
   --sidebar-foreground: var(--text-secondary);
-  --sidebar-primary: var(--foreground);
-  --sidebar-primary-foreground: var(--background);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
   --sidebar-accent: color-mix(in oklab, var(--foreground) 4%, transparent);
   --sidebar-accent-foreground: var(--foreground);
   --sidebar-border: var(--border);
@@ -81,20 +109,74 @@
 
 .dark,
 :root[data-theme="dark"] {
-  /* Arc's dark ramp is pure grey. A trace of the accent's hue (blue, 260) keeps it from reading flat;
-     lightness is unchanged, so the contrast table in docs/ui.md still holds. Borders step up 2% so
-     panels separate from the page (ADR 0053). */
-  --background: oklch(19% 0.006 260);
-  --surface: oklch(21.5% 0.006 260);
-  --surface-raised: oklch(24% 0.006 260);
-  --border: oklch(31% 0.006 260);
-  --border-subtle: oklch(26% 0.006 260);
+  /* Dark taupe (ADR 0058): page taupe-950, cards taupe-900, raised layers and fills step up from it.
+     Borders sit a step above the cards so panels separate from the page. */
+  --background: oklch(14.7% 0.004 49.3);
+  --surface: oklch(21.4% 0.009 43.1);
+  --surface-raised: oklch(24% 0.01 40);
+  --surface-muted: oklch(26.8% 0.011 36.5);
+  --foreground: oklch(98.6% 0.002 67.8);
+  --text-secondary: oklch(71.4% 0.014 41.2);
+  --text-muted: oklch(60% 0.018 42);
+  --border: oklch(31% 0.012 38);
+  --border-subtle: oklch(25% 0.01 40);
   --canvas: var(--background);
-  --surface-muted: oklch(26% 0.006 260);
-  --border-strong: oklch(54% 0 0);
+  --border-strong: oklch(54.7% 0.021 43.1);
   --destructive: oklch(54% 0.21 25);
   --warning-foreground: var(--warning);
   --info-foreground: oklch(78% 0.12 255);
+}
+
+/* Emerald theme colour (ADR 0058). A preset name Arc doesn't define, so an Arc reinstall can't override
+   it. Light: accent emerald-600, text on accent-tinted fills emerald-800, primary fill emerald-700
+   (white text clears 4.5:1). Dark: accent emerald-400, primary emerald-500 with emerald-950 text.
+   Info (in progress, unread) stays blue so it never reads as success. */
+:root[data-accent="emerald"] {
+  --accent: oklch(59.6% 0.145 163.225);
+  --accent-strong: oklch(43.2% 0.095 166.913);
+  --accent-subtle: oklch(59.6% 0.145 163.225 / 0.12);
+  --accent-foreground: oklch(100% 0 0);
+  --control-on: oklch(59.6% 0.145 163.225);
+  --control-thumb-on: oklch(100% 0 0);
+  --control-glyph: oklch(100% 0 0);
+  --primary-fill: oklch(50.8% 0.118 165.612);
+  --primary-fill-foreground: oklch(100% 0 0);
+}
+:root[data-theme="dark"][data-accent="emerald"] {
+  --accent: oklch(76.5% 0.177 163.223);
+  --accent-strong: oklch(84.5% 0.143 164.978);
+  --accent-subtle: oklch(76.5% 0.177 163.223 / 0.15);
+  --accent-foreground: oklch(26.2% 0.051 172.552);
+  --control-on: oklch(59.6% 0.145 163.225);
+  --control-fill: oklch(59.6% 0.145 163.225);
+  --control-thumb-on: oklch(100% 0 0);
+  --control-glyph: oklch(100% 0 0);
+  --primary-fill: oklch(69.6% 0.17 162.48);
+  --primary-fill-foreground: oklch(26.2% 0.051 172.552);
+}
+
+/* Touch targets: compact controls step back up on phones (Arc's 44px guidance, docs/ui.md). */
+@media (max-width: 640px) {
+  :root {
+    --control-height-sm: 2.25rem;
+    --control-height-md: 2.75rem;
+    --control-height-lg: 3.125rem;
+  }
+}
+
+/* Emerald primary on Arc's Button, ButtonLink and SplitButton (ADR 0060). Arc paints its primary
+   variant from --foreground / --background; this remaps them on the button (or the split button's
+   wrapper) only, so text inside other components is untouched. */
+.app-primary {
+  --foreground: var(--primary);
+  --background: var(--primary-foreground);
+}
+
+/* Info badges in the status blue, not the emerald accent Arc uses for them (ADR 0060). */
+.app-info {
+  --accent: var(--info);
+  --accent-strong: var(--info-foreground);
+  --accent-subtle: color-mix(in oklab, var(--info) 12%, var(--surface));
 }
 
 /* The app shell's page area (components/app/app-shell). A plain class: `--canvas` isn't a Tailwind colour. */
@@ -115,20 +197,25 @@ body {
   color-scheme: light;
   /* `color` is inherited already resolved from <body>, so set it again from the redefined token. */
   color: var(--foreground);
-  --background: var(--neutral-0);
-  --surface: var(--neutral-0);
-  --surface-muted: var(--neutral-2);
-  --foreground: var(--neutral-11);
-  --text-secondary: var(--neutral-8);
-  --text-muted: var(--neutral-7);
+  /* Paper is neutral white, never taupe: these are Arc's original grey values, pinned. */
+  --background: oklch(100% 0 0);
+  --surface: oklch(100% 0 0);
+  --surface-muted: oklch(97.8% 0 0);
+  --foreground: oklch(15% 0 0);
+  --text-secondary: oklch(46% 0 0);
+  --text-muted: oklch(59% 0 0);
   --border: oklch(93.5% 0 0);
-  --muted: var(--neutral-2);
-  --muted-foreground: var(--neutral-8);
-  --card: var(--neutral-0);
-  --card-foreground: var(--neutral-11);
-  --primary: var(--neutral-11);
-  --primary-foreground: var(--neutral-0);
-  --input: var(--neutral-5);
+  --muted: oklch(97.8% 0 0);
+  --muted-foreground: oklch(46% 0 0);
+  --card: oklch(100% 0 0);
+  --card-foreground: oklch(15% 0 0);
+  --primary: oklch(15% 0 0);
+  --primary-foreground: oklch(100% 0 0);
+  --input: oklch(84% 0 0);
+  /* Field overlays keep the light emerald accent in both themes. */
+  --accent: oklch(59.6% 0.145 163.225);
+  --accent-strong: oklch(43.2% 0.095 166.913);
+  --accent-subtle: oklch(59.6% 0.145 163.225 / 0.12);
   --destructive: oklch(54% 0.21 25);
   --destructive-foreground: oklch(54% 0.21 25);
   --success: oklch(49% 0.19 150);

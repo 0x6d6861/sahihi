@@ -2,11 +2,12 @@
 
 import type { FieldType, VerificationMethod } from "@sahihi/core"
 import { useCallback, useEffect, useRef, useState } from "react"
+import { Button } from "@/components/app/button"
 import { DownloadButtons } from "@/components/app/downloads/download-buttons"
 import { Panel } from "@/components/app/panel"
+import { AccountInvite } from "@/components/app/signing/account-invite"
 import { SigningSurface } from "@/components/app/signing/signing-surface"
 import { Alert } from "@/components/arc/alert/alert"
-import { Button } from "@/components/arc/button/button"
 import { OtpInput } from "@/components/arc/otp-input/otp-input"
 import { Skeleton } from "@/components/arc/skeleton/skeleton"
 import { ApiError, api } from "@/lib/api"
@@ -146,6 +147,10 @@ export function SigningExperience({ token }: { token: string }) {
             documents={session.documents}
             attachments={session.attachments}
           />
+        )}
+        {/* Optional account (ADR 0062); not inside a host app's iframe. */}
+        {(session.state === "signed" || session.state === "completed") && !session.embed && (
+          <AccountInvite email={session.recipient.email} />
         )}
       </Panel>
     )

@@ -1,6 +1,8 @@
 "use client"
 
 import type { FieldType } from "@sahihi/core"
+import { Button } from "@/components/app/button"
+import { Input } from "@/components/app/fields"
 import {
   AtSignIcon,
   CalendarIcon,
@@ -11,9 +13,7 @@ import {
   TypeIcon,
   UserIcon,
 } from "@/components/app/icons"
-import { Button } from "@/components/arc/button/button"
 import { Checkbox } from "@/components/arc/checkbox/checkbox"
-import { Input } from "@/components/arc/input/input"
 import { Label } from "@/components/ui/label"
 // coss Select here (not Arc): each option shows its recipient's colour, and Arc's options are text only.
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@/components/ui/select"

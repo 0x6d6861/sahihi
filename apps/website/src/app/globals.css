@@ -338,18 +338,18 @@ body {
   container-type: inline-size;
   --dm-bg: #ffffff;
   /* The app's page canvas (its ADR 0051): pages under the top bar; editors stay on --dm-bg. */
-  --dm-canvas: #fafafa;
+  --dm-canvas: #fbfaf9;
   --dm-card: #ffffff;
-  --dm-muted: #f1f1f1;
-  --dm-line: #ececec;
-  --dm-strong: #d1d1d1;
-  --dm-text: #141414;
-  --dm-text-2: #5e5e5e;
-  --dm-text-3: #8a8a8a;
-  --dm-accent: #141414;
+  --dm-muted: #f3f1f1;
+  --dm-line: #e8e4e3;
+  --dm-strong: #d8d2d0;
+  --dm-text: #0c0a09;
+  --dm-text-2: #5b4f4b;
+  --dm-text-3: #7c6d67;
+  --dm-accent: #007a55;
   --dm-on-accent: #ffffff;
-  /* The app's Arc accent (its ADR 0053): ink blue on active tabs and focus. Buttons keep --dm-accent. */
-  --dm-ink: #074db7;
+  /* The app's accent text (its ADR 0058): emerald-800 on active tabs and links. --dm-accent is the emerald primary button. */
+  --dm-ink: #006045;
   --dm-disabled: #8c8c8c;
   --dm-success: #15803d;
   --dm-success-bg: #e8f5ec;
@@ -366,18 +366,18 @@ body {
 }
 [data-theme="dark"] .demo {
   /* The app's dark surfaces carry a trace of the accent's hue (its ADR 0053). */
-  --dm-bg: #121417;
-  --dm-canvas: #121417;
-  --dm-card: #191b1e;
-  --dm-muted: #24262a;
-  --dm-line: #303236;
-  --dm-strong: #45474b;
-  --dm-text: #f2f2f2;
-  --dm-text-2: #bdbdbd;
-  --dm-text-3: #8f8f8f;
-  --dm-accent: #f2f2f2;
-  --dm-on-accent: #141414;
-  --dm-ink: #a4c7ff;
+  --dm-bg: #0c0a09;
+  --dm-canvas: #0c0a09;
+  --dm-card: #1d1816;
+  --dm-muted: #2b2422;
+  --dm-line: #362e2c;
+  --dm-strong: #7c6d67;
+  --dm-text: #fbfaf9;
+  --dm-text-2: #aba09c;
+  --dm-text-3: #8a7d78;
+  --dm-accent: #00bc7d;
+  --dm-on-accent: #002c22;
+  --dm-ink: #5ee9b5;
   --dm-disabled: #7a7a7a;
   --dm-success: #4ade80;
   --dm-success-bg: rgb(34 197 94 / 0.14);

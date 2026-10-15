@@ -2,9 +2,9 @@
 
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { Button } from "@/components/app/button"
 import { ConfirmDialog, DialogActions } from "@/components/app/confirm-dialog"
 import { Alert } from "@/components/arc/alert/alert"
-import { Button } from "@/components/arc/button/button"
 import { Checkbox } from "@/components/arc/checkbox/checkbox"
 import { Dialog, DialogContent } from "@/components/arc/dialog/dialog"
 import { ApiError, api } from "@/lib/api"

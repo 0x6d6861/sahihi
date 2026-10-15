@@ -1,5 +1,6 @@
 import { STARTERS } from "@sahihi/core"
 import Link from "next/link"
+import { Badge } from "@/components/app/badge"
 import { DraftRowActions } from "@/components/app/generator/draft-row-actions"
 import { ImportButton } from "@/components/app/generator/import-dialog"
 import {
@@ -12,7 +13,6 @@ import {
 import { FileTextIcon, SparklesIcon } from "@/components/app/icons"
 import { Panel } from "@/components/app/panel"
 import { Person } from "@/components/app/people"
-import { DraftStatusIcon } from "@/components/app/status-icon"
 import { TemplateTypeIcon } from "@/components/app/type-icons"
 import { EmptyState } from "@/components/arc/empty-state/empty-state"
 import {
@@ -39,6 +39,7 @@ interface DraftItem {
   status: "DRAFT" | "FINALIZED"
   envelopeId: string | null
   updatedAt: string
+  versions: number
   canEdit: boolean
   createdBy: { name: string; image: string | null }
 }
@@ -90,7 +91,18 @@ export default async function GeneratePage() {
           </div>
         </header>
 
-        {/* Coming back is mostly to carry on, so drafts come first. */}
+        <StartSection title="Start from a starter">
+          {STARTERS.map((s) => (
+            <StartCard
+              key={s.key}
+              from={{ starter: s.key }}
+              icon={<FileTextIcon aria-hidden className="size-5 shrink-0 text-muted-foreground" />}
+              name={s.name}
+              description={s.description}
+            />
+          ))}
+        </StartSection>
+
         {drafts.length > 0 && (
           <section aria-labelledby="drafts-heading" className="flex flex-col gap-4">
             <h2 id="drafts-heading" className="font-medium text-base">
@@ -102,6 +114,8 @@ export default async function GeneratePage() {
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="ps-3">Name</TableHead>
+                    <TableHead className="max-md:hidden">Status</TableHead>
+                    <TableHead className="max-lg:hidden">Versions</TableHead>
                     <TableHead className="max-md:hidden">Owner</TableHead>
                     <TableHead className="max-md:hidden">Edited</TableHead>
                     <TableHead className="w-0">
@@ -126,8 +140,19 @@ export default async function GeneratePage() {
                           >
                             {d.title}
                           </Link>
-                          <DraftStatusIcon status={d.status} />
                         </div>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap max-md:hidden">
+                        {d.status === "FINALIZED" ? (
+                          <Badge tone="success" size="sm">
+                            Finalised
+                          </Badge>
+                        ) : (
+                          <Badge size="sm">Draft</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground tabular-nums max-lg:hidden">
+                        {d.versions}
                       </TableCell>
                       <TableCell className="max-w-44 whitespace-nowrap text-muted-foreground max-md:hidden">
                         <Person person={d.createdBy} />
@@ -147,18 +172,6 @@ export default async function GeneratePage() {
             </Panel>
           </section>
         )}
-
-        <StartSection title="Starters">
-          {STARTERS.map((s) => (
-            <StartCard
-              key={s.key}
-              from={{ starter: s.key }}
-              icon={<FileTextIcon aria-hidden className="size-5 shrink-0 text-muted-foreground" />}
-              name={s.name}
-              description={s.description}
-            />
-          ))}
-        </StartSection>
 
         {templates.length > 0 && (
           <StartSection title="Workspace templates">
@@ -185,7 +198,7 @@ function StartSection({ title, children }: { title: string; children: React.Reac
   return (
     <section className="flex flex-col gap-4">
       <h2 className="font-medium text-base">{title}</h2>
-      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{children}</ul>
+      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">{children}</ul>
     </section>
   )
 }

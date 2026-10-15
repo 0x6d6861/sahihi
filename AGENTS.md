@@ -248,6 +248,9 @@ Rules:
   `<Alert tone title />`, Radix `asChild`); coss/shadcn are Base UI compound parts (`render`, `MenuPopup`
   vs `DropdownMenuContent`). Toasts: `toastManager` from `@/components/app/toast` (Arc toast stack).
   Open the installed source before guessing.
+- **Buttons, badges:** import `Button` / `SplitButton` / `Badge` from `@/components/app/`, not `components/arc/` (emerald
+  primary, ADR 0060; Biome enforces it). Text fields (`Input`, `Textarea`, `PasswordField`) come from
+  `@/components/app/fields`: shadcn's default input for now, with Arc's props (ADR 0063).
 - **Theme:** `lib/theme.ts` + the account menu. Dark sets both `.dark` and `data-theme="dark"`. Field
   overlays on a PDF page sit inside `.on-paper` (always light). Re-apply the `sahihi patch (ADR 0023)`
   line in `app/globals.css` after `ui:bootstrap`.

@@ -16,6 +16,7 @@ const LABELS: Record<AuditEventType, (who: string) => string> = {
   "envelope.declined": () => "Envelope declined",
   "recipient.notified": (who) => `Invitation emailed to ${who}`,
   "recipient.reminded": (who) => `Reminder sent to ${who}`,
+  "recipient.link_requested": (who) => `${who} asked for a new signing link`,
   "recipient.link_opened": (who) => `${who} opened the signing link`,
   "recipient.otp_sent": (who) => `Verification code sent to ${who}`,
   "recipient.otp_verified": (who) => `${who} verified their identity`,

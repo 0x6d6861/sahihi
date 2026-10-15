@@ -42,6 +42,25 @@ tenants must never see each other's data.**
   so tokens don't leak to third parties.
 - Unknown token → 404 `invalid_link` with no further detail.
 
+## Signer accounts (ADR 0062)
+
+A signer may create an ordinary Sahihi account; it is never needed to sign.
+
+- The account sees envelopes by **verified email only**: `GET /api/me/envelopes` matches
+  `Recipient.email` to the session user's email, case-insensitively, only when `emailVerified`,
+  in any workspace, never drafts. An unverified account gets `{ verified: false, items: [] }`.
+- A signing token never signs anyone in, never creates or links an account and is never accepted
+  by these routes. The sign-up handoff passes the email in `sessionStorage`, not the URL; better-auth
+  verification is the proof.
+- Responses carry only what the recipient already received (title, workspace and sender names,
+  their own status and dates, the certificate code). Never another recipient, a token or a hash.
+- `/:recipientId/downloads` and `/:recipientId/link` answer 404 for any id that isn't the caller's
+  (also while unverified). Downloads follow the completed signing link's rules (409 until
+  completed, 410 once purged). The link route rotates the token like a reminder (same cooldown, 429
+  with `Retry-After`), audits `recipient.link_requested` with the user as actor, and emails the new
+  link; the response never includes it. All three are rate-limited per user.
+- Purging redacts the recipient's email, so purged envelopes leave the account's list.
+
 ## OTP
 
 - 6 digits drawn by rejection sampling (no modulo bias), stored as `sha256("otp:"+recipientId+":"+code)`.
@@ -187,8 +206,8 @@ them for malware yet; that needs an external scanner.
 - Record exactly which consent text each signer agreed to. The wordings live in `CONSENT_TEXTS`
   (`packages/core/src/signing/consent.ts`), keyed by version, and `CONSENT_VERSION` is the one shown now.
   - The signing page submits the `consentVersion` it displayed. The API refuses an outdated one
-    with 409 `consent_outdated` before storing anything, and the page reloads to show the current
-    text.
+    with 409 `consent_outdated` before storing anything, and a dialog asks the signer to reload the
+    page and read the current text.
   - The `recipient.consented` audit event (in the signing transaction) records
     `{ consentVersion, consentTextSha256 }`. The certificate shows both per signer ("Not recorded"
     for envelopes signed before versioning).

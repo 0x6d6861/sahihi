@@ -8,9 +8,9 @@ import {
   AskQuestionsResultSchema,
 } from "@sahihi/core"
 import { useEffect, useRef, useState } from "react"
+import { Button } from "@/components/app/button"
+import { Input } from "@/components/app/fields"
 import { ArrowLeftIcon, CheckIcon, ChevronRightIcon, XIcon } from "@/components/app/icons"
-import { Button } from "@/components/arc/button/button"
-import { Input } from "@/components/arc/input/input"
 import { Tooltip } from "@/components/arc/tooltip/tooltip"
 import { Button as CossButton } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"

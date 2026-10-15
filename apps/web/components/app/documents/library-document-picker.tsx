@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { Button } from "@/components/app/button"
 import { DocumentTypeIcon } from "@/components/app/documents/document-type-icon"
-import { Button } from "@/components/arc/button/button"
 import { SearchField } from "@/components/arc/search-field/search-field"
 import { api } from "@/lib/api"
 import { formatDate, pluralize } from "@/lib/format"

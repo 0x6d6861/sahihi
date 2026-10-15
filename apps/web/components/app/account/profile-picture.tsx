@@ -3,12 +3,12 @@
 import { AVATAR_SIZE } from "@sahihi/core"
 import { useRouter } from "next/navigation"
 import { useRef, useState } from "react"
+import { Button } from "@/components/app/button"
 import { ConfirmDialog } from "@/components/app/confirm-dialog"
 import { ImageUpIcon, Trash2Icon } from "@/components/app/icons"
 import { toastManager } from "@/components/app/toast"
 import { Alert } from "@/components/arc/alert/alert"
 import { Avatar } from "@/components/arc/avatar/avatar"
-import { Button } from "@/components/arc/button/button"
 import { centerSquare } from "@/lib/account"
 import { api } from "@/lib/api"
 

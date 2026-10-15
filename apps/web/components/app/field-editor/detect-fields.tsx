@@ -2,9 +2,9 @@
 
 import { assignSuggestions, type FieldSuggestion, withoutDuplicates } from "@sahihi/core"
 import { useState } from "react"
+import { Button } from "@/components/app/button"
 import { FileSearchIcon } from "@/components/app/icons"
 import { toastManager } from "@/components/app/toast"
-import { Button } from "@/components/arc/button/button"
 import { Tooltip } from "@/components/arc/tooltip/tooltip"
 import { api } from "@/lib/api"
 import { useFieldEditor } from "./context"

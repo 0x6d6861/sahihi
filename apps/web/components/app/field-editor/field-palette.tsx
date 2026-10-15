@@ -62,7 +62,7 @@ export function FieldPalette({
             <legend className="sr-only">Field type</legend>
             <Toggle
               variant="outline"
-              className="press justify-start"
+              className="press justify-start data-pressed:border-primary data-pressed:bg-primary/10 dark:data-pressed:bg-primary/15"
               pressed={tool === null}
               onPressedChange={(pressed) => pressed && onToolChange(null)}
             >
@@ -75,7 +75,7 @@ export function FieldPalette({
                 <Toggle
                   key={type}
                   variant="outline"
-                  className="press justify-start"
+                  className="press justify-start data-pressed:border-primary data-pressed:bg-primary/10 dark:data-pressed:bg-primary/15"
                   pressed={tool === type}
                   disabled={!activeRecipientId}
                   onPressedChange={(pressed) => onToolChange(pressed ? type : null)}

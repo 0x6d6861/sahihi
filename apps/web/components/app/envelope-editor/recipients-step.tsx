@@ -1,10 +1,10 @@
 "use client"
 
+import { Button } from "@/components/app/button"
 import { ButtonLink } from "@/components/app/button-link"
 import { DocumentTypeIcon } from "@/components/app/documents/document-type-icon"
 import { Panel } from "@/components/app/panel"
 import { RecipientsEditor } from "@/components/app/recipients-editor/recipients-editor"
-import { Button } from "@/components/arc/button/button"
 import type { EnvelopeDetail } from "@/lib/envelope-detail"
 import { documentsLine } from "@/lib/envelope-documents"
 import { formatDate } from "@/lib/format"

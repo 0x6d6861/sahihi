@@ -1,14 +1,7 @@
-import { LogoMark } from "@/components/app/logo"
+import { AuthShell } from "@/components/app/auth/auth-shell"
+import { BrandPanel } from "@/components/app/auth/brand-panel"
 
-/** Auth pages: the Sahihi mark above the panel, so people know where they are before typing a password. */
+/** Sign in, sign up and the account flows: the form beside the brand panel. */
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-6 p-4">
-      <p className="flex items-center gap-2 font-medium text-lg">
-        <LogoMark className="size-[0.85em]" />
-        Sahihi
-      </p>
-      {children}
-    </main>
-  )
+  return <AuthShell aside={<BrandPanel />}>{children}</AuthShell>
 }

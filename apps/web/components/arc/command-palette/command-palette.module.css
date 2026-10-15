@@ -92,3 +92,9 @@
 @media (prefers-reduced-motion: reduce) {
   .searchRow, .itemIcon, .clearButton, .closeButton { transition: none; }
 }
+
+/* sahihi patch (ADR 0059): translucent card like the menus, 32px rows, --radius-xl rows. */
+.palette { border-radius: var(--radius-popover); background: color-mix(in oklab, var(--surface-raised) 70%, transparent); -webkit-backdrop-filter: blur(40px) saturate(1.5); backdrop-filter: blur(40px) saturate(1.5); }
+.result { min-height: 32px; border-radius: var(--radius-xl); }
+.highlight { border-radius: var(--radius-xl); background: color-mix(in oklab, var(--foreground) 10%, transparent); }
+@media (prefers-reduced-transparency: reduce) { .palette { background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; } }

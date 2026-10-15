@@ -45,6 +45,7 @@ const GROUP_TYPES: Record<Exclude<ActivityGroup, "all">, readonly AuditEventType
     "recipient.notified",
     "recipient.reminded",
     "recipient.link_issued",
+    "recipient.link_requested",
   ],
   /** What the platform did */
   system: ["envelope.expired", "document.finalized", "certificate.issued", "envelope.purged"],

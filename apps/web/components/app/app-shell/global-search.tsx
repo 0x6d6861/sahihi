@@ -159,6 +159,25 @@ export function GlobalSearch({ workspaceId }: { workspaceId: string }) {
               onClose={() => setOpen(false)}
             />
           </div>
+          {/* Key hints under the palette (the redesign's footer); keyboards only, so not on phones. */}
+          <div
+            aria-hidden
+            className="mx-auto mt-2 flex w-fit items-center gap-4 rounded-full border bg-popover px-3 py-1.5 text-muted-foreground text-xs max-sm:hidden"
+          >
+            <span className="flex items-center gap-1.5">
+              <Kbd>↑</Kbd>
+              <Kbd>↓</Kbd>
+              to move
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Kbd>↵</Kbd>
+              to open
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Kbd>esc</Kbd>
+              to close
+            </span>
+          </div>
         </DialogPopup>
       </Dialog>
     </>

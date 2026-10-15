@@ -3,10 +3,10 @@
 import { describeUserAgent } from "@sahihi/core"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { Badge } from "@/components/app/badge"
+import { Button } from "@/components/app/button"
 import { ConfirmDialog } from "@/components/app/confirm-dialog"
 import { toastManager } from "@/components/app/toast"
-import { Badge } from "@/components/arc/badge/badge"
-import { Button } from "@/components/arc/button/button"
 import {
   Table,
   TableBody,

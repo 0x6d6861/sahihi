@@ -39,7 +39,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       data-theme-preference={preference}
       // Arc's blue accent: ink blue for focus, selection, active tabs and info (ADR 0053). Primary
       // buttons stay black / white.
-      data-accent="blue"
+      data-accent="emerald"
       {...themeAttributes}
       className={cn(geist.variable, inter.variable, geistMono.variable, themeClass)}
     >

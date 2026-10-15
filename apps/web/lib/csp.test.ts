@@ -103,6 +103,7 @@ describe("helpers", () => {
       "/inbox",
       "/settings/members",
       "/onboarding",
+      "/signed",
     ])
       expect({ p, ok: isProtectedPath(p) }).toEqual({ p, ok: true })
     for (const p of ["/", "/sign/tok", "/verify", "/sign-in", "/documents-old"])

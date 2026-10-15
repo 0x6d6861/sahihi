@@ -40,16 +40,18 @@ weight, and follow the theme. They show one fictional workspace, Tana Freight Lt
 
 ## Colours and type
 
-- The `--dm-*` palette on `.demo` (globals.css) copies Arc's neutral tokens from
-  `apps/web/components/arc/foundation.css` and is redefined under `[data-theme="dark"] .demo`. Use
-  `bg-(--dm-card)`, `border-(--dm-line)`, `text-(--dm-text-2)`, `text-(--dm-success)` and so on,
-  never the page tokens. Recipient colours are `--dm-tone-0…2` (`tone(i)`).
-- `--dm-accent` is the primary button (black / white). `--dm-ink` is the app's blue accent (its ADR
-  0053): the active tab's text. Dark surfaces carry a trace of that hue, as in the app.
-- Radii follow the app's three shapes (its ADR 0053): pills for chips, the nav, badges, avatars and the
-  filled search; about 10 px for buttons, fields, selects and segmented controls (`rounded-[0.7em]`
-  on full screens); about 18 px for panels and cards (`rounded-[1.25em]`). Card demos scale the same
-  ratio (`Card` 0.8em, `Pill` and `Field` 0.55em).
+- The `--dm-*` palette on `.demo` (globals.css) copies the app's tokens (`apps/web/app/app.css`,
+  its ADR 0058: Tailwind taupe neutrals, emerald theme colour) as hex, and is redefined under
+  `[data-theme="dark"] .demo`. Use `bg-(--dm-card)`, `border-(--dm-line)`, `text-(--dm-text-2)`,
+  `text-(--dm-success)` and so on, never the page tokens. Recipient colours are `--dm-tone-0…2`
+  (`tone(i)`).
+- `--dm-accent` is the primary button (emerald-700 with white text; emerald-500 with dark text in
+  dark mode). `--dm-ink` is the app's accent text (emerald-800 / emerald-300): the active tab.
+  Status colours mean status; "in progress" stays blue.
+- Radii follow the app's shapes (its ADR 0058, shadcn "small"): pills for chips, badges, avatars and
+  the filled search; about 13 px for buttons, fields, selects and segmented controls
+  (`rounded-[0.9em]` on full screens); about 19 px for panels and cards (`rounded-[1.35em]`). Card
+  demos scale the same ratio (`Card` 0.8em, `Pill` and `Field` 0.55em).
 - **PDF paper stays white** in both themes (`--dm-paper`, `--dm-paper-ink`), as in the app.
   Literal colours are fine on paper only.
 - Text is Inter (`--font-ui`), the app's face, weight 400.

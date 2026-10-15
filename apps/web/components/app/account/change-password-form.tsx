@@ -3,11 +3,11 @@
 import { ChangePasswordSchema, MIN_PASSWORD_LENGTH } from "@sahihi/core"
 import { useRouter } from "next/navigation"
 import { useRef, useState } from "react"
+import { Button } from "@/components/app/button"
+import { PasswordField } from "@/components/app/fields"
 import { toastManager } from "@/components/app/toast"
 import { Alert } from "@/components/arc/alert/alert"
-import { Button } from "@/components/arc/button/button"
 import { Checkbox } from "@/components/arc/checkbox/checkbox"
-import { PasswordField } from "@/components/arc/password-field/password-field"
 import { changePassword } from "@/lib/auth-client"
 
 /** Change password (better-auth `change-password`), optionally signing out every other device. */

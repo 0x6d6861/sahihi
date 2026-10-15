@@ -9,8 +9,10 @@ There are two kinds of people, and they authenticate completely differently.
 | Session | better-auth cookie `sahihi.session_token` | None. The token in the URL, plus a signed `sahihi_signer` cookie after OTP |
 | Routes | `/api/documents/*`, `/api/envelopes/*` behind `requireOrg` | `/api/sign/:token/*` |
 
-Signers **never** get accounts. Don't add better-auth checks to signing routes, and don't let signing
-tokens unlock anything outside their own envelope.
+Signers **never need** accounts. Don't add better-auth checks to signing routes, and don't let signing
+tokens unlock anything outside their own envelope. A signer may create an ordinary account later
+(ADR 0062): it sees the envelopes sent to its **verified** email (`/api/me/envelopes`,
+`/signed`), and a signing token never signs anyone in or links an account.
 
 ## better-auth setup
 
@@ -261,7 +263,13 @@ continues. After removal, only admins and owners can change those envelopes (the
 
 ## Web flows
 
-- `/sign-up` → verification email → `/onboarding` (create org, set active) → `/documents`
+- `/sign-up` → verification email → `/onboarding` (ADR 0061; `app/(onboarding)/`, its own frame
+  with a preview per step): **Workspace** (name, optional logo: `organization.create`, `setActive`,
+  then `PUT /api/workspace/logo`), **Team** (invite rows, `organization.inviteMember` per row,
+  limited to the seats left; each server error on its own row; "Skip for now"), **AI assistant**
+  (only when the server has a model and the person is an owner or admin: turn it on or not now) →
+  `/files`, where the Get started checklist (`GET`/`PUT /api/getting-started`) shows the first
+  steps until they're done or hidden.
 - `/forgot-password` → `request-password-reset` (same answer whether or not the email has an
   account) → email (`auth.reset-password`) → better-auth checks the token → `/reset-password?token=…`
   → `reset-password` → every session is revoked → `/sign-in`. A bad or used link lands on

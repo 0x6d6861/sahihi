@@ -4,7 +4,7 @@ import type { BulkItemStatus, BulkSendStatus } from "@sahihi/core"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
-import { Badge } from "@/components/arc/badge/badge"
+import { Badge } from "@/components/app/badge"
 import { Progress } from "@/components/arc/progress/progress"
 import {
   Table,

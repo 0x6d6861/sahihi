@@ -18,8 +18,8 @@ Three switches, all required (`requireAssistant` in `routes/generated-documents.
 1. **Server:** `AI_MODEL` is set (`provider:model`, `anthropic:` or `openai:`, with that provider's
    key; `packages/config`). Unset = off everywhere.
 2. **Workspace:** `WorkspaceSettings.aiEnabled`, off by default because document text goes to the
-   model provider. Owners and admins turn it on (`PUT /api/generated-documents/settings`, or the
-   button on `/generate`).
+   model provider. Owners and admins turn it on (`PUT /api/generated-documents/settings`: the
+   button on `/generate`, the switch in Settings › Workspace, or the last onboarding step, ADR 0061).
 3. **Role:** `ai:use` (`canUseAssistant`). Every role has it today; the statement exists so it can
    be narrowed without a migration.
 
@@ -415,15 +415,16 @@ ADR 0009).
 
 ## Web (`/generate`, `components/app/generator/`)
 
-- `/generate` (**Drafting**, its own tab in the top bar): "Import a document" and "Blank
-  document" in the header; your drafts (first once there are any) as a one-line-per-row table
-  (status, owner, when last edited) with a ⋮ menu: Open, Open envelope once finalised, and Delete
-  while it's a DRAFT for its creator, an admin or the owner (`DELETE /generated-documents/:id`:
-  the draft, its versions, events and conversation; 409 once finalised, as a finalised one goes
-  with its envelope; `canEdit` per row in `GET /generated-documents`); then the starters and
-  workspace templates as pressable tiles (the whole tile starts a document; one at a time; delete
-  for those who may); the switch for owners and admins while it's off. "Draft with AI" on All
-  files links here, and a READY document's row menu in Files has "Draft from this document".
+- `/generate` (**Drafting**, its own tab in the top bar): "Import a document" and "Blank document"
+  in the header; the starters first, then your drafts (once there are any) as a one-line-per-row
+  table (status, versions, owner, when last edited) with a ⋮ menu: Open, Open envelope once
+  finalised, and Delete while it's a DRAFT for its creator, an admin or the owner (`DELETE
+  /generated-documents/:id`: the draft, its versions, events and conversation; 409 once finalised,
+  as a finalised one goes with its envelope; `canEdit` and `versions` per row in `GET
+  /generated-documents`); then the workspace templates; starters and templates are pressable tiles
+  (the whole tile starts a document; one at a time; delete for those who may); the switch for owners
+  and admins while it's off. The Drafting tab and "Draft with AI" in ⌘K lead here, and a READY
+  document's row menu in Files has "Draft from this document".
 - **Import a document:** an Arc dialog with "Your documents" (the library search shared with the
   envelope editor's Add document, `LibraryDocumentPicker`) or "Upload a file" (a drop zone for a
   PDF or .docx). A refusal shows its reason in the dialog; otherwise the new draft opens.

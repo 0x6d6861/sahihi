@@ -2,10 +2,10 @@
 
 import { useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useState } from "react"
+import { AuthForm } from "@/components/app/auth/auth-form"
+import { Button } from "@/components/app/button"
 import { ButtonLink } from "@/components/app/button-link"
-import { Panel } from "@/components/app/panel"
 import { Alert } from "@/components/arc/alert/alert"
-import { Button } from "@/components/arc/button/button"
 import { ApiError, api } from "@/lib/api"
 
 /**
@@ -39,36 +39,34 @@ function DeleteAccountConfirm() {
 
   if (state === "deleted") {
     return (
-      <Panel title="Your account is deleted" headingLevel={1} className="w-full max-w-sm">
+      <AuthForm title="Your account is deleted">
         <p className="text-muted-foreground text-sm">
           Your personal details and sign-in methods are gone. Thanks for using Sahihi.
         </p>
         <ButtonLink href="/sign-up" variant="ghost" className="w-full">
           Create a new account
         </ButtonLink>
-      </Panel>
+      </AuthForm>
     )
   }
 
   if (state === "expired") {
     return (
-      <Panel title="This link has expired" headingLevel={1} className="w-full max-w-sm">
+      <AuthForm title="This link has expired">
         <p className="text-muted-foreground text-sm">
           Deletion links work once and for 1 hour. Start again from Settings → Security.
         </p>
         <ButtonLink href="/settings/security" className="w-full">
           Go to Security settings
         </ButtonLink>
-      </Panel>
+      </AuthForm>
     )
   }
 
   return (
-    <Panel
+    <AuthForm
       title="Delete your account?"
       description="Your name, email, sign-in methods, picture and saved signatures are erased, and you leave every workspace. Documents and envelopes you created stay with their workspaces. This can't be undone."
-      headingLevel={1}
-      className="w-full max-w-sm"
     >
       {error && <Alert tone="danger" title={error} />}
       <Button variant="danger" className="w-full" loading={pending} onClick={confirm}>
@@ -77,7 +75,7 @@ function DeleteAccountConfirm() {
       <ButtonLink href="/files" variant="ghost" className="w-full">
         Keep my account
       </ButtonLink>
-    </Panel>
+    </AuthForm>
   )
 }
 

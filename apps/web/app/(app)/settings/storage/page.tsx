@@ -1,6 +1,6 @@
 import { ButtonLink } from "@/components/app/button-link"
 import { DownloadIcon, PackageIcon } from "@/components/app/icons"
-import { Panel } from "@/components/app/panel"
+import { SettingsSection } from "@/components/app/settings/settings-section"
 import { AddConnectionButton } from "@/components/app/storage/add-connection-button"
 import { CloudDriveButton } from "@/components/app/storage/cloud-drive-button"
 import { ConnectionCard } from "@/components/app/storage/connection-card"
@@ -107,14 +107,14 @@ export default async function StoragePage({
             description="Copy every signed agreement to Amazon S3, Cloudflare R2, Backblaze B2, Google Drive, OneDrive and more."
           />
         ) : sync.length === 0 ? (
-          <Panel>
+          <SettingsSection>
             <EmptyState
               className="md:py-10"
               icon={<PackageIcon aria-hidden />}
               title="No sync destinations yet"
               description="Connect a bucket or a cloud drive to keep every signed agreement in your own system of record."
             />
-          </Panel>
+          </SettingsSection>
         ) : (
           sync.map((c) => <ConnectionCard key={c.id} connection={c} />)
         )}
@@ -166,12 +166,12 @@ export default async function StoragePage({
               </ButtonLink>
             )}
           </div>
-          <Panel>
+          <SettingsSection>
             <ReleasedFiles
               initial={releases.data?.items ?? []}
               nextCursor={releases.data?.nextCursor ?? null}
             />
-          </Panel>
+          </SettingsSection>
         </section>
       )}
     </div>
@@ -181,7 +181,7 @@ export default async function StoragePage({
 /** A section the plan doesn't include: the same empty state for both tiers, one way forward. */
 function PlanRequired({ title, description }: { title: string; description: string }) {
   return (
-    <Panel>
+    <SettingsSection>
       <EmptyState
         className="md:py-10"
         icon={<PackageIcon aria-hidden />}
@@ -193,6 +193,6 @@ function PlanRequired({ title, description }: { title: string; description: stri
           </ButtonLink>
         }
       />
-    </Panel>
+    </SettingsSection>
   )
 }

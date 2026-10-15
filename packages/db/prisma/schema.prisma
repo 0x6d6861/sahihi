@@ -52,6 +52,7 @@ model User {
   avatar                  UserAvatar?
   notifications           Notification[]
   notificationPreferences NotificationPreference[]
+  memberPreferences       MemberPreference[]
   generatedDocuments      GeneratedDocument[]
   generationTemplates     GenerationTemplate[]
   storageConnections      StorageConnection[]
@@ -166,6 +167,7 @@ model Organization {
   bulkSends               BulkSend[]
   notifications           Notification[]
   notificationPreferences NotificationPreference[]
+  memberPreferences       MemberPreference[]
   generatedDocuments      GeneratedDocument[]
   generationTemplates     GenerationTemplate[]
   storageConnections      StorageConnection[]
@@ -928,6 +930,20 @@ model NotificationPreference {
   /// NotificationSettings from @sahihi/core: only the types the user changed
   settings       Json         @default("{}")
   updatedAt      DateTime     @updatedAt
+
+  @@id([userId, organizationId])
+}
+
+/// A member's own state in one workspace that isn't a notification choice (ADR 0061). No row =
+/// nothing chosen yet.
+model MemberPreference {
+  userId                    String
+  user                      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId            String
+  organization              Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// Hid the Get started checklist on All files
+  gettingStartedDismissedAt DateTime?
+  updatedAt                 DateTime     @updatedAt
 
   @@id([userId, organizationId])
 }

@@ -2,10 +2,11 @@
 
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { Button } from "@/components/app/button"
 import { FolderPlusIcon } from "@/components/app/icons"
 import { EditItemDialog } from "@/components/app/labels/edit-item-dialog"
 import { toastManager } from "@/components/app/toast"
-import { Button } from "@/components/arc/button/button"
+import { Tooltip } from "@/components/arc/tooltip/tooltip"
 import { api } from "@/lib/api"
 import type { TagRef } from "@/lib/labels"
 
@@ -15,7 +16,8 @@ const NO_TAGS: TagRef[] = []
 /**
  * "Create folder" in the open folder (`parentId`), or at the root: name, color and tags in one
  * dialog. `appearance="ghost"` is a dashed placeholder card the size of a folder card, shown where
- * folders would be when there are none.
+ * folders would be when there are none; `appearance="icon"` is a square secondary button with a tooltip
+ * (the All files header).
  */
 export function CreateFolderButton({
   parentId,
@@ -25,7 +27,7 @@ export function CreateFolderButton({
   parentId?: string
   /** Every tag in use in the workspace, for the tag picker. */
   allTags: TagRef[]
-  appearance?: "button" | "ghost"
+  appearance?: "button" | "ghost" | "icon"
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -44,6 +46,12 @@ export function CreateFolderButton({
             <span className="truncate text-xs">Group documents by client, team or project</span>
           </span>
         </button>
+      ) : appearance === "icon" ? (
+        <Tooltip content="Create folder">
+          <Button variant="secondary" aria-label="Create folder" onClick={() => setOpen(true)}>
+            <FolderPlusIcon aria-hidden />
+          </Button>
+        </Tooltip>
       ) : (
         <Button variant="ghost" onClick={() => setOpen(true)}>
           <FolderPlusIcon aria-hidden />

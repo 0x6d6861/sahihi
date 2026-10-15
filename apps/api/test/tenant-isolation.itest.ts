@@ -446,6 +446,14 @@ const isStaffDashboard = (route: string) =>
   route.split(" ")[1]?.startsWith("/admin/queues/") || route.endsWith(" /admin/queues")
 
 const NOT_TENANT = [
+  // Signer accounts (ADR 0062): scoped by the caller's verified email, not by workspace; another
+  // person's recipient id answers 404 (my-envelopes.itest.ts).
+  "GET /api/me/envelopes",
+  "GET /api/me/envelopes/:recipientId/downloads",
+  "POST /api/me/envelopes/:recipientId/link",
+  // The caller's own workspace counts and their own hide flag; no ids (getting-started.itest.ts).
+  "GET /api/getting-started",
+  "PUT /api/getting-started",
   // Creates in the caller's own org and takes no ids from the request.
   "POST /api/webhooks",
   "POST /api/storage/connections",

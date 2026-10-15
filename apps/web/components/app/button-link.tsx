@@ -16,7 +16,14 @@ export function ButtonLink({
 }: ComponentProps<typeof Link> & { variant?: ButtonVariant; size?: ButtonSize }) {
   return (
     <Link
-      className={cn(styles.button, styles[variant], styles[size], "no-underline", className)}
+      className={cn(
+        styles.button,
+        styles[variant],
+        styles[size],
+        variant === "primary" && "app-primary",
+        "no-underline",
+        className,
+      )}
       {...props}
     />
   )

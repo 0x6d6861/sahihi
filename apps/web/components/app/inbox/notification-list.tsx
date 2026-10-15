@@ -9,6 +9,7 @@ import {
 } from "@sahihi/core"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useRef, useState } from "react"
+import { Button } from "@/components/app/button"
 import {
   BellIcon,
   CheckIcon,
@@ -20,12 +21,12 @@ import {
 import { ListSearch, type SearchChip } from "@/components/app/list-search"
 import { Panel } from "@/components/app/panel"
 import { toastManager } from "@/components/app/toast"
-import { Button } from "@/components/arc/button/button"
 import { DropdownMenu } from "@/components/arc/dropdown-menu/dropdown-menu"
 import { EmptyState } from "@/components/arc/empty-state/empty-state"
 import { api } from "@/lib/api"
 import { PERIOD_LABEL } from "@/lib/documents-list"
-import { formatDateTime } from "@/lib/format"
+import { formatDateTime, formatTime } from "@/lib/format"
+import { groupByDay } from "@/lib/group-by-day"
 import { hasInboxFilters, type NotificationFilters, notificationsQuery } from "@/lib/inbox"
 import {
   INBOX_PAGE_SIZE,
@@ -33,11 +34,11 @@ import {
   type NotificationPage,
   openLabelFor,
   readIdsToClear,
-  timeAgo,
   unreadIdsToMark,
   withReadState,
 } from "@/lib/notifications"
 import { cn } from "@/lib/utils"
+import { NotificationIcon } from "./notification-icon"
 import { useUnreadCount } from "./unread-count"
 
 const TYPE_OPTIONS = NOTIFICATION_TYPES.map((type, i) => ({
@@ -244,23 +245,14 @@ export function NotificationList({
         onChipChange={(id, value) => applyFilters({ ...filters, [id]: value })}
         onClearChips={() => applyFilters({ q: filters.q })}
         pending={loading}
+        actions={
+          <Button variant="ghost" size="sm" disabled={!hasUnread} onClick={markAllRead}>
+            <CheckIcon aria-hidden />
+            {filtered ? "Mark these read" : "Mark all read"}
+          </Button>
+        }
       />
-      <Panel className="gap-0 p-0">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b py-3 ps-9 pe-4">
-          {/* The badge's count, so the strip says where you stand before you scan the list. */}
-          <p className="text-muted-foreground text-sm tabular-nums" aria-live="polite">
-            {filtered ? null : unread.count ? `${unread.count} unread` : "All read"}
-          </p>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" disabled={!hasUnread} onClick={markAllRead}>
-              {filtered ? "Mark these read" : "Mark all read"}
-            </Button>
-            <Button variant="ghost" size="sm" disabled={!hasRead} onClick={clearRead}>
-              Clear read
-            </Button>
-          </div>
-        </div>
-
+      <Panel className="gap-0 overflow-hidden p-0">
         {items.length === 0 ? (
           <EmptyState
             className="md:py-10"
@@ -286,81 +278,26 @@ export function NotificationList({
             }
           />
         ) : (
-          <ul aria-label="Notifications" aria-busy={loading} className="divide-y">
-            {items.map((n) => {
-              const view = describeNotification(n)
-              const isUnread = !n.readAt
-              return (
-                <li key={n.id} className="flex items-start gap-3 px-4 py-3">
-                  <span
-                    aria-hidden
-                    className={cn(
-                      "mt-1.5 size-2 shrink-0 rounded-full",
-                      // One colour means unread, as on the Inbox count; green and amber mean status.
-                      isUnread ? "bg-info" : "bg-transparent",
-                    )}
-                  />
-                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <p
-                      className={cn("text-sm", isUnread ? "font-medium" : "text-muted-foreground")}
-                    >
-                      {isUnread && <span className="sr-only">Unread: </span>}
-                      {view.title}
-                    </p>
-                    {view.body && <p className="text-muted-foreground text-sm">{view.body}</p>}
-                    <time
-                      dateTime={n.createdAt}
-                      title={formatDateTime(n.createdAt)}
-                      className="text-muted-foreground text-xs tabular-nums"
-                    >
-                      {timeAgo(n.createdAt, new Date(now))}
-                    </time>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    {view.href && (
-                      <span className="max-sm:hidden">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => open(n, view.href as string)}
-                        >
-                          {openLabelFor(view.href)}
-                        </Button>
-                      </span>
-                    )}
-                    <DropdownMenu
-                      label={`Actions for “${view.title}”`}
-                      iconOnly
-                      icon={<EllipsisVerticalIcon />}
-                      items={[
-                        ...(view.href
-                          ? [
-                              {
-                                label: openLabelFor(view.href) ?? "Open",
-                                icon: <FileTextIcon />,
-                                onSelect: () => open(n, view.href as string),
-                              },
-                            ]
-                          : []),
-                        {
-                          label: isUnread ? "Mark read" : "Mark unread",
-                          icon: isUnread ? <CheckIcon /> : <MailIcon />,
-                          onSelect: () => setRead(n, isUnread),
-                        },
-                        {
-                          label: "Dismiss",
-                          icon: <Trash2Icon />,
-                          destructive: true,
-                          separatorBefore: true,
-                          onSelect: () => dismiss(n),
-                        },
-                      ]}
+          <div aria-busy={loading} className="divide-y">
+            {groupByDay(items, (n) => n.createdAt, new Date(now)).map((group) => (
+              <section key={group.key} aria-label={group.label} className="divide-y">
+                <h3 className="bg-muted/50 px-5 py-2.5 font-medium text-muted-foreground text-xs">
+                  {group.label}
+                </h3>
+                <ul className="divide-y">
+                  {group.items.map((n) => (
+                    <NotificationRow
+                      key={n.id}
+                      n={n}
+                      onOpen={open}
+                      onSetRead={setRead}
+                      onDismiss={dismiss}
                     />
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </div>
         )}
 
         {nextCursor && (
@@ -371,6 +308,98 @@ export function NotificationList({
           </div>
         )}
       </Panel>
+      {(items.length > 0 || !filtered) && (
+        <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+          {/* The badge's count, so you know where you stand. */}
+          <p className="text-muted-foreground text-sm tabular-nums" aria-live="polite">
+            {filtered ? null : unread.count ? `${unread.count} unread` : "All read"}
+          </p>
+          <Button variant="ghost" size="sm" disabled={!hasRead} onClick={clearRead}>
+            <Trash2Icon aria-hidden />
+            Clear read notifications
+          </Button>
+        </div>
+      )}
     </div>
+  )
+}
+
+/** One notification: unread dot, type mark, title and body, the time, an open button and ⋮. */
+function NotificationRow({
+  n,
+  onOpen,
+  onSetRead,
+  onDismiss,
+}: {
+  n: NotificationItem
+  onOpen: (n: NotificationItem, href: string) => void
+  onSetRead: (n: NotificationItem, read: boolean) => void
+  onDismiss: (n: NotificationItem) => void
+}) {
+  const view = describeNotification(n)
+  const isUnread = !n.readAt
+  return (
+    <li className="flex items-center gap-3.5 px-5 py-4">
+      <span
+        aria-hidden
+        className={cn(
+          "size-2 shrink-0 rounded-full",
+          // One colour means unread, as on the Inbox count; green and amber mean status.
+          isUnread ? "bg-info" : "bg-transparent",
+        )}
+      />
+      <NotificationIcon type={n.type} />
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <p className={cn("text-sm", isUnread ? "font-medium" : "text-muted-foreground")}>
+          {isUnread && <span className="sr-only">Unread: </span>}
+          {view.title}
+        </p>
+        {view.body && <p className="text-muted-foreground text-sm">{view.body}</p>}
+      </div>
+      <time
+        dateTime={n.createdAt}
+        title={formatDateTime(n.createdAt)}
+        className="shrink-0 text-muted-foreground text-sm tabular-nums"
+      >
+        {formatTime(n.createdAt)}
+      </time>
+      <div className="flex shrink-0 items-center gap-1">
+        {view.href && (
+          <span className="max-sm:hidden">
+            <Button variant="secondary" size="sm" onClick={() => onOpen(n, view.href as string)}>
+              {openLabelFor(view.href)}
+            </Button>
+          </span>
+        )}
+        <DropdownMenu
+          label={`Actions for “${view.title}”`}
+          iconOnly
+          icon={<EllipsisVerticalIcon />}
+          items={[
+            ...(view.href
+              ? [
+                  {
+                    label: openLabelFor(view.href) ?? "Open",
+                    icon: <FileTextIcon />,
+                    onSelect: () => onOpen(n, view.href as string),
+                  },
+                ]
+              : []),
+            {
+              label: isUnread ? "Mark read" : "Mark unread",
+              icon: isUnread ? <CheckIcon /> : <MailIcon />,
+              onSelect: () => onSetRead(n, isUnread),
+            },
+            {
+              label: "Dismiss",
+              icon: <Trash2Icon />,
+              destructive: true,
+              separatorBefore: true,
+              onSelect: () => onDismiss(n),
+            },
+          ]}
+        />
+      </div>
+    </li>
   )
 }

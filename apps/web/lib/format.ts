@@ -15,6 +15,12 @@ const dayMonth = new Intl.DateTimeFormat(LOCALE, {
   month: "long",
   timeZone: TIME_ZONE,
 })
+const dayKeyFormat = new Intl.DateTimeFormat("en-CA", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  timeZone: TIME_ZONE,
+})
 // A calendar day the user picked in their own browser: no time zone conversion.
 const localDate = new Intl.DateTimeFormat(LOCALE, { dateStyle: "medium" })
 
@@ -25,6 +31,16 @@ const toDate = (value: DateInput) => (value instanceof Date ? value : new Date(v
 /** "3 Oct 2026" */
 export function formatDate(value: DateInput): string {
   return date.format(toDate(value))
+}
+
+/** "14:05" (Nairobi time) */
+export function formatTime(value: DateInput): string {
+  return time.format(toDate(value))
+}
+
+/** The Nairobi calendar day as "2026-10-03", for grouping by day. */
+export function dayKey(value: DateInput): string {
+  return dayKeyFormat.format(toDate(value))
 }
 
 /** "3 Oct 2026 at 14:05" */

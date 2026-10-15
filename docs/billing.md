@@ -65,6 +65,9 @@ them:
   an invitation is accepted.
 - `organizationHooks.beforeCreateInvitation` refuses a new invitation when every seat is taken. A
   pending invitation holds a seat. Resending an existing invitation isn't blocked.
+- The web says where a workspace stands before anyone hits the limit: the Members page shows
+  "2 of 2 seats used on the Free plan", and onboarding's Team step offers only as many invite rows
+  as seats are left (ADR 0061).
 
 Downgrades don't remove anyone: an over-limit workspace just can't add more people.
 

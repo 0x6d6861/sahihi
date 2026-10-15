@@ -22,7 +22,8 @@ payloads (e.g. a decline or void reason) stays there.
 `purgeEnvelope` (`apps/worker/src/jobs/retention.ts`) deletes files first, then redacts in one
 transaction with the audit event, then removes the original if it's unused. It's idempotent
 (`purgedAt`). Afterwards, downloads return **410** `purged`, and the envelope page shows a
-"Files and personal data deleted" notice.
+"Files and personal data deleted" notice. Because the recipient's email is redacted, the envelope
+also leaves the signer's own Signed documents list (ADR 0062).
 
 ## Retention (automatic)
 

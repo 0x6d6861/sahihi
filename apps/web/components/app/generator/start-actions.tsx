@@ -2,9 +2,9 @@
 
 import { useRouter } from "next/navigation"
 import { createContext, useContext, useState } from "react"
+import { Button } from "@/components/app/button"
 import { ConfirmDialog } from "@/components/app/confirm-dialog"
 import { ChevronRightIcon, LoaderIcon, PlusIcon, Trash2Icon } from "@/components/app/icons"
-import { Button } from "@/components/arc/button/button"
 import { Tooltip } from "@/components/arc/tooltip/tooltip"
 import { Button as IconButton } from "@/components/ui/button"
 import { ApiError, api } from "@/lib/api"

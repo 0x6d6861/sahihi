@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { DetailsCell } from "@/components/app/files/details-cell"
+import { DetailsCell, StatusCell, TypeCell } from "@/components/app/files/details-cell"
 import { DragCard, DragRow, SelectCell } from "@/components/app/files/drag-items"
 import { CreateFolderButton } from "@/components/app/folders/create-folder-button"
 import {
@@ -9,7 +9,6 @@ import {
 } from "@/components/app/folders/folder-card"
 import { FolderIcon } from "@/components/app/icons"
 import { ColorDot, ColorName, TagBadges } from "@/components/app/labels/labels"
-import { Person } from "@/components/app/people"
 import { Breadcrumb } from "@/components/arc/breadcrumb/breadcrumb"
 import { TableCell } from "@/components/ui/table"
 import { folderMeta } from "@/lib/documents-list"
@@ -179,7 +178,7 @@ export function FolderCards({
 /**
  * List layout: folders as the first rows of the table, like Drive's list, one line each. `columns`
  * is how many cells sit between the name and the ⋮ menu on that page. With the All files layout
- * (3: details, person, date) the folder fills them with its contents, creator and date; any other
+ * (4: type, status, details, date) the folder fills them with "Folder", its contents and date; any other
  * table has its own columns, so the name cell spans them instead.
  */
 export function FolderRows({
@@ -190,7 +189,7 @@ export function FolderRows({
   allTags,
   hrefFor,
   rootLabel,
-  columns = 3,
+  columns = 4,
 }: {
   folders: FolderCardData[]
   current: Ref | null
@@ -209,7 +208,7 @@ export function FolderRows({
         <SelectCell {...folderDrag(f, current, path, searching)} />
         <TableCell
           className="w-full max-w-0 ps-3"
-          colSpan={columns === 3 ? undefined : columns + 1}
+          colSpan={columns === 4 ? undefined : columns + 1}
         >
           <div className="flex min-w-0 items-center gap-3">
             <FolderIcon aria-hidden className="size-5 shrink-0 text-muted-foreground" />
@@ -229,12 +228,11 @@ export function FolderRows({
             </div>
           </div>
         </TableCell>
-        {columns === 3 && (
+        {columns === 4 && (
           <>
+            <TypeCell>Folder</TypeCell>
+            <StatusCell status={null} />
             <DetailsCell text={folderMeta(f, rootLabel)} />
-            <TableCell className="whitespace-nowrap text-muted-foreground max-md:hidden">
-              {f.createdBy && <Person person={f.createdBy} />}
-            </TableCell>
             <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums max-md:hidden">
               {f.createdAt && (
                 <time dateTime={f.createdAt} title={formatDateTime(f.createdAt)}>

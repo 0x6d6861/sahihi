@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
+import { Badge } from "@/components/app/badge"
 import { DownloadButtons } from "@/components/app/downloads/download-buttons"
 import {
   ActivityList,
@@ -7,6 +8,7 @@ import {
   type ChainVerification,
 } from "@/components/app/envelope/activity-list"
 import { EnvelopeDocumentsPanel } from "@/components/app/envelope/envelope-documents-panel"
+import { EnvelopeSide } from "@/components/app/envelope/envelope-side"
 import { EnvelopeTabs } from "@/components/app/envelope/envelope-tabs"
 import { PurgeEnvelope } from "@/components/app/envelope/purge-envelope"
 import {
@@ -16,7 +18,6 @@ import {
 import { Panel } from "@/components/app/panel"
 import { SaveTemplateDialog } from "@/components/app/templates/save-template-dialog"
 import { Alert } from "@/components/arc/alert/alert"
-import { Badge } from "@/components/arc/badge/badge"
 import { Breadcrumb } from "@/components/arc/breadcrumb/breadcrumb"
 import { Progress } from "@/components/arc/progress/progress"
 import {
@@ -36,7 +37,8 @@ import { formatDate } from "@/lib/format"
 import { ROLE_LABELS, VERIFICATION_LABELS } from "@/lib/recipients"
 
 /**
- * Envelope detail, read-only: header (status badge, void/purge) + Tabs. An editable draft opens
+ * Envelope detail, read-only: header (status badge, void/purge) + Tabs, with recipients and
+ * facts in a side column from `lg`. An editable draft opens
  * in the draft editor instead (`/envelopes/:id/edit`, ADR 0021).
  *  - Document:   the original, as sent for signing.
  *  - Recipients: a status table.
@@ -172,7 +174,7 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
     (r) => r.role !== "VIEWER" && (r.status === "SENT" || r.status === "VIEWED"),
   )
   const heading = (
-    <div className="flex min-w-0 flex-col gap-2">
+    <div className="flex min-w-0 flex-1 flex-col gap-2">
       <div className="flex min-w-0 items-center gap-3">
         <h1 className="truncate font-medium text-2xl tracking-tight" title={e.title}>
           {e.title}
@@ -181,6 +183,7 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
       </div>
       <p className="text-muted-foreground text-sm">
         {sequential ? "Signing in order" : "Signing in parallel"}
+        {e.sentAt ? ` · Sent ${formatDate(new Date(e.sentAt))}` : ""}
         {e.expiresAt ? ` · Expires ${formatDate(new Date(e.expiresAt))}` : " · No expiry"}
       </p>
     </div>
@@ -217,7 +220,7 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
         items={[{ label: "All files", href: "/files?type=envelope" }, { label: e.title }]}
       />
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         {heading}
         <EnvelopeHeaderActions
           envelopeId={e.id}
@@ -282,11 +285,28 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
         </Panel>
       )}
 
-      <EnvelopeTabs
-        defaultTab="document"
-        counts={{ recipients: e.recipients.length, activity: audit.data?.events.length }}
-        panels={{ document: documentPanel, recipients: recipientsPanel, activity: activityPanel }}
-      />
+      {/* From lg: the tabs beside a side column of recipients and facts (the redesign). */}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="min-w-0">
+          <EnvelopeTabs
+            defaultTab="document"
+            counts={{ recipients: e.recipients.length, activity: audit.data?.events.length }}
+            panels={{
+              document: documentPanel,
+              recipients: recipientsPanel,
+              activity: activityPanel,
+            }}
+          />
+        </div>
+        <EnvelopeSide
+          recipients={e.recipients}
+          createdBy={e.createdBy}
+          sentAt={e.sentAt}
+          completedAt={e.completedAt}
+          sequential={sequential}
+          expiresAt={e.expiresAt}
+        />
+      </div>
     </div>
   )
 }

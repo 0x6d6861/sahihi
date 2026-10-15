@@ -1,4 +1,5 @@
 import type { ComponentType } from "react"
+import { Badge } from "@/components/app/badge"
 import {
   BanIcon,
   BellIcon,
@@ -15,7 +16,6 @@ import {
   XIcon,
 } from "@/components/app/icons"
 import { Alert } from "@/components/arc/alert/alert"
-import { Badge } from "@/components/arc/badge/badge"
 import type { TimelineEvent } from "@/components/arc/timeline/timeline"
 import { Timeline } from "@/components/arc/timeline/timeline"
 import { auditEventLabel, auditEventTone } from "@/lib/audit-labels"
@@ -44,6 +44,7 @@ const ICON_BY_TYPE: Record<string, ComponentType<{ "aria-hidden"?: boolean }>> =
   "recipient.notified": MailIcon,
   "recipient.link_issued": MailIcon,
   "recipient.reminded": BellIcon,
+  "recipient.link_requested": MailIcon,
   "recipient.viewed": EyeIcon,
   "recipient.link_opened": EyeIcon,
   "recipient.otp_sent": KeyRoundIcon,

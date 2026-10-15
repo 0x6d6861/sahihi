@@ -1,8 +1,8 @@
 "use client"
 
 import { uniqueTags } from "@sahihi/core"
+import { Button } from "@/components/app/button"
 import { PlusIcon } from "@/components/app/icons"
-import { Button } from "@/components/arc/button/button"
 import { TagInput } from "@/components/arc/tag-input/tag-input"
 import { tagSuggestions } from "@/lib/labels"
 

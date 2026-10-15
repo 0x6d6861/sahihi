@@ -22,6 +22,7 @@ import {
   MoreVerticalIcon as HugeEllipsisVerticalIcon,
   EraserIcon as HugeEraserIcon,
   ViewIcon as HugeEyeIcon,
+  ViewOffSlashIcon as HugeEyeOffIcon,
   FileEditIcon as HugeFilePenLineIcon,
   FileSearchIcon as HugeFileSearchIcon,
   Xls01Icon as HugeFileSpreadsheetIcon,
@@ -111,6 +112,7 @@ export const EllipsisIcon = icon(HugeEllipsisIcon)
 export const EllipsisVerticalIcon = icon(HugeEllipsisVerticalIcon)
 export const EraserIcon = icon(HugeEraserIcon)
 export const EyeIcon = icon(HugeEyeIcon)
+export const EyeOffIcon = icon(HugeEyeOffIcon)
 export const FilePenLineIcon = icon(HugeFilePenLineIcon)
 export const FileSearchIcon = icon(HugeFileSearchIcon)
 export const FileSpreadsheetIcon = icon(HugeFileSpreadsheetIcon)

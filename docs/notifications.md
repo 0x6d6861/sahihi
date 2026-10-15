@@ -88,6 +88,9 @@ switch per type, saved as soon as it changes. Members don't see workspace types 
 
 ## The Inbox (web)
 
+Signer accounts without a workspace (ADR 0062) have no Inbox: their envelopes are on `/signed`, and
+signing emails still reach them as before.
+
 `/inbox` replaced the bell (ADR 0041). Its tabs are switched with `?tab=`:
 **Notifications**, **Workspace activity** and **Bulk sends**. Each has the All files search section
 (`ListSearch`, without the List / Grid switch): a search box (debounced) and filter chips with

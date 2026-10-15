@@ -3,12 +3,12 @@
 import { describeUserAgent } from "@sahihi/core"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { Badge } from "@/components/app/badge"
+import { Button } from "@/components/app/button"
 import { ConfirmDialog, DialogActions } from "@/components/app/confirm-dialog"
+import { Input } from "@/components/app/fields"
 import { toastManager } from "@/components/app/toast"
-import { Badge } from "@/components/arc/badge/badge"
-import { Button } from "@/components/arc/button/button"
 import { Dialog, DialogContent } from "@/components/arc/dialog/dialog"
-import { Input } from "@/components/arc/input/input"
 import {
   Table,
   TableBody,

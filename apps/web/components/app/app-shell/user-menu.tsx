@@ -21,7 +21,14 @@ export interface ShellUser {
  * menu links the workspace's own pages, ADR 0054),
  * appearance (light, dark, system) and sign out.
  */
-export function UserMenu({ user }: { user: ShellUser }) {
+export function UserMenu({
+  user,
+  showSettings = true,
+}: {
+  user: ShellUser
+  /** Off on the personal Signed documents page: Settings belongs to a workspace (ADR 0062). */
+  showSettings?: boolean
+}) {
   const router = useRouter()
   const [theme, setTheme] = useState<ThemePreference>("system")
 
@@ -48,13 +55,19 @@ export function UserMenu({ user }: { user: ShellUser }) {
       }}
       theme={theme}
       onThemeChange={onThemeChange}
-      items={[
-        {
-          label: "Settings",
-          icon: <HugeiconsIcon icon={Settings02Icon} size={16} strokeWidth={1.75} aria-hidden />,
-          onSelect: () => router.push(SETTINGS_NAV[0].href),
-        },
-      ]}
+      items={
+        showSettings
+          ? [
+              {
+                label: "Settings",
+                icon: (
+                  <HugeiconsIcon icon={Settings02Icon} size={16} strokeWidth={1.75} aria-hidden />
+                ),
+                onSelect: () => router.push(SETTINGS_NAV[0].href),
+              },
+            ]
+          : []
+      }
       onSignOut={onSignOut}
       align="end"
       showName={false}

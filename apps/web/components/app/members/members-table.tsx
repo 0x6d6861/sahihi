@@ -3,11 +3,11 @@
 import { memberActions, type OrgRole } from "@sahihi/core"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { Badge } from "@/components/app/badge"
 import { ConfirmDialog } from "@/components/app/confirm-dialog"
 import { UserMinusIcon } from "@/components/app/icons"
 import { toastManager } from "@/components/app/toast"
 import { Avatar } from "@/components/arc/avatar/avatar"
-import { Badge } from "@/components/arc/badge/badge"
 import { Button } from "@/components/ui/button"
 // coss Select inside the table: the column header is its label (Arc's Select shows its own).
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@/components/ui/select"

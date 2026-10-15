@@ -2,8 +2,8 @@
 
 import { STORAGE_RELEASE_REASON_LABELS, type StorageReleaseReason } from "@sahihi/core"
 import { useState } from "react"
+import { Button } from "@/components/app/button"
 import { toastManager } from "@/components/app/toast"
-import { Button } from "@/components/arc/button/button"
 import {
   Table,
   TableBody,

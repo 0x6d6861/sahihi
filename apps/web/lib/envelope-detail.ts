@@ -16,6 +16,8 @@ export interface EnvelopeDetail {
   status: EnvelopeStatus
   signingOrder: SigningOrder
   expiresAt: string | null
+  sentAt: string | null
+  createdBy: { name: string; image: string | null }
   /** The documents to sign, in signing order (ADR 0037). */
   documents: EnvelopeDocumentView[]
   /** Supporting files: shared with recipients, never signed. */

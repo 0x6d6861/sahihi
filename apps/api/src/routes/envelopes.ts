@@ -222,6 +222,7 @@ export const envelopes = new Hono<AppEnv>()
         recipients: { select: recipientSelect, orderBy: [{ order: "asc" }, { createdAt: "asc" }] },
         fields: { orderBy: [{ page: "asc" }, { y: "asc" }] },
         certificate: { select: { code: true, issuedAt: true, provider: true } },
+        createdBy: { select: { name: true, image: true } },
       },
     })
     if (!envelope) notFound("Envelope")

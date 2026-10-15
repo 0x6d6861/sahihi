@@ -1,8 +1,8 @@
 "use client"
 
+import { Input } from "@/components/app/fields"
 import { Alert } from "@/components/arc/alert/alert"
 import { CopyButton } from "@/components/arc/copy-button/copy-button"
-import { Input } from "@/components/arc/input/input"
 
 /** Arc inputs reset `font`, so a utility class can't switch them to mono; the token can. */
 const MONO = { fontFamily: "var(--font-mono)" }

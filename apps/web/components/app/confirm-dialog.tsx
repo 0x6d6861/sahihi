@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Button } from "@/components/arc/button/button"
+import { Button } from "@/components/app/button"
 import { Dialog, DialogContent } from "@/components/arc/dialog/dialog"
 import { cn } from "@/lib/utils"
 

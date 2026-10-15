@@ -5,7 +5,7 @@ import { DeleteAccount, type DeletionBlocker } from "@/components/app/account/de
 import { type PasskeyRow, PasskeySettings } from "@/components/app/account/passkey-settings"
 import { type SessionRow, SessionsList } from "@/components/app/account/sessions-list"
 import { TwoFactorSettings } from "@/components/app/account/two-factor-settings"
-import { Panel } from "@/components/app/panel"
+import { SettingsSection } from "@/components/app/settings/settings-section"
 import { apiServer, getServerSession } from "@/lib/api-server"
 
 export const metadata = { title: "Security" }
@@ -38,32 +38,35 @@ export default async function SecurityPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Panel title="Password">
+      <SettingsSection title="Password">
         <ChangePasswordForm />
-      </Panel>
+      </SettingsSection>
 
-      <Panel title="Passkeys" description="Sign in with your fingerprint, face or screen lock.">
+      <SettingsSection
+        title="Passkeys"
+        description="Sign in with your fingerprint, face or screen lock."
+      >
         <PasskeySettings passkeys={(passkeys.data ?? []).map(toRow)} />
-      </Panel>
+      </SettingsSection>
 
-      <Panel title="Two-factor authentication">
+      <SettingsSection title="Two-factor authentication">
         <TwoFactorSettings
           enabled={Boolean(session.user.twoFactorEnabled)}
           email={session.user.email}
         />
-      </Panel>
+      </SettingsSection>
 
-      <Panel title="Sessions">
+      <SettingsSection title="Sessions">
         <SessionsList sessions={sessions.data ?? []} currentId={session.session.id} />
-      </Panel>
+      </SettingsSection>
 
-      <Panel
+      <SettingsSection
         className="border-destructive/30"
         title="Delete account"
         description="Erases your name, email, sign-in methods, picture and saved signatures, and removes you from every workspace. Documents and envelopes you created stay with their workspaces, shown as by “Deleted user”. This can't be undone."
       >
         <DeleteAccount blockers={deletion.data?.blockers ?? []} />
-      </Panel>
+      </SettingsSection>
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { labelColorName } from "@sahihi/core"
-import { Badge } from "@/components/arc/badge/badge"
+import { Badge } from "@/components/app/badge"
 import type { TagRef } from "@/lib/labels"
 import { cn } from "@/lib/utils"
 

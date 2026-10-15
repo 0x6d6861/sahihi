@@ -90,6 +90,7 @@ const PROTECTED_PREFIXES = [
   "/inbox",
   "/settings",
   "/onboarding",
+  "/signed",
 ]
 
 export function isProtectedPath(pathname: string): boolean {

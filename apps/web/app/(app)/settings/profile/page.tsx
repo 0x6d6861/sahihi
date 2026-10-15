@@ -6,7 +6,7 @@ import {
   type SavedSignatures,
   SavedSignaturesEditor,
 } from "@/components/app/account/saved-signatures"
-import { Panel } from "@/components/app/panel"
+import { SettingsSection } from "@/components/app/settings/settings-section"
 import { apiServer, getServerSession } from "@/lib/api-server"
 
 export const metadata = { title: "Profile" }
@@ -22,21 +22,24 @@ export default async function ProfilePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Panel title="Your details">
+      <SettingsSection title="Your details">
         <ProfilePicture name={user.name} email={user.email} image={user.image ?? null} />
         <ProfileForm name={user.name} />
-      </Panel>
+      </SettingsSection>
 
-      <Panel title="Email">
+      <SettingsSection title="Email">
         <ChangeEmail email={user.email} verified={user.emailVerified} />
-      </Panel>
+      </SettingsSection>
 
-      <Panel title="Signature" description="Place them with one click on documents sent to you.">
+      <SettingsSection
+        title="Signature"
+        description="Place them with one click on documents sent to you."
+      >
         <SavedSignaturesEditor
           name={user.name}
           initial={signatures.data ?? { signature: null, initials: null }}
         />
-      </Panel>
+      </SettingsSection>
     </div>
   )
 }

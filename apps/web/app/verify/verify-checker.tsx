@@ -3,10 +3,10 @@
 import { normalizeCertificateCode, sha256Hex, type VerifyHashMatch } from "@sahihi/core"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { Button } from "@/components/app/button"
+import { Input } from "@/components/app/fields"
 import { FileSearchIcon, ShieldCheckIcon } from "@/components/app/icons"
 import { Alert } from "@/components/arc/alert/alert"
-import { Button } from "@/components/arc/button/button"
-import { Input } from "@/components/arc/input/input"
 import { FileUpload } from "@/components/extend/file-upload"
 // coss Spinner: Arc has no standalone spinner, and the hash time is unknown (no progress to show).
 import { Spinner } from "@/components/ui/spinner"

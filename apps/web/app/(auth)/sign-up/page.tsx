@@ -1,15 +1,28 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
-import { Panel } from "@/components/app/panel"
+import { useSearchParams } from "next/navigation"
+import { Suspense, useEffect, useState } from "react"
+import { AuthForm } from "@/components/app/auth/auth-form"
+import { Button } from "@/components/app/button"
+import { Input, PasswordField } from "@/components/app/fields"
+import { SIGNUP_EMAIL_KEY } from "@/components/app/signing/account-invite"
 import { Alert } from "@/components/arc/alert/alert"
-import { Button } from "@/components/arc/button/button"
-import { Input } from "@/components/arc/input/input"
-import { PasswordField } from "@/components/arc/password-field/password-field"
 import { signUp } from "@/lib/auth-client"
 
-export default function SignUpPage() {
+function SignUpForm() {
+  // Arriving from a signing page (ADR 0062): the signer's email is prefilled from sessionStorage
+  // (never the URL), and after confirming it they may skip creating a workspace.
+  const fromSigning = useSearchParams().get("from") === "signing"
+  const [prefill, setPrefill] = useState("")
+  useEffect(() => {
+    if (!fromSigning) return
+    try {
+      setPrefill(sessionStorage.getItem(SIGNUP_EMAIL_KEY) ?? "")
+    } catch {
+      // Private mode: they type it.
+    }
+  }, [fromSigning])
   const [error, setError] = useState<string | null>(null)
   const [sentTo, setSentTo] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -24,7 +37,7 @@ export default function SignUpPage() {
       name: String(form.get("name")),
       email,
       password: String(form.get("password")),
-      callbackURL: "/onboarding",
+      callbackURL: fromSigning ? "/signed" : "/onboarding",
     })
     setPending(false)
     if (error) return setError(error.message ?? "Could not create account")
@@ -33,21 +46,42 @@ export default function SignUpPage() {
 
   if (sentTo) {
     return (
-      <Panel
+      <AuthForm
         title="Check your email"
         description={`We sent a verification link to ${sentTo}.`}
-        headingLevel={1}
-        className="w-full max-w-sm"
       />
     )
   }
 
   return (
-    <Panel title="Create your account" headingLevel={1} className="w-full max-w-sm">
+    <AuthForm
+      title={fromSigning ? "Keep track of what you sign" : "Create your account"}
+      description={
+        <>
+          Already have an account?{" "}
+          <Link href="/sign-in" className="text-foreground underline-offset-4 hover:underline">
+            Sign in
+          </Link>
+        </>
+      }
+    >
       <form className="flex flex-col gap-4" onSubmit={onSubmit}>
         {error && <Alert tone="danger" title={error} />}
         <Input label="Full name" name="name" autoComplete="name" required />
-        <Input label="Work email" name="email" type="email" autoComplete="email" required />
+        {fromSigning ? (
+          <Input
+            key={prefill}
+            label="Email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            defaultValue={prefill}
+            description="The address the document was sent to. Documents sent to it appear in your account once you confirm it."
+            required
+          />
+        ) : (
+          <Input label="Work email" name="email" type="email" autoComplete="email" required />
+        )}
         <PasswordField
           label="Password"
           name="password"
@@ -60,12 +94,14 @@ export default function SignUpPage() {
           Create account
         </Button>
       </form>
-      <p className="text-center text-muted-foreground text-sm">
-        Already have an account?{" "}
-        <Link href="/sign-in" className="text-foreground underline-offset-4 hover:underline">
-          Sign in
-        </Link>
-      </p>
-    </Panel>
+    </AuthForm>
+  )
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense>
+      <SignUpForm />
+    </Suspense>
   )
 }

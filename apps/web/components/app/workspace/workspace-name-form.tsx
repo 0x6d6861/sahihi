@@ -3,9 +3,9 @@
 import { UpdateWorkspaceSchema } from "@sahihi/core"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { Button } from "@/components/app/button"
+import { Input } from "@/components/app/fields"
 import { toastManager } from "@/components/app/toast"
-import { Button } from "@/components/arc/button/button"
-import { Input } from "@/components/arc/input/input"
 import { organization } from "@/lib/auth-client"
 
 /** Rename the active workspace (better-auth `organization.update`, owners and admins). */
