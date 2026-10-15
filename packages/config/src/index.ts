@@ -95,6 +95,13 @@ const EnvSchema = z.object({
   SIGNING_LINK_TTL_DAYS: z.coerce.number().int().positive().default(14),
   SIGNING_PROVIDER: z.enum(["internal", "ca"]).default("internal"),
 
+  // ── Workspace icons (docs/auth.md → Account settings) ──
+  /**
+   * logo.dev publishable key (`pk_…`). The API fetches the logo of a workspace's website with it
+   * for the workspace switcher. Unset = no icons; the switcher shows initials.
+   */
+  LOGO_DEV_TOKEN: z.string().min(1).optional(),
+
   // ── AI document assistant (docs/ai-documents.md) ──
   /**
    * `provider:model`, e.g. `anthropic:claude-sonnet-5-5` or `openai:<model>`. Unset = the

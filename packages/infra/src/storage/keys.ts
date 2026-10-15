@@ -14,6 +14,7 @@
  *   org/{orgId}/envelopes/{envelopeId}/certificate[-{v}].pdf
  *   org/{orgId}/exports/{exportId}[-{v}].zip
  *   org/{orgId}/branding/logo-{version}.png
+ *   org/{orgId}/branding/icon-{version}.png
  *   user/{userId}/{signature|initials}-{version}.png
  *   user/{userId}/avatar-{version}.png
  *
@@ -61,6 +62,8 @@ export const keys = {
     `org/${orgId}/exports/${exportId}${v(version)}.zip`,
   /** Workspace logo (Settings → Workspace), served publicly by /api/branding. */
   logo: (orgId: string, version: string) => `org/${orgId}/branding/logo-${version}.png`,
+  /** The website's icon (Settings → Workspace), served to the workspace's own members only. */
+  icon: (orgId: string, version: string) => `org/${orgId}/branding/icon-${version}.png`,
   /** A user's saved signature or initials (Settings → Profile). Not workspace data. */
   savedSignature: (userId: string, kind: "signature" | "initials", version: string) =>
     `user/${userId}/${kind}-${version}.png`,

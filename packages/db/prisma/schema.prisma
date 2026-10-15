@@ -765,6 +765,10 @@ model WorkspaceSettings {
   embedOrigins   String[]     @default([])
   /// Workspace logo (PNG) in storage; Organization.logo holds its public /api/branding URL
   logoKey        String?
+  /// The workspace's own site, as an origin (normalizeWebsite)
+  website        String?
+  /// That site's icon as a 64 px PNG in storage: the active workspace's mark in the switcher
+  iconKey        String?
   /// Admins turn the AI document assistant on (docs/ai-documents.md). Off by default: document
   /// text goes to an external model provider.
   aiEnabled      Boolean      @default(false)

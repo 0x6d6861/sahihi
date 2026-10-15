@@ -155,6 +155,7 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
       dialog, envelope recipients side panel
 - [x] Optional signer accounts: post-signing invite, personal Signed documents page by verified
       email, users without a workspace (ADR 0062)
+- [x] Workspace website in Settings › Workspace; its logo.dev logo marks the active workspace in the switcher (`docs/auth.md`)
 
 ## Later
 

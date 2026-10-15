@@ -24,11 +24,14 @@ export function AppShell({
   user,
   organizations,
   activeOrganizationId,
+  activeIcon,
   children,
 }: {
   user: ShellUser
   organizations: ShellOrganization[]
   activeOrganizationId: string
+  /** Same-origin path of the active workspace's website icon, or null. */
+  activeIcon: string | null
   children: React.ReactNode
 }) {
   const pathname = usePathname()
@@ -39,7 +42,12 @@ export function AppShell({
 
   return (
     <UnreadCountProvider workspaceId={activeOrganizationId}>
-      <Shell user={user} organizations={organizations} activeOrganizationId={activeOrganizationId}>
+      <Shell
+        user={user}
+        organizations={organizations}
+        activeOrganizationId={activeOrganizationId}
+        activeIcon={activeIcon}
+      >
         {children}
       </Shell>
     </UnreadCountProvider>
@@ -50,11 +58,14 @@ function Shell({
   user,
   organizations,
   activeOrganizationId,
+  activeIcon,
   children,
 }: {
   user: ShellUser
   organizations: ShellOrganization[]
   activeOrganizationId: string
+  /** Same-origin path of the active workspace's website icon, or null. */
+  activeIcon: string | null
   children: React.ReactNode
 }) {
   const pathname = usePathname()
@@ -83,6 +94,7 @@ function Shell({
             <OrgSwitcher
               organizations={organizations}
               activeOrganizationId={activeOrganizationId}
+              activeIcon={activeIcon}
             />
           </div>
 

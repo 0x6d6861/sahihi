@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "bun:test"
+import { afterAll, beforeEach, describe, expect, test } from "bun:test"
 import { prisma } from "@sahihi/db"
 import { getQueues, platformStorage } from "@sahihi/infra"
 import { purgeUserStorage } from "../../worker/src/jobs/retention"
@@ -152,6 +152,109 @@ describe("workspace logo", () => {
 
   test("an unknown workspace has no logo", async () => {
     expect((await request(null, "/api/branding/nope/logo.png")).status).toBe(404)
+  })
+})
+
+describe("workspace website", () => {
+  const PNG_BYTES = Buffer.from(PNG.split(",")[1] as string, "base64")
+  const realFetch = globalThis.fetch
+  let asked: URL[] = []
+  beforeEach(() => {
+    asked = []
+    // logo.dev stand-in: a logo for acme.co.tz, none for anything else.
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(input instanceof Request ? input.url : String(input))
+      if (url.hostname !== "img.logo.dev") return realFetch(input, init)
+      asked.push(url)
+      return url.pathname === "/acme.co.tz"
+        ? new Response(PNG_BYTES, { headers: { "content-type": "image/png" } })
+        : new Response("not found", { status: 404 })
+    }) as typeof fetch
+  })
+  afterAll(() => {
+    globalThis.fetch = realFetch
+  })
+
+  test("saving it fetches the logo from logo.dev, served only for the active workspace", async () => {
+    const owner = await createSender("owner")
+    const member = await joinOrganization(owner, "member", "member")
+    const stranger = await createSender("stranger")
+
+    const put = await request(owner, "/api/workspace/website", {
+      method: "PUT",
+      json: { website: "https://www.acme.co.tz/about?x=1" },
+    })
+    expect(put.status).toBe(200)
+    const { website, icon } = (await put.json()) as { website: string; icon: string }
+    expect(website).toBe("https://www.acme.co.tz")
+    expect(icon).toMatch(/^\/api\/workspace\/icon\.png\?v=/)
+    expect(asked).toHaveLength(1)
+    expect(asked[0]?.pathname).toBe("/acme.co.tz")
+    expect(asked[0]?.searchParams.get("token")).toBe("pk_test")
+    expect(await (await request(member, "/api/workspace")).json()).toEqual({
+      website,
+      icon,
+      iconsAvailable: true,
+    })
+
+    const asMember = await request(member, icon)
+    expect(asMember.status).toBe(200)
+    expect(asMember.headers.get("content-type")).toBe("image/png")
+    expect(asMember.headers.get("cache-control")).toContain("private")
+    expect(Buffer.from(await asMember.arrayBuffer()).equals(PNG_BYTES)).toBe(true)
+    // Another workspace's session gets its own (none), never this one.
+    expect((await request(stranger, icon)).status).toBe(404)
+    expect((await request(null, icon)).status).toBe(401)
+
+    // Same website again: no new lookup.
+    await request(owner, "/api/workspace/website", {
+      method: "PUT",
+      json: { website: "www.acme.co.tz" },
+    })
+    expect(asked).toHaveLength(1)
+    // Refresh asks again and replaces it.
+    const refreshed = await request(owner, "/api/workspace/icon/refresh", { method: "POST" })
+    const { icon: next } = (await refreshed.json()) as { icon: string }
+    expect(next).not.toBe(icon)
+    expect(asked).toHaveLength(2)
+
+    // A site logo.dev doesn't know: no icon, initials in the switcher.
+    const other = await request(owner, "/api/workspace/website", {
+      method: "PUT",
+      json: { website: "other.co.tz" },
+    })
+    expect(await other.json()).toEqual({ website: "https://other.co.tz", icon: null })
+    expect((await request(owner, next)).status).toBe(404)
+
+    const cleared = await request(owner, "/api/workspace/website", {
+      method: "PUT",
+      json: { website: null },
+    })
+    expect(await cleared.json()).toEqual({ website: null, icon: null })
+  })
+
+  test("members can't change it or refresh the icon; bad input is refused", async () => {
+    const owner = await createSender("owner")
+    const member = await joinOrganization(owner, "member", "member")
+    const asMember = await request(member, "/api/workspace/website", {
+      method: "PUT",
+      json: { website: "acme.co.tz" },
+    })
+    expect(asMember.status).toBe(403)
+    expect((await request(member, "/api/workspace/icon/refresh", { method: "POST" })).status).toBe(
+      403,
+    )
+    expect((await request(owner, "/api/workspace/icon/refresh", { method: "POST" })).status).toBe(
+      400,
+    )
+    for (const website of ["ftp://acme.co.tz", "localhost:3000", "10.0.0.5"]) {
+      const bad = await request(owner, "/api/workspace/website", {
+        method: "PUT",
+        json: { website },
+      })
+      expect(bad.status).toBe(400)
+    }
+    expect(asked).toHaveLength(0)
   })
 })
 
