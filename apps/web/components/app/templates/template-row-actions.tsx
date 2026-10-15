@@ -3,6 +3,7 @@
 import { UpdateTemplateSchema } from "@sahihi/core"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { Button as ArcButton } from "@/components/app/button"
 import { ConfirmDialog, DialogActions } from "@/components/app/confirm-dialog"
 import {
   EllipsisVerticalIcon,
@@ -15,7 +16,6 @@ import {
 } from "@/components/app/icons"
 import { ItemLabelDialogs } from "@/components/app/labels/item-label-dialogs"
 import { toastManager } from "@/components/app/toast"
-import { Button as ArcButton } from "@/components/arc/button/button"
 import { Dialog, DialogContent } from "@/components/arc/dialog/dialog"
 import { type DropdownItem, DropdownMenu } from "@/components/arc/dropdown-menu/dropdown-menu"
 import { Input } from "@/components/arc/input/input"

@@ -3,19 +3,19 @@
 import { LOGO_MAX_HEIGHT, LOGO_MAX_WIDTH } from "@sahihi/core"
 import { useRouter } from "next/navigation"
 import { useRef, useState } from "react"
+import { Button } from "@/components/app/button"
 import { ConfirmDialog } from "@/components/app/confirm-dialog"
 import { ImageUpIcon, Trash2Icon } from "@/components/app/icons"
 import { toastManager } from "@/components/app/toast"
 import { Alert } from "@/components/arc/alert/alert"
-import { Button } from "@/components/arc/button/button"
 import { fitWithin } from "@/lib/account"
 import { api } from "@/lib/api"
 
-const ACCEPTED = ["image/png", "image/jpeg", "image/webp"]
-const MAX_SOURCE_BYTES = 5 * 1024 * 1024
+export const LOGO_ACCEPTED = ["image/png", "image/jpeg", "image/webp"]
+export const LOGO_MAX_SOURCE_BYTES = 5 * 1024 * 1024
 
 /** Resize into the logo box and re-encode as PNG: storage only ever holds a small, clean PNG. */
-async function toLogoPng(file: File): Promise<string> {
+export async function toLogoPng(file: File): Promise<string> {
   const bitmap = await createImageBitmap(file)
   const size = fitWithin(bitmap.width, bitmap.height, LOGO_MAX_WIDTH, LOGO_MAX_HEIGHT)
   const canvas = document.createElement("canvas")
@@ -50,8 +50,8 @@ export function WorkspaceLogo({
 
   async function upload(file: File) {
     setError(null)
-    if (!ACCEPTED.includes(file.type)) return setError("Use a PNG, JPG or WebP image.")
-    if (file.size > MAX_SOURCE_BYTES) return setError("Use an image under 5 MB.")
+    if (!LOGO_ACCEPTED.includes(file.type)) return setError("Use a PNG, JPG or WebP image.")
+    if (file.size > LOGO_MAX_SOURCE_BYTES) return setError("Use an image under 5 MB.")
     setPending(true)
     try {
       const dataUrl = await toLogoPng(file)
@@ -100,7 +100,7 @@ export function WorkspaceLogo({
           <input
             ref={inputRef}
             type="file"
-            accept={ACCEPTED.join(",")}
+            accept={LOGO_ACCEPTED.join(",")}
             className="sr-only"
             tabIndex={-1}
             aria-hidden

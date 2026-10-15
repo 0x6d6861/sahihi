@@ -3,10 +3,10 @@
 import type { FieldType } from "@sahihi/core"
 import dynamic from "next/dynamic"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Button } from "@/components/app/button"
 import { DocumentSwitcher } from "@/components/app/envelope/document-switcher"
 import { SettingsIcon } from "@/components/app/icons"
 import { toastManager } from "@/components/app/toast"
-import { Button } from "@/components/arc/button/button"
 import { Drawer, DrawerContent, DrawerTrigger } from "@/components/arc/drawer/drawer"
 import type { PDFEditorPageOverlayProps } from "@/components/extend/pdf-editor"
 // coss Skeleton: a block the size of the PDF viewer (Arc's skeleton draws text lines).

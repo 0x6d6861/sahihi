@@ -31,7 +31,9 @@ import { envelopes } from "./routes/envelopes"
 import { files } from "./routes/files"
 import { folders } from "./routes/folders"
 import { generatedDocuments } from "./routes/generated-documents"
+import { gettingStartedRoute } from "./routes/getting-started"
 import { me } from "./routes/me"
+import { myEnvelopes } from "./routes/my-envelopes"
 import { notifications } from "./routes/notifications"
 import { search } from "./routes/search"
 import { signing } from "./routes/signing"
@@ -122,12 +124,14 @@ export function createApp() {
     .route("/api/templates/:id/bulk-sends", startBulkSendRoute)
     .route("/api/bulk-sends", bulkSends)
     .route("/api/billing", billing)
+    .route("/api/me/envelopes", myEnvelopes)
     .route("/api/me", me)
     .route("/api/account", account)
     .route("/api/notifications", notifications)
     .route("/api/activity", activity)
     .route("/api/avatars", avatars)
     .route("/api/workspace", workspace)
+    .route("/api/getting-started", gettingStartedRoute)
     .route("/api/branding", branding)
     .route("/api/data", data)
     .route("/api/api-keys", apiKeys)

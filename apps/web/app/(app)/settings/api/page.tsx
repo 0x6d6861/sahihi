@@ -1,7 +1,7 @@
 import { type ApiKeyRow, ApiKeysPanel } from "@/components/app/developer/api-keys-panel"
 import { EmbedOriginsForm } from "@/components/app/developer/embed-origins-form"
 import { WebhookIcon } from "@/components/app/icons"
-import { Panel } from "@/components/app/panel"
+import { SettingsSection } from "@/components/app/settings/settings-section"
 import { AddWebhookButton } from "@/components/app/webhooks/add-webhook-button"
 import { EndpointCard, type WebhookEndpointRow } from "@/components/app/webhooks/endpoint-card"
 import { Alert } from "@/components/arc/alert/alert"
@@ -31,7 +31,7 @@ export default async function ApiSettingsPage() {
   const endpoints = webhooks.data?.items ?? []
   return (
     <div className="flex flex-col gap-6">
-      <Panel
+      <SettingsSection
         title="API keys"
         description={
           <>
@@ -41,13 +41,13 @@ export default async function ApiSettingsPage() {
         }
       >
         <ApiKeysPanel keys={keys.data?.items ?? []} />
-      </Panel>
-      <Panel
+      </SettingsSection>
+      <SettingsSection
         title="Embedded signing"
         description="Show a signing URL from the API in an iframe on these sites."
       >
         <EmbedOriginsForm initial={embedding.data?.origins ?? []} />
-      </Panel>
+      </SettingsSection>
       <section id="webhooks" className="flex scroll-mt-6 flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-col gap-1">
@@ -59,14 +59,14 @@ export default async function ApiSettingsPage() {
           <AddWebhookButton />
         </div>
         {endpoints.length === 0 ? (
-          <Panel>
+          <SettingsSection>
             <EmptyState
               className="md:py-10"
               icon={<WebhookIcon aria-hidden />}
               title="No webhooks yet"
               description="Add an endpoint to sync completed agreements into your ERP, CRM or storage."
             />
-          </Panel>
+          </SettingsSection>
         ) : (
           endpoints.map((endpoint) => <EndpointCard key={endpoint.id} endpoint={endpoint} />)
         )}

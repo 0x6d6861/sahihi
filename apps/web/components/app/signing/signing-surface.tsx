@@ -3,14 +3,14 @@
 import { CONSENT_TEXT, CONSENT_VERSION, documentsSummary, offersSavedSignature } from "@sahihi/core"
 import dynamic from "next/dynamic"
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
+import { Button } from "@/components/app/button"
 import { ConfirmDialog } from "@/components/app/confirm-dialog"
 import { AttachmentsList } from "@/components/app/envelope/attachments-list"
 import { DocumentSwitcher } from "@/components/app/envelope/document-switcher"
 import { ArrowDownIcon, CheckIcon } from "@/components/app/icons"
-import { Panel } from "@/components/app/panel"
 import { toastManager } from "@/components/app/toast"
 import { Alert } from "@/components/arc/alert/alert"
-import { Button } from "@/components/arc/button/button"
+import { Avatar } from "@/components/arc/avatar/avatar"
 import { Checkbox } from "@/components/arc/checkbox/checkbox"
 import { Input } from "@/components/arc/input/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/arc/popover/popover"
@@ -38,6 +38,7 @@ import {
   isFilled,
   isImageField,
   nextFieldToFill,
+  orderFields,
   type SignerField,
   type SignerValue,
   type SignerValues,
@@ -294,6 +295,7 @@ export function SigningSurface({
   const [submitting, setSubmitting] = useState(false)
   const [declineReason, setDeclineReason] = useState("")
   const [declineOpen, setDeclineOpen] = useState(false)
+  const [termsUpdated, setTermsUpdated] = useState(false)
 
   // Signed in as this recipient? Offer the signature and initials saved in Settings → Profile.
   // Signed-out signers (and embedded iframes, which get no cookie) get a 401 and nothing changes.
@@ -435,12 +437,7 @@ export function SigningSurface({
       if (body?.error === "consent_outdated") {
         // The wording changed since this page loaded (a new deploy). Only a reload shows the new
         // text, so the signer must review it and sign again.
-        toastManager.add({
-          title: "The signing terms were updated",
-          description: "Please review them and sign again.",
-          type: "warning",
-        })
-        setTimeout(() => window.location.reload(), 2500)
+        setTermsUpdated(true)
       } else if (body?.error === "missing_required_fields" && body.fieldIds) {
         setMissing(new Set(body.fieldIds))
         const first = fields.find((f) => body.fieldIds?.includes(f.id))
@@ -476,125 +473,208 @@ export function SigningSurface({
   const captureField = capture ? fields.find((f) => f.id === capture.fieldId) : null
   const logoPath = brandingLogoPath(session.envelope.organization.logo)
 
+  // The side list: the fields this signer fills, in reading order (auto-filled ones excluded).
+  const ownFields = orderFields(fields).filter((f) => !isAutoField(f))
+  const left = progress.total - progress.done
+
   return (
     <SurfaceContext.Provider value={ctx}>
       <div className="flex flex-col gap-4">
-        <Panel
-          headingLevel={1}
-          title={session.envelope.title}
-          description={`${session.envelope.sender.name} (${session.envelope.organization.name}) asked you to sign ${documentsSummary(documents.map((d) => d.name))}.`}
-          actions={
-            logoPath && (
+        <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            {logoPath && (
               // Logos are drawn for white backgrounds (emails), so they sit on paper in dark mode too.
-              <span className="on-paper rounded-lg bg-background px-2 py-1">
+              <span className="on-paper shrink-0 rounded-lg bg-background px-2 py-1">
                 {/* biome-ignore lint/performance/noImgElement: same-origin branding route */}
                 <img
                   src={logoPath}
                   alt={session.envelope.organization.name}
-                  className="h-8 w-auto max-w-40 object-contain"
+                  className="h-8 w-auto max-w-32 object-contain"
                 />
               </span>
-            )
-          }
-        >
-          {session.envelope.message && (
-            <p className="whitespace-pre-line text-sm">{session.envelope.message}</p>
-          )}
-          {session.attachments.length > 0 && (
-            <div className="flex flex-col gap-2 pt-1">
-              <p className="font-medium text-sm">
-                Supporting files{" "}
-                <span className="font-normal text-muted-foreground">(to read, not to sign)</span>
+            )}
+            <div className="flex min-w-0 flex-col">
+              <h1 className="truncate font-medium text-lg" title={session.envelope.title}>
+                {session.envelope.title}
+              </h1>
+              <p className="truncate text-muted-foreground text-sm">
+                From {session.envelope.sender.name} · {session.envelope.organization.name}
               </p>
-              <AttachmentsList
-                attachments={session.attachments}
-                source={{ kind: "signer", base }}
-              />
             </div>
-          )}
-        </Panel>
-
-        <div className="sticky top-0 z-10 flex flex-wrap items-center gap-3 rounded-2xl border bg-background p-3">
-          <div className="w-40">
-            <Progress value={progress.done} max={progress.total || 1} />
           </div>
-          <span className="text-muted-foreground text-sm tabular-nums" aria-live="polite">
-            {progress.done} of {progress.total} required
-          </span>
-          <span className="ml-auto">
+          {/* Sticky on phones, so "Next field" is always one tap away. */}
+          <div className="sticky top-0 z-10 flex shrink-0 items-center gap-4 bg-background py-1 max-md:-mx-1 max-md:px-1">
+            <div className="flex w-36 flex-col gap-1.5">
+              <span className="text-muted-foreground text-xs tabular-nums" aria-live="polite">
+                {progress.done} of {progress.total} required done
+              </span>
+              <Progress value={progress.done} max={progress.total || 1} />
+            </div>
             <Button
-              variant="secondary"
-              size="sm"
+              variant={complete ? "secondary" : "primary"}
               disabled={!next}
               onClick={() => next && goTo(next)}
             >
               <ArrowDownIcon aria-hidden />
-              {complete ? "Next optional field" : "Next field"}
-            </Button>
-          </span>
-        </div>
-
-        {documents.length > 1 && (
-          <DocumentSwitcher
-            documents={documents}
-            value={activeDocument?.id ?? ""}
-            onValueChange={(id) => {
-              setActiveDocumentId(id)
-              setActiveId(null)
-            }}
-            accessory={(id) => {
-              const left = remainingOn(id)
-              return left > 0 ? (
-                <span className="text-muted-foreground tabular-nums">{left}</span>
-              ) : (
-                <CheckIcon aria-label="Done" className="size-3.5 text-success-foreground" />
-              )
-            }}
-          />
-        )}
-
-        <div className="h-[70dvh] min-h-96 overflow-hidden rounded-2xl border">
-          {fileError ? (
-            <div className="p-4">
-              <Alert tone="danger" title="The document could not be loaded">
-                Refresh to try again.
-              </Alert>
-            </div>
-          ) : fileUrl ? (
-            <SigningViewer
-              key={activeDocument?.id}
-              src={fileUrl}
-              fileName={activeDocument?.name ?? "document.pdf"}
-              handleRef={viewerRef}
-              renderPageOverlay={renderPageOverlay}
-            />
-          ) : (
-            <Skeleton className="size-full" />
-          )}
-        </div>
-
-        <Panel>
-          {missing.size > 0 && !complete && (
-            <Alert tone="warning" title="Some required fields are empty">
-              They're outlined in red. Use “Next field” to go through them.
-            </Alert>
-          )}
-          <Checkbox
-            label={CONSENT_TEXT}
-            checked={consent}
-            onCheckedChange={(c) => setConsent(c === true)}
-          />
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Button variant="ghost" disabled={submitting} onClick={() => setDeclineOpen(true)}>
-              Decline to sign
-            </Button>
-            <Button onClick={submit} loading={submitting} disabled={!consent}>
-              {complete
-                ? "Finish signing"
-                : `Finish signing (${progress.total - progress.done} left)`}
+              {complete ? "Next optional field" : "Go to next field"}
             </Button>
           </div>
-        </Panel>
+        </header>
+
+        {/* Phones: message, document, finish. From lg: the document beside a side column. */}
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:grid-rows-[auto_1fr] lg:items-start">
+          <section
+            aria-label="From the sender"
+            className="flex flex-col gap-5 rounded-2xl border bg-card p-5 lg:col-start-2 lg:row-start-1"
+          >
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-2.5">
+                <Avatar name={session.envelope.sender.name} size="sm" />
+                <div className="flex min-w-0 flex-col">
+                  <span className="truncate font-medium text-sm">
+                    {session.envelope.sender.name}
+                  </span>
+                  <span className="truncate text-muted-foreground text-xs">
+                    asked you to sign {documentsSummary(documents.map((d) => d.name))}
+                  </span>
+                </div>
+              </div>
+              {session.envelope.message && (
+                <p className="whitespace-pre-line rounded-xl bg-muted/60 px-3.5 py-3 text-sm">
+                  {session.envelope.message}
+                </p>
+              )}
+            </div>
+
+            {ownFields.length > 0 && (
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center justify-between pb-1.5 text-sm">
+                  <h2 className="font-medium">Your fields</h2>
+                  <span className="text-muted-foreground tabular-nums">
+                    {left > 0 ? `${left} left` : "All done"}
+                  </span>
+                </div>
+                <ul className="flex flex-col gap-1">
+                  {ownFields.map((f) => {
+                    const filled = isFilled(f, values)
+                    const label = f.label || FIELD_LABELS[f.type]
+                    return (
+                      <li key={f.id}>
+                        <button
+                          type="button"
+                          onClick={() => goTo(f)}
+                          className={cn(
+                            "press flex w-full items-center gap-3 rounded-lg px-3 py-2 text-start text-sm outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
+                            activeId === f.id && "bg-primary/10",
+                            missing.has(f.id) && !filled && "text-destructive-foreground",
+                          )}
+                        >
+                          <span className="flex min-w-0 flex-1 flex-col">
+                            <span className="truncate">{label}</span>
+                            <span className="text-muted-foreground text-xs">
+                              {f.required ? "Required" : "Optional"}
+                              {documents.length > 1
+                                ? ` · ${documents.find((d) => d.id === f.envelopeDocumentId)?.name ?? ""}`
+                                : ""}
+                              {` · page ${f.page}`}
+                            </span>
+                          </span>
+                          {filled ? (
+                            <CheckIcon
+                              aria-label="Done"
+                              className="size-4 text-success-foreground"
+                            />
+                          ) : null}
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            )}
+
+            {session.attachments.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <p className="font-medium text-sm">
+                  Supporting files{" "}
+                  <span className="font-normal text-muted-foreground">(to read, not to sign)</span>
+                </p>
+                <AttachmentsList
+                  attachments={session.attachments}
+                  source={{ kind: "signer", base }}
+                />
+              </div>
+            )}
+          </section>
+
+          <div className="flex min-w-0 flex-col gap-3 lg:col-start-1 lg:row-span-2 lg:row-start-1">
+            {documents.length > 1 && (
+              <DocumentSwitcher
+                documents={documents}
+                value={activeDocument?.id ?? ""}
+                onValueChange={(id) => {
+                  setActiveDocumentId(id)
+                  setActiveId(null)
+                }}
+                accessory={(id) => {
+                  const remaining = remainingOn(id)
+                  return remaining > 0 ? (
+                    <span className="text-muted-foreground tabular-nums">{remaining}</span>
+                  ) : (
+                    <CheckIcon aria-label="Done" className="size-3.5 text-success-foreground" />
+                  )
+                }}
+              />
+            )}
+            <div className="h-[70dvh] min-h-96 overflow-hidden rounded-2xl border bg-muted lg:h-[calc(100dvh-10rem)]">
+              {fileError ? (
+                <div className="p-4">
+                  <Alert tone="danger" title="The document could not be loaded">
+                    Refresh to try again.
+                  </Alert>
+                </div>
+              ) : fileUrl ? (
+                <SigningViewer
+                  key={activeDocument?.id}
+                  src={fileUrl}
+                  fileName={activeDocument?.name ?? "document.pdf"}
+                  handleRef={viewerRef}
+                  renderPageOverlay={renderPageOverlay}
+                />
+              ) : (
+                <Skeleton className="size-full" />
+              )}
+            </div>
+          </div>
+
+          <section
+            aria-label="Finish"
+            className="flex flex-col gap-4 rounded-2xl border bg-card p-5 lg:sticky lg:top-4 lg:col-start-2 lg:row-start-2"
+          >
+            {missing.size > 0 && !complete && (
+              <Alert tone="warning" title="Some required fields are empty">
+                They're outlined in red. Use “Go to next field” to go through them.
+              </Alert>
+            )}
+            <Checkbox
+              label={CONSENT_TEXT}
+              checked={consent}
+              onCheckedChange={(c) => setConsent(c === true)}
+            />
+            <Button className="w-full" onClick={submit} loading={submitting} disabled={!consent}>
+              {complete ? "Finish signing" : `Finish signing (${left} left)`}
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full"
+              disabled={submitting}
+              onClick={() => setDeclineOpen(true)}
+            >
+              Decline to sign
+            </Button>
+          </section>
+        </div>
+
         <ConfirmDialog
           open={declineOpen}
           onOpenChange={setDeclineOpen}
@@ -612,6 +692,17 @@ export function SigningSurface({
             onChange={(e) => setDeclineReason(e.target.value)}
           />
         </ConfirmDialog>
+        {/* The consent wording changed since this page loaded (a new deploy): the signer reloads to
+            read the new text, then signs again. A dialog, not a toast: they must act on it. */}
+        <ConfirmDialog
+          open={termsUpdated}
+          onOpenChange={setTermsUpdated}
+          title="The signing terms were updated"
+          description="Reload the page to read the new wording, then sign again. What you filled in isn't kept."
+          confirmLabel="Reload"
+          tone="primary"
+          onConfirm={() => window.location.reload()}
+        />
       </div>
 
       <SignatureCaptureDialog

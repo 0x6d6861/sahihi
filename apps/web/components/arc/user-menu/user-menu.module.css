@@ -98,3 +98,8 @@
   .trigger, .chevron, .dot, .dot::before, .dot::after, .segment, .thumb, .item, .icon { transition: none; }
   .spinner { animation-duration: 2.4s; }
 }
+
+/* sahihi patch (ADR 0059): translucent like the menus, 32px rows (already), --radius-popover panel. */
+.panel { --menu-radius: var(--radius-popover); --menu-line: color-mix(in oklab, var(--foreground) 5%, transparent); background: color-mix(in oklab, var(--surface-raised) 70%, transparent); -webkit-backdrop-filter: blur(40px) saturate(1.5); backdrop-filter: blur(40px) saturate(1.5); }
+.highlight { background: color-mix(in oklab, var(--foreground) 10%, transparent); }
+@media (prefers-reduced-transparency: reduce) { .panel { background: var(--surface-raised); -webkit-backdrop-filter: none; backdrop-filter: none; } }

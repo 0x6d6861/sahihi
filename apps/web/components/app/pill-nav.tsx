@@ -3,7 +3,7 @@
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react"
 import { LayoutGroup, motion, useReducedMotion } from "motion/react"
 import Link from "next/link"
-import { Badge } from "@/components/arc/badge/badge"
+import { Badge } from "@/components/app/badge"
 import { motionTokens } from "@/components/arc/lib/motion-tokens"
 import { Tooltip } from "@/components/arc/tooltip/tooltip"
 import { cn } from "@/lib/utils"

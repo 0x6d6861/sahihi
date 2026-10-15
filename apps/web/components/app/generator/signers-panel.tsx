@@ -10,11 +10,11 @@ import {
   SignersDefinitionSchema,
 } from "@sahihi/core"
 import { useEffect, useRef, useState } from "react"
+import { Button } from "@/components/app/button"
 import { useAutosave } from "@/components/app/field-editor/use-autosave"
 import { XIcon } from "@/components/app/icons"
 import { Panel } from "@/components/app/panel"
 import { Alert } from "@/components/arc/alert/alert"
-import { Button } from "@/components/arc/button/button"
 import { Checkbox } from "@/components/arc/checkbox/checkbox"
 import { DropdownMenu } from "@/components/arc/dropdown-menu/dropdown-menu"
 import { Input } from "@/components/arc/input/input"

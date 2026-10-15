@@ -198,7 +198,7 @@ export function SigningDemo() {
           <span className="px-[1em] py-[0.25em] text-(--dm-text-2)">Type</span>
           <span className="px-[1em] py-[0.25em] text-(--dm-text-2)">Upload</span>
         </div>
-        <div className="relative mt-[0.8em] h-[7.5em] rounded-[0.7em] border border-(--dm-line) bg-(--dm-paper)">
+        <div className="relative mt-[0.8em] h-[7.5em] rounded-[0.9em] border border-(--dm-line) bg-(--dm-paper)">
           <Scrawl className="absolute left-[16%] top-[14%] w-[66%] text-[#1a1a1a]" />
           <span className="absolute bottom-[1.6em] left-[1.2em] text-[0.7em] text-[#9a9a9a]">
             ×

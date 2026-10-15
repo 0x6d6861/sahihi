@@ -3,9 +3,10 @@
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useCallback, useEffect, useState } from "react"
-import { Panel } from "@/components/app/panel"
+import { AuthDivider, AuthForm } from "@/components/app/auth/auth-form"
+import { Button } from "@/components/app/button"
+import { KeyRoundIcon } from "@/components/app/icons"
 import { Alert } from "@/components/arc/alert/alert"
-import { Button } from "@/components/arc/button/button"
 import { Input } from "@/components/arc/input/input"
 import { PasswordField } from "@/components/arc/password-field/password-field"
 import { signIn } from "@/lib/auth-client"
@@ -74,7 +75,22 @@ function SignInForm() {
   }
 
   return (
-    <Panel title="Sign in" headingLevel={1} className="w-full max-w-sm">
+    <AuthForm
+      title="Sign in"
+      description={
+        <>
+          New to Sahihi?{" "}
+          <Link href="/sign-up" className="text-foreground underline-offset-4 hover:underline">
+            Create an account
+          </Link>
+        </>
+      }
+    >
+      <Button variant="secondary" className="w-full" loading={passkeyPending} onClick={withPasskey}>
+        <KeyRoundIcon />
+        Sign in with a passkey
+      </Button>
+      <AuthDivider>or with email</AuthDivider>
       <form className="flex flex-col gap-4" onSubmit={onSubmit}>
         {error && <Alert tone="danger" title={error} />}
         <Input label="Email" name="email" type="email" autoComplete="email webauthn" required />
@@ -96,21 +112,7 @@ function SignInForm() {
           Sign in
         </Button>
       </form>
-      <div className="flex items-center gap-3 text-muted-foreground text-xs" aria-hidden>
-        <span className="h-px flex-1 bg-border" />
-        or
-        <span className="h-px flex-1 bg-border" />
-      </div>
-      <Button variant="secondary" className="w-full" loading={passkeyPending} onClick={withPasskey}>
-        Sign in with a passkey
-      </Button>
-      <p className="text-center text-muted-foreground text-sm">
-        New to Sahihi?{" "}
-        <Link href="/sign-up" className="text-foreground underline-offset-4 hover:underline">
-          Create an account
-        </Link>
-      </p>
-    </Panel>
+    </AuthForm>
   )
 }
 

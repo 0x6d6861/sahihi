@@ -8,9 +8,9 @@ import {
   TemplateNameSchema,
 } from "@sahihi/core"
 import { useEffect, useId, useRef, useState } from "react"
+import { Button } from "@/components/app/button"
 import { DialogActions } from "@/components/app/confirm-dialog"
 import { DIALOG_WITH_POPOVERS, RevealPopovers } from "@/components/app/dialog-popovers"
-import { Button } from "@/components/arc/button/button"
 import { Dialog, DialogContent } from "@/components/arc/dialog/dialog"
 import { Input } from "@/components/arc/input/input"
 import { ApiError } from "@/lib/api"

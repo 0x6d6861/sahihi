@@ -2,9 +2,9 @@
 
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { Button } from "@/components/app/button"
 import { ButtonLink } from "@/components/app/button-link"
 import { ConfirmDialog } from "@/components/app/confirm-dialog"
-import { Button } from "@/components/arc/button/button"
 import { ApiError, api } from "@/lib/api"
 import { useGenerator } from "./generator-context"
 

@@ -1,11 +1,12 @@
 import path from "node:path"
 import { expect, type Page, test } from "@playwright/test"
 import { linkFromEmail } from "./mailpit"
+import { createWorkspace } from "./onboarding"
 
 /**
  * Multi-document envelopes (ADR 0037), through the real UI: one document uploaded on the
  * All files, a second uploaded from the draft editor's "Add document", a supporting CSV,
- * a signature field on each document → send → the signer switches documents with "Next field",
+ * a signature field on each document → send → the signer switches documents with "Go to next field",
  * sees the supporting file, signs both → the worker finalizes both → downloads and /verify list both.
  */
 
@@ -37,8 +38,7 @@ test("an envelope with two documents and a supporting file is signed and finaliz
   await page.goto(await linkFromEmail(sender.email, /https?:\/\/[^\s"<>]+verify-email[^\s"<>]+/))
   await page.waitForURL(/\/onboarding/)
   await settle(page)
-  await page.getByLabel("Workspace name").fill(`Multi Ltd ${run}`)
-  await page.getByRole("button", { name: "Continue" }).click()
+  await createWorkspace(page, `Multi Ltd ${run}`)
   // Onboarding lands on All files, the home page (ADR 0038).
   await page.waitForURL(/\/files/)
 
@@ -144,8 +144,8 @@ test("an envelope with two documents and a supporting file is signed and finaliz
     await expect(dialog).toBeHidden()
   }
   await sign(true)
-  // "Next field" moves to the second document.
-  await signerPage.getByRole("button", { name: /Next field/ }).click()
+  // "Go to next field" moves to the second document.
+  await signerPage.getByRole("button", { name: /next field/i }).click()
   await expect(
     signerPage.getByRole("group", { name: "Documents" }).getByRole("button", { name: /^2\./ }),
   ).toHaveAttribute("aria-pressed", "true")

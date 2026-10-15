@@ -3,9 +3,9 @@
 import type { InvitationState, OrgRole } from "@sahihi/core"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { Badge } from "@/components/app/badge"
 import { MailIcon, XIcon } from "@/components/app/icons"
 import { toastManager } from "@/components/app/toast"
-import { Badge } from "@/components/arc/badge/badge"
 import { type DropdownItem, DropdownMenu } from "@/components/arc/dropdown-menu/dropdown-menu"
 import {
   Table,

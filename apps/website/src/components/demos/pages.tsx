@@ -65,7 +65,7 @@ function Button({
   }[kind]
   return (
     <span
-      className={`inline-flex h-[3.05em] shrink-0 items-center gap-[0.55em] rounded-[0.7em] px-[1.15em] text-[0.97em] ${look} ${className}`}
+      className={`inline-flex h-[3.05em] shrink-0 items-center gap-[0.55em] rounded-[0.9em] px-[1.15em] text-[0.97em] ${look} ${className}`}
     >
       {icon && <Icon name={icon} className="text-[1.15em]" />}
       {children}
@@ -105,7 +105,7 @@ function TopBar({ active = "All files" }: { active?: string }) {
     <div className="flex h-[4.45em] shrink-0 items-center gap-[0.9em] border-b border-(--dm-line) bg-(--dm-card) px-[1.65em]">
       <Logo />
       <span className="h-[1.4em] w-px bg-(--dm-line)" />
-      <span className="flex h-[2.5em] items-center gap-[0.55em] rounded-[0.7em] border border-(--dm-line) px-[0.85em] text-[0.97em]">
+      <span className="flex h-[2.5em] items-center gap-[0.55em] rounded-[0.9em] border border-(--dm-line) px-[0.85em] text-[0.97em]">
         <Icon name="building" className="text-(--dm-text-2)" />
         {sample.workspace}
         <Icon name="chevronDown" className="text-[0.8em] text-(--dm-text-2)" />
@@ -152,42 +152,38 @@ function Check() {
 
 /* ── All files ─────────────────────────────────────────────────── */
 
-const stateIcon: Record<string, ReactNode> = {
-  done: <Icon name="checkCircle" className="text-[1.1em] text-(--dm-success)" />,
-  progress: <Icon name="hourglass" className="text-[1.05em] text-(--dm-tone-0)" />,
-  draft: <Icon name="draft" className="text-[1.05em] text-(--dm-text-2)" />,
+const badgeTone = {
+  neutral: "bg-(--dm-muted) text-(--dm-text-2)",
+  info: "bg-(--dm-tone-0)/10 text-(--dm-tone-0)",
+  success: "bg-(--dm-success-bg) text-(--dm-success)",
 }
+
+/* Name | Type | Status | Recipients | Added | ⋮, as in the app's list view (its ADR 0058 redesign). */
+const filesCols = "grid-cols-[2.4em_1fr_7.6em_9.6em_16em_8.6em_1.6em]"
 
 export function FilesScreen() {
   return (
     <div className="flex h-full flex-col bg-(--dm-canvas)">
       <TopBar />
       <div className="mx-auto flex w-[75.5%] flex-col pt-[2.2em]">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-[1.95em] leading-[1.2] tracking-[-0.01em]">All files</p>
-            <p className="mt-[0.3em] text-[0.97em] text-(--dm-text-2)">
-              {sample.files.length} items
-            </p>
-          </div>
+        <div className="flex items-center justify-between">
+          <p className="flex items-baseline gap-[0.6em]">
+            <span className="text-[1.95em] leading-[1.2] tracking-[-0.01em]">All files</span>
+            <span className="text-[0.97em] text-(--dm-text-2)">{sample.files.length} items</span>
+          </p>
           <div className="flex gap-[0.55em]">
-            <Button icon="folderPlus" kind="ghost">
-              Create folder
-            </Button>
-            <Button icon="sparkles" kind="ghost">
-              Draft with AI
-            </Button>
-            <Button icon="plus">New envelope</Button>
-            <Button icon="upload" kind="primary">
-              Upload document
+            <Button icon="folderPlus" className="px-[0.95em]" />
+            <Button icon="upload">Upload document</Button>
+            <Button icon="plus" kind="primary">
+              New envelope
             </Button>
           </div>
         </div>
-        <div className="mt-[2.2em] flex h-[3.3em] w-full items-center gap-[0.75em] rounded-full bg-(--dm-muted) px-[1.1em] text-[0.97em] text-(--dm-text-3)">
-          <Icon name="search" className="text-[1.15em]" />
-          Search documents, envelopes, templates and folders
-        </div>
-        <div className="mt-[1.1em] flex items-center gap-[0.55em]">
+        <div className="mt-[2.2em] flex items-center gap-[0.55em]">
+          <span className="flex h-[3.05em] w-[22em] items-center gap-[0.75em] rounded-[0.9em] bg-(--dm-muted) px-[1em] text-[0.97em] text-(--dm-text-3)">
+            <Icon name="search" className="text-[1.15em]" />
+            Search files
+          </span>
           {["Type", "Status", "People", "Added"].map((c) => (
             <span
               key={c}
@@ -197,26 +193,29 @@ export function FilesScreen() {
               <Icon name="chevronDown" className="text-[0.8em] text-(--dm-text-2)" />
             </span>
           ))}
-          <span className="ml-auto flex rounded-[0.7em] border border-(--dm-line) bg-(--dm-muted) p-[0.2em] text-[0.97em]">
+          <span className="ml-auto flex rounded-[0.9em] border border-(--dm-line) bg-(--dm-muted) p-[0.2em] text-[0.97em]">
             <span className="rounded-[0.5em] bg-(--dm-card) px-[0.85em] py-[0.35em] shadow-sm">
               List
             </span>
             <span className="px-[0.85em] py-[0.35em] text-(--dm-text-3)">Grid</span>
           </span>
         </div>
-        <div className="mt-[2.2em] rounded-[1.25em] border border-(--dm-line) bg-(--dm-card) px-[0.85em] pb-[0.85em]">
+        <div className="mt-[1.6em] rounded-[1.35em] border border-(--dm-line) bg-(--dm-card) px-[0.85em] pb-[0.85em]">
           {/* Font size on the labels, not the row: the columns are in em and must match the rows'. */}
-          <div className="grid h-[3.6em] grid-cols-[2.4em_1fr_15em_10.8em_9.6em_1.6em] items-center px-[0.9em] text-(--dm-text-2) [&>span]:text-[0.97em]">
+          <div
+            className={`grid h-[3.6em] ${filesCols} items-center px-[0.9em] text-(--dm-text-2) [&>span]:text-[0.97em]`}
+          >
             <Check />
             <span>Name</span>
-            <span>Details</span>
-            <span>Owner</span>
+            <span>Type</span>
+            <span>Status</span>
+            <span>Recipients</span>
             <span>Added</span>
           </div>
           {sample.files.map((f) => (
             <div
               key={f.name}
-              className="grid h-[3.5em] grid-cols-[2.4em_1fr_15em_10.8em_9.6em_1.6em] items-center border-t border-(--dm-line) px-[0.9em]"
+              className={`grid h-[3.5em] ${filesCols} items-center border-t border-(--dm-line) px-[0.9em]`}
             >
               <Check />
               <span className="flex min-w-0 items-center gap-[0.85em]">
@@ -227,15 +226,22 @@ export function FilesScreen() {
                 ) : (
                   <Icon name="mail" className="text-[1.2em] text-(--dm-text-2)" />
                 )}
-                <span className="flex min-w-0 items-center gap-[0.45em] text-[0.97em]">
-                  <span className="truncate">{f.name}</span>
-                  {stateIcon[f.state]}
-                </span>
+                <span className="truncate pe-[1em] text-[0.97em]">{f.name}</span>
               </span>
-              <span className="truncate pe-[1em] text-[0.97em] text-(--dm-text-2)">{f.sub}</span>
-              <span className="flex items-center gap-[0.5em] text-[0.97em] text-(--dm-text-2)">
-                <Avatar small />
-                {sample.user.name}
+              <span className="text-[0.97em] text-(--dm-text-2)">
+                {f.kind === "pdf" ? "Document" : "Envelope"}
+              </span>
+              <span>
+                {f.status && (
+                  <span
+                    className={`rounded-full px-[0.7em] py-[0.2em] text-[0.8em] ${badgeTone[f.status.tone]}`}
+                  >
+                    {f.status.label}
+                  </span>
+                )}
+              </span>
+              <span className="truncate pe-[1em] text-[0.97em] text-(--dm-text-2)">
+                {f.recipients}
               </span>
               <span className="text-[0.97em] text-(--dm-text-2)">{sample.added}</span>
               <Icon name="more" className="text-(--dm-text-2)" />
@@ -259,7 +265,7 @@ function ViewerBar({ page, zoom }: { page: string; zoom: string }) {
         <Icon name="rotateCcw" />
         <span className="h-[1.1em] w-px bg-(--dm-line)" />
         <Icon name="zoomOut" />
-        <span className="flex w-[6.5em] items-center justify-between rounded-[0.7em] border border-(--dm-strong) px-[0.6em] py-[0.25em] text-(--dm-text)">
+        <span className="flex w-[6.5em] items-center justify-between rounded-[0.9em] border border-(--dm-strong) px-[0.6em] py-[0.25em] text-(--dm-text)">
           {zoom}
           <Icon name="updown" className="text-[0.8em]" />
         </span>
@@ -302,7 +308,7 @@ export function EnvelopeScreen() {
         </div>
         <div
           {...settle(0, 200)}
-          className="mt-[1.7em] rounded-[1.25em] border border-(--dm-line) bg-(--dm-card) p-[1.65em]"
+          className="mt-[1.7em] rounded-[1.35em] border border-(--dm-line) bg-(--dm-card) p-[1.65em]"
         >
           <p className="text-[1.1em]">Signed and certified</p>
           <p className="mt-[0.3em] text-[0.97em] text-(--dm-text-2)">
@@ -320,19 +326,19 @@ export function EnvelopeScreen() {
             </span>
           </div>
         </div>
-        <div className="mt-[2.3em] inline-flex w-fit rounded-[0.7em] border border-(--dm-line) bg-(--dm-muted) p-[0.3em] text-[0.97em]">
+        <div className="mt-[2.3em] inline-flex w-fit rounded-[0.9em] border border-(--dm-line) bg-(--dm-muted) p-[0.3em] text-[0.97em]">
           <span className="rounded-[0.5em] bg-(--dm-card) px-[1em] py-[0.45em] text-(--dm-ink) shadow-sm">
             Documents
           </span>
           <span className="px-[1em] py-[0.45em] text-(--dm-text-2)">Recipients 3</span>
           <span className="px-[1em] py-[0.45em] text-(--dm-text-2)">Activity 13</span>
         </div>
-        <div className="mt-[3em] rounded-[1.25em] border border-(--dm-line) bg-(--dm-card) p-[1.65em]">
+        <div className="mt-[3em] rounded-[1.35em] border border-(--dm-line) bg-(--dm-card) p-[1.65em]">
           <p className="text-[1.1em]">{sample.ndaFile}</p>
           <p className="mt-[0.3em] text-[0.97em] text-(--dm-text-2)">
             3 pages · 6 fields · the originals, as sent for signing
           </p>
-          <div className="mt-[1.4em] overflow-hidden rounded-[0.7em] border border-(--dm-line)">
+          <div className="mt-[1.4em] overflow-hidden rounded-[0.9em] border border-(--dm-line)">
             <ViewerBar page="Page 1 of 3" zoom="166%" />
             <div className="bg-(--dm-muted) px-[1.6em] pt-[1.6em]">
               <div className="h-[20em] bg-(--dm-paper) px-[8%] pt-[5%] text-(--dm-paper-ink)">
@@ -369,7 +375,7 @@ export function DraftingScreen() {
         <Icon name="chevronLeft" className="text-(--dm-text-2)" />
         <span className="text-[1.1em]">{d.title}</span>
         <Badge>{d.version}</Badge>
-        <span className="ml-auto flex h-[3.05em] items-center rounded-[0.7em] bg-(--dm-accent) text-[0.97em] text-(--dm-on-accent)">
+        <span className="ml-auto flex h-[3.05em] items-center rounded-[0.9em] bg-(--dm-accent) text-[0.97em] text-(--dm-on-accent)">
           <span className="px-[1.1em]">Finalise</span>
           <span className="flex h-full items-center border-l border-(--dm-on-accent)/20 px-[0.8em]">
             <Icon name="chevronDown" className="text-[0.85em]" />
@@ -380,7 +386,7 @@ export function DraftingScreen() {
         {/* The assistant. */}
         <div className="flex w-[40%] shrink-0 flex-col border-r border-(--dm-line)">
           <div className="flex min-h-0 flex-1 flex-col gap-[1em] overflow-hidden p-[1.4em]">
-            <p className="ml-auto w-[88%] rounded-[1.25em] bg-(--dm-muted) px-[1.1em] py-[0.8em] text-[0.97em] leading-[1.5]">
+            <p className="ml-auto w-[88%] rounded-[1.35em] bg-(--dm-muted) px-[1.1em] py-[0.8em] text-[0.97em] leading-[1.5]">
               {sample.chat.ask}
             </p>
             <p className="flex gap-[0.5em] text-[0.8em] text-(--dm-text-3)">
@@ -391,7 +397,7 @@ export function DraftingScreen() {
             {/* The focus of this screen: it lands, then its choices (only where a Settle wraps it). */}
             <div
               {...settle(0, 200)}
-              className="overflow-hidden rounded-[1.25em] border border-(--dm-tone-0)/40 bg-(--dm-card)"
+              className="overflow-hidden rounded-[1.35em] border border-(--dm-tone-0)/40 bg-(--dm-card)"
             >
               <div className="flex flex-col gap-[0.3em] px-[1.1em] pt-[1em] pb-[0.9em]">
                 <div className="flex items-center gap-[0.6em] text-(--dm-text-3)">
@@ -408,7 +414,7 @@ export function DraftingScreen() {
                     <span
                       key={o}
                       {...settle(i, 380)}
-                      className="flex h-[2.75em] items-center gap-[1em] rounded-[0.7em] border border-(--dm-strong) px-[1em] text-[0.97em]"
+                      className="flex h-[2.75em] items-center gap-[1em] rounded-[0.9em] border border-(--dm-strong) px-[1em] text-[0.97em]"
                     >
                       <span className="text-[0.8em] text-(--dm-text-3)">{i + 1}</span>
                       {o}
@@ -419,10 +425,10 @@ export function DraftingScreen() {
               </div>
               <div className="flex flex-col gap-[0.6em] border-t border-(--dm-line) bg-(--dm-muted)/60 px-[1.1em] py-[0.9em]">
                 <span className="text-[0.88em]">Or type your own answer</span>
-                <span className="h-[2.7em] rounded-[0.7em] border border-(--dm-text) bg-(--dm-card)" />
+                <span className="h-[2.7em] rounded-[0.9em] border border-(--dm-text) bg-(--dm-card)" />
                 <div className="flex items-center justify-between text-[0.97em]">
                   <span className="px-[0.4em] text-(--dm-text-2)">Skip</span>
-                  <span className="flex items-center gap-[0.3em] rounded-[0.7em] bg-(--dm-disabled) px-[1.1em] py-[0.5em] text-white">
+                  <span className="flex items-center gap-[0.3em] rounded-[0.9em] bg-(--dm-disabled) px-[1.1em] py-[0.5em] text-white">
                     Answer <Icon name="chevronRight" className="text-[0.8em]" />
                   </span>
                 </div>
@@ -437,7 +443,7 @@ export function DraftingScreen() {
         {/* The document, as Preview shows it. */}
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex h-[6.5em] shrink-0 items-center border-b border-(--dm-line) px-[1.4em]">
-            <span className="flex rounded-[0.7em] border border-(--dm-line) bg-(--dm-muted) p-[0.3em] text-[0.97em]">
+            <span className="flex rounded-[0.9em] border border-(--dm-line) bg-(--dm-muted) p-[0.3em] text-[0.97em]">
               <span className="rounded-[0.5em] bg-(--dm-card) px-[1em] py-[0.45em] shadow-sm">
                 Preview
               </span>
@@ -505,7 +511,7 @@ function PlacedField({
     // The selected field drops into place, as if just placed (only where a Settle wraps it).
     <span {...(selected ? settle(0, 320, "pop") : {})} className="mt-[0.25em] block">
       <span
-        className="flex items-center justify-center gap-[0.3em] rounded-[0.7em] border-[0.13em] text-[0.6em]"
+        className="flex items-center justify-center gap-[0.3em] rounded-[0.9em] border-[0.13em] text-[0.6em]"
         style={{
           width,
           height,
@@ -567,7 +573,7 @@ export function EditorScreen() {
             <Icon name="chevronDown" className="text-[0.85em]" />
           </span>
         </span>
-        <span className="flex h-[2.75em] items-center gap-[0.5em] rounded-[0.7em] bg-(--dm-accent) px-[1.1em] text-[0.97em] text-(--dm-on-accent)">
+        <span className="flex h-[2.75em] items-center gap-[0.5em] rounded-[0.9em] bg-(--dm-accent) px-[1.1em] text-[0.97em] text-(--dm-on-accent)">
           <Icon name="send" /> Send
         </span>
       </div>
@@ -581,7 +587,7 @@ export function EditorScreen() {
               <Icon name="redo" />
               <span className="h-[1.1em] w-px bg-(--dm-line)" />
               <Icon name="zoomOut" />
-              <span className="flex w-[6.5em] items-center justify-between rounded-[0.7em] border border-(--dm-strong) px-[0.6em] py-[0.25em] text-(--dm-text)">
+              <span className="flex w-[6.5em] items-center justify-between rounded-[0.9em] border border-(--dm-strong) px-[0.6em] py-[0.25em] text-(--dm-text)">
                 100%
                 <Icon name="updown" className="text-[0.8em]" />
               </span>
@@ -619,7 +625,7 @@ export function EditorScreen() {
         <div className="flex w-[20.8%] shrink-0 flex-col border-l border-(--dm-line) text-[0.97em]">
           <div className="border-b border-(--dm-line) p-[1.1em]">
             <p>Recipient</p>
-            <span className="mt-[0.6em] flex h-[2.5em] items-center justify-between rounded-[0.7em] border border-(--dm-strong) px-[0.85em]">
+            <span className="mt-[0.6em] flex h-[2.5em] items-center justify-between rounded-[0.9em] border border-(--dm-strong) px-[0.85em]">
               {sample.user.name}
               <Icon name="updown" className="text-[0.8em] text-(--dm-text-2)" />
             </span>

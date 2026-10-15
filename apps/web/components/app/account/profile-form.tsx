@@ -3,8 +3,8 @@
 import { UpdateProfileSchema } from "@sahihi/core"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { Button } from "@/components/app/button"
 import { toastManager } from "@/components/app/toast"
-import { Button } from "@/components/arc/button/button"
 import { Input } from "@/components/arc/input/input"
 import { updateUser } from "@/lib/auth-client"
 

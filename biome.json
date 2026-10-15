@@ -50,5 +50,32 @@
     "parser": {
       "tailwindDirectives": true
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": [
+        "apps/web/**",
+        "!apps/web/components/app/button.tsx",
+        "!apps/web/components/app/button-link.tsx",
+        "!apps/web/components/app/split-button.tsx",
+        "!apps/web/components/app/badge.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@/components/arc/button/button": "Import Button from @/components/app/button (emerald primary, ADR 0060).",
+                  "@/components/arc/split-button/split-button": "Import SplitButton from @/components/app/split-button (ADR 0060).",
+                  "@/components/arc/badge/badge": "Import Badge from @/components/app/badge (info tone in blue, ADR 0060)."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

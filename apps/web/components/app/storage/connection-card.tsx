@@ -3,6 +3,8 @@
 import { DEFAULT_SYNC_FOLDER } from "@sahihi/core"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { Badge } from "@/components/app/badge"
+import { Button } from "@/components/app/button"
 import { ConfirmDialog, DialogActions } from "@/components/app/confirm-dialog"
 import {
   DownloadIcon,
@@ -13,8 +15,6 @@ import {
 } from "@/components/app/icons"
 import { toastManager } from "@/components/app/toast"
 import { Alert } from "@/components/arc/alert/alert"
-import { Badge } from "@/components/arc/badge/badge"
-import { Button } from "@/components/arc/button/button"
 import { Dialog, DialogContent } from "@/components/arc/dialog/dialog"
 import { DropdownMenu } from "@/components/arc/dropdown-menu/dropdown-menu"
 import { Input } from "@/components/arc/input/input"

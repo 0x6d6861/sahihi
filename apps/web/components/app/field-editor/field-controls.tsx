@@ -1,6 +1,7 @@
 "use client"
 
 import type { FieldType } from "@sahihi/core"
+import { Button } from "@/components/app/button"
 import {
   AtSignIcon,
   CalendarIcon,
@@ -11,7 +12,6 @@ import {
   TypeIcon,
   UserIcon,
 } from "@/components/app/icons"
-import { Button } from "@/components/arc/button/button"
 import { Checkbox } from "@/components/arc/checkbox/checkbox"
 import { Input } from "@/components/arc/input/input"
 import { Label } from "@/components/ui/label"

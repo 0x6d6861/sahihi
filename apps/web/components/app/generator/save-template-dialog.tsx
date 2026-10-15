@@ -1,9 +1,9 @@
 "use client"
 
 import { useState } from "react"
+import { Button } from "@/components/app/button"
 import { ButtonLink } from "@/components/app/button-link"
 import { DialogActions } from "@/components/app/confirm-dialog"
-import { Button } from "@/components/arc/button/button"
 import { Checkbox } from "@/components/arc/checkbox/checkbox"
 import { Dialog, DialogContent } from "@/components/arc/dialog/dialog"
 import { Input } from "@/components/arc/input/input"

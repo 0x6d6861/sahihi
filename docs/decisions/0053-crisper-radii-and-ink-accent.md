@@ -1,6 +1,6 @@
 # 0053: Crisper radii and an ink-blue accent
 
-- **Status:** accepted
+- **Status:** accepted; radii and accent superseded by 0058
 - **Date:** 2026-10-14
 
 ## Context

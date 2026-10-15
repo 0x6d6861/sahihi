@@ -2,7 +2,7 @@
 
 import type { NotificationType } from "@sahihi/core"
 import { useState } from "react"
-import { Panel } from "@/components/app/panel"
+import { SettingsSection } from "@/components/app/settings/settings-section"
 import { toastManager } from "@/components/app/toast"
 import { Switch } from "@/components/arc/switch/switch"
 import { api } from "@/lib/api"
@@ -37,7 +37,7 @@ export function NotificationPreferencesForm({ initial }: { initial: Notification
   return (
     <div className="flex flex-col gap-6">
       {groupPreferences(items).map((group) => (
-        <Panel key={group.group} title={group.title} description={group.description}>
+        <SettingsSection key={group.group} title={group.title} description={group.description}>
           <ul className="flex flex-col divide-y">
             {group.items.map((item) => {
               const id = `notification-${item.type}`
@@ -62,7 +62,7 @@ export function NotificationPreferencesForm({ initial }: { initial: Notification
               )
             })}
           </ul>
-        </Panel>
+        </SettingsSection>
       ))}
     </div>
   )

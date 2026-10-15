@@ -119,7 +119,8 @@ Conventions (`test/helpers.ts`):
 ## E2E (`apps/e2e`)
 
 `bun run test:e2e` runs the core journey through the real UI and real email:
-sign-up → verify email (Mailpit) → create workspace → upload a PDF → create envelope → add a
+sign-up → verify email (Mailpit) → create workspace (onboarding's first step, then "Skip for now"
+and "Not now": `tests/onboarding.ts`) → upload a PDF → create envelope → add a
 recipient → place a signature field → send → the signer opens the emailed link in a separate
 browser context, types a signature, consents and finishes → the worker stamps the PDF and issues
 the certificate → the public `/verify/<code>` page. It takes about 25 s.

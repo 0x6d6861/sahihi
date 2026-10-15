@@ -1,9 +1,9 @@
 "use client"
 
 import { useRef, useState } from "react"
+import { Button } from "@/components/app/button"
 import { MoveToFolderDialog } from "@/components/app/folders/move-to-folder-dialog"
 import { FolderInputIcon, XIcon } from "@/components/app/icons"
-import { Button } from "@/components/arc/button/button"
 import { itemKey } from "@/lib/file-moves"
 import { pluralize } from "@/lib/format"
 import { cn } from "@/lib/utils"

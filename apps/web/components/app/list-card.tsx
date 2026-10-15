@@ -6,9 +6,9 @@ import { cn } from "@/lib/utils"
 
 /**
  * A tile in the Documents, Envelopes and Templates grids, in the manner of a Google Drive file
- * tile (ADR 0033, 0034, 0036): a tonal card with no border; a title row (type icon, title, ⋮
- * menu); the top of the document's first page in a 4:3 window (the page image, a PDF mark on white
- * paper until the worker has rendered it); and one quiet footer line. The whole card is a link; the
+ * tile (ADR 0033, 0034, 0036): a tonal card with no border; the top of the document's first page
+ * in a 4:3 window (the page image, a PDF mark on white paper until the worker has rendered it); a
+ * title row (type icon, title, ⋮ menu); and one quiet footer line. The whole card is a link; the
  * menu sits above it. Hover darkens the card's tone and lifts it with Arc's raised shadow.
  */
 export function ListCard({
@@ -37,7 +37,7 @@ export function ListCard({
   return (
     <article
       className={cn(
-        "press-subtle relative isolate flex min-w-0 flex-col rounded-2xl bg-muted px-1.5 pb-1.5",
+        "press-subtle relative isolate flex min-w-0 flex-col rounded-2xl bg-muted px-1.5 pt-1.5 pb-1.5",
         // Hover tone: a foreground tint under the content, so it works on the muted card in both themes.
         "before:-z-10 before:pointer-events-none before:absolute before:inset-0 before:rounded-2xl before:bg-foreground/0 before:transition-colors has-[a:hover]:before:bg-foreground/5",
         "has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring",
@@ -45,20 +45,6 @@ export function ListCard({
         "[@media(hover:hover)]:has-[a:hover]:shadow-(--shadow-raised)",
       )}
     >
-      <div className="flex h-11 min-w-0 items-center gap-2.5 ps-2 pe-0">
-        {icon}
-        <Link
-          href={href}
-          title={title}
-          className="min-w-0 flex-1 truncate font-medium text-sm outline-none after:absolute after:inset-0 after:rounded-2xl"
-        >
-          {title}
-          {titleExtra}
-        </Link>
-        {/* Above the card-wide link overlay, so the trigger stays clickable. */}
-        <div className="relative z-10">{menu}</div>
-      </div>
-
       {/* The window shows the top of the page, like Drive. The page image is the paper (dimmed a
           little in dark); until it loads, the window keeps the card's own tone so dark mode doesn't
           flash white. Without an image yet, the PDF mark sits on white paper. */}
@@ -89,9 +75,23 @@ export function ListCard({
         />
       </div>
 
+      <div className="flex h-10 min-w-0 items-center gap-2.5 ps-2 pe-0 pt-1">
+        {icon}
+        <Link
+          href={href}
+          title={title}
+          className="min-w-0 flex-1 truncate font-medium text-sm outline-none after:absolute after:inset-0 after:rounded-2xl"
+        >
+          {title}
+          {titleExtra}
+        </Link>
+        {/* Above the card-wide link overlay, so the trigger stays clickable. */}
+        <div className="relative z-10">{menu}</div>
+      </div>
+
       {/* Clicks fall through to the card's link; only the named icons (status tooltips, avatars)
           sit above it so they can be hovered. */}
-      <div className="pointer-events-none relative z-10 flex h-9 min-w-0 items-center gap-2 px-2 pt-1.5 text-muted-foreground text-xs [&_[role=group]]:pointer-events-auto [&_[role=img]]:pointer-events-auto">
+      <div className="pointer-events-none relative z-10 flex h-7 min-w-0 items-center gap-2 px-2 text-muted-foreground text-xs [&_[role=group]]:pointer-events-auto [&_[role=img]]:pointer-events-auto">
         {footer}
       </div>
     </article>

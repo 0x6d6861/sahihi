@@ -3,9 +3,9 @@
 import { labelColorName } from "@sahihi/core"
 import { useRouter } from "next/navigation"
 import { type ReactNode, useEffect, useRef, useState, useTransition } from "react"
+import { Button } from "@/components/app/button"
 import { CheckIcon } from "@/components/app/icons"
 import { ColorDot } from "@/components/app/labels/labels"
-import { Button } from "@/components/arc/button/button"
 import { DropdownMenu } from "@/components/arc/dropdown-menu/dropdown-menu"
 import { SearchField } from "@/components/arc/search-field/search-field"
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control"
@@ -137,9 +137,9 @@ const selectedOption = (chip: SearchChip) =>
 
 /**
  * The search section of the Documents, Envelopes and Templates pages, in the manner of Google
- * Drive (ADR 0035, 0036): a wide filled search bar, then one row of filter chips (each an Arc
+ * Drive (ADR 0035, 0036): a filled search field, then filter chips (one row with it from `md`) (each an Arc
  * `DropdownMenu` that shows its value and fills once set; the first item clears it), "Clear
- * filters" once any is set, and the List / Grid switch at the end (when the page has one). The
+ * filters" once any is set, and the List / Grid switch or the page's `actions` at the end. The
  * page owns the state: it gets the typed query (debounced), chip changes and layout changes
  * through callbacks. The Inbox uses it without a layout (ADR 0041).
  */
@@ -153,6 +153,7 @@ export function ListSearch({
   onClearChips,
   layout,
   onLayoutChange,
+  actions,
   pending = false,
 }: {
   label: string
@@ -166,6 +167,8 @@ export function ListSearch({
   /** Omit both for a list without a List / Grid switch. */
   layout?: ListLayout
   onLayoutChange?: (layout: ListLayout) => void
+  /** Buttons at the end of the row, for a list that acts on what it shows ("Mark all read"). */
+  actions?: ReactNode
   pending?: boolean
 }) {
   const [q, setQ] = useState(query)
@@ -183,8 +186,13 @@ export function ListSearch({
   const filtered = chips.some((chip) => chip.current !== undefined)
 
   return (
-    <search aria-label={label} className="flex flex-col gap-3" aria-busy={pending}>
-      <div>
+    <search
+      aria-label={label}
+      className="flex flex-col gap-3 md:flex-row md:items-center"
+      aria-busy={pending}
+    >
+      {/* One row from md: search, chips, layout (the design's toolbar). Stacked on phones. */}
+      <div className="md:w-80 md:shrink-0">
         <SearchField
           appearance="filled"
           label={label}
@@ -193,7 +201,7 @@ export function ListSearch({
           onValueChange={onSearch}
         />
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
         {/* One row that scrolls sideways on narrow screens, like Drive's chips; the page never does. */}
         <div className="-mx-1 -my-1 flex min-w-0 flex-1 items-center gap-2 overflow-x-auto px-1 py-1 [scrollbar-width:none]">
           {chips.map((chip) => {
@@ -231,6 +239,7 @@ export function ListSearch({
             </Button>
           )}
         </div>
+        {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
         {layout && onLayoutChange && (
           <div className="shrink-0">
             <SegmentedControl

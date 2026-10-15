@@ -1,8 +1,8 @@
 "use client"
 
 import { useState } from "react"
+import { Button } from "@/components/app/button"
 import { PlusIcon } from "@/components/app/icons"
-import { Button } from "@/components/arc/button/button"
 import { type AwsRoleSetup, ConnectionFormDialog } from "./connection-form-dialog"
 
 export function AddConnectionButton({

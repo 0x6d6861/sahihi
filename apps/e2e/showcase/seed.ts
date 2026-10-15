@@ -1,6 +1,7 @@
 import { type APIRequestContext, type Browser, expect, type Page } from "@playwright/test"
 import { MAILPIT_URL } from "../env"
 import { linkFromEmail } from "../tests/mailpit"
+import { createWorkspace } from "../tests/onboarding"
 
 const SIGN_LINK = /https?:\/\/[^\s"<>]+\/sign\/[A-Za-z0-9_-]{43}/
 
@@ -309,8 +310,7 @@ export async function createAccount(page: Page) {
   )
   await page.waitForURL(/\/onboarding/)
   await settle(page)
-  await page.getByLabel("Workspace name").fill(workspace)
-  await page.getByRole("button", { name: "Continue" }).click()
+  await createWorkspace(page, workspace)
   await page.waitForURL(/\/files/)
 }
 

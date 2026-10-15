@@ -1,6 +1,7 @@
 import path from "node:path"
 import { expect, type Page, test } from "@playwright/test"
 import { linkFromEmail } from "./mailpit"
+import { createWorkspace } from "./onboarding"
 
 /**
  * The core journey, through the real UI and real email (Mailpit):
@@ -43,8 +44,7 @@ test("sender signs up, sends an envelope; the signer signs; a certificate is iss
   // ── Create the workspace ──
   await page.waitForURL(/\/onboarding/)
   await settle(page)
-  await page.getByLabel("Workspace name").fill(`E2E Ltd ${run}`)
-  await page.getByRole("button", { name: "Continue" }).click()
+  await createWorkspace(page, `E2E Ltd ${run}`)
   // Onboarding lands on All files, the home page (ADR 0038).
   await page.waitForURL(/\/files/)
 

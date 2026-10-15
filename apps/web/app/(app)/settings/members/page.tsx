@@ -1,10 +1,11 @@
 import { canCancelInvitations, invitableRoles, invitationState } from "@sahihi/core"
+import Link from "next/link"
 import { redirect } from "next/navigation"
 import { MailIcon } from "@/components/app/icons"
 import { type InvitationRow, InvitationsTable } from "@/components/app/members/invitations-table"
 import { InviteDialog } from "@/components/app/members/invite-dialog"
 import { type MemberRow, MembersTable } from "@/components/app/members/members-table"
-import { Panel } from "@/components/app/panel"
+import { SettingsSection } from "@/components/app/settings/settings-section"
 import { EmptyState } from "@/components/arc/empty-state/empty-state"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/arc/tabs/tabs"
 import { apiServer, getServerSession } from "@/lib/api-server"
@@ -25,9 +26,12 @@ export const metadata = { title: "Members" }
  * `@sahihi/core` so the page only offers what the server accepts.
  */
 export default async function MembersPage() {
-  const [session, { data: org }] = await Promise.all([
+  const [session, { data: org }, { data: billing }] = await Promise.all([
     getServerSession(),
     apiServer<FullOrganization>("/auth/organization/get-full-organization"),
+    apiServer<{ plan: { name: string }; seats: { used: number; limit: number | null } }>(
+      "/billing",
+    ),
   ])
   if (!session) redirect("/sign-in")
   const viewer = org?.members.find((m) => m.userId === session.user.id)
@@ -47,7 +51,20 @@ export default async function MembersPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h2 className="font-medium text-lg">Members</h2>
+        <div className="flex flex-col gap-1">
+          <h2 className="font-medium text-lg">Members</h2>
+          {billing && (
+            <p className="text-muted-foreground text-sm tabular-nums">
+              {billing.seats.limit === null
+                ? `${billing.seats.used} seats in use on the ${billing.plan.name} plan`
+                : `${billing.seats.used} of ${billing.seats.limit} seats used on the ${billing.plan.name} plan`}
+              . A pending invitation holds a seat.{" "}
+              <Link href="/settings/billing" className="underline underline-offset-4">
+                Plan &amp; usage
+              </Link>
+            </p>
+          )}
+        </div>
         {roles.length > 0 && <InviteDialog roles={roles} />}
       </div>
 
@@ -63,12 +80,12 @@ export default async function MembersPage() {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="members" className="pt-4">
-          <Panel>
+          <SettingsSection>
             <MembersTable members={members} viewer={viewer} />
-          </Panel>
+          </SettingsSection>
         </TabsContent>
         <TabsContent value="invitations" className="pt-4">
-          <Panel>
+          <SettingsSection>
             {invitations.length === 0 ? (
               <EmptyState
                 className="md:py-10"
@@ -87,7 +104,7 @@ export default async function MembersPage() {
                 canCancel={canCancel}
               />
             )}
-          </Panel>
+          </SettingsSection>
         </TabsContent>
       </Tabs>
     </div>

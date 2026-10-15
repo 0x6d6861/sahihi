@@ -29,3 +29,7 @@
 @media (prefers-reduced-motion: reduce) {
   .content, .content[data-state="closed"] { transform: none; transition: opacity var(--duration-instant) var(--ease-standard); }
 }
+
+/* sahihi patch (ADR 0059): translucent like the menus. */
+.content { border-radius: var(--radius-popover); background: color-mix(in oklab, var(--surface-raised) 70%, transparent); -webkit-backdrop-filter: blur(40px) saturate(1.5); backdrop-filter: blur(40px) saturate(1.5); }
+@media (prefers-reduced-transparency: reduce) { .content { background: var(--surface-raised); -webkit-backdrop-filter: none; backdrop-filter: none; } }

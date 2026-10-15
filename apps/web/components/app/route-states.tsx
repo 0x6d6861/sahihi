@@ -1,9 +1,9 @@
 "use client"
 
 import { useEffect } from "react"
+import { Button } from "@/components/app/button"
 import { ButtonLink } from "@/components/app/button-link"
 import { FileSearchIcon, TriangleAlertIcon } from "@/components/app/icons"
-import { Button } from "@/components/arc/button/button"
 import { EmptyState } from "@/components/arc/empty-state/empty-state"
 
 /**

@@ -2,8 +2,8 @@
 
 import { DOCUMENT_UPLOAD_ACCEPT, MAX_UPLOAD_BYTES } from "@sahihi/core"
 import { useState } from "react"
+import { Button } from "@/components/app/button"
 import { FileTextIcon, UploadIcon } from "@/components/app/icons"
-import { Button } from "@/components/arc/button/button"
 import { Dialog, DialogContent, DialogTrigger } from "@/components/arc/dialog/dialog"
 import { Progress } from "@/components/arc/progress/progress"
 import { FileUpload } from "@/components/extend/file-upload"
@@ -52,13 +52,19 @@ export function UploadDropzone({
 }
 
 /** Header action: opens the drop zone in a dialog, which closes when the upload succeeds. */
-export function UploadDocument({ folderId }: { folderId?: string }) {
+export function UploadDocument({
+  folderId,
+  variant = "primary",
+}: {
+  folderId?: string
+  variant?: "primary" | "secondary"
+}) {
   const [open, setOpen] = useState(false)
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
+        <Button variant={variant}>
           <UploadIcon aria-hidden />
           Upload document
         </Button>

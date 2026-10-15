@@ -2,7 +2,7 @@
 
 import { LABEL_COLOR_PRESETS, labelColorName, normalizeLabelColor } from "@sahihi/core"
 import { forwardRef, useEffect, useState } from "react"
-import { Button } from "@/components/arc/button/button"
+import { Button } from "@/components/app/button"
 import {
   ColorPicker as ArcColorPicker,
   type ColorSwatch,

@@ -2,9 +2,9 @@
 
 import { useParams, useRouter } from "next/navigation"
 import { useState } from "react"
-import { Panel } from "@/components/app/panel"
+import { AuthForm } from "@/components/app/auth/auth-form"
+import { Button } from "@/components/app/button"
 import { Alert } from "@/components/arc/alert/alert"
-import { Button } from "@/components/arc/button/button"
 import { organization } from "@/lib/auth-client"
 import { HOME_HREF } from "@/lib/nav"
 
@@ -28,13 +28,11 @@ export default function AcceptInvitationPage() {
   }
 
   return (
-    <main className="flex min-h-dvh items-center justify-center p-4">
-      <Panel title="Join workspace" headingLevel={1} className="w-full max-w-sm">
-        {error && <Alert tone="danger" title={error} />}
-        <Button className="w-full" onClick={accept} loading={pending}>
-          Accept invitation
-        </Button>
-      </Panel>
-    </main>
+    <AuthForm title="Join workspace">
+      {error && <Alert tone="danger" title={error} />}
+      <Button className="w-full" onClick={accept} loading={pending}>
+        Accept invitation
+      </Button>
+    </AuthForm>
   )
 }

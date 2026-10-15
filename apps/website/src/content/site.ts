@@ -266,7 +266,7 @@ export const site = {
     items: [
       {
         q: "Do signers need an account?",
-        a: "No. Each signer gets their own link by email and signs in the browser. You can ask for a one-time code by email or SMS before they sign.",
+        a: "No. Each signer gets their own link by email and signs in the browser. You can ask for a one-time code by email or SMS before they sign. After signing, a signer can choose to create a free account to find everything sent to their email in one place; it's optional and separate from your workspace.",
       },
       {
         q: "Is an electronic signature legally binding?",
@@ -382,42 +382,47 @@ export const sample = {
   workspace: "Tana Freight Ltd",
   user: { name: "Achieng Otieno", initials: "AO" },
   inbox: 2,
-  /** All files, newest first. `state` picks the status icon after an envelope's name. */
+  /** All files, newest first, as the list view shows them: type, status badge, recipients. */
   files: [
     {
       name: "Board resolution — Athi River depot lease",
       kind: "envelope",
-      sub: "Envelope · Achieng Otieno and David Kariuki",
-      state: "draft",
+      recipients: "Achieng Otieno and David Kariuki",
+      status: { label: "Draft", tone: "neutral" },
     },
     {
       name: "Written Resolution of the Board of Directors.pdf",
       kind: "pdf",
-      sub: "Document",
-      state: "",
+      recipients: "",
+      status: null,
     },
     {
       name: "IT acceptable use policy — Njeri Wambui",
       kind: "envelope",
-      sub: "Envelope · Wanjiru Kamau and Njeri Wambui · 1 of 2 signed",
-      state: "progress",
+      recipients: "Wanjiru Kamau and Njeri Wambui",
+      status: { label: "1 of 2 signed", tone: "info" },
     },
-    { name: "IT Acceptable Use Policy.pdf", kind: "pdf", sub: "Document", state: "" },
+    { name: "IT Acceptable Use Policy.pdf", kind: "pdf", recipients: "", status: null },
     {
       name: "Offer letter — Juma Ochieng, Operations Coordinator",
       kind: "envelope",
-      sub: "Envelope · Achieng Otieno and Juma Ochieng · 1 of 2 signed",
-      state: "progress",
+      recipients: "Achieng Otieno and Juma Ochieng",
+      status: { label: "1 of 2 signed", tone: "info" },
     },
-    { name: "Offer of Employment.pdf", kind: "pdf", sub: "Document", state: "" },
+    { name: "Offer of Employment.pdf", kind: "pdf", recipients: "", status: null },
     {
       name: "Mutual NDA — Kilima Agro",
       kind: "envelope",
-      sub: "Envelope · Achieng Otieno + 2 more · 2 of 2 signed",
-      state: "done",
+      recipients: "Achieng Otieno + 2 more",
+      status: { label: "Completed", tone: "success" },
     },
-    { name: "Mutual Non-Disclosure Agreement.pdf", kind: "pdf", sub: "Document", state: "" },
-  ],
+    { name: "Mutual Non-Disclosure Agreement.pdf", kind: "pdf", recipients: "", status: null },
+  ] as {
+    name: string
+    kind: "envelope" | "pdf"
+    recipients: string
+    status: { label: string; tone: "neutral" | "info" | "success" } | null
+  }[],
   added: "13 Oct 2026",
   /** The drafting conversation: what the person asked, what the assistant did, then its question. */
   chat: {

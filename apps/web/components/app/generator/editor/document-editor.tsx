@@ -3,6 +3,7 @@
 import type { VariableType } from "@sahihi/core"
 import { type Editor, EditorContent, useEditor, useEditorState } from "@tiptap/react"
 import { useCallback, useEffect, useRef, useState } from "react"
+import { Button } from "@/components/app/button"
 import { useAutosave } from "@/components/app/field-editor/use-autosave"
 import {
   BoldIcon,
@@ -17,7 +18,6 @@ import {
   UndoIcon,
 } from "@/components/app/icons"
 import { Alert } from "@/components/arc/alert/alert"
-import { Button } from "@/components/arc/button/button"
 import { DropdownMenu } from "@/components/arc/dropdown-menu/dropdown-menu"
 import { Input } from "@/components/arc/input/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/arc/popover/popover"

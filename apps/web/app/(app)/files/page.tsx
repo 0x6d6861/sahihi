@@ -10,7 +10,7 @@ import { DocumentTypeIcon } from "@/components/app/documents/document-type-icon"
 import { RefreshWhileConverting } from "@/components/app/documents/refresh-while-converting"
 import { EnvelopeCard, type EnvelopeItem } from "@/components/app/envelope/envelope-card"
 import { EnvelopeRowActions } from "@/components/app/envelope/envelope-row-actions"
-import { DetailsCell } from "@/components/app/files/details-cell"
+import { DetailsCell, StatusCell, TypeCell } from "@/components/app/files/details-cell"
 import {
   BreadcrumbDrops,
   DragCard,
@@ -20,6 +20,7 @@ import {
 } from "@/components/app/files/drag-items"
 import { FilesDnd } from "@/components/app/files/files-dnd"
 import { FilesToolbar } from "@/components/app/files/files-toolbar"
+import { GettingStarted, type GettingStartedData } from "@/components/app/files/getting-started"
 import { CreateFolderButton } from "@/components/app/folders/create-folder-button"
 import {
   FolderBreadcrumb,
@@ -28,13 +29,11 @@ import {
   FolderRows,
   type FoldersPageData,
 } from "@/components/app/folders/folder-section"
-import { FileSearchIcon, PlusIcon, SparklesIcon } from "@/components/app/icons"
+import { FileSearchIcon, PlusIcon } from "@/components/app/icons"
 import { ColorDot, ColorName, TagBadges } from "@/components/app/labels/labels"
 import { ListGrid } from "@/components/app/list-card"
 import { ListPagination } from "@/components/app/list-pagination"
 import { Panel } from "@/components/app/panel"
-import { Person } from "@/components/app/people"
-import { DocumentStatusIcon, EnvelopeStatusIcon } from "@/components/app/status-icon"
 import { TemplateCard, type TemplateItem } from "@/components/app/templates/template-card"
 import { TemplateRowActions } from "@/components/app/templates/template-row-actions"
 import { EnvelopeTypeIcon, TemplateTypeIcon } from "@/components/app/type-icons"
@@ -50,6 +49,7 @@ import {
 } from "@/components/ui/table"
 import { apiServer } from "@/lib/api-server"
 import { quotaBanner } from "@/lib/billing"
+import { DOCUMENT_STATUS_BADGE, ENVELOPE_STATUS_BADGE } from "@/lib/constants"
 import { recipientSummary, signingProgress } from "@/lib/envelope-list"
 import type { DropTarget, MovableItem } from "@/lib/file-moves"
 import { filesApiQuery, filesHref, hasFileFilters, parseFilesView } from "@/lib/files-list"
@@ -108,13 +108,14 @@ export default async function FilesPage({
     (await cookies()).get(LIST_LAYOUT_COOKIE.files)?.value,
   )
   const folderQuery = foldersApiQuery(view)
-  const [files, folders, { data: billing }] = await Promise.all([
+  const [files, folders, { data: billing }, { data: checklist }] = await Promise.all([
     apiServer<FilesPageData>(`/files?${filesApiQuery(view)}`),
     apiServer<FoldersPageData>(`/folders${folderQuery ? `?${folderQuery}` : ""}`),
     apiServer<{
       period: { end: string }
       envelopes: { used: number; limit: number | null; level: UsageLevel }
     }>("/billing"),
+    apiServer<GettingStartedData>("/getting-started"),
   ])
   // A deleted or foreign folder id, or a query the API refuses: start over at the top level.
   if ([files.status, folders.status].some((s) => s === 400 || s === 404)) redirect("/files")
@@ -219,17 +220,16 @@ export default async function FilesPage({
                 <FolderBreadcrumb rootLabel={ROOT} path={path} hrefFor={folderHref} />
               </BreadcrumbDrops>
             )}
-            <FolderHeading rootLabel={ROOT} current={current} searching={searching} />
-            {!blank && <p className="text-muted-foreground text-sm tabular-nums">{countLine}</p>}
+            <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-2">
+              <FolderHeading rootLabel={ROOT} current={current} searching={searching} />
+              {!blank && <p className="text-muted-foreground text-sm tabular-nums">{countLine}</p>}
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <CreateFolderButton parentId={current?.id} allTags={allTags} />
-            <ButtonLink variant="ghost" href="/generate">
-              <SparklesIcon aria-hidden />
-              Draft with AI
-            </ButtonLink>
+            <CreateFolderButton parentId={current?.id} allTags={allTags} appearance="icon" />
+            <UploadDocument folderId={current?.id} variant="secondary" />
             <ButtonLink
-              variant="secondary"
+              variant="primary"
               href={
                 current
                   ? `/envelopes/new?folder=${encodeURIComponent(current.id)}`
@@ -239,9 +239,13 @@ export default async function FilesPage({
               <PlusIcon aria-hidden />
               New envelope
             </ButtonLink>
-            <UploadDocument folderId={current?.id} />
           </div>
         </header>
+
+        {/* First steps, at the top level only (ADR 0061); hidden once done or dismissed. */}
+        {checklist && !checklist.dismissed && !checklist.complete && !current && !filtered && (
+          <GettingStarted data={checklist} />
+        )}
 
         {banner && (
           <Alert tone={banner.tone} title={banner.title}>
@@ -340,8 +344,9 @@ export default async function FilesPage({
                   <TableRow className="hover:bg-transparent">
                     <SelectHead />
                     <TableHead className="ps-3">Name</TableHead>
-                    <TableHead className="max-lg:hidden">Details</TableHead>
-                    <TableHead className="max-md:hidden">Owner</TableHead>
+                    <TableHead className="max-md:hidden">Type</TableHead>
+                    <TableHead className="max-md:hidden">Status</TableHead>
+                    <TableHead className="max-lg:hidden">Recipients</TableHead>
                     <TableHead className="max-md:hidden">Added</TableHead>
                     <TableHead className="w-0">
                       <span className="sr-only">Actions</span>
@@ -386,9 +391,9 @@ function rowFacts(item: FileItem, searching: boolean) {
         href: `/documents/${item.id}`,
         name: item.name,
         icon: <DocumentTypeIcon status={item.status} />,
-        status: item.status !== "READY" ? <DocumentStatusIcon status={item.status} /> : null,
-        owner: item.uploadedBy,
-        meta: ["Document", where, item.source ? `Prepared from ${item.source.name}` : null],
+        type: "Document",
+        status: item.status === "READY" ? null : DOCUMENT_STATUS_BADGE[item.status],
+        meta: [where, item.source ? `Prepared from ${item.source.name}` : null],
       }
     case "envelope": {
       const progress = signingProgress(item.recipients)
@@ -400,16 +405,13 @@ function rowFacts(item: FileItem, searching: boolean) {
             : `/envelopes/${item.id}`,
         name: item.title,
         icon: <EnvelopeTypeIcon />,
-        status: <EnvelopeStatusIcon status={item.status} />,
-        owner: item.createdBy,
-        meta: [
-          "Envelope",
-          where,
-          recipientSummary(item.recipients.map((r) => r.name)),
-          item.status !== "DRAFT" && progress.total > 0
-            ? `${progress.signed} of ${progress.total} signed`
-            : null,
-        ],
+        type: "Envelope",
+        // Moving along: how far it got, in the info tone. Otherwise the status itself.
+        status:
+          (item.status === "SENT" || item.status === "IN_PROGRESS") && progress.total > 0
+            ? { label: `${progress.signed} of ${progress.total} signed`, tone: "info" as const }
+            : ENVELOPE_STATUS_BADGE[item.status],
+        meta: [where, recipientSummary(item.recipients.map((r) => r.name))],
       }
     }
     case "template":
@@ -417,9 +419,9 @@ function rowFacts(item: FileItem, searching: boolean) {
         href: `/templates/${item.id}/use`,
         name: item.name,
         icon: <TemplateTypeIcon />,
+        type: "Template",
         status: null,
-        owner: item.createdBy,
-        meta: ["Template", where, documentsSummary(item.documents.map((d) => d.name))],
+        meta: [where, documentsSummary(item.documents.map((d) => d.name))],
       }
   }
 }
@@ -453,17 +455,15 @@ function FileRow({
               {f.name}
               <ColorName color={item.color} />
             </Link>
-            {f.status}
             <div className="hidden shrink-0 sm:flex">
               <TagBadges tags={item.tags} max={2} />
             </div>
           </div>
         </div>
       </TableCell>
+      <TypeCell>{f.type}</TypeCell>
+      <StatusCell status={f.status} />
       <DetailsCell text={f.meta.filter(Boolean).join(" · ")} />
-      <TableCell className="max-w-44 whitespace-nowrap text-muted-foreground max-md:hidden">
-        <Person person={f.owner} />
-      </TableCell>
       <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums max-md:hidden">
         <time dateTime={item.createdAt} title={formatDateTime(item.createdAt)}>
           {formatDate(item.createdAt)}

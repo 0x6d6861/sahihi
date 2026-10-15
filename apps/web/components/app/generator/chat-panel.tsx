@@ -17,8 +17,8 @@ import {
 } from "@assistant-ui/react"
 import { lastAssistantMessageIsCompleteWithToolCalls, type UIMessage } from "ai"
 import { useEffect, useMemo, useRef, useState } from "react"
+import { Button } from "@/components/app/button"
 import { ArrowUpIcon, LoaderIcon, StopIcon, XIcon } from "@/components/app/icons"
-import { Button } from "@/components/arc/button/button"
 import { Tooltip } from "@/components/arc/tooltip/tooltip"
 import { Button as IconButton } from "@/components/ui/button"
 import {

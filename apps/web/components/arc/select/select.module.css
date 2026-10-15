@@ -32,3 +32,9 @@
 @media (prefers-reduced-motion: reduce) { .trigger, .chevron, .item { transition: none; } .content { animation: select-fade var(--duration-instant) var(--ease-standard) both; } .content[data-state="closed"] { animation: select-fade-out var(--duration-instant) var(--ease-standard) both; } .indicator { animation: none; } }
 @keyframes select-fade { from { opacity: 0; } }
 @keyframes select-fade-out { to { opacity: 0; } }
+
+/* sahihi patch (ADR 0059): translucent list like the menus, 32px rows, --radius-xl rows. */
+.content { border-radius: var(--radius-popover); padding: 5px; background: color-mix(in oklab, var(--surface-raised) 70%, transparent); -webkit-backdrop-filter: blur(40px) saturate(1.5); backdrop-filter: blur(40px) saturate(1.5); }
+.item { min-height: 32px; border-radius: var(--radius-xl); }
+.item[data-highlighted] { background: color-mix(in oklab, var(--foreground) 10%, transparent); }
+@media (prefers-reduced-transparency: reduce) { .content { background: var(--surface-raised); -webkit-backdrop-filter: none; backdrop-filter: none; } }

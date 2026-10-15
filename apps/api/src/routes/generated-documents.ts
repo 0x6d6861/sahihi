@@ -222,12 +222,14 @@ export const generatedDocuments = new Hono<AppEnv>()
         updatedAt: true,
         createdById: true,
         createdBy: { select: { name: true, image: true } },
+        _count: { select: { versions: true } },
       },
     })
     const who = actor(c)
     return c.json({
-      items: items.map(({ createdById, ...d }) => ({
+      items: items.map(({ createdById, _count, ...d }) => ({
         ...d,
+        versions: _count.versions,
         canEdit: canEditGeneratedDocument(who, { createdById }),
       })),
     })

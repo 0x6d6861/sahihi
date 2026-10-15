@@ -2,7 +2,7 @@ import type { RetentionYears } from "@sahihi/core"
 import { DeleteWorkspace } from "@/components/app/data/delete-workspace"
 import { type ExportRow, ExportsPanel } from "@/components/app/data/exports-panel"
 import { RetentionForm } from "@/components/app/data/retention-form"
-import { Panel } from "@/components/app/panel"
+import { SettingsSection } from "@/components/app/settings/settings-section"
 import { Alert } from "@/components/arc/alert/alert"
 import { apiServer, getServerSession } from "@/lib/api-server"
 
@@ -35,19 +35,22 @@ export default async function DataPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Panel title="Retention" description="Files in your own storage stay until you remove them.">
+      <SettingsSection
+        title="Retention"
+        description="Files in your own storage stay until you remove them."
+      >
         <RetentionForm initial={settings.data?.retentionYears ?? null} />
-      </Panel>
+      </SettingsSection>
 
-      <Panel
+      <SettingsSection
         title="Export"
         description="Every sent envelope with its audit trail, PDFs and certificate, as a ZIP. Kept for 7 days."
       >
         <ExportsPanel exports={exports.data?.items ?? []} />
-      </Panel>
+      </SettingsSection>
 
       {isOwner && org.data && (
-        <Panel
+        <SettingsSection
           className="border-destructive/30"
           title="Delete workspace"
           description={`Permanently deletes ${org.data.name} and all of its data, files and members.`}
@@ -55,7 +58,7 @@ export default async function DataPage() {
           <div>
             <DeleteWorkspace id={org.data.id} name={org.data.name} />
           </div>
-        </Panel>
+        </SettingsSection>
       )}
     </div>
   )

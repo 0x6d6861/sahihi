@@ -2,9 +2,9 @@
 
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { Button } from "@/components/app/button"
 import { ConfirmDialog } from "@/components/app/confirm-dialog"
 import { toastManager } from "@/components/app/toast"
-import { Button } from "@/components/arc/button/button"
 import { organization } from "@/lib/auth-client"
 import { HOME_HREF } from "@/lib/nav"
 

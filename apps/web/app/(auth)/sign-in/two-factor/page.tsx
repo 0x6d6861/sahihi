@@ -4,9 +4,9 @@ import { BackupCodeSchema, TotpCodeSchema } from "@sahihi/core"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useState } from "react"
-import { Panel } from "@/components/app/panel"
+import { AuthForm } from "@/components/app/auth/auth-form"
+import { Button } from "@/components/app/button"
 import { Alert } from "@/components/arc/alert/alert"
-import { Button } from "@/components/arc/button/button"
 import { Checkbox } from "@/components/arc/checkbox/checkbox"
 import { Input } from "@/components/arc/input/input"
 import { OtpInput } from "@/components/arc/otp-input/otp-input"
@@ -59,15 +59,13 @@ function TwoFactorForm() {
   }
 
   return (
-    <Panel
+    <AuthForm
       title="Two-factor authentication"
       description={
         mode === "totp"
           ? "Enter the 6-digit code from your authenticator app."
           : "Enter one of the backup codes you saved. Each works once."
       }
-      headingLevel={1}
-      className="w-full max-w-sm"
     >
       <form className="flex flex-col gap-4" onSubmit={onSubmit}>
         {error && <Alert tone="danger" title={error} />}
@@ -103,7 +101,7 @@ function TwoFactorForm() {
           Back to sign in
         </Link>
       </div>
-    </Panel>
+    </AuthForm>
   )
 }
 

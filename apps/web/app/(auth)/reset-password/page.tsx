@@ -4,11 +4,11 @@ import { MIN_PASSWORD_LENGTH, ResetPasswordSchema } from "@sahihi/core"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useState } from "react"
+import { AuthForm } from "@/components/app/auth/auth-form"
+import { Button } from "@/components/app/button"
 import { ButtonLink } from "@/components/app/button-link"
-import { Panel } from "@/components/app/panel"
 import { toastManager } from "@/components/app/toast"
 import { Alert } from "@/components/arc/alert/alert"
-import { Button } from "@/components/arc/button/button"
 import { PasswordField } from "@/components/arc/password-field/password-field"
 import { authClient } from "@/lib/auth-client"
 
@@ -27,7 +27,7 @@ function ResetPasswordForm() {
 
   if (!token || params.get("error")) {
     return (
-      <Panel title="This link doesn't work" headingLevel={1} className="w-full max-w-sm">
+      <AuthForm title="This link doesn't work">
         <p className="text-muted-foreground text-sm">
           {params.get("error")
             ? "Reset links work once and for 1 hour. Ask for a new one."
@@ -36,7 +36,7 @@ function ResetPasswordForm() {
         <ButtonLink href="/forgot-password" variant="primary" className="w-full">
           Send a new link
         </ButtonLink>
-      </Panel>
+      </AuthForm>
     )
   }
 
@@ -65,11 +65,9 @@ function ResetPasswordForm() {
   }
 
   return (
-    <Panel
+    <AuthForm
       title="Choose a new password"
       description="You'll be signed out everywhere and can sign in again with it."
-      headingLevel={1}
-      className="w-full max-w-sm"
     >
       <form className="flex flex-col gap-4" onSubmit={onSubmit}>
         {error && <Alert tone="danger" title={error} />}
@@ -95,7 +93,7 @@ function ResetPasswordForm() {
           Back to sign in
         </Link>
       </p>
-    </Panel>
+    </AuthForm>
   )
 }
 

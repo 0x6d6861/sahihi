@@ -1,6 +1,6 @@
 import type { Plan, UsageLevel } from "@sahihi/core"
-import { Panel } from "@/components/app/panel"
-import { Badge } from "@/components/arc/badge/badge"
+import { Badge } from "@/components/app/badge"
+import { SettingsSection } from "@/components/app/settings/settings-section"
 import { MetricCard } from "@/components/arc/metric-card/metric-card"
 import { UsageMeter } from "@/components/arc/usage-meter/usage-meter"
 import {
@@ -44,7 +44,7 @@ export default async function BillingPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Panel
+      <SettingsSection
         title={
           <span className="flex flex-wrap items-center gap-2">
             {data.plan.name} plan <Badge size="sm">Current</Badge>
@@ -82,9 +82,9 @@ export default async function BillingPage() {
             hint={`Resets on ${resetsOn}. Each reply of the assistant in Drafting counts; editing and finalising don't.`}
           />
         </div>
-      </Panel>
+      </SettingsSection>
 
-      <Panel
+      <SettingsSection
         title="Plans"
         description="Plan changes are handled by the Sahihi team for now. Online payment is coming."
       >
@@ -123,7 +123,7 @@ export default async function BillingPage() {
             ))}
           </TableBody>
         </Table>
-      </Panel>
+      </SettingsSection>
     </div>
   )
 }

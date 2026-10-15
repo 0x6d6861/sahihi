@@ -2,11 +2,11 @@
 
 import type { SavedSignatureKind } from "@sahihi/core"
 import { useState } from "react"
+import { Button } from "@/components/app/button"
 import { ConfirmDialog } from "@/components/app/confirm-dialog"
 import { PenLineIcon, Trash2Icon } from "@/components/app/icons"
 import { SignatureCaptureDialog } from "@/components/app/signing/signature-capture-dialog"
 import { toastManager } from "@/components/app/toast"
-import { Button } from "@/components/arc/button/button"
 import { api } from "@/lib/api"
 
 export interface SavedSignatures {

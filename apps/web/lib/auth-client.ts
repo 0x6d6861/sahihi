@@ -28,4 +28,5 @@ export const {
   revokeSession,
   revokeOtherSessions,
   passkey,
+  getSession,
 } = authClient

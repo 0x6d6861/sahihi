@@ -239,3 +239,13 @@ Web (`components/app/envelope/sender-actions.tsx`, on sent envelopes):
 The finalize job (see `pdf-pipeline.md`) produces `signed.pdf` and `certificate.pdf`, then
 `envelope.completed` emails everyone fresh links to `/sign/<token>` (state `completed`, downloads).
 Senders download from `GET /api/envelopes/:id/downloads`.
+
+### Optional signer account (ADR 0062)
+
+On the `signed` and `completed` states (not when embedded), the signing page offers a free account:
+"Create a free account" stores the recipient's email in `sessionStorage` and opens
+`/sign-up?from=signing` (email prefilled, verification link back to `/signed`); "Continue without an
+account" hides the offer. Someone already signed in gets a link to `/signed`. On `/signed` the
+person sees every envelope sent to their verified email, downloads completed ones
+(`GET /api/me/envelopes/:recipientId/downloads`) and can have a fresh signing link emailed while
+it's their turn (`POST /api/me/envelopes/:recipientId/link`, the reminder's rules and cooldown).

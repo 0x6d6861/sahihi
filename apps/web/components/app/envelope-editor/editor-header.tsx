@@ -10,6 +10,7 @@ import type { IconSvgElement } from "@hugeicons/react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { Badge } from "@/components/app/badge"
 import {
   ActivityList,
   type AuditEventRow,
@@ -23,10 +24,9 @@ import {
   LayoutTemplateIcon,
 } from "@/components/app/icons"
 import { PillNav } from "@/components/app/pill-nav"
+import { SplitButton, type SplitButtonAction } from "@/components/app/split-button"
 import { SaveTemplateDialog } from "@/components/app/templates/save-template-dialog"
-import { Badge } from "@/components/arc/badge/badge"
 import { Drawer, DrawerContent } from "@/components/arc/drawer/drawer"
-import { SplitButton, type SplitButtonAction } from "@/components/arc/split-button/split-button"
 import { Tooltip } from "@/components/arc/tooltip/tooltip"
 import { Button } from "@/components/ui/button"
 import { ENVELOPE_STATUS_BADGE } from "@/lib/constants"

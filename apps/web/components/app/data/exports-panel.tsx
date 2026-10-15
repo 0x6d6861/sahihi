@@ -2,10 +2,10 @@
 
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { Badge } from "@/components/app/badge"
+import { Button } from "@/components/app/button"
 import { DownloadIcon, PackageIcon } from "@/components/app/icons"
 import { toastManager } from "@/components/app/toast"
-import { Badge } from "@/components/arc/badge/badge"
-import { Button } from "@/components/arc/button/button"
 import {
   Table,
   TableBody,

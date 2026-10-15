@@ -2,11 +2,11 @@
 
 import type { PreflightIssue } from "@sahihi/core"
 import { AlertList, AlertListItem } from "@/components/app/alert-list"
+import { Button } from "@/components/app/button"
 import { DialogActions } from "@/components/app/confirm-dialog"
 import { DIALOG_WITH_POPOVERS, RevealPopovers } from "@/components/app/dialog-popovers"
 import { SendIcon } from "@/components/app/icons"
 import { Alert } from "@/components/arc/alert/alert"
-import { Button } from "@/components/arc/button/button"
 import { DatePicker } from "@/components/arc/date-picker/date-picker"
 import { Dialog, DialogContent } from "@/components/arc/dialog/dialog"
 import { Input } from "@/components/arc/input/input"

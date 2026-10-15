@@ -3,7 +3,7 @@
 import { EmbedSettingsSchema } from "@sahihi/core"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { Button } from "@/components/arc/button/button"
+import { Button } from "@/components/app/button"
 import { Textarea } from "@/components/arc/textarea/textarea"
 import { ApiError, api } from "@/lib/api"
 

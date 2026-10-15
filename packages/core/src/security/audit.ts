@@ -26,6 +26,8 @@ export const AUDIT_EVENT_TYPES = [
   "recipient.link_opened",
   /** An embedded signing URL was issued through the API (docs/embedded-signing.md). */
   "recipient.link_issued",
+  /** The recipient asked for a fresh signing link from their own Sahihi account (ADR 0062). */
+  "recipient.link_requested",
   "recipient.otp_sent",
   "recipient.otp_verified",
   "recipient.otp_failed",

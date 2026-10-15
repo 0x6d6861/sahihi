@@ -3,9 +3,9 @@
 import { ForgotPasswordSchema } from "@sahihi/core"
 import Link from "next/link"
 import { useState } from "react"
-import { Panel } from "@/components/app/panel"
+import { AuthForm } from "@/components/app/auth/auth-form"
+import { Button } from "@/components/app/button"
 import { Alert } from "@/components/arc/alert/alert"
-import { Button } from "@/components/arc/button/button"
 import { Input } from "@/components/arc/input/input"
 import { authClient } from "@/lib/auth-client"
 
@@ -37,15 +37,13 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <Panel
+    <AuthForm
       title="Reset your password"
       description={
         sentTo
           ? undefined
           : "Enter the email you sign in with and we'll send you a link to choose a new password."
       }
-      headingLevel={1}
-      className="w-full max-w-sm"
     >
       {sentTo ? (
         <div className="flex flex-col gap-4">
@@ -71,6 +69,6 @@ export default function ForgotPasswordPage() {
           Sign in
         </Link>
       </p>
-    </Panel>
+    </AuthForm>
   )
 }

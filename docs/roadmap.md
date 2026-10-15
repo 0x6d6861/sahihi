@@ -143,6 +143,19 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
       in and out, health check, released-files log and webhook, unique keys for worker retries
 - [x] Google Drive and OneDrive sync destinations (SharePoint libraries later; `docs/storage.md` → Not in v1)
 
+## P8: Redesign, onboarding and signer accounts (`design/app/app.pen`)
+
+- [x] Taupe and emerald theme, small radius, compact controls in `app.css` (ADR 0058)
+- [x] App Button wrapper for emerald primary buttons; translucent menus patched into Arc (ADR 0059, 0060)
+- [x] Screens: shell and auth, All files, Inbox and Drafting, Settings, Envelopes, Signing and verify
+- [x] Marketing site: coded screens and `--dm-*` palette match the new theme
+- [x] Multi-step onboarding (workspace and logo, invite team, AI opt-in) and the Get started
+      checklist on All files (ADR 0061)
+- [x] Small gaps: seats on Members, AI switch in Settings › Workspace, ⌘K key hints, consent-updated
+      dialog, envelope recipients side panel
+- [x] Optional signer accounts: post-signing invite, personal Signed documents page by verified
+      email, users without a workspace (ADR 0062)
+
 ## Later
 
 - [ ] **CA integration** via `SigningProvider` (PAdES-B-LT), see `docs/certificates.md`

@@ -20,6 +20,9 @@ Component: $ARGUMENTS
        && bunx --bun shadcn@latest add @uiarc/<id> --yes; cp /tmp/components.json components.json
      ```
      Then pin any new dependency in `apps/web/package.json` to the exact installed version.
+     Reinstalling an item that carries a `sahihi patch (ADR …)` overwrites it: re-apply the patches
+     listed in `docs/ui.md` (e.g. the ADR 0059 menu block). Use Arc's Button through
+     `@/components/app/button` (ADR 0060).
    - **coss / Extend / shadcn:** `cd apps/web && bunx shadcn@latest add @coss/<name>` (or
      `@extend/<name>`, or plain `<name>`). If asked to overwrite existing files, answer **no**.
 3. Don't edit the installed files. Open them to learn the real export names and props (Arc takes
