@@ -25,7 +25,7 @@ const UnreadCountContext = createContext<UnreadCount>({
  * visible, and on focus, and tries to reopen the stream. A workspace switch starts it over. The
  * Inbox page calls `refresh` after its own changes so the badge follows at once. Polls are skipped
  * while a request is in flight (focus and visibilitychange often fire together), and only the
- * newest request's answer is applied.
+ * newest request's answer is applied, and not if a stream event arrived since it started.
  */
 export function UnreadCountProvider({
   workspaceId,
@@ -37,13 +37,16 @@ export function UnreadCountProvider({
   const [count, setCount] = useState<number | null>(null)
   const latest = useRef(0)
   const inFlight = useRef(false)
+  const pushed = useRef(0)
 
   const refresh = useCallback(async () => {
     const id = ++latest.current
+    const pushedAtStart = pushed.current
     inFlight.current = true
     try {
       const r = await api<{ count: number }>("/notifications/unread-count")
-      if (id !== latest.current) return null
+      // A count pushed over the stream since this request started is newer than its answer.
+      if (id !== latest.current || pushedAtStart !== pushed.current) return null
       setCount(r.count)
       return r.count
     } catch {
@@ -62,8 +65,13 @@ export function UnreadCountProvider({
     const open = () => {
       stream = new EventSource("/api/notifications/stream")
       stream.addEventListener("count", (e) => {
-        const { count } = JSON.parse((e as MessageEvent<string>).data) as { count: number }
-        setCount(count)
+        try {
+          const { count } = JSON.parse((e as MessageEvent<string>).data) as { count: number }
+          pushed.current++
+          setCount(count)
+        } catch {
+          // A malformed event is ignored: the next signal or poll catches up.
+        }
       })
     }
     open()
