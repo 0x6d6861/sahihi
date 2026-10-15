@@ -12,10 +12,12 @@ import {
   periodStart,
   UpdateNotificationPreferencesSchema,
 } from "@sahihi/core"
-import { forOrganization, type Prisma, prisma } from "@sahihi/db"
+import { forOrganization, type Prisma, prisma, signalNotifications } from "@sahihi/db"
 import { Hono } from "hono"
+import { streamSSE } from "hono/streaming"
 import type { AppEnv } from "../lib/env"
 import { badRequest, parseJson, parseQuery } from "../lib/http"
+import { subscribeToNotifications } from "../lib/notification-hub"
 import { requireOrg } from "../middleware/session"
 
 /**
@@ -39,6 +41,22 @@ function preferencesView(role: string, settings: NotificationSettings) {
     })),
   }
 }
+
+function unreadCount(organizationId: string, userId: string) {
+  return prisma.notification.count({
+    where: forOrganization(organizationId).notification({ userId, readAt: null }),
+  })
+}
+
+/** Batches a burst of signals (a bulk send, "Mark all read") into one count query. */
+const STREAM_DEBOUNCE_MS = 250
+/** Keeps proxies and Bun from closing a quiet stream. */
+const STREAM_HEARTBEAT_MS = 20_000
+/**
+ * Then the server ends the stream and the browser reconnects through `requireOrg` again, so a
+ * revoked session or a removed member stops hearing within minutes.
+ */
+const STREAM_LIFETIME_MS = 10 * 60_000
 
 export const notifications = new Hono<AppEnv>()
   .use(requireOrg)
@@ -90,15 +108,70 @@ export const notifications = new Hono<AppEnv>()
     return c.json({ items, nextCursor, unreadCount })
   })
 
-  /** The badge on the Inbox tab, polled by the web app. */
+  /** The badge on the Inbox tab, read when the stream below is down. */
   .get("/unread-count", async (c) => {
-    const count = await prisma.notification.count({
-      where: forOrganization(c.get("organizationId")).notification({
-        userId: c.get("user").id,
-        readAt: null,
-      }),
+    return c.json({ count: await unreadCount(c.get("organizationId"), c.get("user").id) })
+  })
+
+  /**
+   * The badge, pushed (ADR 0057): a `count` event `{ count }` on open and after each change to
+   * the user's notifications in this workspace. Ends after `STREAM_LIFETIME_MS`; EventSource
+   * reconnects.
+   */
+  .get("/stream", (c) => {
+    const organizationId = c.get("organizationId")
+    const userId = c.get("user").id
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let send = () => {}
+    const unsubscribe = subscribeToNotifications(organizationId, userId, () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => send(), STREAM_DEBOUNCE_MS)
     })
-    return c.json({ count })
+    if (!unsubscribe) return c.json({ error: "too_many_streams" }, 429)
+    // Bun closes a connection idle for 10 s; Hono on Bun passes the server as `env`.
+    const server = c.env as { timeout?: (req: Request, seconds: number) => void } | undefined
+    server?.timeout?.(c.req.raw, 0)
+    const res = streamSSE(c, async (stream) => {
+      let wake = () => {}
+      const ended = new Promise<void>((resolve) => {
+        wake = resolve
+      })
+      stream.onAbort(() => wake())
+      // One query at a time, in order, so an older count never lands after a newer one.
+      let sending = Promise.resolve()
+      send = () => {
+        sending = sending
+          .then(async () => {
+            const count = await unreadCount(organizationId, userId)
+            await stream.writeSSE({ event: "count", data: JSON.stringify({ count }) })
+          })
+          .catch(() => {})
+      }
+      try {
+        send()
+        const deadline = Date.now() + STREAM_LIFETIME_MS
+        while (!stream.aborted && Date.now() < deadline) {
+          const wait = Math.min(STREAM_HEARTBEAT_MS, deadline - Date.now())
+          await Promise.race([stream.sleep(wait), ended])
+          if (!stream.aborted) await stream.write(": ping\n\n")
+        }
+      } finally {
+        unsubscribe()
+        clearTimeout(timer)
+        send = () => {}
+        await sending
+      }
+    })
+    // `no-transform` keeps compressing proxies (Next's among them) from buffering the stream. Set
+    // on both: Hono copies headers already set on the context over the returned response.
+    for (const [name, value] of [
+      ["Cache-Control", "no-cache, no-transform"],
+      ["X-Accel-Buffering", "no"],
+    ] as const) {
+      res.headers.set(name, value)
+      c.header(name, value)
+    }
+    return res
   })
 
   /** `{ ids }` marks those, `{ all: true }` marks everything unread. Already-read rows are kept as is. */
@@ -112,6 +185,7 @@ export const notifications = new Hono<AppEnv>()
       }),
       data: { readAt: new Date() },
     })
+    if (count > 0) await signalNotifications(prisma, c.get("organizationId"), [c.get("user").id])
     return c.json({ updated: count })
   })
 
@@ -126,6 +200,7 @@ export const notifications = new Hono<AppEnv>()
       }),
       data: { readAt: null },
     })
+    if (count > 0) await signalNotifications(prisma, c.get("organizationId"), [c.get("user").id])
     return c.json({ updated: count })
   })
 
@@ -138,6 +213,7 @@ export const notifications = new Hono<AppEnv>()
         id: { in: ids },
       }),
     })
+    if (count > 0) await signalNotifications(prisma, c.get("organizationId"), [c.get("user").id])
     return c.json({ deleted: count })
   })
 

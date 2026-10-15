@@ -95,6 +95,8 @@ Legend: `[x]` done · `[ ]` to do · `[~]` partially done (see note)
       Templates tabs removed (their lists redirect to All files)
 - [x] Inbox search and filters: text search and Status / Type / Date chips on notifications, Type /
       People / Date on workspace activity, Status on bulk sends (ADR 0041) (`docs/notifications.md`, ADR 0041)
+- [x] Live Inbox badge: unread count pushed over SSE, signalled by Postgres NOTIFY on commit; polling
+      only as a fallback (`docs/notifications.md`, ADR 0057)
 - [x] Shared folders and labels for documents, envelopes and templates (ADR 0038)
 - [x] All files: one home page for documents, envelopes and templates, with one search and
       Type / Status / People / Added / Tags / Color filters (ADR 0038, `docs/ui.md`)

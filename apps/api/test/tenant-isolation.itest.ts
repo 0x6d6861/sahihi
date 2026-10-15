@@ -487,6 +487,7 @@ const NOT_TENANT = [
   // The caller's own notifications in their workspace, keyed by user and org; ids from the body
   // only ever match the caller's rows (notifications.itest.ts).
   "GET /api/notifications/unread-count",
+  "GET /api/notifications/stream",
   "POST /api/notifications/read",
   "POST /api/notifications/unread",
   "POST /api/notifications/dismiss",
