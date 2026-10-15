@@ -6,6 +6,7 @@ import { useState } from "react"
 import { Badge } from "@/components/app/badge"
 import { Button } from "@/components/app/button"
 import { ConfirmDialog, DialogActions } from "@/components/app/confirm-dialog"
+import { Input, PasswordField } from "@/components/app/fields"
 import {
   DownloadIcon,
   PencilIcon,
@@ -17,8 +18,6 @@ import { toastManager } from "@/components/app/toast"
 import { Alert } from "@/components/arc/alert/alert"
 import { Dialog, DialogContent } from "@/components/arc/dialog/dialog"
 import { DropdownMenu } from "@/components/arc/dropdown-menu/dropdown-menu"
-import { Input } from "@/components/arc/input/input"
-import { PasswordField } from "@/components/arc/password-field/password-field"
 import { Progress } from "@/components/arc/progress/progress"
 import { Select } from "@/components/arc/select/select"
 import {

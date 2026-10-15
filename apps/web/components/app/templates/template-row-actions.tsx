@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { Button as ArcButton } from "@/components/app/button"
 import { ConfirmDialog, DialogActions } from "@/components/app/confirm-dialog"
+import { Input } from "@/components/app/fields"
 import {
   EllipsisVerticalIcon,
   FolderInputIcon,
@@ -18,7 +19,6 @@ import { ItemLabelDialogs } from "@/components/app/labels/item-label-dialogs"
 import { toastManager } from "@/components/app/toast"
 import { Dialog, DialogContent } from "@/components/arc/dialog/dialog"
 import { type DropdownItem, DropdownMenu } from "@/components/arc/dropdown-menu/dropdown-menu"
-import { Input } from "@/components/arc/input/input"
 import { api } from "@/lib/api"
 import { type FormErrors, issuesToFormErrors } from "@/lib/envelope-form"
 import type { TagRef } from "@/lib/labels"

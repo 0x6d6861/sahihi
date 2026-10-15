@@ -5,10 +5,9 @@ import { useSearchParams } from "next/navigation"
 import { Suspense, useEffect, useState } from "react"
 import { AuthForm } from "@/components/app/auth/auth-form"
 import { Button } from "@/components/app/button"
+import { Input, PasswordField } from "@/components/app/fields"
 import { SIGNUP_EMAIL_KEY } from "@/components/app/signing/account-invite"
 import { Alert } from "@/components/arc/alert/alert"
-import { Input } from "@/components/arc/input/input"
-import { PasswordField } from "@/components/arc/password-field/password-field"
 import { signUp } from "@/lib/auth-client"
 
 function SignUpForm() {

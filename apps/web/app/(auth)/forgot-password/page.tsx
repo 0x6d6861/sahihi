@@ -5,8 +5,8 @@ import Link from "next/link"
 import { useState } from "react"
 import { AuthForm } from "@/components/app/auth/auth-form"
 import { Button } from "@/components/app/button"
+import { Input } from "@/components/app/fields"
 import { Alert } from "@/components/arc/alert/alert"
-import { Input } from "@/components/arc/input/input"
 import { authClient } from "@/lib/auth-client"
 
 /**

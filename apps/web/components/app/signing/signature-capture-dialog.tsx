@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/app/button"
 import { DialogActions } from "@/components/app/confirm-dialog"
+import { Input } from "@/components/app/fields"
 import { ImageUpIcon } from "@/components/app/icons"
 import { Alert } from "@/components/arc/alert/alert"
 import { Dialog, DialogContent } from "@/components/arc/dialog/dialog"
-import { Input } from "@/components/arc/input/input"
 import { Select } from "@/components/arc/select/select"
 import {
   type InkStroke,

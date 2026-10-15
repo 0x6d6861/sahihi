@@ -6,8 +6,8 @@ import {
   VERIFICATION_METHODS,
   type VerificationMethod,
 } from "@sahihi/core"
+import { Input } from "@/components/app/fields"
 import { Trash2Icon } from "@/components/app/icons"
-import { Input } from "@/components/arc/input/input"
 import { NumberField } from "@/components/arc/number-field/number-field"
 import { Select } from "@/components/arc/select/select"
 import { Button } from "@/components/ui/button"

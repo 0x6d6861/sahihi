@@ -7,9 +7,9 @@ import { Suspense, useState } from "react"
 import { AuthForm } from "@/components/app/auth/auth-form"
 import { Button } from "@/components/app/button"
 import { ButtonLink } from "@/components/app/button-link"
+import { PasswordField } from "@/components/app/fields"
 import { toastManager } from "@/components/app/toast"
 import { Alert } from "@/components/arc/alert/alert"
-import { PasswordField } from "@/components/arc/password-field/password-field"
 import { authClient } from "@/lib/auth-client"
 
 /**

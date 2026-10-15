@@ -35,6 +35,10 @@ marked `sahihi patch (ADR 0030)`), and the translucent-menu block appended to Ar
 `select`, `popover`, `user-menu` and `command-palette` stylesheets (ADR 0059, marked
 `sahihi patch (ADR 0059)`).
 
+**Text fields (ADR 0063):** `Input`, `Textarea` and `PasswordField` come from
+`@/components/app/fields` (shadcn's default input, textarea and label in `components/shadcn/`, with
+Arc's props) until Arc ships a filled input. Biome refuses the Arc and shadcn paths elsewhere.
+
 **Buttons and badges (ADR 0060):** import `Button` from `@/components/app/button`, `SplitButton`
 from `@/components/app/split-button` and `Badge` from `@/components/app/badge`, never from
 `components/arc/` (Biome fails the lint). They are Arc's components with the emerald primary and the

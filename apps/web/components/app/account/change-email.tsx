@@ -5,9 +5,9 @@ import { useState } from "react"
 import { Badge } from "@/components/app/badge"
 import { Button } from "@/components/app/button"
 import { DialogActions } from "@/components/app/confirm-dialog"
+import { Input } from "@/components/app/fields"
 import { Alert } from "@/components/arc/alert/alert"
 import { Dialog, DialogContent } from "@/components/arc/dialog/dialog"
-import { Input } from "@/components/arc/input/input"
 import { changeEmail } from "@/lib/auth-client"
 
 /**

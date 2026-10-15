@@ -6,9 +6,9 @@ import { useState } from "react"
 import { Badge } from "@/components/app/badge"
 import { Button } from "@/components/app/button"
 import { ConfirmDialog, DialogActions } from "@/components/app/confirm-dialog"
+import { Input } from "@/components/app/fields"
 import { toastManager } from "@/components/app/toast"
 import { Dialog, DialogContent } from "@/components/arc/dialog/dialog"
-import { Input } from "@/components/arc/input/input"
 import {
   Table,
   TableBody,

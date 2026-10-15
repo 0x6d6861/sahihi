@@ -2,8 +2,8 @@
 
 import { InviteMemberSchema, type OrgRole } from "@sahihi/core"
 import { Button } from "@/components/app/button"
+import { Input } from "@/components/app/fields"
 import { PlusIcon, XIcon } from "@/components/app/icons"
-import { Input } from "@/components/arc/input/input"
 import { Select } from "@/components/arc/select/select"
 import { organization } from "@/lib/auth-client"
 import { MEMBER_ROLE_LABELS } from "@/lib/members"

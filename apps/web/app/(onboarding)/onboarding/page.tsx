@@ -7,6 +7,7 @@ import { AuthForm } from "@/components/app/auth/auth-form"
 import { AuthShell } from "@/components/app/auth/auth-shell"
 import { BrandPanel } from "@/components/app/auth/brand-panel"
 import { Button } from "@/components/app/button"
+import { Input } from "@/components/app/fields"
 import { ImageUpIcon } from "@/components/app/icons"
 import {
   type InviteRow,
@@ -25,7 +26,6 @@ import {
   toLogoPng,
 } from "@/components/app/workspace/workspace-logo"
 import { Alert } from "@/components/arc/alert/alert"
-import { Input } from "@/components/arc/input/input"
 import { RadioGroup } from "@/components/arc/radio-group/radio-group"
 import { api } from "@/lib/api"
 import { organization } from "@/lib/auth-client"

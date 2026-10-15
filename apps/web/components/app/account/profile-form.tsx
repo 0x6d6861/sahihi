@@ -4,8 +4,8 @@ import { UpdateProfileSchema } from "@sahihi/core"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { Button } from "@/components/app/button"
+import { Input } from "@/components/app/fields"
 import { toastManager } from "@/components/app/toast"
-import { Input } from "@/components/arc/input/input"
 import { updateUser } from "@/lib/auth-client"
 
 /** Your display name (better-auth `update-user`). */

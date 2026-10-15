@@ -15,6 +15,7 @@
       "!apps/web/components/ui",
       "!apps/web/components/extend",
       "!apps/web/components/arc",
+      "!apps/web/components/shadcn",
       "!apps/web/components/blocks",
       "!apps/web/hooks/use-media-query.ts",
       "!apps/web/lib/color-picker-utils.ts",
@@ -58,7 +59,8 @@
         "!apps/web/components/app/button.tsx",
         "!apps/web/components/app/button-link.tsx",
         "!apps/web/components/app/split-button.tsx",
-        "!apps/web/components/app/badge.tsx"
+        "!apps/web/components/app/badge.tsx",
+        "!apps/web/components/app/fields.tsx"
       ],
       "linter": {
         "rules": {
@@ -69,7 +71,12 @@
                 "paths": {
                   "@/components/arc/button/button": "Import Button from @/components/app/button (emerald primary, ADR 0060).",
                   "@/components/arc/split-button/split-button": "Import SplitButton from @/components/app/split-button (ADR 0060).",
-                  "@/components/arc/badge/badge": "Import Badge from @/components/app/badge (info tone in blue, ADR 0060)."
+                  "@/components/arc/badge/badge": "Import Badge from @/components/app/badge (info tone in blue, ADR 0060).",
+                  "@/components/arc/input/input": "Import Input / Textarea / PasswordField from @/components/app/fields (shadcn fields until Arc's patch, ADR 0063).",
+                  "@/components/arc/textarea/textarea": "Import Input / Textarea / PasswordField from @/components/app/fields (shadcn fields until Arc's patch, ADR 0063).",
+                  "@/components/arc/password-field/password-field": "Import Input / Textarea / PasswordField from @/components/app/fields (shadcn fields until Arc's patch, ADR 0063).",
+                  "@/components/shadcn/input": "Import Input / Textarea / PasswordField from @/components/app/fields (shadcn fields until Arc's patch, ADR 0063).",
+                  "@/components/shadcn/textarea": "Import Input / Textarea / PasswordField from @/components/app/fields (shadcn fields until Arc's patch, ADR 0063)."
                 }
               }
             }
