@@ -1,7 +1,7 @@
 "use client"
 
 import { NodeViewContent, type NodeViewProps, NodeViewWrapper } from "@tiptap/react"
-import { Badge } from "@/components/app/badge"
+import { MessageSquareIcon } from "@/components/app/icons"
 import { pendingSectionIds } from "@/lib/generator"
 import { cn } from "@/lib/utils"
 import { useGenerator } from "../generator-context"
@@ -32,12 +32,14 @@ export function SectionView({ node, updateAttributes }: NodeViewProps) {
       className={cn(
         // Numbers come from the editor's CSS counter, so they follow the sections' order.
         node.attrs.numbered && "[counter-increment:section]",
-        "group relative -mx-3.5 flex flex-col gap-3 rounded-xl px-3.5 pt-1.5 pb-1 transition-colors",
+        "group relative -mx-2.5 flex flex-col gap-2 rounded-md border border-transparent px-2.5 py-2 transition-colors",
         // A section that just changed (document-editor.tsx `flash`): on at once, out slowly.
-        "data-[flash=on]:bg-info/15 data-[flash=off]:duration-700",
+        "data-[flash=on]:bg-primary/10 data-[flash=off]:duration-700",
         askable && "cursor-pointer hover:bg-muted/60",
-        // The chat selection belongs to Preview; in Editing it would sit behind the text.
-        selected && mode === "preview" && "bg-info/10 ring-1 ring-info",
+        // A pending suggestion, and the chat selection (Preview only; in Editing it would sit
+        // behind the text): an emerald edge on a faint tint.
+        (suggested || (selected && mode === "preview")) &&
+          "border-primary bg-primary/5 hover:bg-primary/5",
       )}
       {...(askable
         ? {
@@ -54,15 +56,15 @@ export function SectionView({ node, updateAttributes }: NodeViewProps) {
           }
         : {})}
     >
-      <div className="flex items-baseline justify-between gap-3" contentEditable={false}>
-        <h3 className="flex min-w-0 flex-1 items-baseline font-semibold text-lg">
+      <div className="flex items-center gap-2" contentEditable={false}>
+        <h3 className="flex min-w-0 items-baseline font-medium text-base leading-[1.6] tracking-tight">
           {node.attrs.numbered && (
             <span className="mr-1 before:content-[counter(section)'.']" aria-hidden />
           )}
           {editable && mode === "editing" ? (
             <input
               aria-label="Section title"
-              className="min-w-0 flex-1 bg-transparent font-semibold outline-none"
+              className="min-w-0 flex-1 bg-transparent font-medium outline-none"
               value={title}
               onChange={(e) => updateAttributes({ title: e.target.value })}
             />
@@ -71,25 +73,26 @@ export function SectionView({ node, updateAttributes }: NodeViewProps) {
           )}
         </h3>
         {suggested && (
-          <span className="shrink-0">
-            <Badge tone="info" size="sm">
-              Suggested edit
-            </Badge>
+          <span className="shrink-0 rounded-full bg-primary/12 px-2 py-px font-medium text-primary text-xs">
+            Suggested edit
           </span>
         )}
         {askable && (
           <span
             aria-hidden
             className={cn(
-              "pointer-events-none shrink-0 rounded-full border bg-background px-2 py-1 font-medium text-[11px] text-muted-foreground leading-none opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100",
-              selected && "opacity-100",
+              "pointer-events-none ml-auto inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-px font-medium text-xs opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100",
+              selected
+                ? "bg-primary text-primary-foreground opacity-100"
+                : "border bg-background text-muted-foreground",
             )}
           >
-            {selected ? "Selected" : "Ask about this"}
+            <MessageSquareIcon className="size-3" />
+            {selected ? "Asking about this" : "Ask about this"}
           </span>
         )}
       </div>
-      <NodeViewContent className="flex flex-col gap-3" />
+      <NodeViewContent className="flex flex-col gap-2" />
     </NodeViewWrapper>
   )
 }

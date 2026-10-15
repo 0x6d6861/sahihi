@@ -18,7 +18,14 @@ import {
 import { lastAssistantMessageIsCompleteWithToolCalls, type UIMessage } from "ai"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/app/button"
-import { ArrowUpIcon, LoaderIcon, StopIcon, XIcon } from "@/components/app/icons"
+import {
+  ArrowUpIcon,
+  InfoIcon,
+  LoaderIcon,
+  StopIcon,
+  TextQuoteIcon,
+  XIcon,
+} from "@/components/app/icons"
 import { Tooltip } from "@/components/arc/tooltip/tooltip"
 import { Button as IconButton } from "@/components/ui/button"
 import {
@@ -88,7 +95,7 @@ export function ChatPanel() {
   return (
     <AssistantRuntimeProvider runtime={runtime} config={config}>
       <ThreadPrimitive.Root className="flex h-full min-h-0 flex-col">
-        <ThreadPrimitive.Viewport className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-5 md:px-5">
+        <ThreadPrimitive.Viewport className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-5">
           <ThreadPrimitive.Empty>
             <EmptyState />
           </ThreadPrimitive.Empty>
@@ -138,7 +145,7 @@ function EmptyState() {
   const origin = draftOrigin(detail.document.starter)
   if (origin === "blank") {
     return (
-      <div className="mt-2 flex flex-col gap-1 rounded-2xl border border-dashed p-5 text-sm">
+      <div className="flex flex-col gap-3 rounded-(--radius-panel) border p-5 text-sm">
         <p className="font-medium text-foreground">Describe the document you need</p>
         <p className="text-muted-foreground">
           Say what it's for and who it's between, below. The assistant asks what it still needs and
@@ -150,8 +157,8 @@ function EmptyState() {
   if (origin === "import") {
     const sections = detail.version.data.content.content.length
     return (
-      <div className="mt-2 flex flex-col gap-3 rounded-2xl border border-dashed p-5">
-        <div className="flex flex-col gap-1 text-sm">
+      <div className="flex flex-col gap-3 rounded-(--radius-panel) border p-5">
+        <div className="flex flex-col gap-3 text-sm leading-[1.45]">
           <p className="font-medium text-foreground">
             Imported {sections} {sections === 1 ? "section" : "sections"} word for word
           </p>
@@ -176,8 +183,8 @@ function EmptyState() {
     )
   }
   return (
-    <div className="mt-2 flex flex-col gap-3 rounded-2xl border border-dashed p-5">
-      <div className="flex flex-col gap-1 text-sm">
+    <div className="flex flex-col gap-3 rounded-(--radius-panel) border p-5">
+      <div className="flex flex-col gap-3 text-sm leading-[1.45]">
         <p className="font-medium text-foreground">Draft “{title}” with the assistant</p>
         <p className="text-muted-foreground">
           It asks for missing details as questions and fills the document as you answer. It only
@@ -198,7 +205,7 @@ function EmptyState() {
 
 /** An assistant reply: paragraphs, with **bold** kept. */
 const Text: TextMessagePartComponent = ({ text }) => (
-  <div className="flex flex-col gap-2.5 text-sm leading-relaxed">
+  <div className="flex flex-col gap-2.5 text-sm leading-[1.45]">
     {replyParagraphs(text).map((runs, i) => (
       // biome-ignore lint/suspicious/noArrayIndexKey: paragraphs of one immutable reply
       <p key={i} className="whitespace-pre-wrap">
@@ -232,15 +239,16 @@ function UserMessage() {
   return (
     <MessagePrimitive.Root className="flex flex-col items-end gap-1.5">
       {section && (
-        <div className="max-w-[85%] rounded-lg border border-dashed border-info/30 bg-info/10 px-3 py-1.5 text-muted-foreground text-xs">
-          <span className="font-medium text-foreground">
-            {sectionLabel(detail.version.data.content, section)}
-          </span>
-          {excerpt ? ` · ${excerpt.slice(0, 90)}${excerpt.length > 90 ? "…" : ""}` : null}
+        <div
+          className="flex max-w-[80%] items-center gap-1.5 px-1 text-muted-foreground text-xs"
+          title={excerpt ?? undefined}
+        >
+          <TextQuoteIcon aria-hidden className="size-3.5 shrink-0" />
+          <span className="truncate">{sectionLabel(detail.version.data.content, section)}</span>
         </div>
       )}
       <SentFiles attachments={attachments} />
-      <div className="max-w-[85%] rounded-2xl bg-muted px-4 py-2.5 text-foreground">
+      <div className="max-w-[80%] rounded-(--radius-panel) bg-muted px-3.5 py-2.5 text-foreground leading-[1.45]">
         <MessagePrimitive.Parts components={{ Text: UserText }} />
       </div>
     </MessagePrimitive.Root>
@@ -325,9 +333,12 @@ function Composer() {
   }
   if (pendingQuestion) {
     return (
-      <p className="shrink-0 border-t px-4 py-3 text-muted-foreground text-sm md:px-5">
-        Answer or dismiss the questions above to keep chatting.
-      </p>
+      <div className="shrink-0 px-4 pb-4">
+        <p className="flex items-center gap-2.5 rounded-(--radius-panel) bg-muted p-3.5 text-muted-foreground text-sm leading-[1.45]">
+          <InfoIcon aria-hidden className="shrink-0" />
+          Answer or skip the questions above to continue the chat.
+        </p>
+      </div>
     )
   }
   const section = detail.version.data.content.content.find((s) => s.attrs.id === selectedSectionId)
@@ -355,13 +366,14 @@ function Composer() {
   }
 
   return (
-    <div className="shrink-0 border-t p-3">
+    <div className="shrink-0 px-4 pb-4">
       {/* Files can also be dropped on the card or pasted into the message. */}
       <fieldset
         aria-label="New message"
         className={cn(
-          "min-w-0 overflow-hidden rounded-2xl border bg-card transition-colors focus-within:border-foreground/30",
-          dragging && "border-info bg-info/5",
+          "flex min-w-0 flex-col gap-2.5 overflow-hidden rounded-(--radius-panel) border border-foreground bg-card pt-3 pr-3 pb-2.5 pl-3.5 transition-colors",
+          section && "border-primary",
+          dragging && "border-primary bg-primary/5",
         )}
         onDragOver={(e) => {
           if (!e.dataTransfer.types.includes("Files")) return
@@ -376,22 +388,24 @@ function Composer() {
           files.add(e.dataTransfer.files)
         }}
       >
-        <PendingFiles files={files.files} onRemove={files.remove} />
         {section && (
-          <div className="flex items-start gap-2 border-b bg-info/10 py-2.5 pr-2 pl-3.5">
-            <div className="min-w-0 flex-1">
-              <p className="font-mono text-[10.5px] text-muted-foreground uppercase tracking-wider">
+          <div className="-mr-0.5 -ml-1 flex items-start gap-2 rounded-2xl bg-primary/12 py-2 pr-1 pl-2.5">
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <p className="font-medium text-primary text-xs leading-[1.45]">
                 Selected section · {sectionLabel(detail.version.data.content, section)}
               </p>
               {excerpt && (
-                <p className="mt-0.5 line-clamp-2 text-foreground/80 text-xs">{excerpt}</p>
+                <p className="line-clamp-3 text-muted-foreground text-xs leading-[1.4]">
+                  {excerpt}
+                </p>
               )}
             </div>
             <Tooltip content="Remove section">
               <IconButton
                 variant="ghost"
-                size="icon-sm"
+                size="icon-xs"
                 aria-label="Remove selected section"
+                className="text-primary"
                 onClick={() => setSelectedSectionId(null)}
               >
                 <XIcon aria-hidden />
@@ -399,6 +413,7 @@ function Composer() {
             </Tooltip>
           </div>
         )}
+        <PendingFiles files={files.files} onRemove={files.remove} />
         <ComposerPrimitive.Input
           submitMode="none"
           rows={2}
@@ -406,7 +421,7 @@ function Composer() {
           autoFocus={draftOrigin(detail.document.starter) === "blank"}
           aria-label="Message the assistant"
           placeholder={section ? "Ask about this section…" : "Message the assistant…"}
-          className="block w-full resize-none bg-transparent px-3.5 py-3 text-sm outline-none placeholder:text-muted-foreground"
+          className="block w-full resize-none bg-transparent text-sm leading-[1.45] outline-none placeholder:text-muted-foreground"
           onPaste={(e) => {
             if (e.clipboardData.files.length) {
               e.preventDefault()
@@ -420,13 +435,13 @@ function Composer() {
             }
           }}
         />
-        <div className="flex items-center justify-between px-2.5 pb-2.5">
+        <div className="-ml-1.5 flex items-center justify-between">
           <AttachButton disabled={files.full} onFiles={files.add} />
           {running ? (
             <Tooltip content="Stop">
               <IconButton
-                size="icon-sm"
-                className="rounded-full"
+                size="icon"
+                className="size-8 rounded-lg sm:size-8"
                 aria-label="Stop"
                 onClick={() => aui.thread().cancelRun()}
               >
@@ -436,8 +451,8 @@ function Composer() {
           ) : (
             <Tooltip content="Send">
               <IconButton
-                size="icon-sm"
-                className="rounded-full"
+                size="icon"
+                className="size-8 rounded-lg sm:size-8"
                 aria-label="Send"
                 disabled={!canSend}
                 onClick={send}

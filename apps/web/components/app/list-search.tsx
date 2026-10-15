@@ -4,15 +4,35 @@ import { labelColorName } from "@sahihi/core"
 import { useRouter } from "next/navigation"
 import { type ReactNode, useEffect, useRef, useState, useTransition } from "react"
 import { Button } from "@/components/app/button"
-import { CheckIcon } from "@/components/app/icons"
+import { SearchInput } from "@/components/app/fields"
+import {
+  CalendarIcon,
+  CheckIcon,
+  CircleCheckIcon,
+  FileTextIcon,
+  TagIcon,
+  UsersIcon,
+} from "@/components/app/icons"
 import { ColorDot } from "@/components/app/labels/labels"
 import { DropdownMenu } from "@/components/arc/dropdown-menu/dropdown-menu"
-import { SearchField } from "@/components/arc/search-field/search-field"
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control"
 import type { TagRef } from "@/lib/labels"
 import { type ListLayout, type ListPage, listLayoutCookie } from "@/lib/list-layout"
 
 const SEARCH_DELAY_MS = 300
+
+/** Each chip's leading icon at rest, by its id (the design's toolbar); `SearchChip.icon` overrides. */
+const CHIP_ICONS: Record<string, ReactNode> = {
+  type: <FileTextIcon />,
+  group: <FileTextIcon />,
+  status: <CircleCheckIcon />,
+  state: <CircleCheckIcon />,
+  owner: <UsersIcon />,
+  actor: <UsersIcon />,
+  period: <CalendarIcon />,
+  tag: <TagIcon />,
+  tags: <TagIcon />,
+}
 
 function saveLayout(page: ListPage, layout: ListLayout) {
   // biome-ignore lint/suspicious/noDocumentCookie: a plain preference cookie, read by the page
@@ -57,6 +77,8 @@ export interface SearchChip {
   /** The first item, which clears the chip ("Any status"). */
   any: string
   options: ChipOption[]
+  /** Shown before the name at rest (the design's chips); the check replaces it once set. */
+  icon?: ReactNode
   /** The value in the URL, if any. */
   current?: string
   /** Tags match without case; everything else exactly. */
@@ -192,14 +214,8 @@ export function ListSearch({
       aria-busy={pending}
     >
       {/* One row from md: search, chips, layout (the design's toolbar). Stacked on phones. */}
-      <div className="md:w-80 md:shrink-0">
-        <SearchField
-          appearance="filled"
-          label={label}
-          value={q}
-          placeholder={placeholder}
-          onValueChange={onSearch}
-        />
+      <div className="md:w-[340px] md:shrink-0">
+        <SearchInput label={label} value={q} placeholder={placeholder} onValueChange={onSearch} />
       </div>
       <div className="flex min-w-0 flex-1 items-center gap-3">
         {/* One row that scrolls sideways on narrow screens, like Drive's chips; the page never does. */}
@@ -208,12 +224,12 @@ export function ListSearch({
             const value = selectedOption(chip)
             const set = chip.current !== undefined
             return (
-              <div key={chip.id} className="shrink-0">
+              <div key={chip.id} className="app-chip shrink-0">
                 <DropdownMenu
                   label={value?.label ?? chip.current ?? chip.label}
                   accessibleLabel={`${chip.label}: ${value?.label ?? chip.current ?? chip.any}`}
                   active={set}
-                  icon={set ? <CheckIcon /> : undefined}
+                  icon={set ? <CheckIcon /> : (chip.icon ?? CHIP_ICONS[chip.id])}
                   align="start"
                   items={[
                     {
@@ -241,7 +257,7 @@ export function ListSearch({
         </div>
         {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
         {layout && onLayoutChange && (
-          <div className="shrink-0">
+          <div className="app-segmented shrink-0">
             <SegmentedControl
               label="Show as"
               value={layout}

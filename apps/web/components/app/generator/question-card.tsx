@@ -10,7 +10,7 @@ import {
 import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/app/button"
 import { Input } from "@/components/app/fields"
-import { ArrowLeftIcon, CheckIcon, ChevronRightIcon, XIcon } from "@/components/app/icons"
+import { ArrowLeftIcon, CheckIcon, XIcon } from "@/components/app/icons"
 import { Tooltip } from "@/components/arc/tooltip/tooltip"
 import { Button as CossButton } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -62,17 +62,14 @@ function AnsweredQuestions({
     return <p className="text-muted-foreground text-sm">Questions dismissed.</p>
   }
   return (
-    <ul className="flex flex-col gap-2">
+    <ul className="flex flex-col gap-1.5 rounded-(--radius-panel) border bg-card px-3.5 py-3 text-sm leading-[1.45]">
       {answeredLines(input, result).map((line) => (
-        <li
-          key={line.question}
-          className="flex flex-col gap-0.5 rounded-2xl border bg-card px-4 py-3"
-        >
-          <span className="text-[13px] text-muted-foreground">{line.question}</span>
+        <li key={line.question} className="flex justify-between gap-3">
+          <span className="min-w-0 text-muted-foreground">{line.question}</span>
           <span
             className={cn(
-              "text-sm",
-              line.answer ? "font-medium text-foreground" : "text-muted-foreground italic",
+              "shrink-0 text-right",
+              line.answer ? "max-w-[50%] font-medium text-foreground" : "text-warning-foreground",
             )}
           >
             {line.answer ?? "Skipped"}
@@ -211,44 +208,27 @@ function ActiveQuestions({
   return (
     <section
       aria-label="Questions from the assistant"
-      className="overflow-hidden rounded-2xl border border-info/50 bg-card shadow-(--shadow-raised)"
+      className="flex flex-col gap-3.5 rounded-(--radius-panel) border bg-card p-4"
     >
-      <header className="flex flex-col gap-1.5 px-4 pt-3.5 pb-1">
-        <div className="flex items-center justify-between gap-3">
-          <span className="flex items-center gap-1">
-            {index > 0 && (
-              <Tooltip content="Previous question">
-                <CossButton
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Previous question"
-                  className="-ml-1.5"
-                  disabled={saving}
-                  onClick={back}
-                >
-                  <ArrowLeftIcon aria-hidden />
-                </CossButton>
-              </Tooltip>
-            )}
-            <span className="font-mono text-[11px] text-muted-foreground uppercase tabular-nums tracking-wider">
-              Question {index + 1} of {input.questions.length}
-            </span>
-          </span>
-          <Tooltip content="Dismiss questions">
-            <CossButton
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Dismiss questions"
-              disabled={saving}
-              onClick={() => {
-                onDone({ dismissed: true, answers: [] })
-                remember(null)
-              }}
-            >
-              <XIcon aria-hidden />
-            </CossButton>
-          </Tooltip>
-        </div>
+      <header className="-my-1 flex items-center justify-between gap-3">
+        <span className="text-muted-foreground text-xs tabular-nums">
+          Question {index + 1} of {input.questions.length}
+        </span>
+        <Tooltip content="Dismiss questions">
+          <CossButton
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Dismiss questions"
+            className="-mr-1.5 text-muted-foreground"
+            disabled={saving}
+            onClick={() => {
+              onDone({ dismissed: true, answers: [] })
+              remember(null)
+            }}
+          >
+            <XIcon aria-hidden />
+          </CossButton>
+        </Tooltip>
       </header>
 
       {/* Keyed by question: each one eases in from the side the step went (opacity only under
@@ -256,43 +236,54 @@ function ActiveQuestions({
       <div
         key={question.id}
         className={cn(
-          "flex flex-col gap-3 transition-[opacity,translate] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] starting:opacity-0 motion-reduce:starting:translate-x-0",
+          "flex flex-col gap-3.5 transition-[opacity,translate] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] starting:opacity-0 motion-reduce:starting:translate-x-0",
           direction === 1 ? "starting:translate-x-2" : "starting:-translate-x-2",
         )}
       >
-        <div className={cn("flex flex-col gap-1.5 px-4", question.options.length === 0 && "pb-3")}>
-          <h3 className="font-medium text-[15px] leading-snug">{question.question}</h3>
+        <div className="flex flex-col gap-1">
+          <h3 className="font-medium text-base leading-[1.45] tracking-tight">
+            {question.question}
+          </h3>
           {fills && <p className="text-muted-foreground text-xs">Fills: {fills}</p>}
         </div>
 
         {question.options.length > 0 && (
-          <div className="flex flex-col gap-1.5 px-3 pb-3">
-            {question.options.map((option, i) => (
-              // coss, not Arc: Arc's button sizes its label for the morph animation and can't
-              // stretch into a left-aligned row with the chevron on the right.
-              <CossButton
-                key={option}
-                variant="outline"
-                className="h-auto min-h-10 w-full justify-between gap-3 whitespace-normal py-2 text-left"
-                disabled={saving}
-                onClick={() => answer(option)}
-              >
-                <span
-                  aria-hidden
-                  className="w-3 shrink-0 font-mono text-muted-foreground text-xs tabular-nums [@media(pointer:coarse)]:hidden"
+          <div className="flex flex-col gap-1.5">
+            {question.options.map((option, i) => {
+              // The answer given before stepping back here.
+              const chosen = answers[question.id] === option
+              return (
+                // coss, not Arc: Arc's button sizes its label for the morph animation and can't
+                // stretch into a left-aligned row.
+                <CossButton
+                  key={option}
+                  variant="outline"
+                  className={cn(
+                    "group/option h-auto min-h-11 w-full justify-start gap-3 whitespace-normal rounded-2xl border-border px-3 py-2 text-left font-normal shadow-none before:rounded-[calc(var(--radius-2xl)-1px)] hover:border-primary hover:bg-primary/12 dark:hover:bg-primary/12",
+                    chosen && "border-primary bg-primary/12 font-medium dark:bg-primary/12",
+                  )}
+                  disabled={saving}
+                  onClick={() => answer(option)}
                 >
-                  {i + 1}
-                </span>
-                <span className="min-w-0 flex-1">{option}</span>
-                <ChevronRightIcon aria-hidden className="text-muted-foreground" />
-              </CossButton>
-            ))}
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "flex size-[22px] shrink-0 items-center justify-center rounded-md border font-medium text-muted-foreground text-xs tabular-nums group-hover/option:border-primary group-hover/option:text-primary [@media(pointer:coarse)]:hidden",
+                      chosen && "border-primary text-primary",
+                    )}
+                  >
+                    {i + 1}
+                  </span>
+                  <span className="min-w-0 flex-1">{option}</span>
+                </CossButton>
+              )
+            })}
           </div>
         )}
       </div>
 
       <form
-        className="flex flex-col gap-2.5 border-t bg-muted/40 px-3 py-3"
+        className="flex flex-col gap-3.5"
         onSubmit={(e) => {
           e.preventDefault()
           if (draft.trim()) answer(draft)
@@ -308,19 +299,28 @@ function ActiveQuestions({
           onChange={(e) => setDraft(e.target.value)}
         />
         <div className="flex items-center justify-between gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={saving}
-            onClick={() => answer(null)}
-          >
-            Skip
-          </Button>
-          <Button type="submit" size="sm" loading={saving} disabled={!draft.trim() || saving}>
-            Answer
-            <ChevronRightIcon aria-hidden />
-          </Button>
+          {index > 0 ? (
+            <Button type="button" variant="ghost" size="sm" disabled={saving} onClick={back}>
+              <ArrowLeftIcon aria-hidden />
+              Back
+            </Button>
+          ) : (
+            <span />
+          )}
+          <span className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={saving}
+              onClick={() => answer(null)}
+            >
+              Skip
+            </Button>
+            <Button type="submit" size="sm" loading={saving} disabled={!draft.trim() || saving}>
+              Answer
+            </Button>
+          </span>
         </div>
       </form>
     </section>
@@ -363,8 +363,8 @@ export const AppliedNote: ToolCallMessagePartComponent<
     (v) => detail.version.data.variables.find((x) => x.key === v.key)?.label ?? v.key,
   )
   return (
-    <p className="flex items-center gap-2 text-muted-foreground text-xs">
-      <CheckIcon aria-hidden className="size-3.5 text-success-foreground" />
+    <p className="flex items-center gap-2 text-muted-foreground text-sm">
+      <CheckIcon aria-hidden className="size-3.5 shrink-0 text-success-foreground" />
       Updated {labels.join(", ")}
     </p>
   )

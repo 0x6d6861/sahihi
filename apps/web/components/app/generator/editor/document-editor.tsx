@@ -165,7 +165,10 @@ export function DocumentEditor({ mode }: { mode: DocMode }) {
           ]}
         />
       )}
-      <div ref={surface} className="mx-auto flex max-w-[720px] flex-col gap-4 px-6 py-10 sm:px-12">
+      <div
+        ref={surface}
+        className="mx-auto flex max-w-[720px] flex-col gap-4 px-3 pt-1 pb-10 sm:px-0"
+      >
         {stale && (
           <Alert tone="danger" title="The text changed somewhere else">
             Your last edit wasn't saved.{" "}
@@ -179,14 +182,13 @@ export function DocumentEditor({ mode }: { mode: DocMode }) {
             Something in the text isn't supported in a document. Undo the last change.
           </Alert>
         )}
-        <article className="flex flex-col gap-6">
-          <h2 className="font-semibold text-[1.75rem] leading-tight tracking-tight">
-            {data.title}
-          </h2>
+        {/* A page of paper on the muted workspace, as in the design: 720px, 4px corners, a hairline. */}
+        <article className="flex flex-col gap-5 rounded-sm border bg-card px-6 pt-10 pb-12 sm:px-16 sm:pt-14 sm:pb-16">
+          <h2 className="font-medium text-[22px] leading-[1.6] tracking-tight">{data.title}</h2>
           <EditorContent
             editor={editor}
             className={cn(
-              "[counter-reset:section] [&_.ProseMirror]:flex [&_.ProseMirror]:flex-col [&_.ProseMirror]:gap-3 [&_.ProseMirror]:whitespace-pre-wrap [&_.ProseMirror]:text-base [&_.ProseMirror]:leading-7 [&_.ProseMirror]:outline-none [&_.selectedCell]:bg-muted [&_ol]:list-[lower-alpha] [&_ol]:pl-7 [&_table]:w-full [&_table]:table-fixed [&_table]:border-collapse [&_td]:border [&_td]:px-2 [&_td]:py-1.5 [&_td]:align-top [&_th]:border [&_th]:px-2 [&_th]:py-1.5 [&_th]:text-left [&_th]:align-top [&_th]:font-medium [&_ul]:list-disc [&_ul]:pl-7",
+              "[counter-reset:section] [&_.ProseMirror]:flex [&_.ProseMirror]:flex-col [&_.ProseMirror]:gap-5 [&_.ProseMirror]:whitespace-pre-wrap [&_.ProseMirror]:text-sm [&_.ProseMirror]:leading-[1.6] [&_.ProseMirror]:outline-none [&_.selectedCell]:bg-muted [&_ol]:list-[lower-alpha] [&_ol]:pl-7 [&_table]:w-full [&_table]:table-fixed [&_table]:border-collapse [&_td]:border [&_td]:px-2 [&_td]:py-1.5 [&_td]:align-top [&_th]:border [&_th]:px-2 [&_th]:py-1.5 [&_th]:text-left [&_th]:align-top [&_th]:font-medium [&_ul]:list-disc [&_ul]:pl-7",
               editable && "[&_.ProseMirror]:min-h-[60vh]",
             )}
           />

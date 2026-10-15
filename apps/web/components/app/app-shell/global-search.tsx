@@ -118,11 +118,11 @@ export function GlobalSearch({ workspaceId }: { workspaceId: string }) {
         type="button"
         onClick={() => setOpen(true)}
         aria-keyshortcuts="Meta+K Control+K"
-        className="press-subtle flex h-9 w-full min-w-0 items-center gap-2 rounded-full bg-muted ps-3 pe-1.5 text-muted-foreground text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(hover:hover)]:hover:text-foreground"
+        className="press-subtle flex h-9 w-full min-w-0 items-center gap-2 rounded-2xl border bg-card ps-2.5 pe-1.5 text-muted-foreground text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(hover:hover)]:hover:text-foreground"
       >
         <SearchIcon aria-hidden className="shrink-0" />
         <span className="flex-1 truncate text-start">Search</span>
-        <Kbd className="max-sm:hidden">⌘K</Kbd>
+        <Kbd className="bg-background max-sm:hidden">⌘K</Kbd>
       </button>
       <Dialog
         open={open}

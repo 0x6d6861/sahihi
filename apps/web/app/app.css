@@ -172,11 +172,50 @@
   --background: var(--primary-foreground);
 }
 
+/* A borderless Arc dropdown trigger (the workspace switcher in the top bar). Arc draws the trigger's
+   edge and fill from these tokens; the menu is portaled, so it keeps them. */
+.app-plain-trigger {
+  --border: transparent;
+  --border-strong: transparent;
+  --surface: transparent;
+}
+
+/* List toolbar filter chips (ListSearch): the design's 32px chip with a leading icon, regular-weight
+   muted text and no chevron. Arc's trigger keys its height off --control-height-sm; the rest needs a
+   selector inside the wrapper, which out-ranks the trigger's single module class. */
+.app-chip {
+  --control-height-sm: 2rem;
+}
+.app-chip button[aria-haspopup] {
+  padding-inline: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+.app-chip button[aria-haspopup][data-active="true"] {
+  color: var(--accent-strong);
+}
+.app-chip button[aria-haspopup] > svg:last-child {
+  display: none;
+}
+
+/* The List / Grid switch: 26px segments in a 32px track, as in the design. */
+.app-segmented {
+  --control-height-sm: 26px;
+}
+
 /* Info badges in the status blue, not the emerald accent Arc uses for them (ADR 0060). */
 .app-info {
   --accent: var(--info);
   --accent-strong: var(--info-foreground);
   --accent-subtle: color-mix(in oklab, var(--info) 12%, var(--surface));
+}
+
+/* The signing page's consent: Arc's checkbox with its label as small, muted body text (the
+   design's 12px), doubled class to out-rank the module's `.copy label`. */
+.app-consent.app-consent label {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 400;
 }
 
 /* The app shell's page area (components/app/app-shell). A plain class: `--canvas` isn't a Tailwind colour. */
@@ -209,7 +248,9 @@ body {
   --muted-foreground: oklch(46% 0 0);
   --card: oklch(100% 0 0);
   --card-foreground: oklch(15% 0 0);
-  --primary: oklch(15% 0 0);
+  /* The light theme's emerald primary, in both themes: the signer's "Click to sign" fields and
+     their "Required" tag (docs/ui.md → Public signing). */
+  --primary: oklch(50.8% 0.118 165.612);
   --primary-foreground: oklch(100% 0 0);
   --input: oklch(84% 0 0);
   /* Field overlays keep the light emerald accent in both themes. */

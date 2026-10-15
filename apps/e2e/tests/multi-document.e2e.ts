@@ -108,7 +108,7 @@ test("an envelope with two documents and a supporting file is signed and finaliz
   })
 
   // ── Send ──
-  await page.getByRole("button", { name: "Send", exact: true }).click()
+  await page.getByRole("button", { name: "Send envelope" }).click()
   const review = page.getByRole("dialog", { name: "Review & send" })
   await review.getByRole("button", { name: "Send", exact: true }).click()
   await expect(page.getByText("Envelope sent")).toBeVisible()

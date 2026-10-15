@@ -103,7 +103,7 @@ async function browserPage(theme) {
     (existsSync("/opt/pw-browsers/chromium") ? "/opt/pw-browsers/chromium" : undefined)
   const browser = await chromium.launch({ executablePath, args: ["--no-sandbox"] })
   const ctx = await browser.newContext({
-    viewport: { width: 1280, height: 900 },
+    viewport: { width: Number(process.env.VIEWPORT_WIDTH ?? 1280), height: 900 },
     colorScheme: theme,
   })
   const session = loadSession()

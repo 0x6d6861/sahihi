@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export default async function SignPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-7xl flex-col gap-4 p-4 md:px-8 md:py-6">
+    <main className="app-canvas flex min-h-dvh w-full flex-col lg:h-dvh lg:overflow-hidden">
       <SigningExperience token={token} />
     </main>
   )

@@ -14,7 +14,7 @@ import { Input, PasswordField } from "@/components/app/fields"
 import { toastManager } from "@/components/app/toast"
 import { Alert } from "@/components/arc/alert/alert"
 import { CopyButton } from "@/components/arc/copy-button/copy-button"
-import { Dialog, DialogContent } from "@/components/arc/dialog/dialog"
+import { Drawer, DrawerContent } from "@/components/arc/drawer/drawer"
 import { RadioGroup } from "@/components/arc/radio-group/radio-group"
 import { Select } from "@/components/arc/select/select"
 import { ApiError, api } from "@/lib/api"
@@ -157,8 +157,9 @@ export function ConnectionFormDialog({
 
   const title = purpose === "PRIMARY" ? "Keep every file in your bucket" : "Sync to a bucket"
   return (
-    <Dialog open={open} onOpenChange={change}>
-      <DialogContent
+    <Drawer open={open} onOpenChange={change}>
+      <DrawerContent
+        side="right"
         title={failure ? "Saved, but the test failed" : title}
         description={
           failure
@@ -320,8 +321,8 @@ export function ConnectionFormDialog({
             </DialogActions>
           </form>
         )}
-      </DialogContent>
-    </Dialog>
+      </DrawerContent>
+    </Drawer>
   )
 }
 

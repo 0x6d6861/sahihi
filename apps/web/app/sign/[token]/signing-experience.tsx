@@ -3,9 +3,18 @@
 import type { FieldType, VerificationMethod } from "@sahihi/core"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Button } from "@/components/app/button"
-import { DownloadButtons } from "@/components/app/downloads/download-buttons"
-import { Panel } from "@/components/app/panel"
+import { DownloadRows } from "@/components/app/downloads/download-buttons"
+import {
+  BadgeCheckIcon,
+  BanIcon,
+  CheckIcon,
+  CircleXIcon,
+  ClockAlertIcon,
+  ClockIcon,
+  UnlinkIcon,
+} from "@/components/app/icons"
 import { AccountInvite } from "@/components/app/signing/account-invite"
+import { SignHeader, StatusCard, type StatusTone } from "@/components/app/signing/sign-shell"
 import { SigningSurface } from "@/components/app/signing/signing-surface"
 import { Alert } from "@/components/arc/alert/alert"
 import { OtpInput } from "@/components/arc/otp-input/otp-input"
@@ -60,26 +69,49 @@ interface SigningSession {
   embed: { origins: string[] } | null
 }
 
-const MESSAGES: Record<Exclude<State, "ready">, { title: string; body: string }> = {
-  waiting: { title: "Not your turn yet", body: "You'll get an email when it's your turn to sign." },
+const MESSAGES: Record<
+  Exclude<State, "ready">,
+  { title: string; body: string; icon: StatusIcon; tone: StatusTone }
+> = {
+  waiting: {
+    title: "Not your turn yet",
+    body: "You'll get an email when it's your turn to sign.",
+    icon: ClockIcon,
+    tone: "primary",
+  },
   signed: {
     title: "Thanks, you've signed",
     body: "We'll email you the final document once everyone has signed.",
+    icon: CheckIcon,
+    tone: "success",
   },
   completed: {
     title: "All parties have signed",
     body: "Download the signed document and certificate below.",
+    icon: BadgeCheckIcon,
+    tone: "success",
   },
   declined: {
     title: "Signing declined",
     body: "This envelope was declined and can no longer be signed.",
+    icon: CircleXIcon,
+    tone: "danger",
   },
-  expired: { title: "This link has expired", body: "Ask the sender to send you a new link." },
+  expired: {
+    title: "This link has expired",
+    body: "Ask the sender to send you a new link.",
+    icon: ClockAlertIcon,
+    tone: "warning",
+  },
   closed: {
     title: "This envelope is closed",
     body: "The sender cancelled or closed this request.",
+    icon: BanIcon,
+    tone: "muted",
   },
 }
+
+type StatusIcon = React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>
 
 export function SigningExperience({ token }: { token: string }) {
   const [session, setSession] = useState<SigningSession | null>(null)
@@ -105,11 +137,7 @@ export function SigningExperience({ token }: { token: string }) {
     try {
       setSession(await api<SigningSession>(base))
     } catch (err) {
-      setError(
-        err instanceof ApiError && err.status === 404
-          ? "This signing link is invalid."
-          : "Something went wrong.",
-      )
+      setError(err instanceof ApiError && err.status === 404 ? "invalid" : "failed")
     }
   }, [base])
 
@@ -119,45 +147,66 @@ export function SigningExperience({ token }: { token: string }) {
 
   if (error) {
     return (
-      <Alert tone="danger" title="Can't open this document">
-        {error}
-      </Alert>
+      <>
+        <SignHeader />
+        <StatusCard
+          icon={UnlinkIcon}
+          tone="danger"
+          title="Can't open this document"
+          description={
+            error === "invalid"
+              ? "This signing link is invalid. Ask the sender to send you a new link."
+              : "Something went wrong. Refresh to try again."
+          }
+        />
+      </>
     )
   }
   if (!session) {
     return (
-      <Panel className="mx-auto w-full max-w-md">
-        <Skeleton label="Opening the document" lines={4} />
-      </Panel>
+      <>
+        <SignHeader />
+        <div className="flex flex-1 items-center justify-center px-4 py-10 md:pb-26">
+          <div className="w-full max-w-[440px] rounded-(--radius-panel) border bg-card p-7">
+            <Skeleton label="Opening the document" lines={4} />
+          </div>
+        </div>
+      </>
     )
   }
 
   if (session.state !== "ready") {
     const m = MESSAGES[session.state]
     return (
-      <Panel
-        headingLevel={1}
-        title={m.title}
-        description={m.body}
-        className="enter-fade mx-auto w-full max-w-md"
-      >
-        {session.downloadsAvailable && (
-          <DownloadButtons
-            endpoint={`${base}/downloads`}
-            documents={session.documents}
-            attachments={session.attachments}
-          />
-        )}
-        {/* Optional account (ADR 0062); not inside a host app's iframe. */}
-        {(session.state === "signed" || session.state === "completed") && !session.embed && (
-          <AccountInvite email={session.recipient.email} />
-        )}
-      </Panel>
+      <>
+        <SignHeader envelope={session.envelope} />
+        <StatusCard icon={m.icon} tone={m.tone} title={m.title} description={m.body}>
+          {session.downloadsAvailable && (
+            <DownloadRows
+              endpoint={`${base}/downloads`}
+              documents={session.documents}
+              attachments={session.attachments}
+              certificateCode={session.certificateCode}
+            />
+          )}
+          {/* Optional account (ADR 0062); not inside a host app's iframe. */}
+          {(session.state === "signed" || session.state === "completed") && !session.embed && (
+            <div className="border-t pt-4">
+              <AccountInvite email={session.recipient.email} />
+            </div>
+          )}
+        </StatusCard>
+      </>
     )
   }
 
   if (session.requiresVerification)
-    return <OtpStep base={base} session={session} onVerified={load} />
+    return (
+      <>
+        <SignHeader envelope={session.envelope} />
+        <OtpStep base={base} session={session} onVerified={load} />
+      </>
+    )
 
   return <SigningSurface base={base} session={session} onDone={load} />
 }
@@ -251,13 +300,12 @@ function OtpStep({
   }
 
   return (
-    <Panel
-      headingLevel={1}
+    <StatusCard
       title="Verify it's you"
       description={
         sentTo ? `Enter the 6-digit code sent to ${sentTo}.` : `We'll send a code to ${channel}.`
       }
-      className="mx-auto w-full max-w-sm"
+      className="gap-5"
     >
       {sentTo ? (
         <form
@@ -267,7 +315,8 @@ function OtpStep({
             void verify(code)
           }}
         >
-          {/* A wrong code clears the slots; the error sits on the field itself. */}
+          {/* A wrong code clears the slots; the error sits on the field itself. Six digits
+              verify on their own; Enter does too. */}
           <OtpInput
             label="Verification code"
             length={CODE_LENGTH}
@@ -280,25 +329,18 @@ function OtpStep({
             disabled={verifying}
             autoFocus
           />
-          <Button
-            type="submit"
-            className="w-full"
-            loading={verifying}
-            disabled={code.length !== CODE_LENGTH}
-          >
-            Verify
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            className="w-full"
-            onClick={send}
-            loading={sending}
-            disabled={resendIn > 0}
-            aria-live="polite"
-          >
-            {resendIn > 0 ? `Resend code in ${formatCountdown(resendIn)}` : "Resend code"}
-          </Button>
+          <div className="flex items-center justify-between gap-3" aria-live="polite">
+            {resendIn > 0 ? (
+              <span className="text-muted-foreground text-xs">
+                Resend code in {formatCountdown(resendIn)}
+              </span>
+            ) : (
+              <Button type="button" variant="ghost" size="sm" onClick={send} loading={sending}>
+                Resend code
+              </Button>
+            )}
+            {verifying && <span className="text-muted-foreground text-xs">Checking…</span>}
+          </div>
         </form>
       ) : (
         <div className="flex flex-col gap-4">
@@ -308,6 +350,6 @@ function OtpStep({
           </Button>
         </div>
       )}
-    </Panel>
+    </StatusCard>
   )
 }

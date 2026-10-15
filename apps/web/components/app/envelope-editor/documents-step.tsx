@@ -1,20 +1,20 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useId, useState } from "react"
 import { Button } from "@/components/app/button"
+import { ButtonLink } from "@/components/app/button-link"
 import { DocumentTypeIcon } from "@/components/app/documents/document-type-icon"
 import { AttachmentsList } from "@/components/app/envelope/attachments-list"
 import { useDraftState } from "@/components/app/envelope/draft-state"
 import {
   ArrowDownIcon,
   ArrowLeftIcon,
-  EllipsisVerticalIcon,
+  ArrowRightIcon,
+  EllipsisIcon,
   FilePenLineIcon,
-  FileTextIcon,
   Trash2Icon,
 } from "@/components/app/icons"
-import { Panel } from "@/components/app/panel"
 import { toastManager } from "@/components/app/toast"
 import { type DropdownItem, DropdownMenu } from "@/components/arc/dropdown-menu/dropdown-menu"
 import { api } from "@/lib/api"
@@ -25,9 +25,10 @@ import { PrepareStep } from "./prepare-step"
 
 /**
  * Step 1 of the draft editor (ADR 0024, 0037): the documents to sign, in signing order, and the
- * supporting files shared with the recipients. Each document's ⋮ menu prepares its pages (the full
- * PDF editor, which saves a new document and removes that document's fields), moves it or removes
- * it (with its fields). Every change saves at once.
+ * supporting files shared with the recipients, as sections on the canvas. Each document is a card
+ * with Open (its library page) and a ⋯ menu that prepares its pages (the full PDF editor, which
+ * saves a new document and removes that document's fields), moves it or removes it (with its
+ * fields). Every change saves at once.
  */
 export function DocumentsStep({
   envelope: e,
@@ -111,12 +112,12 @@ export function DocumentsStep({
     )
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 md:p-8">
-      <Panel
+    <div className="mx-auto flex w-full max-w-[760px] flex-col gap-10 px-4 py-6 md:py-10">
+      <StepSection
         title="Documents to sign"
         description="Signed in this order. Each becomes its own signed PDF, and one certificate covers them all."
       >
-        <ol className="flex flex-col divide-y rounded-xl border">
+        <ol className="flex flex-col gap-2">
           {docs.map((d, i) => {
             const fields = fieldCountOf(d.id)
             const items: DropdownItem[] = [
@@ -125,11 +126,6 @@ export function DocumentsStep({
                 icon: <FilePenLineIcon />,
                 disabled: !files[d.id],
                 onSelect: () => setPreparing(d.id),
-              },
-              {
-                label: "Open in library",
-                icon: <FileTextIcon />,
-                onSelect: () => router.push(`/documents/${d.documentId}`),
               },
               ...(i > 0
                 ? [
@@ -157,40 +153,50 @@ export function DocumentsStep({
                 : []),
             ]
             return (
-              <li key={d.id} className="flex min-w-0 items-center gap-3 py-2.5 ps-3 pe-1">
-                <span className="w-5 shrink-0 text-center text-muted-foreground text-xs tabular-nums">
-                  {i + 1}
+              <li
+                key={d.id}
+                className="flex min-w-0 items-center gap-3 rounded-(--radius-panel) border bg-card py-3 ps-4 pe-2"
+              >
+                {docs.length > 1 && (
+                  <span className="w-4 shrink-0 text-center text-muted-foreground text-xs tabular-nums">
+                    {i + 1}
+                  </span>
+                )}
+                <span className="on-paper flex h-14 w-11 shrink-0 items-center justify-center rounded-sm border bg-background">
+                  <DocumentTypeIcon status="READY" />
                 </span>
-                <DocumentTypeIcon status="READY" />
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate font-medium text-sm" title={d.name}>
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="truncate text-sm" title={d.name}>
                     {d.name}
                   </span>
-                  <span className="text-muted-foreground text-xs tabular-nums">
+                  <span className="text-muted-foreground text-sm tabular-nums">
                     {pluralize(d.pageCount ?? 0, "page")}
                     {fields > 0 ? ` · ${pluralize(fields, "field")}` : ""}
                   </span>
                 </span>
+                <ButtonLink variant="ghost" size="sm" href={`/documents/${d.documentId}`}>
+                  Open
+                </ButtonLink>
                 <DropdownMenu
                   label={`Actions for ${d.name}`}
                   iconOnly
-                  icon={<EllipsisVerticalIcon />}
+                  icon={<EllipsisIcon />}
                   items={items}
                 />
               </li>
             )
           })}
         </ol>
-        <div className="pt-3">
+        <div>
           <AddDocumentDialog
             envelopeId={e.id}
             inEnvelope={docs.map((d) => d.documentId)}
             onAdded={() => router.refresh()}
           />
         </div>
-      </Panel>
+      </StepSection>
 
-      <Panel
+      <StepSection
         title="Supporting files"
         description="Optional. Shared with the recipients while they sign; nobody signs them. Each file's fingerprint goes on the certificate."
       >
@@ -199,13 +205,43 @@ export function DocumentsStep({
           source={{ kind: "sender", envelopeId: e.id }}
           editable
         />
-      </Panel>
+      </StepSection>
 
       <div className="flex justify-end">
-        <Button variant="secondary" onClick={onNext}>
+        <Button size="sm" onClick={onNext}>
+          <ArrowRightIcon aria-hidden />
           Continue to recipients
         </Button>
       </div>
     </div>
+  )
+}
+
+/** A step's section on the canvas: heading and line, then its content (no card around it). */
+export function StepSection({
+  title,
+  description,
+  actions,
+  children,
+}: {
+  title: string
+  description: string
+  actions?: React.ReactNode
+  children: React.ReactNode
+}) {
+  const id = useId()
+  return (
+    <section aria-labelledby={id} className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h2 id={id} className="font-medium text-lg tracking-tight">
+            {title}
+          </h2>
+          <p className="text-muted-foreground text-sm">{description}</p>
+        </div>
+        {actions}
+      </div>
+      {children}
+    </section>
   )
 }

@@ -3,7 +3,6 @@
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react"
 import { LayoutGroup, motion, useReducedMotion } from "motion/react"
 import Link from "next/link"
-import { Badge } from "@/components/app/badge"
 import { motionTokens } from "@/components/arc/lib/motion-tokens"
 import { Tooltip } from "@/components/arc/tooltip/tooltip"
 import { cn } from "@/lib/utils"
@@ -47,7 +46,7 @@ export function PillNav({
   return (
     <nav aria-label={label} className={className}>
       <LayoutGroup id={id}>
-        <ul className="flex w-full items-center gap-1 overflow-x-auto rounded-full bg-muted p-1 [scrollbar-width:none] md:w-auto">
+        <ul className="flex w-full items-center gap-0.5 overflow-x-auto rounded-2xl bg-muted p-[3px] [scrollbar-width:none] md:w-auto">
           {items.map((item) => (
             <PillNavEntry key={item.id} item={item} layoutId={`${id}-active`} current={current} />
           ))}
@@ -69,10 +68,8 @@ function PillNavEntry({
   const reduced = useReducedMotion()
   const badge = item.badge ? (item.badge > 99 ? "99+" : String(item.badge)) : null
   const className = cn(
-    "relative isolate flex h-9 items-center justify-center gap-2 rounded-full px-2 text-sm whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-4",
-    item.active
-      ? "font-medium text-foreground"
-      : "text-muted-foreground transition-colors hover:text-foreground",
+    "relative isolate flex h-[26px] items-center justify-center gap-1.5 rounded-xl px-2 font-medium text-sm whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-3",
+    item.active ? "text-foreground" : "text-foreground/80 transition-colors hover:text-foreground",
     item.disabled && "cursor-not-allowed opacity-50 hover:text-muted-foreground",
   )
   const content = (
@@ -81,7 +78,7 @@ function PillNavEntry({
         <motion.span
           layoutId={layoutId}
           aria-hidden
-          className="absolute inset-0 -z-10 rounded-full bg-background shadow-(--shadow-resting)"
+          className="absolute inset-0 -z-10 rounded-xl bg-card shadow-(--shadow-resting)"
           transition={reduced ? { duration: 0 } : motionTokens.spring.snappy}
         />
       )}
@@ -90,9 +87,13 @@ function PillNavEntry({
       </span>
       <span>{item.label}</span>
       {badge && (
-        <Badge tone="info" size="sm" aria-hidden className="tabular-nums">
+        // The unread count: a small primary pill, as in the design (Arc's Badge has no primary tone).
+        <span
+          aria-hidden
+          className="grid h-4.5 min-w-4.5 place-items-center rounded-full bg-primary px-1.5 font-medium text-primary-foreground text-xs tabular-nums"
+        >
           {badge}
-        </Badge>
+        </span>
       )}
     </>
   )

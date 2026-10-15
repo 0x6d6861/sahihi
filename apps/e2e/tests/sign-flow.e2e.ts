@@ -84,7 +84,7 @@ test("sender signs up, sends an envelope; the signer signs; a certificate is iss
   ).toBeVisible()
 
   // ── Send ──
-  await page.getByRole("button", { name: "Send", exact: true }).click()
+  await page.getByRole("button", { name: "Send envelope" }).click()
   // "Review & send": the details can be changed before sending.
   const review = page.getByRole("dialog", { name: "Review & send" })
   await review.getByLabel("Message (optional)").fill("Please sign the lease.")

@@ -2,8 +2,11 @@ import {
   Activity01Icon as HugeActivityIcon,
   ArrowDown01Icon as HugeArrowDownIcon,
   ArrowLeft01Icon as HugeArrowLeftIcon,
+  ArrowRight02Icon as HugeArrowRightIcon,
   ArrowUp02Icon as HugeArrowUpIcon,
   AtIcon as HugeAtSignIcon,
+  Medal01Icon as HugeAwardIcon,
+  CheckmarkBadge01Icon as HugeBadgeCheckIcon,
   UnavailableIcon as HugeBanIcon,
   Notification01Icon as HugeBellIcon,
   TextBoldIcon as HugeBoldIcon,
@@ -14,9 +17,11 @@ import {
   ArrowRight01Icon as HugeChevronRightIcon,
   AlertCircleIcon as HugeCircleAlertIcon,
   CheckmarkCircle02Icon as HugeCircleCheckIcon,
+  DashedLineCircleIcon as HugeCircleDashedIcon,
   CancelCircleIcon as HugeCircleXIcon,
   Copy01Icon as HugeClipboardCopyIcon,
   TimeQuarterPassIcon as HugeClockAlertIcon,
+  Clock01Icon as HugeClockIcon,
   Download01Icon as HugeDownloadIcon,
   MoreHorizontalIcon as HugeEllipsisIcon,
   MoreVerticalIcon as HugeEllipsisVerticalIcon,
@@ -34,15 +39,18 @@ import {
   Home01Icon as HugeHomeIcon,
   HourglassIcon as HugeHourglassIcon,
   ImageUploadIcon as HugeImageUpIcon,
+  InformationCircleIcon as HugeInfoIcon,
   TextItalicIcon as HugeItalicIcon,
   Key01Icon as HugeKeyRoundIcon,
   LicenseDraftIcon as HugeLayoutTemplateIcon,
   LeftToRightListBulletIcon as HugeListIcon,
   LeftToRightListNumberIcon as HugeListOrderedIcon,
   Loading03Icon as HugeLoaderIcon,
+  Location01Icon as HugeLocateIcon,
   SquareLock02Icon as HugeLockIcon,
   Mail01Icon as HugeMailIcon,
   MailSend01Icon as HugeMailSendIcon,
+  Message01Icon as HugeMessageSquareIcon,
   Cursor01Icon as HugeMousePointer2Icon,
   PackageIcon as HugePackageIcon,
   Attachment01Icon as HugePaperclipIcon,
@@ -62,11 +70,13 @@ import {
   StopIcon as HugeStopIcon,
   TableIcon as HugeTableIcon,
   Tag01Icon as HugeTagIcon,
+  LeftToRightBlockQuoteIcon as HugeTextQuoteIcon,
   Delete02Icon as HugeTrash2Icon,
   Alert02Icon as HugeTriangleAlertIcon,
   TextIcon as HugeTypeIcon,
   TextUnderlineIcon as HugeUnderlineIcon,
   Undo02Icon as HugeUndoIcon,
+  Unlink02Icon as HugeUnlinkIcon,
   Upload01Icon as HugeUploadIcon,
   UserIcon as HugeUserIcon,
   UserRemove01Icon as HugeUserMinusIcon,
@@ -101,6 +111,7 @@ export const UndoIcon = icon(HugeUndoIcon)
 export const RedoIcon = icon(HugeRedoIcon)
 export const StopIcon = icon(HugeStopIcon)
 export const ArrowLeftIcon = icon(HugeArrowLeftIcon)
+export const ArrowRightIcon = icon(HugeArrowRightIcon)
 export const AtSignIcon = icon(HugeAtSignIcon)
 export const BanIcon = icon(HugeBanIcon)
 export const BellIcon = icon(HugeBellIcon)
@@ -168,3 +179,12 @@ export const ListIcon = icon(HugeListIcon)
 export const ListOrderedIcon = icon(HugeListOrderedIcon)
 export const TableIcon = icon(HugeTableIcon)
 export const BracesIcon = icon(HugeBracesIcon)
+export const CircleDashedIcon = icon(HugeCircleDashedIcon)
+export const InfoIcon = icon(HugeInfoIcon)
+export const LocateIcon = icon(HugeLocateIcon)
+export const TextQuoteIcon = icon(HugeTextQuoteIcon)
+export const MessageSquareIcon = icon(HugeMessageSquareIcon)
+export const AwardIcon = icon(HugeAwardIcon)
+export const BadgeCheckIcon = icon(HugeBadgeCheckIcon)
+export const UnlinkIcon = icon(HugeUnlinkIcon)
+export const ClockIcon = icon(HugeClockIcon)

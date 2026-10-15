@@ -204,7 +204,7 @@ export function SendButton() {
   return (
     <Button size="sm" onClick={() => void check()} loading={busy}>
       <SendIcon aria-hidden />
-      Send
+      Send envelope
     </Button>
   )
 }

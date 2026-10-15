@@ -11,12 +11,13 @@ import {
   PdfFrame,
   VIEW_ONLY_FEATURES,
 } from "@/components/app/field-editor/field-editor-surface"
+import { CircleAlertIcon, CircleCheckIcon, EyeIcon } from "@/components/app/icons"
 import { toastManager } from "@/components/app/toast"
 import type { PDFEditorPageOverlayProps } from "@/components/extend/pdf-editor"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { FIELD_LABEL_CLASS, FIELD_LABELS, RECIPIENT_COLORS } from "@/lib/constants"
-import { fieldSummary } from "@/lib/envelope-editor"
+import { fieldSummary, invitationOrderLine } from "@/lib/envelope-editor"
 import type { EditorField } from "@/lib/field-editor"
 import {
   displayedToLocalRect,
@@ -85,19 +86,22 @@ const renderPageOverlay = (p: PDFEditorPageOverlayProps) => <PreviewLayer page={
 /**
  * Step 4 of the draft editor: each original PDF with its placed fields drawn over it, as the
  * recipients will find them (one document at a time, ADR 0037; the switcher sits in the viewer's
- * second toolbar row, like on the fields step), and a per-recipient count
- * across all documents beside it. Fields are the live editor
- * state, so unsaved edits show too.
+ * second toolbar row, like on the fields step), and beside it each recipient's fields across all
+ * documents (with their step when they sign in order) and two checks: everyone has a signature
+ * field, and who is invited when. Fields are the live editor state, so unsaved edits show too.
  */
 export function PreviewStep({
   documents,
   fields: allFields,
   recipients,
+  stepOf,
 }: {
   /** The envelope's documents in signing order; one is on screen at a time (ADR 0037). */
   documents: EditorDocument[]
   fields: EditorField[]
   recipients: EditorRecipient[]
+  /** Each recipient's signing step, when they sign in order; null when everyone signs at once. */
+  stepOf: Record<string, number> | null
 }) {
   const [activeId, setActiveId] = useState(documents[0]?.id ?? "")
   // A document whose PDF failed to load (the viewer shows why).
@@ -108,6 +112,12 @@ export function PreviewStep({
     () => allFields.filter((f) => f.envelopeDocumentId === active?.id),
     [allFields, active?.id],
   )
+  const missingSignature = recipients.filter(
+    (r) => !allFields.some((f) => f.recipientId === r.id && f.type === "SIGNATURE"),
+  )
+  const order = stepOf
+    ? invitationOrderLine(recipients.map((r) => ({ name: r.name, step: stepOf[r.id] ?? 1 })))
+    : null
   const recipientMap = useMemo(() => new Map(recipients.map((r) => [r.id, r])), [recipients])
   const fieldCount = (id: string) => allFields.filter((f) => f.envelopeDocumentId === id).length
   const rotationsKey = pageRotations.join(",")
@@ -152,9 +162,6 @@ export function PreviewStep({
                       </span>
                     )}
                   />
-                  <span className="max-lg:hidden">
-                    Fields as recipients will see them. Go back to Fields to change them.
-                  </span>
                 </div>
               }
               onDocumentLoadError={() => setFailedId(active.id)}
@@ -167,39 +174,74 @@ export function PreviewStep({
         </PdfFrame>
         <aside
           aria-label="Fields per recipient"
-          className="w-72 shrink-0 border-l bg-background max-lg:hidden"
+          className="w-80 shrink-0 border-l bg-background max-lg:hidden"
         >
           <ScrollArea className="h-full">
-            <div className="flex flex-col gap-4 p-4">
-              <h2 className="font-medium text-sm">Fields per recipient</h2>
-              <ul className="flex flex-col gap-3">
-                {recipients.map((r) => {
-                  // Across every document: what the recipient will be asked to do.
-                  const own = allFields.filter((f) => f.recipientId === r.id)
-                  return (
-                    <li key={r.id} className="flex flex-col gap-1">
-                      <span className="flex items-center gap-2 font-medium text-sm">
-                        <RecipientDot colorIndex={r.colorIndex} />
-                        <span className="truncate">{r.name}</span>
-                        <span className="ml-auto text-muted-foreground tabular-nums">
-                          {own.length}
+            <div className="flex flex-col gap-5 p-5">
+              <p className="flex items-start gap-2.5 rounded-2xl bg-muted px-3.5 py-3 text-muted-foreground text-xs leading-[1.45]">
+                <EyeIcon aria-hidden className="mt-px size-3.5 shrink-0" />
+                Fields as recipients will see them. Go back to Fields to change them.
+              </p>
+              <div className="flex flex-col gap-3">
+                <h2 className="font-medium text-sm">Fields per recipient</h2>
+                <ul className="flex flex-col gap-2">
+                  {recipients.map((r) => {
+                    // Across every document: what the recipient will be asked to do.
+                    const own = allFields.filter((f) => f.recipientId === r.id)
+                    const step = stepOf?.[r.id]
+                    return (
+                      <li
+                        key={r.id}
+                        className="flex flex-col gap-1 rounded-2xl border bg-card px-3 py-2.5"
+                      >
+                        <span className="flex items-center gap-2 text-sm">
+                          <RecipientDot colorIndex={r.colorIndex} />
+                          <span className="truncate font-medium">{r.name}</span>
+                          {step !== undefined && (
+                            <span className="ml-auto shrink-0 text-muted-foreground text-xs">
+                              Step {step}
+                            </span>
+                          )}
                         </span>
-                      </span>
-                      {own.length === 0 ? (
-                        <span className="text-muted-foreground text-xs">No fields yet</span>
-                      ) : (
                         <span className="text-muted-foreground text-xs">
-                          {fieldSummary(own.map((f) => f.type))}
+                          {own.length === 0
+                            ? "No fields yet"
+                            : fieldSummary(own.map((f) => f.type))}
                         </span>
-                      )}
-                    </li>
-                  )
-                })}
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+              <ul className="flex flex-col gap-2 border-t pt-4 text-sm">
+                <Check ok={missingSignature.length === 0}>
+                  {missingSignature.length === 0
+                    ? "Every recipient has a signature field"
+                    : `No signature field yet for ${missingSignature.map((r) => r.name).join(", ")}`}
+                </Check>
+                {order && <Check ok>{order}</Check>}
               </ul>
             </div>
           </ScrollArea>
         </aside>
       </div>
     </PreviewContext.Provider>
+  )
+}
+
+/** One line of the checks under the recipients: green when it holds, amber when not. */
+function Check({ ok, children }: { ok: boolean; children: React.ReactNode }) {
+  const Icon = ok ? CircleCheckIcon : CircleAlertIcon
+  return (
+    <li className="flex items-start gap-2">
+      <Icon
+        aria-hidden
+        className={cn(
+          "mt-0.5 size-3.5 shrink-0",
+          ok ? "text-success-foreground" : "text-warning-foreground",
+        )}
+      />
+      {children}
+    </li>
   )
 }

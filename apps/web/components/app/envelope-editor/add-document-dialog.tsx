@@ -54,7 +54,7 @@ export function AddDocumentDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="secondary" disabled={full}>
+        <Button variant="secondary" size="sm" disabled={full}>
           <PlusIcon aria-hidden />
           Add document
         </Button>

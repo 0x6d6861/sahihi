@@ -32,7 +32,13 @@ bun .claude/skills/run-sahihi/driver.mjs flow .claude/skills/run-sahihi/flows/co
   Add `--json` to print only the body (status on stderr) for piping:
   `bun .claude/skills/run-sahihi/driver.mjs api GET /documents --json | python3 -c 'import json,sys; print(json.load(sys.stdin)["items"][0]["id"])'`.
 - `shot` waits for network idle, or for `--wait "<visible text>"` (more reliable on pages that
-  poll). `--out` names the file; default `<path>-<theme>`.
+  poll). `--out` names the file; default `<path>-<theme>`. The viewport is 1280×900; set
+  `VIEWPORT_WIDTH` (e.g. `1440` to compare with `design/app/app.pen`, `390` for a phone).
+- Other flows in `flows/`: `envelope-editor-steps.mjs` (each draft editor step, `ENVELOPE_ID`),
+  `draft-select-section.mjs` and `draft-signers.mjs` (Drafting with AI, `DRAFT_ID`; a new
+  workspace needs `api PUT /generated-documents/settings '{"enabled":true}'` first),
+  `sign-states.mjs` and `sign-otp.mjs` (the signing page, `SIGN_TOKEN` from the invite in
+  Mailpit; a completed envelope's links are in the "Completed" emails, since links rotate).
 - `flow <file.mjs>` runs a module exporting `default async ({ page, goto, shot, api, session })`
   in a signed-in browser. `flows/connect-storage.mjs` is a worked example: Radix select, a dialog
   form, a toast, two screenshots. Copy it for new flows; keep the ones worth reusing in `flows/`.
