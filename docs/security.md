@@ -155,6 +155,15 @@ Owners and admins can connect storage that receives the workspace's files, so:
   the same user and workspace; scopes are Drive's `drive.file` and OneDrive's app folder.
 - **Uploads** for primary storage wait in `staging/` in Sahihi's bucket until validated.
 
+## Workspace website icon
+
+The switcher icon comes from logo.dev (docs/auth.md → Account settings). The API calls a fixed
+host, `img.logo.dev`, with the website's domain only, so an admin-supplied website never makes
+Sahihi connect to that site. `LOGO_DEV_TOKEN` is a publishable key but stays server-side, and
+logged errors carry only the error name (a message could echo the URL with the key). The PNG
+must pass `workspaceIconProblem` before it is stored, and it is served only to members of the
+session's active workspace (`default-src 'none'` CSP, `Cache-Control: private`).
+
 ## Webhooks
 
 Owners and admins can send the org's envelope data to a URL of their choosing, so the

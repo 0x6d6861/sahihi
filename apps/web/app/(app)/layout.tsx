@@ -11,7 +11,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!activeOrganizationId) redirect("/onboarding")
 
   // better-auth returns only the organizations this user is a member of.
-  const { data } = await apiServer<ShellOrganization[]>("/auth/organization/list")
+  const [{ data }, { data: workspace }] = await Promise.all([
+    apiServer<ShellOrganization[]>("/auth/organization/list"),
+    // The website icon of the active workspace only: the API serves no one else's.
+    apiServer<{ icon: string | null }>("/workspace"),
+  ])
   const organizations = (data ?? []).map(({ id, name }) => ({ id, name }))
 
   return (
@@ -19,6 +23,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       user={session.user}
       organizations={organizations}
       activeOrganizationId={activeOrganizationId}
+      activeIcon={workspace?.icon ?? null}
     >
       {children}
     </AppShell>

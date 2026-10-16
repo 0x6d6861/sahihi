@@ -35,9 +35,12 @@ const WORKSPACE_LINKS = [
 export function OrgSwitcher({
   organizations,
   activeOrganizationId,
+  activeIcon,
 }: {
   organizations: ShellOrganization[]
   activeOrganizationId: string
+  /** The active workspace's website icon (Settings → Workspace); other workspaces show none. */
+  activeIcon: string | null
 }) {
   const router = useRouter()
   const [pending, setPending] = useState(false)
@@ -98,15 +101,31 @@ export function OrgSwitcher({
       <DropdownMenu
         align="start"
         label={active?.name ?? "Select a workspace"}
-        icon={<WorkspaceMark name={active?.name ?? ""} />}
+        icon={<WorkspaceMark name={active?.name ?? ""} icon={activeIcon} />}
         items={items}
       />
     </span>
   )
 }
 
-/** The active workspace's initials on a small emerald square, as in the top bar of the design. */
-function WorkspaceMark({ name }: { name: string }) {
+/**
+ * The active workspace's website icon, or its initials on a small emerald square as in the top
+ * bar of the design (also when the icon fails to load).
+ */
+function WorkspaceMark({ name, icon }: { name: string; icon: string | null }) {
+  const [failed, setFailed] = useState<string | null>(null)
+  if (icon && failed !== icon) {
+    return (
+      // biome-ignore lint/performance/noImgElement: same-origin icon route, fixed size
+      <img
+        src={icon}
+        alt=""
+        aria-hidden
+        className="on-paper size-5.5 rounded-md border bg-background object-contain p-0.5"
+        onError={() => setFailed(icon)}
+      />
+    )
+  }
   const initials =
     name
       .split(/\s+/)
