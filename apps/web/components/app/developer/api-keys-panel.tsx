@@ -16,7 +16,7 @@ import { KeyRoundIcon, PlusIcon } from "@/components/app/icons"
 import { toastManager } from "@/components/app/toast"
 import { SecretReveal } from "@/components/app/webhooks/secret-reveal"
 import { Checkbox } from "@/components/arc/checkbox/checkbox"
-import { Dialog, DialogContent, DialogTrigger } from "@/components/arc/dialog/dialog"
+import { Drawer, DrawerContent, DrawerTrigger } from "@/components/arc/drawer/drawer"
 import { RadioGroup } from "@/components/arc/radio-group/radio-group"
 import { Tooltip } from "@/components/arc/tooltip/tooltip"
 import {
@@ -182,14 +182,15 @@ function CreateKeyDialog() {
   }
 
   return (
-    <Dialog open={open} onOpenChange={change}>
-      <DialogTrigger asChild>
+    <Drawer open={open} onOpenChange={change}>
+      <DrawerTrigger asChild>
         <Button>
           <PlusIcon aria-hidden />
           Create API key
         </Button>
-      </DialogTrigger>
-      <DialogContent
+      </DrawerTrigger>
+      <DrawerContent
+        side="right"
         title={key ? "Copy your API key" : "Create an API key"}
         description="For your own systems to call the Sahihi API. Give each system its own key with only the permissions it needs."
       >
@@ -256,8 +257,8 @@ function CreateKeyDialog() {
             </DialogActions>
           </form>
         )}
-      </DialogContent>
-    </Dialog>
+      </DrawerContent>
+    </Drawer>
   )
 }
 

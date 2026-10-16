@@ -13,12 +13,11 @@ import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/app/button"
 import { useAutosave } from "@/components/app/field-editor/use-autosave"
 import { Input } from "@/components/app/fields"
-import { XIcon } from "@/components/app/icons"
-import { Panel } from "@/components/app/panel"
+import { CheckIcon, PlusIcon, UserPlusIcon, XIcon } from "@/components/app/icons"
 import { Alert } from "@/components/arc/alert/alert"
 import { Checkbox } from "@/components/arc/checkbox/checkbox"
 import { DropdownMenu } from "@/components/arc/dropdown-menu/dropdown-menu"
-import { Select } from "@/components/arc/select/select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/arc/popover/popover"
 import { Switch } from "@/components/arc/switch/switch"
 import { Tooltip } from "@/components/arc/tooltip/tooltip"
 import { Button as IconButton } from "@/components/ui/button"
@@ -134,7 +133,10 @@ export function SignersPanel() {
   }, [nav])
 
   return (
-    <div ref={root} className="mx-auto flex max-w-2xl scroll-mt-4 flex-col gap-4 px-4 py-6 md:px-8">
+    <div
+      ref={root}
+      className="mx-auto flex max-w-[720px] scroll-mt-4 flex-col gap-4 px-3 pt-1 pb-10 sm:px-0"
+    >
       {draft.roles.map((role, i) => {
         const issues = roleIssues(detail.issues, role.key)
         const savedRole = saved.roles.find((r) => r.key === role.key)
@@ -149,67 +151,98 @@ export function SignersPanel() {
         const party = partyForRole(parties, draft, role.key)
         return (
           <div key={role.key} data-role-key={role.key} className="scroll-mt-4">
-            <Panel
-              title={role.label || "Untitled signer"}
-              description={roleDescription(signer, party)}
-              actions={
-                editable && draft.roles.length > 1 ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() =>
-                      update((d) => {
-                        d.roles.splice(i, 1)
-                        delete d.fields[role.key]
-                        delete d.parties[role.key]
-                      })
-                    }
-                  >
-                    Remove
-                  </Button>
-                ) : null
-              }
+            <section
+              aria-label={role.label || "Untitled signer"}
+              className="flex flex-col gap-4 rounded-(--radius-panel) border bg-card p-5"
             >
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Input
-                  label="Role"
-                  value={role.label}
-                  disabled={!editable}
-                  onChange={(e) => update((d) => setRole(d, i, { label: e.target.value }))}
-                />
-                <Select
-                  label="Takes part as"
-                  value={role.recipientRole}
-                  disabled={!editable}
-                  options={[
-                    { value: "SIGNER", label: "Signer" },
-                    { value: "VIEWER", label: "Gets a copy" },
-                  ]}
-                  onValueChange={(v) =>
-                    update((d) => {
-                      setRole(d, i, {
-                        recipientRole: v as "SIGNER" | "VIEWER",
-                        ...(v === "VIEWER" ? { initialsOnEveryPage: false } : {}),
-                      })
-                      // A copy has no signature block, so it can't carry a party link (ADR 0048).
-                      if (v === "VIEWER") {
-                        d.fields[role.key] = []
-                        delete d.parties[role.key]
-                      }
-                    })
-                  }
-                />
-                <Input
-                  label="Full name"
-                  autoComplete="off"
-                  value={role.name ?? ""}
-                  disabled={!editable}
-                  error={issue("missing_name", nameSaved)}
-                  onChange={(e) => update((d) => setRole(d, i, { name: e.target.value || null }))}
-                />
+              <header className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5 leading-[1.45]">
+                  {/* The role is the card's title, renamed in place. */}
+                  <input
+                    aria-label="Role"
+                    className="-mx-1 min-w-0 rounded-md bg-transparent px-1 font-medium text-base outline-none hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring disabled:hover:bg-transparent"
+                    value={role.label}
+                    placeholder="Untitled signer"
+                    disabled={!editable}
+                    onChange={(e) => update((d) => setRole(d, i, { label: e.target.value }))}
+                  />
+                  <p className="text-muted-foreground text-sm">{roleDescription(signer, party)}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  {editable ? (
+                    <DropdownMenu
+                      label={signer ? "Signer" : "Gets a copy"}
+                      accessibleLabel={`Takes part as: ${signer ? "Signer" : "Gets a copy"}`}
+                      align="end"
+                      items={(["SIGNER", "VIEWER"] as const).map((v) => ({
+                        label: v === "SIGNER" ? "Signer" : "Gets a copy",
+                        icon: role.recipientRole === v ? <CheckIcon /> : <span />,
+                        onSelect: () =>
+                          update((d) => {
+                            setRole(d, i, {
+                              recipientRole: v,
+                              ...(v === "VIEWER" ? { initialsOnEveryPage: false } : {}),
+                            })
+                            // A copy has no signature block, so it can't carry a party link (ADR 0048).
+                            if (v === "VIEWER") {
+                              d.fields[role.key] = []
+                              delete d.parties[role.key]
+                            }
+                          }),
+                      }))}
+                    />
+                  ) : (
+                    <span className="text-muted-foreground text-sm">
+                      {signer ? "Signer" : "Gets a copy"}
+                    </span>
+                  )}
+                  {editable && draft.roles.length > 1 && (
+                    <Tooltip content="Remove signer">
+                      <IconButton
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Remove ${role.label || "signer"}`}
+                        className="text-muted-foreground"
+                        onClick={() =>
+                          update((d) => {
+                            d.roles.splice(i, 1)
+                            delete d.fields[role.key]
+                            delete d.parties[role.key]
+                          })
+                        }
+                      >
+                        <XIcon aria-hidden />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                </div>
+              </header>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="relative">
+                  <Input
+                    label="Name"
+                    placeholder="Full name"
+                    autoComplete="off"
+                    value={role.name ?? ""}
+                    disabled={!editable}
+                    error={issue("missing_name", nameSaved)}
+                    onChange={(e) => update((d) => setRole(d, i, { name: e.target.value || null }))}
+                  />
+                  {/* Signing in person: the party's own name. For a company, whoever signs for it. */}
+                  {editable && party?.value && !role.name && (
+                    <button
+                      type="button"
+                      className="absolute top-0 right-0 max-w-[60%] truncate text-muted-foreground text-sm leading-5 hover:text-foreground"
+                      onClick={() => update((d) => setRole(d, i, { name: party.value }))}
+                    >
+                      Use “{party.value}”
+                    </button>
+                  )}
+                </div>
                 <Input
                   label="Email"
                   type="email"
+                  placeholder="name@company.com"
                   autoComplete="off"
                   value={role.email ?? ""}
                   disabled={!editable}
@@ -217,29 +250,21 @@ export function SignersPanel() {
                   onChange={(e) => update((d) => setRole(d, i, { email: e.target.value || null }))}
                 />
               </div>
-              {editable && party?.value && !role.name && (
-                <p className="flex flex-wrap items-center gap-x-2 text-muted-foreground text-sm">
-                  Signing in person?
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => update((d) => setRole(d, i, { name: party.value }))}
-                  >
-                    Use “{party.value}”
-                  </Button>
-                  For a company, enter who signs on its behalf.
-                </p>
-              )}
               {signer && (
                 <>
-                  <Switch
-                    label="Initials on every page"
-                    checked={role.initialsOnEveryPage}
-                    disabled={!editable}
-                    onCheckedChange={(checked) =>
-                      update((d) => setRole(d, i, { initialsOnEveryPage: checked }))
-                    }
-                  />
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm" id={`${role.key}-initials`}>
+                      Initials on every page
+                    </span>
+                    <Switch
+                      aria-labelledby={`${role.key}-initials`}
+                      checked={role.initialsOnEveryPage}
+                      disabled={!editable}
+                      onCheckedChange={(checked) =>
+                        update((d) => setRole(d, i, { initialsOnEveryPage: checked }))
+                      }
+                    />
+                  </div>
                   <FieldList
                     fields={fields}
                     disabled={!editable}
@@ -256,7 +281,7 @@ export function SignersPanel() {
                   )}
                 </>
               )}
-            </Panel>
+            </section>
           </div>
         )
       })}
@@ -290,6 +315,7 @@ export function SignersPanel() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Button
             variant="secondary"
+            size="sm"
             onClick={() =>
               update((d) => {
                 const key = blankKey(
@@ -301,6 +327,7 @@ export function SignersPanel() {
               })
             }
           >
+            <UserPlusIcon aria-hidden />
             Add signer
           </Button>
           <span className="text-muted-foreground text-sm" role="status">
@@ -357,7 +384,10 @@ function setRole(
   if (role) d.roles[index] = { ...role, ...patch }
 }
 
-/** One signer's fields: type, what to fill or agree to (text, checkbox), required, remove. */
+/**
+ * One signer's fields as chips: a click opens what to fill or agree to (text, checkbox), whether
+ * it's required, and remove; "Add field" appends one.
+ */
 function FieldList({
   fields,
   disabled,
@@ -370,59 +400,90 @@ function FieldList({
   const set = (i: number, patch: Partial<SignerField>) =>
     onChange(fields.map((f, j) => (j === i ? { ...f, ...patch } : f)))
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2">
       <span className="font-medium text-sm">Fields</span>
       {fields.length === 0 && (
         <p className="text-muted-foreground text-sm">No fields yet. A signer needs a signature.</p>
       )}
-      <ul className="flex flex-col divide-y rounded-xl border">
+      <ul className="flex flex-wrap items-center gap-2">
         {fields.map((f, i) => (
-          <li key={f.id ?? `new-${i}`} className="flex flex-wrap items-center gap-3 px-3 py-2">
-            <span className="w-28 shrink-0 text-sm">{FIELD_NAMES[f.fieldType]}</span>
-            {f.fieldType === "TEXT" || f.fieldType === "CHECKBOX" ? (
-              <div className="min-w-48 flex-1">
-                <Input
-                  label={f.fieldType === "TEXT" ? "What to fill in" : "Statement to tick"}
-                  value={f.label ?? ""}
-                  disabled={disabled}
-                  onChange={(e) => set(i, { label: e.target.value || undefined })}
-                />
-              </div>
-            ) : (
-              <span className="flex-1" />
-            )}
-            <Checkbox
-              label="Required"
-              checked={f.required}
+          <li key={f.id ?? `new-${i}`}>
+            <FieldChip
+              field={f}
               disabled={disabled}
-              onCheckedChange={(v) => set(i, { required: v === true })}
+              onChange={(patch) => set(i, patch)}
+              onRemove={() => onChange(fields.filter((_, j) => j !== i))}
             />
-            <Tooltip content="Remove field">
-              <IconButton
-                variant="ghost"
-                size="icon-sm"
-                aria-label={`Remove ${FIELD_NAMES[f.fieldType]} field`}
-                disabled={disabled}
-                onClick={() => onChange(fields.filter((_, j) => j !== i))}
-              >
-                <XIcon aria-hidden />
-              </IconButton>
-            </Tooltip>
           </li>
         ))}
+        {!disabled && (
+          <li className="app-plain-trigger">
+            <DropdownMenu
+              label="Add field"
+              icon={<PlusIcon />}
+              align="start"
+              items={FIELD_TYPES.map((t) => ({
+                label: FIELD_NAMES[t],
+                onSelect: () => onChange([...fields, { fieldType: t, required: t !== "CHECKBOX" }]),
+              }))}
+            />
+          </li>
+        )}
       </ul>
-      {!disabled && (
-        <div>
-          <DropdownMenu
-            label="Add field"
-            align="start"
-            items={FIELD_TYPES.map((t) => ({
-              label: FIELD_NAMES[t],
-              onSelect: () => onChange([...fields, { fieldType: t, required: t !== "CHECKBOX" }]),
-            }))}
-          />
-        </div>
-      )}
     </div>
+  )
+}
+
+function FieldChip({
+  field,
+  disabled,
+  onChange,
+  onRemove,
+}: {
+  field: SignerField
+  disabled: boolean
+  onChange: (patch: Partial<SignerField>) => void
+  onRemove: () => void
+}) {
+  const name = FIELD_NAMES[field.fieldType]
+  const withLabel = field.fieldType === "TEXT" || field.fieldType === "CHECKBOX"
+  // Text and checkbox fields say what they ask for; the others are named by their type.
+  const title = withLabel && field.label ? `${name}: ${field.label}` : name
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          aria-label={`${title}, ${field.required ? "required" : "optional"}`}
+          className="app-canvas press inline-flex h-[30px] max-w-64 items-center gap-1.5 rounded-2xl border px-2.5 text-sm outline-none hover:border-input focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none"
+        >
+          <span className="truncate">{title}</span>
+          {!field.required && <span className="text-muted-foreground text-xs">optional</span>}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72" align="start">
+        <div className="flex flex-col gap-3">
+          <span className="font-medium text-sm">{name}</span>
+          {withLabel && (
+            <Input
+              label={field.fieldType === "TEXT" ? "What to fill in" : "Statement to tick"}
+              value={field.label ?? ""}
+              onChange={(e) => onChange({ label: e.target.value || undefined })}
+            />
+          )}
+          <Checkbox
+            label="Required"
+            checked={field.required}
+            onCheckedChange={(v) => onChange({ required: v === true })}
+          />
+          <div className="flex justify-end">
+            <Button variant="ghost" size="sm" onClick={onRemove}>
+              Remove field
+            </Button>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }

@@ -95,3 +95,22 @@ export function splitPreflight(issues: PreflightIssue[]): {
   }
   return { inDialog, blocking }
 }
+
+/**
+ * The order recipients are invited in, by first name, for the preview's checks: "Achieng is
+ * invited first, then David"; recipients on one step are joined with "and". Null with fewer than
+ * two steps (everyone at once).
+ */
+export function invitationOrderLine(recipients: { name: string; step: number }[]): string | null {
+  const steps = [...new Set(recipients.map((r) => r.step))].sort((a, b) => a - b)
+  if (steps.length < 2) return null
+  const names = steps.map((s) =>
+    joinAnd(recipients.filter((r) => r.step === s).map((r) => r.name.trim().split(/\s+/)[0] ?? "")),
+  )
+  const [first, ...rest] = names
+  const verb = recipients.filter((r) => r.step === steps[0]).length > 1 ? "are" : "is"
+  return `${first} ${verb} invited first, then ${rest.join(", then ")}`
+}
+
+const joinAnd = (parts: string[]) =>
+  parts.length < 2 ? (parts[0] ?? "") : `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`

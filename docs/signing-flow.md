@@ -23,9 +23,10 @@ file is still uploading; `envelope.sent` records every document's and file's nam
    reports them as field issues (`recipients.<i>.email` / `.phone`). `order` only matters for
    `SEQUENTIAL` (equal numbers sign in parallel); parallel envelopes store `1`. `colorIndex` is the
    list position, used for the editor colours.
-   Web: `components/app/recipients-editor/` on the DRAFT envelope page. Each row has name, email,
-   role `Select`, verification `Select`, a step `NumberField` (sequential only) and a phone `Input`
-   (shown for SMS). It validates with the same schema via `lib/recipients.ts` and shows
+   Web: `components/app/recipients-editor/` on the DRAFT envelope page, a table from `md` (cards
+   below it). Each row has a step `Input` (sequential only), name, email, role and verification
+   (coss `Select`s) and a phone `Input` (shown for SMS). "Sign in order" beside the heading saves
+   the signing order at once (`PUT …/details`, which renumbers the steps). It validates with the same schema via `lib/recipients.ts` and shows
    client/API issues per field.
 3. `PUT /api/envelopes/:id/fields` replaces all fields (editor autosave). Each field belongs to one
    recipient and **VIEWERs can't own fields**.
@@ -108,9 +109,9 @@ Link lifetime is `min(now + SIGNING_LINK_TTL_DAYS, envelope.expiresAt)`.
 
 Web: an editable draft opens in the **draft editor**, a full page without the app's bar
 (`app/(app)/envelopes/[id]/edit/`, ADR 0021, ADR 0031); `/envelopes/:id` redirects it there and
-shows everything else read-only. The editor's own top bar has the four steps as a pill, in
-`?step=` (Document, optional, ADR 0024 → Recipients → Fields → Preview), a split button (**Save
-as template**, with download original, open document and activity behind its chevron) and **Send**. Send first settles the draft editors
+shows everything else read-only. The editor's own top bar has the four steps, numbered (a check on
+the ones behind the current one), in `?step=` (Documents → Recipients → Fields → Preview), a More
+menu (**Save as template**, download original, open document, activity) and **Send envelope**. Send first settles the draft editors
 (`components/app/envelope/draft-state.tsx`): the field autosave is flushed, and unsaved recipient
 edits block with a message. It then calls `preflight` and lists the issues inline in an `Alert`,
 each with a **Fix** link to the step that fixes it. Only a clean preflight opens **Review & send**

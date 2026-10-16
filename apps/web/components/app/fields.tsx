@@ -1,7 +1,7 @@
 "use client"
 
 import { forwardRef, useId, useState } from "react"
-import { EyeIcon, EyeOffIcon } from "@/components/app/icons"
+import { EyeIcon, EyeOffIcon, SearchIcon, XIcon } from "@/components/app/icons"
 import { Input as ShadcnInput } from "@/components/shadcn/input"
 import { Label } from "@/components/shadcn/label"
 import { Textarea as ShadcnTextarea } from "@/components/shadcn/textarea"
@@ -19,6 +19,11 @@ interface FieldProps {
   label: string
   description?: string
   error?: string
+}
+
+interface InputOnlyProps {
+  /** E.g. `md:sr-only` in a table whose column header names the field from `md`. */
+  labelClassName?: string
 }
 
 /** Label, control, then the description and error under it, wired with aria-describedby. */
@@ -59,16 +64,18 @@ function Messages({
 
 const describedBy = (...ids: (string | undefined)[]) => ids.filter(Boolean).join(" ") || undefined
 
-export type InputProps = FieldProps & React.InputHTMLAttributes<HTMLInputElement>
+export type InputProps = FieldProps & InputOnlyProps & React.InputHTMLAttributes<HTMLInputElement>
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-  { label, description, error, id, className, ...props },
+  { label, labelClassName, description, error, id, className, ...props },
   ref,
 ) {
   const { controlId, hintId, errorId } = useField(id, { label, description, error })
   return (
     <div className="flex flex-col gap-2">
-      <Label htmlFor={controlId}>{label}</Label>
+      <Label htmlFor={controlId} className={labelClassName}>
+        {label}
+      </Label>
       <ShadcnInput
         {...props}
         ref={ref}
@@ -143,3 +150,57 @@ export const PasswordField = forwardRef<HTMLInputElement, PasswordFieldProps>(
     )
   },
 )
+
+export type SearchInputProps = Omit<
+  React.InputHTMLAttributes<HTMLInputElement>,
+  "type" | "value"
+> & {
+  /** Read by assistive tech; not shown (the placeholder and the icon say it's a search). */
+  label: string
+  value: string
+  onValueChange: (value: string) => void
+}
+
+/** A filled search field (the list toolbars): icon, input, and a clear button once something is typed. */
+export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(function SearchInput(
+  { label, value, onValueChange, id, className, ...props },
+  ref,
+) {
+  const generated = useId()
+  const controlId = id ?? generated
+  return (
+    <div className="relative">
+      <label htmlFor={controlId} className="sr-only">
+        {label}
+      </label>
+      <SearchIcon
+        aria-hidden
+        className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+      />
+      <ShadcnInput
+        {...props}
+        ref={ref}
+        id={controlId}
+        type="search"
+        value={value}
+        onChange={(e) => onValueChange(e.target.value)}
+        className={cn(
+          "rounded-2xl border-transparent bg-muted ps-8 pe-8 dark:bg-muted [&::-webkit-search-cancel-button]:appearance-none",
+          className,
+        )}
+      />
+      {value && (
+        <IconButton
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          className="absolute end-1 top-1/2 -translate-y-1/2 text-muted-foreground"
+          aria-label="Clear search"
+          onClick={() => onValueChange("")}
+        >
+          <XIcon aria-hidden />
+        </IconButton>
+      )}
+    </div>
+  )
+})

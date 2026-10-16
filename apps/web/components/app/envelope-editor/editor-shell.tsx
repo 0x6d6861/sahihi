@@ -18,7 +18,7 @@ import { SendProblems, SendProvider } from "./send-context"
 
 /**
  * Draft envelope editor frame (ADR 0021, ADR 0031): a full page (the app shell hides its bar) with
- * its own top bar (`EditorHeader`: back, title, the steps as a pill, More and Send) and the current
+ * its own top bar (`EditorHeader`: back, title, the numbered steps, More and Send) and the current
  * step in the rest. All steps stay mounted while hidden, so switching never drops the field
  * autosave or unsaved recipient edits.
  */
@@ -84,7 +84,7 @@ export function EditorShell({
           <div className="min-h-0 flex-1">
             {/* Mounted only while shown: the Prepare view is heavy and holds no draft state. */}
             {step === "document" && (
-              <div className="h-full overflow-y-auto">
+              <div className="app-canvas h-full overflow-y-auto">
                 <DocumentsStep
                   envelope={e}
                   files={files}
@@ -93,7 +93,7 @@ export function EditorShell({
                 />
               </div>
             )}
-            <div hidden={step !== "recipients"} className="h-full overflow-y-auto">
+            <div hidden={step !== "recipients"} className="app-canvas h-full overflow-y-auto">
               <RecipientsStep
                 envelope={e}
                 hasFieldOwners={hasFieldOwners}
@@ -116,7 +116,16 @@ export function EditorShell({
             {/* Mounted only while shown: nothing to keep, and it saves loading the PDF twice. */}
             {step === "preview" && (
               <div className="h-full">
-                <PreviewStep documents={documents} fields={fields} recipients={fieldOwners} />
+                <PreviewStep
+                  documents={documents}
+                  fields={fields}
+                  recipients={fieldOwners}
+                  stepOf={
+                    e.signingOrder === "SEQUENTIAL"
+                      ? Object.fromEntries(e.recipients.map((r) => [r.id, r.order]))
+                      : null
+                  }
+                />
               </div>
             )}
           </div>

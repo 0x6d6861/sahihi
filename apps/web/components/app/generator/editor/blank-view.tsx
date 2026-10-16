@@ -12,8 +12,7 @@ import { useGenerator } from "../generator-context"
 
 /**
  * A blank in the text (docs/ai-documents.md → Editing): never bracketed text, always a distinct,
- * non-editable chip. Filled, it shows the value with a dotted underline; empty, a dashed chip with
- * the label ("skipped" when the question was skipped). A click fills it, in Preview as in Editing
+ * non-editable chip. Filled, it shows the value as plain text; empty, an amber chip with the label ("skipped" when the question was skipped). A click fills it, in Preview as in Editing
  * (the rest of a section's surface still selects it for the chat); "Save and next" moves on to the
  * next open blank. The value is data, not text.
  */
@@ -30,11 +29,9 @@ export function BlankView({ node, selected }: NodeViewProps) {
 
   const chip =
     state === "filled" ? (
-      <span className="underline decoration-info decoration-dotted underline-offset-[3px]">
-        {variable?.value}
-      </span>
+      <span className="mx-0.5">{variable?.value}</span>
     ) : (
-      <span className="mx-0.5 inline-flex items-baseline gap-1 whitespace-nowrap rounded-sm border border-warning border-dashed bg-warning/15 px-1.5 text-[0.86em] text-foreground">
+      <span className="mx-0.5 inline-flex items-baseline gap-1 whitespace-nowrap rounded-[4px] border border-warning/40 bg-warning/8 px-1.5 py-px font-normal text-warning-foreground">
         {label}
         {state === "skipped" && <span className="text-muted-foreground text-xs">skipped</span>}
       </span>

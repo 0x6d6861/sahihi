@@ -5,6 +5,7 @@ import { type DiffPart, diffLines, diffWords, numberSections } from "@sahihi/cor
 import { useEffect, useRef, useState } from "react"
 import { Badge } from "@/components/app/badge"
 import { Button } from "@/components/app/button"
+import { LocateIcon } from "@/components/app/icons"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ApiError } from "@/lib/api"
 import { PROPOSAL_STATUS_LABEL, type ProposalView, proposalTitle } from "@/lib/generator"
@@ -84,9 +85,12 @@ function Proposal({ view }: { view: ProposalView }) {
   }
 
   return (
-    <section aria-label={title} className="flex flex-col gap-3 rounded-2xl border bg-card p-4">
+    <section
+      aria-label={title}
+      className="flex flex-col gap-3 rounded-(--radius-panel) border bg-card p-4 leading-[1.45]"
+    >
       <header className="flex items-start justify-between gap-3">
-        <h3 className="font-medium text-base">{title}</h3>
+        <h3 className="font-medium text-sm">{title}</h3>
         <span className="shrink-0">
           <Badge
             size="sm"
@@ -124,6 +128,7 @@ function Proposal({ view }: { view: ProposalView }) {
               size="sm"
               onClick={() => navigate({ kind: "section", id: sectionId })}
             >
+              <LocateIcon aria-hidden />
               Show in document
             </Button>
           ) : (
@@ -133,6 +138,7 @@ function Proposal({ view }: { view: ProposalView }) {
             <span className="flex items-center gap-2">
               <Button
                 variant="ghost"
+                size="sm"
                 loading={busy === "reject"}
                 disabled={busy !== null}
                 onClick={() => decide("reject")}
@@ -140,6 +146,7 @@ function Proposal({ view }: { view: ProposalView }) {
                 Reject
               </Button>
               <Button
+                size="sm"
                 loading={busy === "accept"}
                 disabled={busy !== null}
                 onClick={() => decide("accept")}
@@ -157,7 +164,7 @@ function Proposal({ view }: { view: ProposalView }) {
 /** Removed words struck through, added words highlighted; long unchanged runs stay readable. */
 function Diff({ parts }: { parts: DiffPart[] }) {
   return (
-    <p className="max-h-72 overflow-y-auto whitespace-pre-wrap rounded-xl border bg-background p-3 text-sm leading-relaxed">
+    <p className="app-canvas max-h-72 overflow-y-auto whitespace-pre-wrap rounded-2xl px-3 py-2.5 text-sm leading-[1.45]">
       {parts.map((part, i) =>
         part.kind === "same" ? (
           // biome-ignore lint/suspicious/noArrayIndexKey: diff parts have no ids; order is stable
@@ -168,8 +175,11 @@ function Diff({ parts }: { parts: DiffPart[] }) {
             {part.text}
           </del>
         ) : (
-          // biome-ignore lint/suspicious/noArrayIndexKey: as above
-          <ins key={i} className="rounded-sm bg-success/10 text-foreground no-underline">
+          <ins
+            // biome-ignore lint/suspicious/noArrayIndexKey: as above
+            key={i}
+            className="rounded-[3px] bg-success/12 px-0.5 text-success-foreground no-underline"
+          >
             {part.text}
           </ins>
         ),

@@ -2,7 +2,14 @@
 
 import type { CompleteAttachment } from "@assistant-ui/react"
 import { useCallback, useRef, useState } from "react"
-import { FileTextIcon, ImageUpIcon, LoaderIcon, PaperclipIcon, XIcon } from "@/components/app/icons"
+import {
+  CheckIcon,
+  FileTextIcon,
+  ImageUpIcon,
+  LoaderIcon,
+  PaperclipIcon,
+  XIcon,
+} from "@/components/app/icons"
 import { Tooltip } from "@/components/arc/tooltip/tooltip"
 import { Button as IconButton } from "@/components/ui/button"
 import { api } from "@/lib/api"
@@ -175,7 +182,7 @@ export function AttachButton({
         <IconButton
           variant="ghost"
           size="icon-sm"
-          className="rounded-full text-muted-foreground"
+          className="text-muted-foreground"
           aria-label="Attach a file or an image"
           disabled={disabled}
           onClick={() => input.current?.click()}
@@ -208,41 +215,45 @@ export function PendingFiles({
 }) {
   if (files.length === 0) return null
   return (
-    <ul className="flex flex-wrap gap-1.5 px-3 pt-3" aria-label="Attached files">
+    <ul className="-ml-1 flex flex-wrap gap-1.5" aria-label="Attached files">
       {files.map((f) => (
         <li
           key={f.id}
           className={cn(
-            "flex max-w-full items-center gap-1.5 rounded-lg border bg-background py-1 pr-1 pl-2 text-xs",
+            "app-canvas flex min-h-[30px] max-w-full items-center gap-1.5 rounded-2xl border py-0.5 pr-0.5 pl-2.5 text-xs leading-[1.45]",
             f.status === "failed" && "border-destructive/40",
           )}
         >
-          {f.status === "reading" ? (
-            <LoaderIcon
-              aria-hidden
-              className="size-3.5 shrink-0 animate-spin text-muted-foreground"
-            />
-          ) : f.kind === "image" ? (
+          {f.kind === "image" ? (
             <ImageUpIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
           ) : (
             <FileTextIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
           )}
-          <span className="flex min-w-0 flex-col">
-            <span className="truncate font-medium" title={f.name}>
-              {f.name}
-            </span>
-            {f.status === "failed" ? (
-              <span className="text-destructive-foreground" role="alert">
-                {f.error}
-              </span>
-            ) : f.status === "reading" ? (
-              <span className="text-muted-foreground">Reading…</span>
-            ) : f.kind === "image" ? (
-              <span className="text-muted-foreground">Image, for reference</span>
-            ) : f.truncated ? (
-              <span className="text-muted-foreground">Long: only the start is used</span>
-            ) : null}
+          <span className="min-w-0 truncate font-medium" title={f.name}>
+            {f.name}
           </span>
+          <span aria-hidden className="text-muted-foreground">
+            ·
+          </span>
+          {f.status === "failed" ? (
+            <span className="text-destructive-foreground" role="alert">
+              {f.error}
+            </span>
+          ) : f.status === "reading" ? (
+            <span className="flex shrink-0 items-center gap-1 text-muted-foreground">
+              <LoaderIcon aria-hidden className="size-3 animate-spin motion-reduce:animate-none" />
+              Reading
+            </span>
+          ) : (
+            <span className="flex shrink-0 items-center gap-1 text-success-foreground">
+              <CheckIcon aria-hidden className="size-3" />
+              {f.kind === "image"
+                ? "Image, for reference"
+                : f.truncated
+                  ? "Long: only the start is used"
+                  : "Ready"}
+            </span>
+          )}
           <IconButton
             variant="ghost"
             size="icon-xs"

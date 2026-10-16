@@ -56,7 +56,7 @@ delete need the creator, or `template:manage-any` (admin, owner). Other orgs get
 
 - **Templates** (`/templates`, sidebar): table with roles, document and author; **Use**; rename and
   delete for managers.
-- **Save as template**: a dialog in the envelope header, available to anyone who can see the
+- **Save as template**: a drawer in the envelope header, available to anyone who can see the
   envelope. It proposes role labels (`defaultRoleLabels`: "Signer 1", "Viewer 1"…), and each role
   has "Always send to <email>" to keep the contact. On a draft, pending field edits are saved first
   (`DraftState.settle`, like Send).

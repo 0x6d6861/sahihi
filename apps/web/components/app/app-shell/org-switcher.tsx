@@ -1,7 +1,6 @@
 "use client"
 
 import {
-  Building03Icon,
   CreditCardIcon,
   PlusSignIcon,
   Settings02Icon,
@@ -95,11 +94,32 @@ export function OrgSwitcher({
 
   // The shell hides this in the icon rail, so the trigger always has room for the name.
   return (
-    <DropdownMenu
-      align="start"
-      label={active?.name ?? "Select a workspace"}
-      icon={<HugeiconsIcon icon={Building03Icon} size={16} />}
-      items={items}
-    />
+    <span className="app-plain-trigger contents">
+      <DropdownMenu
+        align="start"
+        label={active?.name ?? "Select a workspace"}
+        icon={<WorkspaceMark name={active?.name ?? ""} />}
+        items={items}
+      />
+    </span>
+  )
+}
+
+/** The active workspace's initials on a small emerald square, as in the top bar of the design. */
+function WorkspaceMark({ name }: { name: string }) {
+  const initials =
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase())
+      .join("") || "W"
+  return (
+    <span
+      aria-hidden
+      className="grid size-5.5 place-items-center rounded-md bg-primary font-medium text-primary-foreground text-xs"
+    >
+      {initials}
+    </span>
   )
 }

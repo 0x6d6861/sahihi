@@ -2,10 +2,10 @@
 
 import type { SigningOrder } from "@sahihi/core"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/app/button"
 import { useRegisterDraftEditor } from "@/components/app/envelope/draft-state"
-import { PlusIcon } from "@/components/app/icons"
+import { UserPlusIcon } from "@/components/app/icons"
 import { toastManager } from "@/components/app/toast"
 import { Alert } from "@/components/arc/alert/alert"
 import { ApiError, api } from "@/lib/api"
@@ -45,6 +45,15 @@ export function RecipientsEditor({
   const [dirty, setDirty] = useState(false)
   const blank = initial.length === 0 && !dirty
   const [pending, setPending] = useState(false)
+  // Saved changes made elsewhere (turning "sign in order" on renumbers the steps) show here too,
+  // unless there are edits of this form's own to keep.
+  const savedKey = JSON.stringify(initial)
+  const [loadedKey, setLoadedKey] = useState(savedKey)
+  useEffect(() => {
+    if (savedKey === loadedKey || dirty) return
+    setLoadedKey(savedKey)
+    if (initial.length > 0) setRows(rowsFromSaved(initial))
+  }, [savedKey, loadedKey, dirty, initial])
   useRegisterDraftEditor("recipients", {
     unsavedMessage: () => (dirty ? "Save your recipient changes first." : null),
   })
@@ -94,7 +103,7 @@ export function RecipientsEditor({
   }
 
   return (
-    <form className="flex flex-col gap-4" noValidate onSubmit={onSubmit}>
+    <form className="flex flex-col gap-3" noValidate onSubmit={onSubmit}>
       {errors.recipients && <Alert tone="danger" title="Add at least one recipient." />}
 
       <RecipientRows
@@ -109,17 +118,18 @@ export function RecipientsEditor({
         <Button
           type="button"
           variant="secondary"
+          size="sm"
           onClick={add}
           disabled={rows.length >= MAX_RECIPIENTS}
         >
-          <PlusIcon aria-hidden />
+          <UserPlusIcon aria-hidden />
           Add recipient
         </Button>
         <div className="flex items-center gap-3">
           <span className="text-muted-foreground text-sm" aria-live="polite">
             {blank ? null : dirty ? "Unsaved changes" : "All changes saved"}
           </span>
-          <Button type="submit" loading={pending} disabled={!dirty && !blank}>
+          <Button type="submit" size="sm" loading={pending} disabled={!dirty && !blank}>
             Save recipients
           </Button>
         </div>

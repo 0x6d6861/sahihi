@@ -11,7 +11,7 @@ import { Input } from "@/components/app/fields"
 import { LayoutTemplateIcon } from "@/components/app/icons"
 import { Alert } from "@/components/arc/alert/alert"
 import { Checkbox } from "@/components/arc/checkbox/checkbox"
-import { Dialog, DialogContent, DialogTrigger } from "@/components/arc/dialog/dialog"
+import { Drawer, DrawerContent, DrawerTrigger } from "@/components/arc/drawer/drawer"
 import { ApiError, api } from "@/lib/api"
 import { type FormErrors, issuesToFormErrors } from "@/lib/envelope-form"
 
@@ -128,16 +128,17 @@ export function SaveTemplateDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Drawer open={open} onOpenChange={onOpenChange}>
       {!controlled && (
-        <DialogTrigger asChild>
+        <DrawerTrigger asChild>
           <Button variant="secondary">
             <LayoutTemplateIcon aria-hidden />
             <span>Save as template</span>
           </Button>
-        </DialogTrigger>
+        </DrawerTrigger>
       )}
-      <DialogContent
+      <DrawerContent
+        side="right"
         title={savedId ? "Template saved" : "Save as template"}
         description="Reuse this document, its recipients' roles and every field. This envelope isn't changed."
       >
@@ -241,7 +242,7 @@ export function SaveTemplateDialog({
             </DialogActions>
           </form>
         )}
-      </DialogContent>
-    </Dialog>
+      </DrawerContent>
+    </Drawer>
   )
 }

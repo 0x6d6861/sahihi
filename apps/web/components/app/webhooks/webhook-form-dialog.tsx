@@ -13,7 +13,7 @@ import { DialogActions } from "@/components/app/confirm-dialog"
 import { Input } from "@/components/app/fields"
 import { toastManager } from "@/components/app/toast"
 import { Checkbox } from "@/components/arc/checkbox/checkbox"
-import { Dialog, DialogContent } from "@/components/arc/dialog/dialog"
+import { Drawer, DrawerContent } from "@/components/arc/drawer/drawer"
 import { ApiError, api } from "@/lib/api"
 import { type FormErrors, issuesToFormErrors } from "@/lib/envelope-form"
 import { SecretReveal } from "./secret-reveal"
@@ -103,8 +103,9 @@ export function WebhookFormDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={change}>
-      <DialogContent
+    <Drawer open={open} onOpenChange={change}>
+      <DrawerContent
+        side="right"
         title={secret ? "Copy the signing secret" : editing ? "Edit webhook" : "Add a webhook"}
         description="Sahihi POSTs signed JSON to this URL when the events you pick happen in this workspace."
       >
@@ -174,7 +175,7 @@ export function WebhookFormDialog({
             </DialogActions>
           </form>
         )}
-      </DialogContent>
-    </Dialog>
+      </DrawerContent>
+    </Drawer>
   )
 }

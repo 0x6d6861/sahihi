@@ -6,7 +6,7 @@ import { useState } from "react"
 import { Badge } from "@/components/app/badge"
 import { Button } from "@/components/app/button"
 import { DocumentViewer } from "@/components/app/document-viewer"
-import { ArrowLeftIcon } from "@/components/app/icons"
+import { ArrowLeftIcon, CircleCheckIcon, CircleDashedIcon } from "@/components/app/icons"
 import { SplitButton } from "@/components/app/split-button"
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control"
 import { Tooltip } from "@/components/arc/tooltip/tooltip"
@@ -63,25 +63,33 @@ function Frame() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b bg-background px-4 py-2.5 md:px-6">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+      <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b bg-background px-4 py-2.5 md:py-0">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
           <Tooltip content="Back to Drafting" side="bottom">
             <IconButton
-              variant="ghost"
-              size="icon-sm"
+              variant="outline"
+              size="icon-lg"
               aria-label="Back to Drafting"
-              className="shrink-0 text-muted-foreground hover:text-foreground"
+              className="shrink-0 rounded-2xl border-border shadow-none before:rounded-[calc(var(--radius-2xl)-1px)]"
               render={<Link href="/generate" />}
             >
               <ArrowLeftIcon aria-hidden />
             </IconButton>
           </Tooltip>
-          <h1 className="truncate font-medium">{detail.version.data.title}</h1>
-          <span className="shrink-0">
-            <Badge tone={finalized ? "success" : "neutral"} size="sm">
-              {finalized ? "Finalised" : `Draft · version ${detail.version.number}`}
-            </Badge>
-          </span>
+          <h1 className="truncate font-medium text-base tracking-tight">
+            {detail.version.data.title}
+          </h1>
+          {finalized ? (
+            <span className="shrink-0">
+              <Badge tone="success" size="sm">
+                Finalised
+              </Badge>
+            </span>
+          ) : (
+            <span className="shrink-0 text-muted-foreground text-sm">
+              Version {detail.version.number}
+            </span>
+          )}
           {detail.document.previousId && (
             <Link
               href={`/generate/${encodeURIComponent(detail.document.previousId)}`}
@@ -129,17 +137,22 @@ function Frame() {
         />
       </div>
 
-      <div className="grid min-h-0 flex-1 md:grid-cols-[minmax(20rem,2fr)_3fr]">
+      <div className="grid min-h-0 flex-1 md:grid-cols-[minmax(20rem,2fr)_3fr] xl:grid-cols-[440px_1fr]">
         <div
           className={cn(
-            "min-h-0 md:flex md:flex-col md:border-r",
+            "min-h-0 bg-background md:flex md:flex-col md:border-r",
             pane === "chat" ? "flex flex-col" : "hidden",
           )}
         >
           <ChatPanel />
         </div>
-        <div className={cn("min-h-0 flex-col md:flex", pane === "document" ? "flex" : "hidden")}>
-          <div className="flex shrink-0 flex-wrap items-center gap-3 border-b px-4 py-3 md:px-5">
+        <div
+          className={cn(
+            "min-h-0 flex-col bg-muted md:flex",
+            pane === "document" ? "flex" : "hidden",
+          )}
+        >
+          <div className="flex min-h-14 shrink-0 flex-wrap items-center gap-3 px-4 py-2.5 md:px-5">
             <SegmentedControl
               label="Document view"
               value={tab}
@@ -156,22 +169,18 @@ function Frame() {
                 <Tooltip content="Go to the next open blank" side="bottom">
                   <button
                     type="button"
-                    className="rounded-full outline-none transition-transform duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97]"
+                    className="press rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     onClick={() => navigate({ kind: "blank", key: nextBlank })}
                   >
-                    <Badge tone="warning" size="sm">
-                      {blanks.label}
-                    </Badge>
+                    <BlanksPill open={blanks.open} label={blanks.label} />
                   </button>
                 </Tooltip>
               ) : (
-                <Badge tone={blanks.open > 0 ? "warning" : "success"} size="sm">
-                  {blanks.label}
-                </Badge>
+                <BlanksPill open={blanks.open} label={blanks.label} />
               )}
             </span>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto bg-muted/30">
+          <div className="min-h-0 flex-1 overflow-y-auto">
             {tab === "pdf" && (
               <div className="h-full p-4 md:px-8">
                 <DocumentViewer
@@ -198,6 +207,24 @@ function Frame() {
       <FinalizeDialog open={finalizeOpen} onOpenChange={setFinalizeOpen} saveFailed={saveFailed} />
       <SaveTemplateDialog open={templateOpen} onOpenChange={setTemplateOpen} />
     </div>
+  )
+}
+
+/** How many blanks are open: amber with a dashed ring while any are, green once all are filled. */
+function BlanksPill({ open, label }: { open: number; label: string }) {
+  const Icon = open > 0 ? CircleDashedIcon : CircleCheckIcon
+  return (
+    <span
+      className={cn(
+        "inline-flex h-[30px] items-center gap-1.5 rounded-full border px-2.5 font-medium text-xs",
+        open > 0
+          ? "border-warning/40 bg-warning/8 text-warning-foreground"
+          : "border-success/40 bg-success/8 text-success-foreground",
+      )}
+    >
+      <Icon aria-hidden className="size-3.5" />
+      {label}
+    </span>
   )
 }
 

@@ -467,10 +467,11 @@ ADR 0009).
 - **Editing** tab: the same editor, editable, with a sticky toolbar (coss `Toolbar`: bold, italic,
   underline, lists, table, insert blank, add section, undo, redo) and a Saved / Saving… / Retry
   status. Inside a table, the table button is a menu: add a row or column, delete the row, column
-  or table. A new section's title field takes the focus with "New section" selected. Blanks are chips: dashed and amber while empty ("skipped" when skipped), the value with a
-  dotted underline once filled; click one to fill it.
-- **Signers** tab: a `Panel` per role (role, signer or copy, name, email, initials on every page,
-  the role's fields with "Add field") and "Add signer". It saves on its own like the text
+  or table. A new section's title field takes the focus with "New section" selected. Blanks are chips: amber while empty ("skipped" when skipped), the value as plain text once
+  filled; click one to fill it.
+- **Signers** tab: a card per role (the role as its title, renamed in place; signer or copy in a
+  menu beside it; name and email; initials on every page; the role's fields as chips, each opening
+  its label, required and remove, with "Add field") and "Add signer". It saves on its own like the text
   (debounced, serialised, Saving… / Saved / Retry); a signer without a role isn't sent. The
   preflight's problems show on the fields; the field being edited hides only its own until it's
   saved. Each card says who it signs for ("Signs for Acme Ltd", or the party's label while

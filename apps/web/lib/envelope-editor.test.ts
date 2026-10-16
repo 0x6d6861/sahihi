@@ -3,6 +3,7 @@ import {
   EDITOR_STEPS,
   FIX_STEP,
   fieldSummary,
+  invitationOrderLine,
   isEditorStep,
   nextStep,
   resolveStep,
@@ -93,5 +94,37 @@ describe("splitPreflight", () => {
     ])
     expect(blocking.map((i) => i.code)).toEqual(["missing_signature_field"])
     expect(Object.keys(inDialog)).toEqual(["expiresAt"])
+  })
+})
+
+describe("invitationOrderLine", () => {
+  test("names each step by first name, in order", () => {
+    expect(
+      invitationOrderLine([
+        { name: "David Kariuki", step: 2 },
+        { name: "Achieng Otieno", step: 1 },
+      ]),
+    ).toBe("Achieng is invited first, then David")
+  })
+
+  test("joins recipients who share a step", () => {
+    expect(
+      invitationOrderLine([
+        { name: "Achieng Otieno", step: 1 },
+        { name: "Baraka Mwangi", step: 1 },
+        { name: "David Kariuki", step: 2 },
+        { name: "Amina Hassan", step: 3 },
+      ]),
+    ).toBe("Achieng and Baraka are invited first, then David, then Amina")
+  })
+
+  test("nothing to say when everyone is invited at once", () => {
+    expect(invitationOrderLine([{ name: "Achieng Otieno", step: 1 }])).toBeNull()
+    expect(
+      invitationOrderLine([
+        { name: "Achieng Otieno", step: 1 },
+        { name: "David Kariuki", step: 1 },
+      ]),
+    ).toBeNull()
   })
 })
