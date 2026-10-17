@@ -1,10 +1,12 @@
 import { z } from "zod"
 import { PngDataUrlSchema } from "../account/profile"
+import { checkWebhookUrl } from "../integrations/webhooks"
 import { pngDimensions } from "../shared/png"
 import { hasPermission } from "./permissions"
 
 /**
- * Settings → Workspace (docs/auth.md → Account settings): name and logo. The logo appears in emails
+ * Settings → Workspace (docs/auth.md → Account settings): name, website and logo.
+ * The website's logo (from logo.dev) is the active workspace's mark in the switcher, nothing else. The logo appears in emails
  * sent on the workspace's behalf, on signing pages and in the workspace switcher.
  */
 
@@ -54,5 +56,72 @@ export function logoProblem(bytes: Uint8Array): string | null {
   if (size.width < 1 || size.height < 1) return "The logo is empty"
   if (size.width > LOGO_MAX_WIDTH || size.height > LOGO_MAX_HEIGHT)
     return `The logo must fit in ${LOGO_MAX_WIDTH}×${LOGO_MAX_HEIGHT} pixels`
+  return null
+}
+
+// ── Website and its icon ─────────────────────────────────────────────────────
+
+export const WorkspaceWebsiteSchema = z.object({
+  website: z.string().trim().max(200).nullable(),
+})
+
+export type WebsiteCheck = { ok: true; website: string } | { ok: false; message: string }
+
+/**
+ * Normalizes what an admin types ("acme.co.tz", "https://www.acme.co.tz/about") into the site's
+ * origin. Hosts that can't be a public site (localhost, private IPs, single labels) are refused,
+ * as for webhooks; plain http is accepted (many small sites still serve it).
+ */
+export function normalizeWebsite(raw: string): WebsiteCheck {
+  const input = raw.trim()
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(input) ? input : `https://${input}`
+  let url: URL
+  try {
+    url = new URL(withScheme)
+  } catch {
+    return { ok: false, message: "Enter a website address, e.g. acme.co.tz" }
+  }
+  if ((url.protocol !== "https:" && url.protocol !== "http:") || url.username || url.password) {
+    return { ok: false, message: "Enter a website address, e.g. acme.co.tz" }
+  }
+  // Only the host matters from here: checkWebhookUrl's https rule isn't one websites must follow.
+  if (!checkWebhookUrl(`https://${url.host}/`).ok) {
+    return { ok: false, message: "The website must be a public address" }
+  }
+  return { ok: true, website: url.origin }
+}
+
+/** The icon is fetched at this size (logo.dev `size`) and shown at 22 px in the switcher. */
+export const WORKSPACE_ICON_SIZE = 64
+
+/**
+ * logo.dev image URL for a website (https://www.logo.dev/docs): the domain without `www.`, a
+ * 64 px PNG, and a 404 instead of logo.dev's generated monogram when it has no logo, so the
+ * switcher keeps its own initials.
+ */
+export function logoDevUrl(website: string, token: string): string {
+  const domain = new URL(website).hostname.replace(/^www\./, "")
+  const params = new URLSearchParams({
+    token,
+    size: String(WORKSPACE_ICON_SIZE),
+    format: "png",
+    fallback: "404",
+  })
+  return `https://img.logo.dev/${encodeURIComponent(domain)}?${params}`
+}
+
+/** Same-origin path of the active workspace's icon; `version` busts caches on every change. */
+export function workspaceIconPath(version: string): string {
+  return `/api/workspace/icon.png?v=${encodeURIComponent(version)}`
+}
+
+/** Why an icon PNG is refused, or null when it's acceptable. */
+export function workspaceIconProblem(bytes: Uint8Array): string | null {
+  const size = pngDimensions(bytes)
+  if (!size) return "The icon must be a PNG image"
+  if (bytes.length > MAX_LOGO_BYTES) return "The icon is too large"
+  if (size.width < 1 || size.height < 1) return "The icon is empty"
+  if (size.width > WORKSPACE_ICON_SIZE || size.height > WORKSPACE_ICON_SIZE)
+    return `The icon must fit in ${WORKSPACE_ICON_SIZE}×${WORKSPACE_ICON_SIZE} pixels`
   return null
 }

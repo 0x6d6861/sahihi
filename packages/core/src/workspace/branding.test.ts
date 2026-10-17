@@ -5,8 +5,13 @@ import {
   canLeaveWorkspace,
   LOGO_MAX_HEIGHT,
   LOGO_MAX_WIDTH,
+  logoDevUrl,
   logoProblem,
   MAX_LOGO_BYTES,
+  normalizeWebsite,
+  WORKSPACE_ICON_SIZE,
+  workspaceIconPath,
+  workspaceIconProblem,
   workspaceLogoUrl,
 } from "./branding"
 
@@ -58,5 +63,82 @@ describe("logo validation", () => {
     expect(logoProblem(pngHeader(10, 10, MAX_LOGO_BYTES))).toBe("The logo is too large")
     expect(logoProblem(pngHeader(0, 10))).toBe("The logo is empty")
     expect(logoProblem(new Uint8Array([1, 2, 3]))).toBe("The logo must be a PNG image")
+  })
+})
+
+describe("normalizeWebsite", () => {
+  test("keeps the origin and adds https when the scheme is missing", () => {
+    expect(normalizeWebsite("acme.co.tz")).toEqual({ ok: true, website: "https://acme.co.tz" })
+    expect(normalizeWebsite(" https://www.Acme.co.tz/about?x=1 ")).toEqual({
+      ok: true,
+      website: "https://www.acme.co.tz",
+    })
+    expect(normalizeWebsite("http://acme.co.tz:8080/")).toEqual({
+      ok: true,
+      website: "http://acme.co.tz:8080",
+    })
+  })
+
+  test("refuses other schemes, credentials and junk", () => {
+    expect(normalizeWebsite("ftp://acme.co.tz").ok).toBe(false)
+    expect(normalizeWebsite("https://user:pw@acme.co.tz").ok).toBe(false)
+    expect(normalizeWebsite("not a website").ok).toBe(false)
+  })
+
+  test("refuses private addresses", () => {
+    for (const raw of [
+      "localhost:3000",
+      "http://127.0.0.1",
+      "10.0.0.5",
+      "intranet",
+      "printer.local",
+    ]) {
+      expect(normalizeWebsite(raw)).toEqual({
+        ok: false,
+        message: "The website must be a public address",
+      })
+    }
+  })
+})
+
+describe("logoDevUrl", () => {
+  test("asks for the bare domain as a 64 px PNG, 404 when unknown", () => {
+    const url = new URL(logoDevUrl("https://www.acme.co.tz", "pk_abc"))
+    expect(url.origin + url.pathname).toBe("https://img.logo.dev/acme.co.tz")
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      token: "pk_abc",
+      size: "64",
+      format: "png",
+      fallback: "404",
+    })
+    expect(new URL(logoDevUrl("http://shop.acme.co.tz:8080", "t")).pathname).toBe(
+      "/shop.acme.co.tz",
+    )
+  })
+})
+
+describe("workspace icon", () => {
+  // 1×1 PNG with its IHDR width/height patched in.
+  const png = (w: number, h: number) => {
+    const bytes = Uint8Array.from(
+      atob(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+      ),
+      (c) => c.charCodeAt(0),
+    )
+    const view = new DataView(bytes.buffer)
+    view.setUint32(16, w)
+    view.setUint32(20, h)
+    return bytes
+  }
+
+  test("accepts a PNG up to the square, refuses bigger or not PNG", () => {
+    expect(workspaceIconProblem(png(WORKSPACE_ICON_SIZE, WORKSPACE_ICON_SIZE))).toBeNull()
+    expect(workspaceIconProblem(png(WORKSPACE_ICON_SIZE + 1, 10))).toContain("must fit")
+    expect(workspaceIconProblem(new Uint8Array([1, 2, 3]))).toBe("The icon must be a PNG image")
+  })
+
+  test("path is same-origin and versioned", () => {
+    expect(workspaceIconPath("ab12")).toBe("/api/workspace/icon.png?v=ab12")
   })
 })

@@ -5,6 +5,7 @@ import { AssistantSwitch } from "@/components/app/workspace/assistant-switch"
 import { LeaveWorkspace } from "@/components/app/workspace/leave-workspace"
 import { WorkspaceLogo } from "@/components/app/workspace/workspace-logo"
 import { WorkspaceNameForm } from "@/components/app/workspace/workspace-name-form"
+import { WorkspaceWebsiteForm } from "@/components/app/workspace/workspace-website-form"
 import { brandingLogoPath } from "@/lib/account"
 import { apiServer, getServerSession } from "@/lib/api-server"
 
@@ -19,13 +20,16 @@ interface FullOrganization {
 export const metadata = { title: "Workspace" }
 
 /**
- * The active workspace's name and logo, the AI assistant switch, and leaving it (docs/auth.md → Account settings).
+ * The active workspace's name, website and logo, the AI assistant switch, and leaving it (docs/auth.md → Account settings).
  * Everyone sees it; owners and admins edit. Deleting the workspace is under Data.
  */
 export default async function WorkspacePage() {
-  const [session, { data: org }, { data: ai }] = await Promise.all([
+  const [session, { data: org }, { data: settings }, { data: ai }] = await Promise.all([
     getServerSession(),
     apiServer<FullOrganization>("/auth/organization/get-full-organization"),
+    apiServer<{ website: string | null; icon: string | null; iconsAvailable: boolean }>(
+      "/workspace",
+    ),
     apiServer<{ configured: boolean; enabled: boolean; canManage: boolean }>(
       "/generated-documents/settings",
     ),
@@ -35,6 +39,7 @@ export default async function WorkspacePage() {
   if (!org || !viewer) redirect("/onboarding")
 
   const canEdit = canEditWorkspace(viewer.role)
+  const website = settings?.website ?? null
   const ownerCount = org.members.filter((m) => m.role.split(",").includes("owner")).length
 
   return (
@@ -49,6 +54,23 @@ export default async function WorkspacePage() {
               Only owners and admins can rename the workspace.
             </span>
           </div>
+        )}
+      </SettingsSection>
+
+      <SettingsSection
+        title="Website"
+        description="Its logo, looked up on logo.dev, marks this workspace in the workspace switcher."
+      >
+        {canEdit ? (
+          <WorkspaceWebsiteForm
+            website={website}
+            icon={settings?.icon ?? null}
+            iconsAvailable={settings?.iconsAvailable ?? false}
+          />
+        ) : (
+          <p className="text-muted-foreground text-sm">
+            {website ?? "None"}. Only owners and admins can change it.
+          </p>
         )}
       </SettingsSection>
 

@@ -34,6 +34,7 @@ Object.assign(process.env, {
   EMAIL_FROM: "Sahihi Test <test@example.com>",
   // Webhook itests use a local receiver; SSRF rules are covered by core unit tests.
   WEBHOOKS_ALLOW_PRIVATE_URLS: "true",
+  LOGO_DEV_TOKEN: "pk_test",
   // Own-storage itests use a second MinIO bucket on localhost as the customer's (storage.itest.ts).
   STORAGE_ALLOW_PRIVATE_ENDPOINTS: "true",
   // Cloud drive OAuth apps; their APIs are mocked in storage-drives.itest.ts.

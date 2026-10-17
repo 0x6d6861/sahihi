@@ -117,6 +117,7 @@ with "Deleted user" as the sender. The audit trail stores `actorUserId` only, so
 | What | Who | How |
 |---|---|---|
 | Rename | owner, admin (`canEditWorkspace` = `organization:update`) | better-auth `organization.update` |
+| Website and its icon | everyone reads, owner and admin change | `GET /api/workspace`, `PUT /api/workspace/website`, `POST /api/workspace/icon/refresh` |
 | Logo | owner, admin | `PUT/DELETE /api/workspace/logo` (`routes/workspace.ts`) |
 | Leave | everyone except the last owner (`canLeaveWorkspace`) | better-auth `organization.leave`, then the next workspace becomes active (or `/onboarding`) |
 
@@ -135,6 +136,28 @@ plus the web origin itself so Mailpit shows it in development), the signing page
 (`brandingLogoPath` keeps only our branding path, served same-origin). better-auth's
 `beforeCreateOrganization` / `beforeUpdateOrganization` hooks refuse a `logo`, so it can't be set
 to an arbitrary remote image (a tracking pixel in every email).
+
+**Website and its icon.** `PUT /api/workspace/website` stores the site's origin
+(`WorkspaceSettings.website`, `normalizeWebsite`: `acme.co.tz` becomes `https://acme.co.tz`; http
+is kept; localhost, private IPs and single-label hosts are refused) or `null` to clear it. Its
+logo is the active workspace's mark on the workspace switcher trigger, in place of the initials,
+and is used nowhere else (not in emails, not on signing pages, not for the other workspaces in the
+menu).
+
+The logo comes from [logo.dev](https://www.logo.dev/docs), fetched by the API, never the browser,
+so the key and viewers stay private: `https://img.logo.dev/{domain}?token=…&size=64&format=png&fallback=404`
+(`logoDevUrl`; the domain without `www.`). Only the domain is sent. Setting or changing the
+website fetches it (`lib/logo-dev.ts`, 5 s timeout); the PNG must pass `workspaceIconProblem`
+(64×64 at most) and is stored at `org/{orgId}/branding/icon-{version}.png`
+(`WorkspaceSettings.iconKey`). A 404 (logo.dev has no logo), an error or clearing the website
+leaves no icon, and the switcher shows initials. "Fetch icon again" is
+`POST /api/workspace/icon/refresh` (owner, admin, 20 an hour per workspace). The icon is written
+only if the website is still the one it was fetched for.
+
+`GET /api/workspace/icon.png?v={version}` serves it behind `requireOrg`: always the icon of the
+session's **active** workspace, to its members only, `Cache-Control: private`. `GET /api/workspace`
+returns `{ website, icon, iconsAvailable }` and the app layout passes `icon` to the switcher.
+Without `LOGO_DEV_TOKEN` there are no icons and Settings hides "Fetch icon again".
 
 ### What better-auth offers next
 
