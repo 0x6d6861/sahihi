@@ -159,13 +159,16 @@ describe("workspace website", () => {
   const PNG_BYTES = Buffer.from(PNG.split(",")[1] as string, "base64")
   const realFetch = globalThis.fetch
   let asked: URL[] = []
+  let down = false
   beforeEach(() => {
     asked = []
+    down = false
     // logo.dev stand-in: a logo for acme.co.tz, none for anything else.
     globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
       const url = new URL(input instanceof Request ? input.url : String(input))
       if (url.hostname !== "img.logo.dev") return realFetch(input, init)
       asked.push(url)
+      if (down) return new Response("unavailable", { status: 503 })
       return url.pathname === "/acme.co.tz"
         ? new Response(PNG_BYTES, { headers: { "content-type": "image/png" } })
         : new Response("not found", { status: 404 })
@@ -231,6 +234,29 @@ describe("workspace website", () => {
       json: { website: null },
     })
     expect(await cleared.json()).toEqual({ website: null, icon: null })
+  })
+
+  test("a failed fetch keeps the icon on refresh but not for a changed website", async () => {
+    const owner = await createSender("owner")
+    const put = await request(owner, "/api/workspace/website", {
+      method: "PUT",
+      json: { website: "acme.co.tz" },
+    })
+    const { icon } = (await put.json()) as { icon: string }
+    expect(icon).toMatch(/^\/api\/workspace\/icon\.png\?v=/)
+
+    down = true
+    const refreshed = await request(owner, "/api/workspace/icon/refresh", { method: "POST" })
+    expect(await refreshed.json()).toEqual({ icon })
+
+    const changed = await request(owner, "/api/workspace/website", {
+      method: "PUT",
+      json: { website: "other.co.tz" },
+    })
+    expect(await changed.json()).toEqual({ website: "https://other.co.tz", icon: null })
+    expect((await (await request(owner, "/api/workspace")).json()) as object).toMatchObject({
+      icon: null,
+    })
   })
 
   test("members can't change it or refresh the icon; bad input is refused", async () => {

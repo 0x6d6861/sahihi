@@ -44,12 +44,17 @@ function iconPathFor(key: string): string | null {
 
 /**
  * Replaces the stored icon with `website`'s logo from logo.dev, or removes it when there's no
- * website or logo.dev has none; a failed fetch keeps the current icon. Only written while the website is still `website`, so a slow fetch can't
+ * website or logo.dev has none; a failed fetch keeps the current icon
+ * only with `keepOnFailure` (same website, "Fetch icon again"). Only written while the website is still `website`, so a slow fetch can't
  * attach an old site's logo. Returns the new icon path, or null.
  */
-async function refreshIcon(organizationId: string, website: string | null): Promise<string | null> {
+async function refreshIcon(
+  organizationId: string,
+  website: string | null,
+  keepOnFailure = false,
+): Promise<string | null> {
   const fetched = website ? await fetchLogoDevIcon(website) : ({ status: "none" } as const)
-  if (fetched.status === "failed") {
+  if (fetched.status === "failed" && keepOnFailure) {
     // Couldn't tell whether there's a logo: keep the current icon.
     const current = await prisma.workspaceSettings.findUnique({
       where: { organizationId },
@@ -163,7 +168,7 @@ export const workspace = new Hono<AppEnv>()
         select: { website: true },
       })
       if (!settings?.website) badRequest("Add the website first")
-      return c.json({ icon: await refreshIcon(organizationId, settings.website) })
+      return c.json({ icon: await refreshIcon(organizationId, settings.website, true) })
     },
   )
 
