@@ -4,17 +4,23 @@ import { createLogger } from "@sahihi/infra"
 
 /**
  * A workspace website's logo from logo.dev (docs/auth.md → Account settings), as a PNG small
- * enough to store, or null: no LOGO_DEV_TOKEN, logo.dev has no logo for the domain, or the call
- * failed. Only the domain is sent. The bytes are checked like any icon before they're kept.
+ * enough to store. `none` means logo.dev has no logo for the domain (404); `failed` means we
+ * couldn't tell (no LOGO_DEV_TOKEN, timeout, 5xx, unusable bytes), so callers keep what they have.
+ * Only the domain is sent. The bytes are checked like any icon before they're kept.
  */
 const log = createLogger("logo-dev")
 const TIMEOUT_MS = 5000
 
 export const logoDevConfigured = () => Boolean(getEnv().LOGO_DEV_TOKEN)
 
-export async function fetchLogoDevIcon(website: string): Promise<Uint8Array | null> {
+export type LogoDevResult =
+  | { status: "found"; png: Uint8Array }
+  | { status: "none" }
+  | { status: "failed" }
+
+export async function fetchLogoDevIcon(website: string): Promise<LogoDevResult> {
   const token = getEnv().LOGO_DEV_TOKEN
-  if (!token) return null
+  if (!token) return { status: "failed" }
   let res: Response
   try {
     res = await fetch(logoDevUrl(website, token), {
@@ -24,18 +30,18 @@ export async function fetchLogoDevIcon(website: string): Promise<Uint8Array | nu
   } catch (err) {
     // Only the error's name: a message could echo the URL, which carries the key.
     log.warn("logo.dev unreachable", { reason: err instanceof Error ? err.name : "unknown" })
-    return null
+    return { status: "failed" }
   }
-  if (res.status === 404) return null
+  if (res.status === 404) return { status: "none" }
   if (!res.ok) {
     log.warn("logo.dev refused", { status: res.status })
-    return null
+    return { status: "failed" }
   }
   const bytes = new Uint8Array(await res.arrayBuffer())
   const problem = workspaceIconProblem(bytes)
   if (problem) {
     log.warn("logo.dev icon refused", { problem })
-    return null
+    return { status: "failed" }
   }
-  return bytes
+  return { status: "found", png: bytes }
 }
